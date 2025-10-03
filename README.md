@@ -17,8 +17,6 @@
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/midimind/midimind)
 
-[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [API](#-api-reference)
-
 </div>
 
 
