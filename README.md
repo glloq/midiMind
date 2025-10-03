@@ -1,5 +1,10 @@
 # 🎹 MidiMind
 
+> [!NOTE]
+> partie du projet completé ( en grande partie) 
+> mais code non testé en reel pour l'instant !
+
+
 <div align="center">
 
 ![MidiMind Logo](docs/images/logo.png)
@@ -150,5 +155,50 @@
   - Error handling
 
 ---
+### Core Components
 
-## 🏗️ Architecture
+- **MIDI Router**: Central message routing engine with flexible rules
+- **Device Manager**: USB, virtual, and network device management
+- **Processor Manager**: Real-time MIDI processing pipeline
+- **Network Manager**: RTP-MIDI, mDNS, BLE, WiFi services
+- **API Server**: REST and WebSocket interfaces
+- **Storage**: SQLite database for persistence
+- **Monitoring**: Real-time system and performance metrics
+- **Optimization**: Thread pools, memory pools, lock-free queues
+
+---
+
+## 📋 Requirements
+
+### Hardware
+
+- **Raspberry Pi 3B+** or newer (Raspberry Pi 4 recommended)
+- **4GB RAM** minimum (8GB recommended for complex setups)
+- **8GB SD Card** minimum (32GB recommended)
+- **USB MIDI devices** (keyboards, controllers, synthesizers)
+- **Network connection** (Ethernet or WiFi)
+
+### Software
+
+- **Raspberry Pi OS** (Bullseye or newer, 64-bit recommended)
+- **Kernel 5.10+** (with ALSA support)
+- **Internet connection** (for installation)
+
+### Dependencies
+
+Automatically installed by the installer:
+
+- `build-essential` (GCC 9+)
+- `cmake` (3.16+)
+- `libasound2-dev` (ALSA)
+- `libsqlite3-dev` (SQLite3)
+- `nlohmann-json3-dev` (JSON library)
+
+---
+
+## 🚀 Installation
+
+### Quick Install (Recommended)
+```bash
+# Download and run installer
+curl -fsSL https://raw.githubusercontent.com/midimind/midimind/main/scripts/install.sh | sudo bash
