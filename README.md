@@ -199,4 +199,4 @@ Automatically installed by the installer:
 ### Quick Install (Recommended)
 ```bash
 # Download and run installer
-curl -fsSL https://raw.githubusercontent.com/midimind/midimind/main/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/glloq/midimind/main/scripts/install.sh | sudo bash
