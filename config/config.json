@@ -1,0 +1,288 @@
+{
+  "_comment": "MidiMind v3.0 - Configuration File",
+  "_version": "3.0.0",
+  
+  "application": {
+    "name": "MidiMind",
+    "version": "3.0.0",
+    "description": "MIDI Orchestration System for Raspberry Pi",
+    "auto_start": true,
+    "auto_save_interval_sec": 300
+  },
+  
+  "paths": {
+    "_comment": "Paths are relative to the base path (/home/pi/MidiMind by default)",
+    "base": "/home/pi/MidiMind",
+    "config": "config",
+    "data": "data",
+    "midi_files": "midi/files",
+    "recordings": "midi/recordings",
+    "logs": "logs",
+    "backups": "backups",
+    "sessions": "data/sessions",
+    "presets": "config/presets"
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "_comment_level": "Available levels: DEBUG, INFO, WARN, ERROR",
+    "console": true,
+    "file": true,
+    "max_file_size_mb": 10,
+    "max_files": 5,
+    "rotation": "daily"
+  },
+  
+  "database": {
+    "path": "data/midimind.db",
+    "auto_backup": true,
+    "backup_interval_hours": 24,
+    "vacuum_on_startup": false
+  },
+  
+  "midi": {
+    "default_channel": 1,
+    "auto_connect_devices": true,
+    "hot_plug_enabled": true,
+    
+    "clock": {
+      "enabled": false,
+      "tempo": 120.0,
+      "send_to_all_outputs": true
+    },
+    
+    "routing": {
+      "enabled": true,
+      "default_route": "passthrough",
+      "_comment_route": "passthrough, filtered, transformed",
+      "routes": [
+        {
+          "name": "Default Route",
+          "enabled": true,
+          "source": "all",
+          "destination": "all",
+          "channel_filter": [],
+          "message_type_filter": [],
+          "processors": []
+        }
+      ]
+    },
+    
+    "devices": {
+      "_comment": "Device-specific configurations",
+      "scan_on_startup": true,
+      "preferred_devices": [],
+      "blocked_devices": []
+    },
+    
+    "processing": {
+      "enabled": true,
+      "max_processors_per_chain": 10,
+      "default_processors": []
+    },
+    
+    "recording": {
+      "enabled": true,
+      "auto_name": true,
+      "format": "mid",
+      "quantize": false
+    },
+    
+    "player": {
+      "auto_play": false,
+      "loop": false,
+      "tempo_sync": true
+    }
+  },
+  
+  "network": {
+    "enabled": true,
+    
+    "rtpmidi": {
+      "enabled": true,
+      "port": 5004,
+      "session_name": "MidiMind",
+      "auto_accept_invitations": true,
+      "latency_compensation_ms": 0,
+      "multicast": false,
+      "ssrc": 0
+    },
+    
+    "mdns": {
+      "enabled": true,
+      "service_name": "MidiMind",
+      "service_type": "_apple-midi._udp",
+      "domain": "local"
+    },
+    
+    "bluetooth": {
+      "enabled": false,
+      "device_name": "MidiMind BLE",
+      "auto_reconnect": true,
+      "pairable": true
+    },
+    
+    "wifi": {
+      "hotspot_enabled": false,
+      "hotspot_ssid": "MidiMind-AP",
+      "hotspot_password": "midimind123",
+      "hotspot_channel": 6
+    },
+    
+    "security": {
+      "require_authentication": false,
+      "allowed_ips": [],
+      "blocked_ips": []
+    }
+  },
+  
+  "api": {
+    "enabled": true,
+    "port": 8080,
+    "host": "0.0.0.0",
+    "_comment_host": "0.0.0.0 = all interfaces, 127.0.0.1 = localhost only",
+    
+    "websocket": {
+      "enabled": true,
+      "path": "/ws",
+      "ping_interval_sec": 30,
+      "max_connections": 10
+    },
+    
+    "rest": {
+      "enabled": true,
+      "cors_enabled": true,
+      "cors_origins": ["*"],
+      "rate_limit": {
+        "enabled": false,
+        "requests_per_minute": 100
+      }
+    },
+    
+    "authentication": {
+      "enabled": false,
+      "api_key": "",
+      "session_timeout_minutes": 60
+    }
+  },
+  
+  "monitoring": {
+    "enabled": true,
+    
+    "system": {
+      "enabled": true,
+      "update_interval_ms": 1000,
+      "metrics": ["cpu", "memory", "disk", "network", "temperature"]
+    },
+    
+    "latency": {
+      "enabled": true,
+      "window_size": 100,
+      "alert_threshold_ms": 10.0
+    },
+    
+    "health_check": {
+      "enabled": true,
+      "check_interval_sec": 5,
+      "rules": {
+        "cpu_threshold": 90,
+        "memory_threshold": 90,
+        "disk_threshold": 95,
+        "temperature_threshold": 80
+      }
+    },
+    
+    "metrics_export": {
+      "enabled": false,
+      "format": "json",
+      "_comment_format": "json, csv, prometheus",
+      "interval_sec": 60,
+      "path": "data/metrics"
+    }
+  },
+  
+  "optimization": {
+    "enabled": true,
+    
+    "thread_pool": {
+      "size": 4,
+      "_comment_size": "0 = auto (number of CPU cores)"
+    },
+    
+    "memory_pool": {
+      "enabled": true,
+      "block_size": 1024,
+      "initial_blocks": 500
+    },
+    
+    "object_pools": {
+      "midi_message_pool_size": 2000
+    },
+    
+    "auto_optimize": {
+      "enabled": true,
+      "interval_sec": 60
+    }
+  },
+  
+  "audio": {
+    "_comment": "Optional audio synthesis/playback",
+    "enabled": false,
+    "backend": "alsa",
+    "_comment_backend": "alsa, jack, pulse",
+    "sample_rate": 48000,
+    "buffer_size": 256,
+    "channels": 2,
+    
+    "soundfont": {
+      "enabled": false,
+      "path": "",
+      "preset": 0
+    }
+  },
+  
+  "presets": {
+    "_comment": "Built-in presets",
+    "default_preset": "Basic Routing",
+    "auto_load_last": true,
+    
+    "list": [
+      {
+        "name": "Basic Routing",
+        "description": "Simple passthrough routing",
+        "category": "routing",
+        "enabled": true
+      }
+    ]
+  },
+  
+  "features": {
+    "_comment": "Enable/disable specific features",
+    "sysex_support": true,
+    "program_change_support": true,
+    "clock_sync": true,
+    "file_playback": true,
+    "recording": true,
+    "processing": true,
+    "network": true,
+    "api": true,
+    "monitoring": true
+  },
+  
+  "advanced": {
+    "max_message_queue_size": 1000,
+    "message_timeout_ms": 5000,
+    "device_scan_interval_sec": 10,
+    "auto_reconnect": true,
+    "reconnect_delay_ms": 1000,
+    "max_reconnect_attempts": 5
+  },
+  
+  "debug": {
+    "enabled": false,
+    "verbose_midi": false,
+    "log_all_messages": false,
+    "dump_sysex": false,
+    "performance_profiling": false
+  }
+}

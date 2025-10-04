@@ -1,0 +1,18 @@
+{
+  "routes": [
+    {
+      "id": "default_through",
+      "name": "MIDI Through",
+      "enabled": true,
+      "source": {
+        "type": "device",
+        "pattern": "*"
+      },
+      "destination": {
+        "type": "device",
+        "pattern": "*"
+      },
+      "processors": []
+    }
+  ]
+}

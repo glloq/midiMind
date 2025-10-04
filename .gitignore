@@ -1,0 +1,33 @@
+# Build directories
+build/
+cmake-build-*/
+*.o
+*.so
+*.a
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Data
+data/
+midi/recordings/
+backups/
+
+# Temporary files
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config overrides (keep default)
+config/config_local.json
