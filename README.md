@@ -11,11 +11,10 @@
 
 **MIDI Orchestration System for Raspberry Pi**
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/midimind/midimind)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/midimind/midimind)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-red.svg)](https://www.raspberrypi.org/)
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/midimind/midimind)
 
 </div>
 
