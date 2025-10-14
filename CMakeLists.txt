@@ -1,19 +1,19 @@
 # ============================================================================
-# Fichier: /midiMind/CMakeLists.txt (ROOT)
-# Version: 3.0.7-ROOT
+# Fichier: /midiMind/CMakeLists.txt (ROOT - AUTO-DETECT)
+# Version: 3.0.8-AUTO
 # Date: 2025-10-14
 # Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 # ============================================================================
-# NOUVEAU v3.0.7-ROOT:
-#   ✅ CMakeLists.txt à la racine du projet
-#   ✅ Sources dans backend/src/
-#   ✅ Build dans build/ (à la racine)
-#   ✅ Structure moderne et standard
+# NOUVEAU v3.0.8-AUTO:
+#   ✅ Détection automatique de TOUS les fichiers .cpp
+#   ✅ Pas d'erreur si fichier manquant
+#   ✅ Liste uniquement les fichiers existants
+#   ✅ Headers-only supportés (Config.h, etc.)
 # ============================================================================
 
 cmake_minimum_required(VERSION 3.16)
 
-project(MidiMind VERSION 3.0.7 LANGUAGES CXX)
+project(MidiMind VERSION 3.0.8 LANGUAGES CXX)
 
 # ============================================================================
 # AFFICHAGE CONFIGURATION
@@ -50,9 +50,6 @@ option(ENABLE_SANITIZERS "Enable sanitizers (Debug only)" ON)
 message(STATUS "Build type:      ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ Standard:    ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler:        ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Build tests:     ${BUILD_TESTS}")
-message(STATUS "Build docs:      ${BUILD_DOCS}")
-message(STATUS "Sanitizers:      ${ENABLE_SANITIZERS}")
 message(STATUS "========================================")
 
 # ============================================================================
@@ -118,208 +115,90 @@ else()
 endif()
 
 # ============================================================================
-# FICHIERS SOURCE - CORE
+# DÉTECTION AUTOMATIQUE DES FICHIERS SOURCES
 # ============================================================================
 
-set(SOURCES_CORE
-    backend/src/core/Application.cpp
-    backend/src/core/Config.cpp
-    backend/src/core/Logger.cpp
-    backend/src/core/ErrorManager.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - CORE UTILS
-# ============================================================================
-
-set(SOURCES_CORE_UTILS)
-
-# Ajouter seulement si les fichiers existent
-if(EXISTS "${CMAKE_SOURCE_DIR}/backend/src/core/utils/JsonValidator.cpp")
-    list(APPEND SOURCES_CORE_UTILS backend/src/core/utils/JsonValidator.cpp)
-    message(STATUS "✓ JsonValidator.cpp found")
-else()
-    message(STATUS "⚠ JsonValidator.cpp not found (optional)")
-endif()
-
-if(EXISTS "${CMAKE_SOURCE_DIR}/backend/src/core/utils/ResourceMonitor.cpp")
-    list(APPEND SOURCES_CORE_UTILS backend/src/core/utils/ResourceMonitor.cpp)
-    message(STATUS "✓ ResourceMonitor.cpp found")
-else()
-    message(STATUS "⚠ ResourceMonitor.cpp not found (optional)")
-endif()
-
-# ============================================================================
-# FICHIERS SOURCE - API
-# ============================================================================
-
-set(SOURCES_API
-    # API Server
-    backend/src/api/ApiServer.cpp
-    backend/src/api/CommandProcessorV2.cpp
-    
-    # Handlers de commandes
-    backend/src/api/commands/devices.cpp
-    backend/src/api/commands/routing.cpp
-    backend/src/api/commands/playback.cpp
-    backend/src/api/commands/files.cpp
-    backend/src/api/commands/system.cpp
-    backend/src/api/commands/editor.cpp
-    backend/src/api/commands/network.cpp
-)
-
-# Ajouter logger.cpp si existe
-if(EXISTS "${CMAKE_SOURCE_DIR}/backend/src/api/commands/logger.cpp")
-    list(APPEND SOURCES_API backend/src/api/commands/logger.cpp)
-    message(STATUS "✓ logger.cpp found")
-else()
-    message(STATUS "⚠ logger.cpp not found (optional)")
-endif()
-
-# ============================================================================
-# FICHIERS SOURCE - MIDI CORE
-# ============================================================================
-
-set(SOURCES_MIDI_CORE
-    backend/src/midi/MidiMessage.cpp
-    backend/src/midi/MidiRouter.cpp
-    backend/src/midi/MidiDevice.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - MIDI DEVICES
-# ============================================================================
-
-set(SOURCES_MIDI_DEVICES
-    backend/src/midi/devices/MidiDeviceManager.cpp
-    backend/src/midi/devices/AlsaDevice.cpp
-    backend/src/midi/devices/WifiDevice.cpp
-    backend/src/midi/devices/BluetoothDevice.cpp
-    backend/src/midi/devices/VirtualDevice.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - MIDI PROCESSING
-# ============================================================================
-
-set(SOURCES_MIDI_PROCESSING
-    backend/src/midi/processing/NoteProcessor.cpp
-    backend/src/midi/processing/ControlProcessor.cpp
-    backend/src/midi/processing/ChainProcessor.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - MIDI ROUTING
-# ============================================================================
-
-set(SOURCES_MIDI_ROUTING
-    backend/src/midi/routing/ChannelMapper.cpp
-    backend/src/midi/routing/TransformationEngine.cpp
-    backend/src/midi/routing/RoutingTable.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - MIDI FILE
-# ============================================================================
-
-set(SOURCES_MIDI_FILE
-    backend/src/midi/MidiFileManager.cpp
-    backend/src/midi/file/MidiFileReader.cpp
-    backend/src/midi/file/MidiFileWriter.cpp
-    backend/src/midi/file/MidiPlayer.cpp
-)
-
-# Vérifier MidiFileConverter.cpp (optionnel)
-if(EXISTS "${CMAKE_SOURCE_DIR}/backend/src/midi/file/MidiFileConverter.cpp")
-    list(APPEND SOURCES_MIDI_FILE backend/src/midi/file/MidiFileConverter.cpp)
-    message(STATUS "✓ MidiFileConverter.cpp found")
-else()
-    message(STATUS "⚠ MidiFileConverter.cpp not found (optional)")
-endif()
-
-# ============================================================================
-# FICHIERS SOURCE - SYSEX
-# ============================================================================
-
-set(SOURCES_SYSEX
-    backend/src/midi/sysex/SysExHandler.cpp
-    backend/src/midi/sysex/SysExMessage.cpp
-    backend/src/midi/sysex/SysExIdentity.cpp
-    backend/src/midi/sysex/SysExNotemap.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - NETWORK
-# ============================================================================
-
-set(SOURCES_NETWORK
-    backend/src/network/NetworkManager.cpp
-    backend/src/network/WifiManager.cpp
-    backend/src/network/BluetoothManager.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - STORAGE
-# ============================================================================
-
-set(SOURCES_STORAGE
-    backend/src/storage/Database.cpp
-    backend/src/storage/FileManager.cpp
-    backend/src/storage/PresetManager.cpp
-    backend/src/storage/SessionManager.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - MONITORING
-# ============================================================================
-
-set(SOURCES_MONITORING
-    backend/src/monitoring/PerformanceMonitor.cpp
-    backend/src/monitoring/HealthMonitor.cpp
-    backend/src/monitoring/MetricsCollector.cpp
-)
-
-# ============================================================================
-# FICHIERS SOURCE - TIMING (optionnels)
-# ============================================================================
-
-set(SOURCES_TIMING)
-
-if(EXISTS "${CMAKE_SOURCE_DIR}/backend/src/timing/LatencyCompensator.cpp")
-    list(APPEND SOURCES_TIMING
-        backend/src/timing/LatencyCompensator.cpp
-        backend/src/timing/ClockSync.cpp
-        backend/src/timing/TimestampManager.cpp
-    )
-    message(STATUS "✓ Timing modules found")
-else()
-    message(STATUS "⚠ Timing modules not found (optional)")
-endif()
-
-# ============================================================================
-# AGRÉGATION DE TOUS LES SOURCES
-# ============================================================================
-
-set(ALL_SOURCES
-    ${SOURCES_CORE}
-    ${SOURCES_CORE_UTILS}
-    ${SOURCES_API}
-    ${SOURCES_MIDI_CORE}
-    ${SOURCES_MIDI_DEVICES}
-    ${SOURCES_MIDI_PROCESSING}
-    ${SOURCES_MIDI_ROUTING}
-    ${SOURCES_MIDI_FILE}
-    ${SOURCES_SYSEX}
-    ${SOURCES_NETWORK}
-    ${SOURCES_STORAGE}
-    ${SOURCES_MONITORING}
-    ${SOURCES_TIMING}
-)
-
-# Afficher nombre de fichiers sources
-list(LENGTH ALL_SOURCES SOURCE_COUNT)
 message(STATUS "========================================")
-message(STATUS "Total source files: ${SOURCE_COUNT}")
+message(STATUS "Auto-detecting source files...")
+message(STATUS "========================================")
+
+# Fonction helper pour collecter les .cpp
+function(collect_sources output_var directory)
+    file(GLOB_RECURSE sources 
+        "${CMAKE_SOURCE_DIR}/${directory}/*.cpp"
+    )
+    set(${output_var} ${sources} PARENT_SCOPE)
+endfunction()
+
+# Collecter tous les .cpp dans backend/src
+file(GLOB_RECURSE ALL_SOURCES 
+    "${CMAKE_SOURCE_DIR}/backend/src/*.cpp"
+)
+
+# Filtrer les fichiers à exclure (si nécessaire)
+set(EXCLUDED_FILES
+    # Ajouter ici les fichiers à exclure
+)
+
+foreach(exclude ${EXCLUDED_FILES})
+    list(FILTER ALL_SOURCES EXCLUDE REGEX ${exclude})
+endforeach()
+
+# Afficher les fichiers trouvés par module
+message(STATUS "")
+message(STATUS "Source files by module:")
+message(STATUS "")
+
+# Core
+file(GLOB CORE_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/core/*.cpp")
+list(LENGTH CORE_SOURCES CORE_COUNT)
+message(STATUS "  Core:         ${CORE_COUNT} files")
+
+# Core Utils
+file(GLOB CORE_UTILS_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/core/utils/*.cpp")
+list(LENGTH CORE_UTILS_SOURCES CORE_UTILS_COUNT)
+message(STATUS "  Core Utils:   ${CORE_UTILS_COUNT} files")
+
+# API
+file(GLOB_RECURSE API_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/api/*.cpp")
+list(LENGTH API_SOURCES API_COUNT)
+message(STATUS "  API:          ${API_COUNT} files")
+
+# MIDI
+file(GLOB_RECURSE MIDI_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/midi/*.cpp")
+list(LENGTH MIDI_SOURCES MIDI_COUNT)
+message(STATUS "  MIDI:         ${MIDI_COUNT} files")
+
+# Network
+file(GLOB_RECURSE NETWORK_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/network/*.cpp")
+list(LENGTH NETWORK_SOURCES NETWORK_COUNT)
+message(STATUS "  Network:      ${NETWORK_COUNT} files")
+
+# Storage
+file(GLOB_RECURSE STORAGE_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/storage/*.cpp")
+list(LENGTH STORAGE_SOURCES STORAGE_COUNT)
+message(STATUS "  Storage:      ${STORAGE_COUNT} files")
+
+# Monitoring
+file(GLOB_RECURSE MONITORING_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/monitoring/*.cpp")
+list(LENGTH MONITORING_SOURCES MONITORING_COUNT)
+message(STATUS "  Monitoring:   ${MONITORING_COUNT} files")
+
+# Timing
+file(GLOB_RECURSE TIMING_SOURCES "${CMAKE_SOURCE_DIR}/backend/src/timing/*.cpp")
+list(LENGTH TIMING_SOURCES TIMING_COUNT)
+message(STATUS "  Timing:       ${TIMING_COUNT} files")
+
+# Total
+list(LENGTH ALL_SOURCES TOTAL_COUNT)
+message(STATUS "")
+message(STATUS "  TOTAL:        ${TOTAL_COUNT} files")
+message(STATUS "")
+
+if(TOTAL_COUNT EQUAL 0)
+    message(FATAL_ERROR "No source files found in backend/src/")
+endif()
+
 message(STATUS "========================================")
 
 # ============================================================================
@@ -472,6 +351,7 @@ message(STATUS "========================================")
 message(STATUS "Configuration complete!")
 message(STATUS "Build directory: ${CMAKE_BINARY_DIR}")
 message(STATUS "Executable: ${CMAKE_BINARY_DIR}/bin/midimind")
+message(STATUS "Source files: ${TOTAL_COUNT}")
 message(STATUS "")
 message(STATUS "Next steps:")
 message(STATUS "  cd ${CMAKE_BINARY_DIR}")
@@ -480,5 +360,5 @@ message(STATUS "  sudo make install")
 message(STATUS "========================================")
 
 # ============================================================================
-# FIN DU FICHIER CMakeLists.txt v3.0.7-ROOT
+# FIN DU FICHIER CMakeLists.txt v3.0.8-AUTO
 # ============================================================================
