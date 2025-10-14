@@ -113,13 +113,20 @@ detect_system() {
     info "Répertoire projet: $PROJECT_ROOT"
     
     # Vérifier structure du projet
-    if [ ! -d "$PROJECT_ROOT/backend" ]; then
-        error "Répertoire backend introuvable dans $PROJECT_ROOT/"
+    if [ ! -f "$PROJECT_ROOT/CMakeLists.txt" ]; then
+        error "CMakeLists.txt introuvable à la racine: $PROJECT_ROOT/CMakeLists.txt"
     fi
+    success "✓ CMakeLists.txt trouvé à la racine"
+    
+    if [ ! -d "$PROJECT_ROOT/backend/src" ]; then
+        error "Répertoire backend/src introuvable dans $PROJECT_ROOT/"
+    fi
+    success "✓ backend/src/ trouvé"
     
     if [ ! -d "$PROJECT_ROOT/frontend" ]; then
         error "Répertoire frontend introuvable dans $PROJECT_ROOT/"
     fi
+    success "✓ frontend/ trouvé"
     
     success "Structure du projet validée"
     
@@ -390,13 +397,19 @@ create_directories() {
 compile_backend() {
     log "🔨 ÉTAPE 7/10: Compilation du backend"
     
-    if [ ! -d "$PROJECT_ROOT/backend" ]; then
-        error "Répertoire backend introuvable: $PROJECT_ROOT/backend"
+    # Vérifier que CMakeLists.txt existe à la racine
+    if [ ! -f "$PROJECT_ROOT/CMakeLists.txt" ]; then
+        error "CMakeLists.txt introuvable: $PROJECT_ROOT/CMakeLists.txt"
     fi
     
-    cd "$PROJECT_ROOT/backend"
+    # Vérifier que backend/src existe
+    if [ ! -d "$PROJECT_ROOT/backend/src" ]; then
+        error "Répertoire backend/src introuvable: $PROJECT_ROOT/backend/src"
+    fi
     
-    info "Configuration CMake..."
+    cd "$PROJECT_ROOT"
+    
+    info "Configuration CMake (depuis la racine du projet)..."
     mkdir -p build
     cd build
     cmake .. -DCMAKE_BUILD_TYPE=Release 2>&1 | tee -a "$LOG_FILE" || error "Échec de cmake"
@@ -405,7 +418,7 @@ compile_backend() {
     make -j$NPROC 2>&1 | tee -a "$LOG_FILE" || error "Échec de make"
     
     info "Installation du binaire..."
-    cp midimind "$INSTALL_DIR/bin/" || error "Échec copie binaire"
+    cp bin/midimind "$INSTALL_DIR/bin/" || error "Échec copie binaire"
     
     ln -sf "$INSTALL_DIR/bin/midimind" /usr/local/bin/midimind
     
@@ -589,8 +602,10 @@ print_final_info() {
     echo -e "${CYAN}📂 Chemins du projet:${NC}"
     echo ""
     echo -e "  ${BLUE}•${NC} Répertoire projet: ${GREEN}$PROJECT_ROOT${NC}"
-    echo -e "  ${BLUE}•${NC} Backend source:    ${GREEN}$PROJECT_ROOT/backend${NC}"
+    echo -e "  ${BLUE}•${NC} CMakeLists.txt:    ${GREEN}$PROJECT_ROOT/CMakeLists.txt${NC}"
+    echo -e "  ${BLUE}•${NC} Backend source:    ${GREEN}$PROJECT_ROOT/backend/src${NC}"
     echo -e "  ${BLUE}•${NC} Frontend source:   ${GREEN}$PROJECT_ROOT/frontend${NC}"
+    echo -e "  ${BLUE}•${NC} Build directory:   ${GREEN}$PROJECT_ROOT/build${NC}"
     echo ""
     echo -e "${CYAN}📊 Informations importantes:${NC}"
     echo ""
