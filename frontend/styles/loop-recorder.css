@@ -1,0 +1,754 @@
+/* ============================================================================
+   Fichier: frontend/css/loop-recorder.css + notifications
+   Version: 3.0.0
+   Date: 2025-10-10
+   ============================================================================
+   Description:
+     Styles complets pour Loop Recorder avec notifications toast.
+   
+   Changelog v3.0.0:
+     - Ajout système de notifications toast
+     - Timeline améliorée avec contrôles zoom
+     - Meilleure organisation des contrôles
+     - Info hover sur timeline
+     - Animations fluides
+   ============================================================================ */
+
+/* ============================================================================
+   NOTIFICATIONS TOAST
+   ============================================================================ */
+
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.notification {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.notification.hide {
+    opacity: 0;
+    transform: translateX(400px);
+}
+
+.notification-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.notification-success {
+    border-left: 4px solid #2ecc71;
+}
+
+.notification-success .notification-icon {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+}
+
+.notification-error {
+    border-left: 4px solid #e74c3c;
+}
+
+.notification-error .notification-icon {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+}
+
+.notification-warning {
+    border-left: 4px solid #f39c12;
+}
+
+.notification-warning .notification-icon {
+    background: rgba(243, 156, 18, 0.2);
+    color: #f39c12;
+}
+
+.notification-info {
+    border-left: 4px solid #3498db;
+}
+
+.notification-info .notification-icon {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-message {
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.notification-details {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+}
+
+.notification-action {
+    padding: 6px 12px;
+    background: rgba(102, 126, 234, 0.2);
+    border: 1px solid #667eea;
+    border-radius: 4px;
+    color: #667eea;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.notification-action:hover {
+    background: #667eea;
+    color: #fff;
+}
+
+.notification-close {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.notification-close:hover {
+    color: #fff;
+}
+
+/* ============================================================================
+   COUNT-IN DISPLAY
+   ============================================================================ */
+
+.count-in-display {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    background: rgba(102, 126, 234, 0.95);
+    border-radius: 20px;
+    padding: 40px 60px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+.count-in-display.hidden {
+    display: none;
+}
+
+#countInNumber {
+    font-size: 120px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    display: block;
+    text-align: center;
+    line-height: 1;
+}
+
+.count-in-display.pulse {
+    animation: pulse-count 0.3s ease-out;
+}
+
+@keyframes pulse-count {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+/* ============================================================================
+   CONTAINER PRINCIPAL
+   ============================================================================ */
+
+.loop-recorder {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #0a0a0a;
+    color: #e0e0e0;
+    overflow: hidden;
+}
+
+/* ============================================================================
+   CONTRÔLES PRINCIPAUX
+   ============================================================================ */
+
+.loop-controls-main {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+}
+
+.loop-controls-main button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    min-width: 80px;
+}
+
+.btn-record {
+    background: #2a2a2a;
+    color: #fff;
+}
+
+.btn-record:hover {
+    background: #3a3a3a;
+}
+
+.btn-record.active {
+    background: #e74c3c;
+    animation: pulse-record 1.5s infinite;
+}
+
+@keyframes pulse-record {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+    }
+    50% { 
+        box-shadow: 0 0 20px 10px rgba(231, 76, 60, 0);
+    }
+}
+
+.btn-play {
+    background: #667eea;
+    color: #fff;
+}
+
+.btn-play:hover {
+    background: #5568d3;
+}
+
+.btn-play.active {
+    background: #45B7D1;
+}
+
+.btn-stop {
+    background: #2a2a2a;
+    color: #fff;
+}
+
+.btn-stop:hover {
+    background: #3a3a3a;
+}
+
+.btn-clear {
+    background: #2a2a2a;
+    color: #fff;
+}
+
+.btn-clear:hover {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.loop-controls-main .icon {
+    font-size: 24px;
+}
+
+.loop-controls-main .label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================================================
+   PARAMÈTRES DE LOOP
+   ============================================================================ */
+
+.loop-settings {
+    display: flex;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #151515;
+    border-bottom: 1px solid #333;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.setting-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-group label {
+    font-size: 13px;
+    color: #888;
+    white-space: nowrap;
+}
+
+.setting-group input[type="number"],
+.setting-group select {
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+    width: 80px;
+}
+
+.setting-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.setting-group .unit {
+    font-size: 12px;
+    color: #666;
+}
+
+.btn-secondary {
+    padding: 6px 12px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.btn-zoom {
+    padding: 4px 8px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-zoom:hover {
+    background: #3a3a3a;
+    border-color: #555;
+    color: #fff;
+}
+
+/* ============================================================================
+   MÉTRONOME
+   ============================================================================ */
+
+.metronome-controls {
+    display: flex;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #151515;
+    border-bottom: 1px solid #333;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.metronome-controls input[type="range"] {
+    width: 100px;
+}
+
+#metronomeVolumeValue {
+    min-width: 35px;
+    font-size: 12px;
+    color: #888;
+}
+
+/* ============================================================================
+   LAYERS
+   ============================================================================ */
+
+.loop-layers {
+    flex: 1;
+    overflow-y: auto;
+    background: #0a0a0a;
+}
+
+.layers-header {
+    padding: 12px 16px;
+    background: #151515;
+    border-bottom: 1px solid #333;
+}
+
+.layers-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.layers-list {
+    padding: 8px;
+}
+
+.no-layers {
+    text-align: center;
+    padding: 40px 20px;
+    color: #555;
+    font-size: 14px;
+}
+
+.layer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #151515;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.layer-item:hover {
+    background: #1a1a1a;
+    border-color: #333;
+}
+
+.layer-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.layer-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+}
+
+.layer-channel {
+    font-size: 11px;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.layer-events {
+    font-size: 11px;
+    color: #888;
+}
+
+.btn-layer {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #444;
+    background: #2a2a2a;
+    color: #888;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-layer:hover {
+    background: #3a3a3a;
+    border-color: #555;
+    color: #fff;
+}
+
+.btn-layer.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: #fff;
+}
+
+.layer-volume {
+    width: 100px;
+    cursor: pointer;
+}
+
+.layer-volume-value {
+    font-size: 12px;
+    color: #888;
+    min-width: 30px;
+    text-align: right;
+}
+
+.btn-layer-delete {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #444;
+    background: #2a2a2a;
+    color: #e74c3c;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+
+.btn-layer-delete:hover {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: #fff;
+}
+
+/* ============================================================================
+   VISUALIZER TIMELINE
+   ============================================================================ */
+
+.loop-visualizer-timeline {
+    background: #0a0a0a;
+    border-top: 1px solid #333;
+    position: relative;
+}
+
+.timeline-header {
+    padding: 8px 16px;
+    background: #151515;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.position-label {
+    font-size: 13px;
+    font-family: monospace;
+    color: #888;
+}
+
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.zoom-label {
+    font-size: 12px;
+    color: #888;
+}
+
+#zoomValue {
+    color: #667eea;
+    font-weight: 500;
+}
+
+#loopTimelineCanvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+}
+
+#loopTimelineCanvas:active {
+    cursor: grabbing;
+}
+
+.timeline-info {
+    position: absolute;
+    bottom: 8px;
+    left: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    color: #888;
+    pointer-events: none;
+    display: none;
+}
+
+/* ============================================================================
+   ACTIONS
+   ============================================================================ */
+
+.loop-actions {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background: #1a1a1a;
+    border-top: 1px solid #333;
+}
+
+.loop-actions button {
+    flex: 1;
+    padding: 10px 16px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.loop-actions button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+/* ============================================================================
+   RANGE INPUTS
+   ============================================================================ */
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-track {
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #667eea;
+    border-radius: 50%;
+    margin-top: -5px;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #5568d3;
+}
+
+input[type="range"]::-moz-range-track {
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #667eea;
+    border: none;
+    border-radius: 50%;
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
+.layers-list::-webkit-scrollbar {
+    width: 10px;
+}
+
+.layers-list::-webkit-scrollbar-track {
+    background: #0a0a0a;
+}
+
+.layers-list::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+    border-radius: 5px;
+}
+
+.layers-list::-webkit-scrollbar-thumb:hover {
+    background: #4a4a4a;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .notification-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .notification {
+        padding: 12px;
+    }
+    
+    .loop-controls-main {
+        flex-wrap: wrap;
+    }
+    
+    .loop-controls-main button {
+        flex: 1;
+        min-width: auto;
+    }
+    
+    .loop-settings,
+    .metronome-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .loop-actions {
+        flex-direction: column;
+    }
+    
+    .count-in-display {
+        padding: 30px 50px;
+    }
+    
+    #countInNumber {
+        font-size: 80px;
+    }
+}
+
+/* ============================================================================
+   FIN DU FICHIER loop-recorder.css v3.0.0
+   ============================================================================ */

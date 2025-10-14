@@ -1,0 +1,154 @@
+<!-- ============================================================================
+Fichier: frontend/index.html
+Version: v3.1.2 - CORRECTED (removed duplicates)
+Date: 2025-10-10
+============================================================================ 
+CORRECTIONS v3.1.2:
+✓ Removed duplicate Formatter.js load (line 16 deleted)
+✓ Removed duplicate ApiClient.js reference
+✓ Fixed script loading order
+============================================================================ -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Mind - Système d'Orchestration MIDI v3.0</title>
+    
+    <!-- Styles CSS -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="styles/pages.css">
+    <link rel="stylesheet" href="styles/midi.css">
+    <link rel="stylesheet" href="styles/themes.css">
+</head>
+<body>
+    <!-- Header removed for brevity - keep your existing header -->
+    
+    <!-- ========================================================================
+         ÉTAPE 1: FONDATIONS - EventBus (utilisé par TOUT le reste)
+         ======================================================================== -->
+    <script src="js/core/EventBus.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 2: UTILITAIRES DE BASE (pas de dépendances)
+         ======================================================================== -->
+    <script src="js/utils/Logger.js"></script>
+    <script src="js/utils/Constants.js"></script>
+    <script src="js/utils/Formatter.js"></script>
+    <!-- ✓ FIXED: Removed duplicate Formatter.js line -->
+    <script src="js/utils/Validator.js"></script>
+    <script src="js/utils/ApiClient.js"></script>
+	<script src="js/core/MidiJsonConverter.js"></script>
+	
+    <!-- ========================================================================
+         ÉTAPE 3: CLASSES DE BASE (utilisées par tous les modèles/vues/contrôleurs)
+         ======================================================================== -->
+    <script src="js/core/BaseModel.js"></script>
+    <script src="js/core/BaseView.js"></script>
+    <script src="js/core/BaseController.js"></script>
+
+	
+    <!-- ========================================================================
+         ÉTAPE 4: SERVICES BACKEND (utilisés par les modèles et contrôleurs)
+         ======================================================================== -->
+    <script src="js/services/BackendService.js"></script>
+    <script src="js/services/StorageService.js"></script>
+    <script src="js/services/MidiService.js"></script>
+    <script src="js/services/FileService.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 5: UTILITAIRES ET HELPERS (dépendent des services)
+         ======================================================================== -->
+    <script src="js/utils/DebugConsole.js"></script>
+    <script src="js/utils/Notifications.js"></script>
+
+    
+    <script src="js/utils/RoutingManager.js"></script>
+    
+    <!-- Composants UI de base -->
+    <script src="js/views/components/Modal.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 6: MODÈLES (héritent de BaseModel)
+         ======================================================================== -->
+    <script src="js/models/FileModel.js"></script>
+    <script src="js/models/PlaylistModel.js"></script>
+    <script src="js/models/InstrumentModel.js"></script>
+    <script src="js/models/SystemModel.js"></script>
+    <script src="js/models/PlaybackModel.js"></script>
+    <script src="js/models/EditorModel.js"></script>
+    <script src="js/models/RoutingModel.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 7: VUES (héritent de BaseView)
+         ======================================================================== -->
+    <script src="js/views/HomeView.js"></script>
+    <script src="js/views/FileView.js"></script>
+    <script src="js/views/InstrumentView.js"></script>
+    <script src="js/views/KeyboardView.js"></script>
+    <script src="js/views/SystemView.js"></script>
+    <script src="js/views/RoutingView.js"></script>
+    <script src="js/views/EditorView.js"></script>
+
+    <!-- Composants de vues -->
+    <script src="js/views/components/RoutingMatrixView.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 8: GLOBAL PLAYBACK CONTROLLER
+         ======================================================================== -->
+    <script src="js/controllers/GlobalPlaybackController.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 9: CONTRÔLEURS (héritent de BaseController)
+         ======================================================================== -->
+    <script src="js/controllers/NavigationController.js"></script>
+    <script src="js/controllers/FileController.js"></script>
+    <script src="js/controllers/PlaylistController.js"></script>
+    <script src="js/controllers/InstrumentController.js"></script>
+    <script src="js/controllers/PlaybackController.js"></script>
+    <script src="js/controllers/SystemController.js"></script>
+    <script src="js/controllers/SearchController.js"></script>
+    <script src="js/controllers/RoutingController.js"></script>
+    <script src="js/controllers/EditorController.js"></script>
+    <script src="js/controllers/HomeController.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 10: ÉDITEUR MIDI - Composants spécialisés
+         ======================================================================== -->
+    
+    <!-- Core de l'éditeur -->
+    <script src="js/editor/core/CoordinateSystem.js"></script>
+    <script src="js/editor/core/Viewport.js"></script>
+    <script src="js/editor/core/RenderEngine.js"></script>
+    <script src="js/editor/core/MidiVisualizer.js"></script>
+
+    <!-- Renderers -->
+    <script src="js/editor/renderers/GridRenderer.js"></script>
+    <script src="js/editor/renderers/NoteRenderer.js"></script>
+    <script src="js/editor/renderers/TimelineRenderer.js"></script>
+    <script src="js/editor/renderers/PianoRollRenderer.js"></script>
+    <script src="js/editor/renderers/CCRenderer.js"></script>
+
+
+    <!-- Interaction -->
+    <script src="js/editor/interaction/SelectionManager.js"></script>
+    <script src="js/editor/interaction/DragHandler.js"></script>
+
+
+    <!-- Utils de l'éditeur -->
+    <script src="js/editor/utils/HistoryManager.js"></script>
+    <script src="js/editor/utils/ClipboardManager.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 11: APPLICATION (orchestration de tous les composants)
+         ======================================================================== -->
+    <script src="js/core/Application.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 12: INITIALISATION FINALE
+         ======================================================================== -->
+    <script src="js/main.js"></script>
+
+</body>
+</html>
