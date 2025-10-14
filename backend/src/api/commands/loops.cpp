@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "../CommandFactory.h"
+#include "../../core/commands/CommandFactory.h"
 #include "../../loop/LoopManager.h"
 #include "../../core/Logger.h"
 #include <nlohmann/json.hpp>

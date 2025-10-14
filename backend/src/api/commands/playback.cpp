@@ -9,9 +9,9 @@
 // ✅ Total: 11 commandes playback (au lieu de 9)
 // ============================================================================
 
-#include "../core/commands/CommandFactory.h"
-#include "../midi/player/MidiPlayer.h"
-#include "../core/Logger.h"
+#include "../../core/commands/CommandFactory.h"
+#include "../../midi/player/MidiPlayer.h"
+#include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;

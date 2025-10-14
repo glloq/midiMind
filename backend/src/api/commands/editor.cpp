@@ -20,9 +20,9 @@
 // Auteur: MidiMind Team
 // ============================================================================
 
-#include "../core/commands/CommandFactory.h"
-#include "../midi/MidiFileManager.h"
-#include "../core/Logger.h"
+#include "../../core/commands/CommandFactory.h"
+#include "../../midi/MidiFileManager.h"
+#include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
 #include <stack>
 

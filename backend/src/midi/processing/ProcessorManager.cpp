@@ -6,6 +6,8 @@
 #include "ProcessorManager.h"
 #include <fstream>
 #include <sstream>
+#include "../../core/Logger.h"     // Remonter 2 niveaux
+#include "../../core/Error.h"
 
 namespace midiMind {
 

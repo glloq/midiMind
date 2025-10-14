@@ -16,8 +16,8 @@
 // ============================================================================
 
 #include "MidiDeviceManager.h"
-#include "../core/Logger.h"
-#include "../core/Config.h"
+#include "../../core/Logger.h"
+#include "../../core/Config.h"
 #include "devices/UsbMidiDevice.h"
 #include "devices/VirtualMidiDevice.h"
 #include "devices/NetworkMidiDevice.h"

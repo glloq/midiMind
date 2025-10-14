@@ -21,8 +21,8 @@
 // Auteur: MidiMind Team
 // ============================================================================
 
-#include "../core/commands/CommandFactory.h"
-#include "../core/Logger.h"
+#include "../../core/commands/CommandFactory.h"
+#include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
