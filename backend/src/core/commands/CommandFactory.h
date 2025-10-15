@@ -1,40 +1,32 @@
 // ============================================================================
-// Fichier: src/core/commands/CommandFactory.h
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: backend/src/core/commands/CommandFactory.h
+// Version: 3.0.1 - COMPLET ET FONCTIONNEL
+// Date: 2025-10-15
 // ============================================================================
 // Description:
-//   Factory Pattern pour la création dynamique de commandes API.
-//   Permet d'enregistrer, créer et gérer les commandes de manière centralisée.
+//   Factory pour enregistrement et exécution de commandes via lambdas
+//   Pattern: Command Pattern avec Factory
 //
-// Fonctionnalités:
-//   - Enregistrement dynamique de commandes
-//   - Création thread-safe d'instances de commandes
-//   - Introspection (liste, compte, vérification existence)
-//   - Support pour documentation automatique
-//   - Gestion par catégorie
+// Architecture:
+//   CommandFactory stocke des lambdas (json -> json)
+//   Utilisé par CommandProcessorV2 pour router les commandes
 //
-// Auteur: midiMind Team
-// Date: 2025-10-05
-// Version: 3.0.0 - MISE À JOUR COMPLÈTE
+// Thread-safety: OUI (mutex sur toutes les opérations)
+//
+// Auteur: MidiMind Team
 // ============================================================================
 
 #pragma once
 
-// ============================================================================
-// INCLUDES
-// ============================================================================
-#include <string>              // Pour std::string
-#include <memory>              // Pour std::unique_ptr, std::shared_ptr
-#include <functional>          // Pour std::function
-#include <unordered_map>       // Pour std::unordered_map
-#include <map>                 // Pour std::map
-#include <vector>              // Pour std::vector
-#include <mutex>               // Pour std::mutex
-#include <algorithm>           // Pour std::sort
-#include <nlohmann/json.hpp>   // Pour json
-
-#include "../interfaces/ICommand.h"
+#include <string>
+#include <map>
+#include <vector>
+#include <functional>
+#include <mutex>
+#include <algorithm>
+#include <nlohmann/json.hpp>
 #include "../Logger.h"
+#include "../interfaces/ICommand.h"
 
 using json = nlohmann::json;
 
@@ -42,10 +34,10 @@ namespace midiMind {
 
 /**
  * @class CommandFactory
- * @brief Factory pour lambdas d'exécution directe
+ * @brief Factory pour enregistrement et exécution de commandes
  * 
- * NOUVELLE APPROCHE: Les lambdas retournent directement du JSON,
- * sans passer par des objets Command intermédiaires.
+ * Permet d'enregistrer des commandes sous forme de lambdas.
+ * Alternative légère à ICommand pour les cas simples.
  * 
  * Signature des lambdas: (const json& params) -> json
  */
@@ -100,6 +92,28 @@ public:
         
         executors_[name] = executor;
         Logger::debug("CommandFactory", "✓ Registered command: " + name);
+    }
+    
+    /**
+     * @brief Enregistre une commande ICommand
+     * 
+     * @param name Nom de la commande
+     * @param command Pointeur partagé vers ICommand
+     */
+    void registerCommand(const std::string& name, std::shared_ptr<ICommand> command) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        if (executors_.find(name) != executors_.end()) {
+            Logger::warn("CommandFactory", 
+                "Command '" + name + "' already registered, replacing");
+        }
+        
+        // Wrapper: ICommand -> lambda
+        executors_[name] = [command](const json& params) -> json {
+            return command->execute(params);
+        };
+        
+        Logger::debug("CommandFactory", "✓ Registered ICommand: " + name);
     }
     
     // ========================================================================
@@ -224,69 +238,44 @@ public:
         return executors_.empty();
     }
     
-    // ========================================================================
-    // DEBUG / LOGGING
-    // ========================================================================
-    
     /**
-     * @brief Log toutes les commandes enregistrées
+     * @brief Efface toutes les commandes
      */
-    void logRegisteredCommands(const std::string& logLevel = "INFO") const {
-        auto byCategory = listCommandsByCategory();
-        
-        Logger::log(logLevel, "CommandFactory", 
-            "=== Registered Commands (" + std::to_string(count()) + " total) ===");
-        
-        for (const auto& [category, commands] : byCategory) {
-            Logger::log(logLevel, "CommandFactory", 
-                "  [" + category + "] (" + std::to_string(commands.size()) + " commands)");
-            
-            for (const auto& cmd : commands) {
-                Logger::log(logLevel, "CommandFactory", "    - " + cmd);
-            }
-        }
-        
-        Logger::log(logLevel, "CommandFactory", "======================================");
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        executors_.clear();
+        Logger::info("CommandFactory", "All commands cleared");
     }
     
-    /**
-     * @brief Statistiques
-     */
-    json getStatistics() const {
-        json stats;
-        stats["total_commands"] = count();
-        stats["by_category"] = countByCategory();
-        stats["categories"] = listCategories();
-        stats["is_empty"] = empty();
-        
-        return stats;
-    }
-
 private:
     // ========================================================================
-    // HELPERS PRIVÉS
+    // MÉTHODES PRIVÉES
     // ========================================================================
     
     /**
-     * @brief Extrait la catégorie depuis le nom
+     * @brief Extrait la catégorie d'un nom de commande
      * 
-     * "devices.list" -> "devices"
-     * "player.play" -> "player"
+     * @param name Nom complet (ex: "devices.list")
+     * @return string Catégorie (ex: "devices")
      */
-    std::string extractCategory(const std::string& name) const {
+    static std::string extractCategory(const std::string& name) {
         size_t dotPos = name.find('.');
-        if (dotPos != std::string::npos) {
-            return name.substr(0, dotPos);
+        if (dotPos == std::string::npos) {
+            return "uncategorized";
         }
-        return "other";
+        return name.substr(0, dotPos);
     }
     
     // ========================================================================
     // MEMBRES PRIVÉS
     // ========================================================================
     
-    std::unordered_map<std::string, CommandExecutor> executors_;
-    mutable std::mutex mutex_;
+    mutable std::mutex mutex_;  ///< Mutex pour thread-safety
+    std::map<std::string, CommandExecutor> executors_;  ///< Map nom -> executor
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// FIN DU FICHIER CommandFactory.h v3.0.1 - COMPLET
+// ============================================================================

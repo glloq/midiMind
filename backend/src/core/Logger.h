@@ -1,61 +1,34 @@
 // ============================================================================
 // Fichier: backend/src/core/Logger.h
-// Version: 3.1.0 - CORRECTIONS PHASE 2
+// Version: 3.1.1 - CORRECTIONS CRITIQUES
 // Date: 2025-10-15
 // ============================================================================
-// CORRECTIFS v3.1.0 (PHASE 2 - IMPORTANTES):
-//   ✅ 2.1 Rotation automatique des logs
-//   ✅ Limite taille fichier: 10 MB par défaut
-//   ✅ Conservation 5 anciennes versions
-//   ✅ Check size avant chaque log
-//   ✅ Préservation TOTALE des fonctionnalités existantes
+// CORRECTIONS v3.1.1:
+//   ✅ FIX #1: Suppression du conflit getLevel() - une seule version publique
+//   ✅ FIX #2: Correction setLevel() pour utiliser getLevelRef()
 //
 // Description:
-//   Système de logging thread-safe avec rotation automatique
-//
-// Fonctionnalités:
-//   - 4 niveaux de log (DEBUG, INFO, WARNING, ERROR)
-//   - Logging console avec couleurs ANSI
-//   - ✅ Logging fichier avec rotation automatique
-//   - Filtrage par catégorie
-//   - Support syslog Linux
-//   - Métriques internes
-//   - Thread-safe complet
-//
-// Thread-safety: OUI (mutex + atomics)
-//
-// Auteur: MidiMind Team
+//   Système de logging centralisé thread-safe avec rotation automatique
 // ============================================================================
 
 #pragma once
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <string>
-#include <vector>
-#include <algorithm>
+#include <fstream>
 #include <mutex>
+#include <vector>
 #include <chrono>
 #include <iomanip>
-#include <ctime>
-#include <exception>
+#include <sstream>
+#include <iostream>
 #include <atomic>
-#include <cstdio>
-#include <filesystem>
-
-#ifdef __linux__
-#include <syslog.h>
-#endif
+#include <ctime>
 
 namespace midiMind {
 
 /**
  * @class Logger
- * @brief Système de logging thread-safe avec rotation automatique
- * 
- * @details
- * Logger singleton avec support multi-niveaux et rotation fichiers.
+ * @brief Système de logging centralisé thread-safe
  * 
  * Fonctionnalités:
  * - 4 niveaux: DEBUG, INFO, WARNING, ERROR
@@ -71,15 +44,6 @@ namespace midiMind {
  * - Naming: log.0, log.1, ... log.4
  * 
  * Thread-safety: OUI (mutex pour toutes opérations)
- * 
- * @example Utilisation
- * ```cpp
- * Logger::setLevel(Logger::Level::DEBUG);
- * Logger::enableFileLogging("/var/log/midimind.log");
- * 
- * Logger::info("Application", "Starting...");
- * Logger::error("Database", "Connection failed");
- * ```
  */
 class Logger {
 public:
@@ -166,7 +130,7 @@ public:
      */
     static void setLevel(Level level) {
         std::lock_guard<std::mutex> lock(getMutex());
-        getLevel() = level;
+        getLevelRef() = level;  // ✅ FIX #2: Utilise getLevelRef() pour modifier
     }
     
     /**
@@ -174,9 +138,9 @@ public:
      * @return Level Niveau actuel
      * @note Thread-safe
      */
-    static Level getLevel() {
+    static Level getLevel() {  // ✅ FIX #1: Une seule version publique
         std::lock_guard<std::mutex> lock(getMutex());
-        return getLevel();
+        return getLevelRef();
     }
     
     /**
@@ -188,52 +152,32 @@ public:
      * 
      * @note Thread-safe
      * @note ✅ PHASE 2: Rotation automatique activée
-     * 
-     * @example
-     * ```cpp
-     * Logger::enableFileLogging("/var/log/midimind.log");
-     * // Créera: midimind.log, midimind.log.0, midimind.log.1, etc.
-     * ```
      */
-    static void enableFileLogging(const std::string& filepath, 
+    static bool enableFileLogging(const std::string& filepath, 
                                   size_t maxSize = 10 * 1024 * 1024,
                                   size_t maxFiles = 5) {
         std::lock_guard<std::mutex> lock(getMutex());
         
-        // Fermer fichier existant si ouvert
+        // Fermer l'ancien fichier si ouvert
         if (getLogFile().is_open()) {
             getLogFile().close();
         }
         
-        // Créer répertoire parent si nécessaire
-        std::filesystem::path path(filepath);
-        if (path.has_parent_path()) {
-            std::filesystem::create_directories(path.parent_path());
-        }
-        
-        // Ouvrir fichier
-        getLogFile().open(filepath, std::ios::app);
-        
-        if (!getLogFile().is_open()) {
-            std::cerr << "[Logger] ERROR: Cannot open log file: " << filepath << std::endl;
-            return;
-        }
-        
-        getLogFilePath() = filepath;
-        getFileLoggingEnabled() = true;
-        
-        // ✅ PHASE 2: Configurer rotation
+        // Configurer rotation
         getMaxFileSize() = maxSize;
         getMaxFiles() = maxFiles;
+        getLogFilePath() = filepath;
         
-        // Header dans le fichier
-        getLogFile() << "========================================\n";
-        getLogFile() << "MidiMind Logger Started\n";
-        getLogFile() << "Date: " << getCurrentTimestamp() << "\n";
-        getLogFile() << "Max Size: " << (maxSize / (1024 * 1024)) << " MB\n";
-        getLogFile() << "Max Files: " << maxFiles << "\n";
-        getLogFile() << "========================================\n";
-        getLogFile().flush();
+        // Ouvrir nouveau fichier
+        getLogFile().open(filepath, std::ios::out | std::ios::app);
+        
+        if (!getLogFile().is_open()) {
+            std::cerr << "[Logger] Failed to open log file: " << filepath << std::endl;
+            return false;
+        }
+        
+        getFileLoggingEnabled() = true;
+        return true;
     }
     
     /**
@@ -244,10 +188,6 @@ public:
         std::lock_guard<std::mutex> lock(getMutex());
         
         if (getLogFile().is_open()) {
-            getLogFile() << "========================================\n";
-            getLogFile() << "MidiMind Logger Stopped\n";
-            getLogFile() << "Date: " << getCurrentTimestamp() << "\n";
-            getLogFile() << "========================================\n";
             getLogFile().close();
         }
         
@@ -256,8 +196,7 @@ public:
     
     /**
      * @brief Ajoute un filtre de catégorie
-     * @param category Catégorie à filtrer (ex: "MIDI", "API")
-     * @note Seules les catégories filtrées seront loggées
+     * @param category Catégorie à filtrer (exclure)
      * @note Thread-safe
      */
     static void addCategoryFilter(const std::string& category) {
@@ -266,41 +205,31 @@ public:
     }
     
     /**
-     * @brief Supprime tous les filtres de catégorie
+     * @brief Supprime un filtre de catégorie
+     * @param category Catégorie à ne plus filtrer
      * @note Thread-safe
      */
-    static void clearCategoryFilter() {
+    static void removeCategoryFilter(const std::string& category) {
+        std::lock_guard<std::mutex> lock(getMutex());
+        auto& filter = getCategoryFilter();
+        filter.erase(
+            std::remove(filter.begin(), filter.end(), category),
+            filter.end()
+        );
+    }
+    
+    /**
+     * @brief Efface tous les filtres de catégorie
+     * @note Thread-safe
+     */
+    static void clearCategoryFilters() {
         std::lock_guard<std::mutex> lock(getMutex());
         getCategoryFilter().clear();
     }
     
-    // ========================================================================
-    // MÉTHODES PUBLIQUES - SYSLOG (Linux)
-    // ========================================================================
-    
-#ifdef __linux__
-    static void enableSyslog(const std::string& ident = "midimind") {
-        std::lock_guard<std::mutex> lock(getMutex());
-        openlog(ident.c_str(), LOG_PID | LOG_CONS, LOG_USER);
-        getSyslogEnabled() = true;
-    }
-    
-    static void disableSyslog() {
-        std::lock_guard<std::mutex> lock(getMutex());
-        if (getSyslogEnabled()) {
-            closelog();
-            getSyslogEnabled() = false;
-        }
-    }
-#endif
-    
-    // ========================================================================
-    // MÉTHODES PUBLIQUES - STATISTIQUES
-    // ========================================================================
-    
     /**
      * @brief Récupère les statistiques de logging
-     * @return Stats Structure avec compteurs
+     * @return Stats Structure des statistiques
      * @note Thread-safe
      */
     static Stats getStats() {
@@ -322,11 +251,10 @@ public:
     }
     
     /**
-     * @brief Remet à zéro les statistiques
+     * @brief Réinitialise les statistiques
      * @note Thread-safe
      */
     static void resetStats() {
-        std::lock_guard<std::mutex> lock(getMutex());
         getTotalMessages().store(0);
         getDebugMessages().store(0);
         getInfoMessages().store(0);
@@ -336,179 +264,146 @@ public:
         getFileRotations().store(0);
     }
     
-private:
-    // ========================================================================
-    // MÉTHODES PRIVÉES - CORE LOGGING
-    // ========================================================================
-    
     /**
-     * @brief ✅ Méthode principale de logging avec rotation
-     * @param level Niveau du log
-     * @param category Catégorie
-     * @param message Message
+     * @brief Force une rotation du fichier de log
      * @note Thread-safe
-     * @note PHASE 2: Check rotation avant chaque log
      */
-    static void log(Level level, const std::string& category, const std::string& message) {
-        try {
-            std::lock_guard<std::mutex> lock(getMutex());
-            
-            // Filtrer par niveau
-            if (level < getLevel()) {
-                getFilteredMessages().fetch_add(1);
-                return;
-            }
-            
-            // Filtrer par catégorie
-            if (!getCategoryFilter().empty()) {
-                auto& filters = getCategoryFilter();
-                if (std::find(filters.begin(), filters.end(), category) == filters.end()) {
-                    getFilteredMessages().fetch_add(1);
-                    return;
-                }
-            }
-            
-            // Formater message
-            std::string timestamp = getCurrentTimestamp();
-            std::string levelStr = levelToString(level);
-            std::string formatted = "[" + timestamp + "] [" + levelStr + "] [" + category + "] " + message;
-            
-            // Console avec couleurs
-            std::cout << getColorCode(level) << formatted << "\033[0m" << std::endl;
-            
-            // ✅ PHASE 2: Check rotation AVANT écriture fichier
-            if (getFileLoggingEnabled() && getLogFile().is_open()) {
-                checkRotation();
-                
-                getLogFile() << formatted << std::endl;
-                getLogFile().flush();
-            }
-            
-            // Syslog si activé
-#ifdef __linux__
-            if (getSyslogEnabled()) {
-                int priority;
-                switch (level) {
-                    case Level::DEBUG:   priority = LOG_DEBUG; break;
-                    case Level::INFO:    priority = LOG_INFO; break;
-                    case Level::WARNING: priority = LOG_WARNING; break;
-                    case Level::ERROR:   priority = LOG_ERR; break;
-                }
-                syslog(priority, "[%s] %s", category.c_str(), message.c_str());
-            }
-#endif
-            
-            // Incrémenter compteurs
-            getTotalMessages().fetch_add(1);
-            switch (level) {
-                case Level::DEBUG:   getDebugMessages().fetch_add(1); break;
-                case Level::INFO:    getInfoMessages().fetch_add(1); break;
-                case Level::WARNING: getWarnMessages().fetch_add(1); break;
-                case Level::ERROR:   getErrorMessages().fetch_add(1); break;
-            }
-            
-        } catch (const std::exception& e) {
-            std::cerr << "[Logger] INTERNAL ERROR: " << e.what() << std::endl;
-        }
+    static void rotateLogFile() {
+        std::lock_guard<std::mutex> lock(getMutex());
+        performRotation();
     }
     
+private:
     // ========================================================================
-    // MÉTHODES PRIVÉES - ROTATION (PHASE 2)
+    // MÉTHODES PRIVÉES - CORE
     // ========================================================================
     
     /**
-     * @brief ✅ PHASE 2: Vérifie si rotation nécessaire
-     * @note Appelé avant chaque écriture fichier
+     * @brief Méthode principale de logging
+     * @note Thread-safe (appelant doit déjà avoir le lock)
      */
-    static void checkRotation() {
-        if (!getLogFile().is_open()) {
+    static void log(Level level, const std::string& category, const std::string& message) {
+        std::lock_guard<std::mutex> lock(getMutex());
+        
+        // Filtrage par niveau
+        if (level < getLevelRef()) {
+            getFilteredMessages()++;
             return;
         }
         
-        try {
-            // Obtenir position actuelle (= taille fichier)
-            getLogFile().seekp(0, std::ios::end);
-            std::streampos fileSize = getLogFile().tellp();
+        // Filtrage par catégorie
+        const auto& filter = getCategoryFilter();
+        if (std::find(filter.begin(), filter.end(), category) != filter.end()) {
+            getFilteredMessages()++;
+            return;
+        }
+        
+        // Statistiques
+        getTotalMessages()++;
+        switch (level) {
+            case Level::DEBUG:   getDebugMessages()++; break;
+            case Level::INFO:    getInfoMessages()++; break;
+            case Level::WARNING: getWarnMessages()++; break;
+            case Level::ERROR:   getErrorMessages()++; break;
+        }
+        
+        // Formater le message
+        std::string formatted = formatLogMessage(level, category, message);
+        
+        // Output console
+        std::cout << getColorCode(level) << formatted << "\033[0m" << std::endl;
+        
+        // Output fichier
+        if (getFileLoggingEnabled() && getLogFile().is_open()) {
+            // Vérifier si rotation nécessaire
+            checkAndRotate();
             
-            if (static_cast<size_t>(fileSize) >= getMaxFileSize()) {
-                rotateLogFile();
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[Logger] Rotation check error: " << e.what() << std::endl;
+            getLogFile() << formatted << std::endl;
+            getLogFile().flush();
         }
     }
     
     /**
-     * @brief ✅ PHASE 2: Effectue la rotation des fichiers de log
-     * @note Ferme fichier actuel, renomme anciennes versions, ouvre nouveau
+     * @brief Formate un message de log
      */
-    static void rotateLogFile() {
-        try {
-            // Fermer fichier actuel
-            if (getLogFile().is_open()) {
-                getLogFile() << "========================================\n";
-                getLogFile() << "File rotation: " << getCurrentTimestamp() << "\n";
-                getLogFile() << "========================================\n";
-                getLogFile().close();
-            }
-            
-            const std::string& basePath = getLogFilePath();
-            const size_t maxFiles = getMaxFiles();
-            
-            // Supprimer le plus ancien (maxFiles - 1)
-            std::string oldestPath = basePath + "." + std::to_string(maxFiles - 1);
-            if (std::filesystem::exists(oldestPath)) {
-                std::filesystem::remove(oldestPath);
-            }
-            
-            // Renommer les fichiers (de maxFiles-2 vers maxFiles-1, ..., 0 vers 1)
-            for (int i = static_cast<int>(maxFiles) - 2; i >= 0; --i) {
-                std::string oldPath = (i == 0) ? basePath : basePath + "." + std::to_string(i);
-                std::string newPath = basePath + "." + std::to_string(i + 1);
-                
-                if (std::filesystem::exists(oldPath)) {
-                    std::filesystem::rename(oldPath, newPath);
-                }
-            }
-            
-            // Renommer fichier actuel en .0
-            if (std::filesystem::exists(basePath)) {
-                std::filesystem::rename(basePath, basePath + ".0");
-            }
-            
-            // Ouvrir nouveau fichier
-            getLogFile().open(basePath, std::ios::app);
-            
-            if (getLogFile().is_open()) {
-                getLogFile() << "========================================\n";
-                getLogFile() << "Log file rotated\n";
-                getLogFile() << "Date: " << getCurrentTimestamp() << "\n";
-                getLogFile() << "========================================\n";
-                getLogFile().flush();
-            }
-            
-            // Incrémenter compteur
-            getFileRotations().fetch_add(1);
-            
-        } catch (const std::exception& e) {
-            std::cerr << "[Logger] Rotation error: " << e.what() << std::endl;
+    static std::string formatLogMessage(Level level, const std::string& category, 
+                                       const std::string& message) {
+        std::ostringstream ss;
+        ss << "[" << getCurrentTimestamp() << "] "
+           << "[" << levelToString(level) << "] "
+           << "[" << category << "] "
+           << message;
+        return ss.str();
+    }
+    
+    /**
+     * @brief Vérifie et effectue la rotation si nécessaire
+     */
+    static void checkAndRotate() {
+        if (!getLogFile().is_open()) return;
+        
+        // Obtenir taille actuelle
+        auto currentPos = getLogFile().tellp();
+        if (currentPos < 0) return;
+        
+        size_t currentSize = static_cast<size_t>(currentPos);
+        
+        // Rotation si nécessaire
+        if (currentSize >= getMaxFileSize()) {
+            performRotation();
         }
     }
     
-    // ========================================================================
-    // MÉTHODES PRIVÉES - UTILITAIRES
-    // ========================================================================
+    /**
+     * @brief Effectue la rotation des fichiers
+     */
+    static void performRotation() {
+        if (!getFileLoggingEnabled()) return;
+        
+        const std::string& basePath = getLogFilePath();
+        
+        // Fermer fichier actuel
+        getLogFile().close();
+        
+        // Rotation: .4 → supprimé, .3 → .4, .2 → .3, .1 → .2, .0 → .1, actuel → .0
+        size_t maxFiles = getMaxFiles();
+        
+        // Supprimer le plus ancien
+        std::string oldestFile = basePath + "." + std::to_string(maxFiles - 1);
+        std::remove(oldestFile.c_str());
+        
+        // Décaler les autres
+        for (size_t i = maxFiles - 1; i > 0; --i) {
+            std::string from = basePath + "." + std::to_string(i - 1);
+            std::string to = basePath + "." + std::to_string(i);
+            std::rename(from.c_str(), to.c_str());
+        }
+        
+        // Renommer fichier actuel
+        std::string firstBackup = basePath + ".0";
+        std::rename(basePath.c_str(), firstBackup.c_str());
+        
+        // Créer nouveau fichier
+        getLogFile().open(basePath, std::ios::out | std::ios::app);
+        
+        getFileRotations()++;
+    }
     
+    /**
+     * @brief Génère un timestamp formaté
+     */
     static std::string getCurrentTimestamp() {
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now.time_since_epoch()
-        ) % 1000;
+            now.time_since_epoch()) % 1000;
         
-        std::stringstream ss;
-        ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-        ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+        std::tm tm;
+        localtime_r(&time, &tm);
+        
+        std::ostringstream ss;
+        ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        ss << "." << std::setfill('0') << std::setw(3) << ms.count();
         
         return ss.str();
     }
@@ -542,7 +437,8 @@ private:
         return mutex;
     }
     
-    static Level& getLevel() {
+    // ✅ FIX #1: Version privée qui retourne une référence modifiable
+    static Level& getLevelRef() {
         static Level level = Level::INFO;
         return level;
     }
@@ -572,7 +468,6 @@ private:
         return filter;
     }
     
-    // ✅ PHASE 2: Nouveaux accesseurs pour rotation
     static size_t& getMaxFileSize() {
         static size_t size = 10 * 1024 * 1024;  // 10 MB par défaut
         return size;
@@ -623,5 +518,5 @@ private:
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Logger.h v3.1.0 - PHASE 2 COMPLÈTE
+// FIN DU FICHIER Logger.h v3.1.1 - CORRIGÉ
 // ============================================================================

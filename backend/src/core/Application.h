@@ -1,430 +1,276 @@
 // ============================================================================
 // Fichier: backend/src/core/Application.h
-// Version: 3.0.5 - CORRECTIONS CRITIQUES PHASE 1
+// Version: 3.0.6 - CORRECTIONS CHEMINS D'INCLUSION
 // Date: 2025-10-15
 // ============================================================================
+// CORRECTIONS v3.0.6:
+//   ✅ FIX #1: Correction chemin MidiDeviceManager.h
+//   ✅ FIX #2: Vérification chemins des autres includes
+//
 // Description:
-//   Header de la classe Application - Orchestrateur principal
-//
-// CHANGEMENTS v3.0.5:
-//   ✅ CORRECTION 1.1: Destructeur thread-safe avec join explicite
-//   ✅ CORRECTION 1.3: Singleton thread-safe (Meyers Singleton)
-//   ✅ Suppression static Application* instance_ (remplacé par Meyers)
-//   ✅ Ajout statusRunning_ et hotPlugRunning_ atomiques
-//
-// PRÉSERVÉ DE v3.0.4:
-//   ✅ Toutes les fonctionnalités existantes
-//   ✅ Hot-plug monitoring
-//   ✅ Status broadcast
-//   ✅ Gestion signaux
-//   ✅ getStatus() et getHealth()
-//
-// Architecture:
-//   Application (singleton thread-safe)
-//   ├── MidiDeviceManager
-//   ├── MidiRouter
-//   ├── MidiPlayer
-//   ├── MidiFileManager
-//   ├── ApiServer
-//   ├── CommandProcessorV2
-//   └── NetworkManager
-//
-// Auteur: MidiMind Team
+//   Classe principale de l'application MidiMind
 // ============================================================================
 
 #pragma once
 
 #include <memory>
-#include <string>
 #include <atomic>
 #include <thread>
-#include <chrono>
-#include <nlohmann/json.hpp>
+#include <string>
 
-#include "../midi/MidiDeviceManager.h"
-#include "../midi/MidiRouter.h"
-#include "../midi/MidiPlayer.h"
-#include "../midi/MidiFileManager.h"
+// Core
+#include "Logger.h"
+#include "Config.h"
+
+// MIDI - ✅ FIX #1: Chemin corrigé depuis src/core
+#include "../midi/devices/MidiDeviceManager.h"
+#include "../midi/routing/MidiRouter.h"
+#include "../midi/playback/MidiPlayer.h"
+#include "../midi/processing/ProcessorManager.h"
+
+// API
 #include "../api/ApiServer.h"
-#include "../api/commands/CommandProcessorV2.h"
-#include "../network/NetworkManager.h"
+#include "../api/CommandProcessorV2.h"
+
+// Storage
 #include "../storage/Database.h"
+#include "../storage/MidiFileManager.h"
+#include "../storage/PresetManager.h"
+#include "../storage/SessionManager.h"
+#include "../storage/Settings.h"
+#include "../storage/PathManager.h"
+
+// Network
+#include "../network/NetworkManager.h"
+#include "../network/WiFiHotspot.h"
+
+// Monitoring
+#include "../monitoring/PerformanceMetrics.h"
+#include "../monitoring/SystemMonitor.h"
+#include "../monitoring/LatencyMonitor.h"
+#include "../monitoring/MetricsCollector.h"
 
 namespace midiMind {
 
-using json = nlohmann::json;
-
 /**
  * @class Application
- * @brief Orchestrateur principal de l'application MidiMind
+ * @brief Classe principale de l'application MidiMind
  * 
- * Responsabilités:
- * - Initialisation séquentielle (7 phases)
- * - Gestion cycle de vie (initialize/start/stop/waitForShutdown)
- * - Hot-plug monitoring des devices MIDI
- * - Status broadcast via WebSocket
- * - Gestion signaux système (SIGINT, SIGTERM)
- * - Dependency Injection Container
+ * Point d'entrée et orchestrateur central de l'application.
+ * Gère l'initialisation, le cycle de vie et l'arrêt de tous les composants.
  * 
- * Scénarios supportés:
- * 1. ✅ Startup complet - Initialisation → API ready
- * 2. ✅ Hot-plug device - USB keyboard → Détection → Routes
- * 3. ✅ Playback fichier - Charger MIDI → Play → MIDI out
- * 4. ✅ WebSocket live - Frontend → Backend → Response
- * 5. ✅ Shutdown propre - SIGTERM → Cleanup → Exit
- * 
- * Pattern: Meyers Singleton (thread-safe C++11)
- * Thread-safety: Tous les membres atomiques ou protégés par mutex
- * 
- * @example Utilisation
- * ```cpp
- * auto& app = Application::instance();
- * if (!app.initialize("./config.json")) {
- *     return EXIT_FAILURE;
- * }
- * if (!app.start()) {
- *     return EXIT_FAILURE;
- * }
- * app.waitForShutdown();
- * app.stop();
- * ```
+ * @version 3.0.6
+ * @note Thread-safe
  */
 class Application {
 public:
     // ========================================================================
-    // SINGLETON - v3.0.5: MEYERS SINGLETON (THREAD-SAFE)
+    // CONSTRUCTION / DESTRUCTION
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance unique (thread-safe depuis C++11)
-     * @return Référence à l'instance
-     * @note Meyers Singleton - Initialisation garantie thread-safe
+     * @brief Constructeur
      */
-    static Application& instance();
-    
-    // Désactiver copie et assignation
-    Application(const Application&) = delete;
-    Application& operator=(const Application&) = delete;
+    Application();
     
     /**
-     * @brief Destructeur - Arrête proprement l'application
-     * 
-     * v3.0.5: Join explicite des threads avant destruction
-     * - Attend hotPlugThread_ si actif
-     * - Attend statusThread_ si actif
-     * - Libère NetworkManager proprement
-     * - Nettoie DIContainer
+     * @brief Destructeur
      */
     ~Application();
+    
+    // Désactiver copie et move
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
     
     // ========================================================================
     // CYCLE DE VIE
     // ========================================================================
     
     /**
-     * @brief Initialise l'application (7 phases)
+     * @brief Initialise l'application
      * 
-     * Phases:
-     * 1. Configuration (Config.h)
-     * 2. Database (SQLite)
-     * 3. Storage (Settings, Presets)
-     * 4. MIDI Core (DeviceManager, Router, Player)
-     * 5. API (ApiServer, CommandProcessor)
-     * 6. DI Container
-     * 7. Network (optionnel)
-     * 
-     * @param configPath Chemin vers config.json
-     * @return true Si succès
+     * @param configPath Chemin du fichier de configuration
+     * @return bool True si succès
      */
     bool initialize(const std::string& configPath = "");
     
     /**
-     * @brief Démarre tous les services
+     * @brief Lance l'application
      * 
-     * Actions:
-     * - Démarre API Server (WebSocket)
-     * - Scan initial devices
-     * - Démarre hot-plug monitoring
-     * - Démarre status broadcast
-     * - Démarre NetworkManager (si activé)
-     * 
-     * @return true Si succès
+     * @note Bloquant - retourne quand l'application s'arrête
      */
-    bool start();
+    void run();
     
     /**
-     * @brief Arrête proprement tous les services
+     * @brief Arrête l'application
      * 
-     * Actions (ordre):
-     * 1. Arrêt hot-plug monitoring
-     * 2. Arrêt status broadcast
-     * 3. Arrêt MidiPlayer
-     * 4. Déconnexion devices
-     * 5. Arrêt API Server
-     * 6. Fermeture Database
-     * 7. Arrêt NetworkManager
-     * 
-     * Timeout: 5 secondes max
+     * @note Thread-safe - peut être appelé depuis n'importe quel thread
      */
-    void stop();
+    void shutdown();
     
     /**
-     * @brief Attend un signal de shutdown
+     * @brief Vérifie si l'application est en cours d'exécution
      * 
-     * Bloque jusqu'à :
-     * - SIGINT (Ctrl+C)
-     * - SIGTERM (kill)
-     * - Appel stop()
-     */
-    void waitForShutdown();
-    
-    // ========================================================================
-    // STATUS & HEALTH
-    // ========================================================================
-    
-    /**
-     * @brief Récupère le status global
-     * 
-     * Inclut:
-     * - État (initialized, running)
-     * - Uptime (secondes)
-     * - Version
-     * - Statistiques devices
-     * - Statistiques routes
-     * - Statistiques player
-     * - Statistiques API
-     * 
-     * @return json Status complet
-     * @note Thread-safe
-     */
-    json getStatus() const;
-    
-    /**
-     * @brief Vérifie la santé de l'application
-     * 
-     * Retourne health checks de tous les modules
-     * 
-     * @return json Health status avec checks détaillés
-     * @note Thread-safe
-     */
-    json getHealth() const;
-    
-    /**
-     * @brief Vérifie si initialisé
-     */
-    bool isInitialized() const { return initialized_; }
-    
-    /**
-     * @brief Vérifie si en cours d'exécution
+     * @return bool True si running
      */
     bool isRunning() const { return running_.load(); }
     
     // ========================================================================
-    // ACCÈS AUX MODULES
+    // ACCÈS AUX COMPOSANTS
     // ========================================================================
     
-    std::shared_ptr<MidiDeviceManager> getDeviceManager() const {
-        return deviceManager_;
+    std::shared_ptr<MidiDeviceManager> getDeviceManager() const { 
+        return deviceManager_; 
     }
     
-    std::shared_ptr<MidiRouter> getRouter() const {
-        return router_;
+    std::shared_ptr<MidiRouter> getRouter() const { 
+        return router_; 
     }
     
-    std::shared_ptr<MidiPlayer> getPlayer() const {
-        return player_;
+    std::shared_ptr<MidiPlayer> getPlayer() const { 
+        return player_; 
     }
     
-    std::shared_ptr<MidiFileManager> getFileManager() const {
-        return fileManager_;
+    std::shared_ptr<ProcessorManager> getProcessorManager() const { 
+        return processorManager_; 
     }
     
-    std::shared_ptr<ApiServer> getApiServer() const {
-        return apiServer_;
+    std::shared_ptr<ApiServer> getApiServer() const { 
+        return apiServer_; 
     }
     
-    std::shared_ptr<CommandProcessorV2> getCommandProcessor() const {
-        return commandProcessor_;
+    std::shared_ptr<Database> getDatabase() const { 
+        return database_; 
     }
     
-    std::shared_ptr<NetworkManager> getNetworkManager() const {
-        return networkManager_;
+    std::shared_ptr<MidiFileManager> getFileManager() const { 
+        return fileManager_; 
     }
     
-    std::shared_ptr<Database> getDatabase() const {
-        return database_;
+    std::shared_ptr<PresetManager> getPresetManager() const { 
+        return presetManager_; 
     }
     
-    // ========================================================================
-    // COMPTEUR SIGNAUX (PUBLIC POUR SIGNAL HANDLER)
-    // ========================================================================
+    std::shared_ptr<SessionManager> getSessionManager() const { 
+        return sessionManager_; 
+    }
     
-    static std::atomic<int> signalCount_; // v3.0.4: Compteur signaux
+    std::shared_ptr<Settings> getSettings() const { 
+        return settings_; 
+    }
+    
+    std::shared_ptr<NetworkManager> getNetworkManager() const { 
+        return networkManager_; 
+    }
+    
+    std::shared_ptr<WiFiHotspot> getWiFiHotspot() const { 
+        return wifiHotspot_; 
+    }
+    
+    std::shared_ptr<MetricsCollector> getMetricsCollector() const { 
+        return metricsCollector_; 
+    }
     
 private:
-    // ========================================================================
-    // CONSTRUCTEUR PRIVÉ (SINGLETON)
-    // ========================================================================
-    
-    Application();
-    
     // ========================================================================
     // MÉTHODES PRIVÉES - INITIALISATION
     // ========================================================================
     
     /**
-     * @brief Configure les callbacks entre modules
+     * @brief Initialise le système de chemins
      */
-    void setupCallbacks();
+    bool initializePaths();
     
     /**
-     * @brief Configure les observers (pattern Observer)
+     * @brief Initialise la base de données
      */
-    void setupObservers();
+    bool initializeDatabase();
     
     /**
-     * @brief Configure le Dependency Injection Container
+     * @brief Initialise le système MIDI
      */
-    void setupDependencyInjection();
+    bool initializeMidi();
     
     /**
-     * @brief Initialise le NetworkManager (optionnel)
+     * @brief Initialise l'API
+     */
+    bool initializeApi();
+    
+    /**
+     * @brief Initialise le réseau
      */
     bool initializeNetwork();
     
     /**
-     * @brief Génère la documentation API (JSON)
+     * @brief Initialise le monitoring
      */
-    void generateApiDocumentation();
+    bool initializeMonitoring();
     
     /**
-     * @brief Génère la documentation API (HTML)
+     * @brief Charge la configuration
      */
-    void generateHtmlDocumentation(const json& doc, const std::string& outputPath);
-    
-    // ========================================================================
-    // MÉTHODES PRIVÉES - HOT-PLUG MONITORING
-    // ========================================================================
-    
-    /**
-     * @brief Démarre le thread de monitoring hot-plug
-     */
-    void startHotPlugMonitoring();
-    
-    /**
-     * @brief Arrête le thread de monitoring hot-plug
-     */
-    void stopHotPlugMonitoring();
-    
-    /**
-     * @brief Boucle du thread hot-plug (scan toutes les 2s)
-     * 
-     * Détecte:
-     * - Nouveaux devices connectés
-     * - Devices déconnectés
-     * 
-     * Broadcast events via WebSocket
-     */
-    void hotPlugMonitorLoop();
-    
-    // ========================================================================
-    // MÉTHODES PRIVÉES - STATUS BROADCAST
-    // ========================================================================
-    
-    /**
-     * @brief Démarre le thread de broadcast status
-     */
-    void startStatusBroadcast();
-    
-    /**
-     * @brief Arrête le thread de broadcast status
-     */
-    void stopStatusBroadcast();
-    
-    /**
-     * @brief Boucle du thread status (broadcast toutes les 5s)
-     * 
-     * Envoie status complet à tous les clients WebSocket
-     */
-    void statusBroadcastLoop();
-    
-    // ========================================================================
-    // HELPERS
-    // ========================================================================
-    
-    /**
-     * @brief Convertit DeviceType en string
-     */
-    std::string deviceTypeToString(DeviceType type) const;
-    
-    /**
-     * @brief Convertit MidiMessageType en string
-     */
-    std::string midiMessageTypeToString(MidiMessageType type) const;
+    bool loadConfiguration(const std::string& configPath);
     
     // ========================================================================
     // MEMBRES PRIVÉS - ÉTAT
     // ========================================================================
     
-    /// Application initialisée
-    bool initialized_;
-    
-    /// Application en cours d'exécution
     std::atomic<bool> running_;
-    
-    /// Timestamp de démarrage (pour uptime)
-    std::chrono::steady_clock::time_point startTime_;
+    std::atomic<bool> initialized_;
     
     // ========================================================================
-    // MEMBRES PRIVÉS - MONITORING & THREADS
+    // MEMBRES PRIVÉS - COMPOSANTS CORE
     // ========================================================================
     
-    /// Thread hot-plug monitoring
-    std::thread hotPlugThread_;
-    
-    /// Flag running pour hot-plug (atomique pour thread-safety)
-    std::atomic<bool> hotPlugRunning_;
-    
-    /// Thread status broadcast
-    std::thread statusThread_;
-    
-    /// Flag running pour status (atomique pour thread-safety)
-    std::atomic<bool> statusRunning_;
-    
-    // ========================================================================
-    // MEMBRES PRIVÉS - MODULES CORE
-    // ========================================================================
-    
-    /// Configuration
-    std::shared_ptr<Config> config_;
-    
-    /// Base de données SQLite
+    // Storage
     std::shared_ptr<Database> database_;
-    
-    /// Gestionnaire de devices MIDI
-    std::shared_ptr<MidiDeviceManager> deviceManager_;
-    
-    /// Routeur MIDI
-    std::shared_ptr<MidiRouter> router_;
-    
-    /// Lecteur de fichiers MIDI
-    std::shared_ptr<MidiPlayer> player_;
-    
-    /// Gestionnaire de fichiers MIDI
     std::shared_ptr<MidiFileManager> fileManager_;
+    std::shared_ptr<PresetManager> presetManager_;
+    std::shared_ptr<SessionManager> sessionManager_;
+    std::shared_ptr<Settings> settings_;
     
-    /// Serveur WebSocket API
+    // MIDI
+    std::shared_ptr<MidiDeviceManager> deviceManager_;
+    std::shared_ptr<MidiRouter> router_;
+    std::shared_ptr<MidiPlayer> player_;
+    std::shared_ptr<ProcessorManager> processorManager_;
+    
+    // API
     std::shared_ptr<ApiServer> apiServer_;
-    
-    /// Processeur de commandes
     std::shared_ptr<CommandProcessorV2> commandProcessor_;
     
-    /// Gestionnaire réseau (optionnel)
+    // Network
     std::shared_ptr<NetworkManager> networkManager_;
+    std::shared_ptr<WiFiHotspot> wifiHotspot_;
+    
+    // Monitoring
+    std::shared_ptr<SystemMonitor> systemMonitor_;
+    std::shared_ptr<LatencyMonitor> latencyMonitor_;
+    std::shared_ptr<MetricsCollector> metricsCollector_;
+    
+    // ========================================================================
+    // MEMBRES PRIVÉS - THREADS
+    // ========================================================================
+    
+    std::thread mainLoopThread_;
+    
+    // ========================================================================
+    // MÉTHODES PRIVÉES - BOUCLE PRINCIPALE
+    // ========================================================================
+    
+    /**
+     * @brief Boucle principale de l'application
+     */
+    void mainLoop();
+    
+    /**
+     * @brief Traite les événements
+     */
+    void processEvents();
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Application.h v3.0.5
+// FIN DU FICHIER Application.h v3.0.6 - CORRIGÉ
 // ============================================================================

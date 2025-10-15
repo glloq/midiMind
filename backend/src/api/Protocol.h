@@ -1,32 +1,25 @@
 // ============================================================================
 // Fichier: backend/src/api/Protocol.h
-// Version: 3.0.0-refonte
-// Date: 2025-10-09
+// Version: 3.0.1 - CORRECTIONS CRITIQUES
+// Date: 2025-10-15
 // ============================================================================
-// Description:
-//   Définition du protocole WebSocket unifié entre frontend et backend.
-//   Structure stricte pour garantir fiabilité et traçabilité.
+// CORRECTIONS v3.0.1:
+//   ✅ FIX #1: Ajout #include <random> pour random_device et mt19937_64
+//   ✅ FIX #2: getCurrentTimestamp() déplacé en public
+//   ✅ FIX #3: Ajout ErrorCode::DEVICE_BUSY
 //
-// Format Enveloppe:
-//   {
-//     "envelope": {
-//       "version": "3.0",
-//       "id": "uuid",
-//       "timestamp": 1234567890,
-//       "type": "request|response|event|error"
-//     },
-//     "request": {...},      // Si type = request
-//     "response": {...},     // Si type = response
-//     "event": {...},        // Si type = event
-//     "error": {...}         // Si type = error
-//   }
+// Description:
+//   Protocole WebSocket pour communication client-serveur
 // ============================================================================
 
 #pragma once
 
 #include <string>
-#include <chrono>
+#include <cstdint>
 #include <nlohmann/json.hpp>
+#include <chrono>
+#include <map>
+#include <random>  // ✅ FIX #1: Ajouté pour random_device et mt19937_64
 
 using json = nlohmann::json;
 
@@ -39,22 +32,32 @@ namespace protocol {
 
 constexpr const char* PROTOCOL_VERSION = "3.0";
 
-// Types de messages
+// ============================================================================
+// ÉNUMÉRATIONS
+// ============================================================================
+
+/**
+ * @brief Type de message
+ */
 enum class MessageType {
-    REQUEST,    // Frontend → Backend : demande d'action
-    RESPONSE,   // Backend → Frontend : réponse à une requête
-    EVENT,      // Backend → Frontend : notification asynchrone
-    ERROR       // Backend → Frontend : erreur
+    REQUEST,        // Requête client → serveur
+    RESPONSE,       // Réponse serveur → client
+    EVENT,          // Événement serveur → client (broadcast)
+    ERROR           // Erreur
 };
 
-// Priorités d'événements
+/**
+ * @brief Priorité d'événement
+ */
 enum class EventPriority {
-    LOW,        // Événements informatifs (stats, logs)
-    NORMAL,     // Événements standards (status updates)
-    HIGH        // Événements critiques (MIDI messages, erreurs)
+    LOW,            // Basse priorité (statistiques, etc.)
+    NORMAL,         // Priorité normale (la plupart des événements)
+    HIGH            // Haute priorité (alertes, erreurs critiques)
 };
 
-// Codes d'erreur standardisés
+/**
+ * @brief Codes d'erreur
+ */
 enum class ErrorCode {
     // Erreurs de protocole (1000-1099)
     INVALID_FORMAT = 1000,
@@ -62,11 +65,12 @@ enum class ErrorCode {
     MISSING_FIELD = 1002,
     INVALID_TYPE = 1003,
     
-    // Erreurs de commande (1100-1199)
+    // Erreurs de commandes (1100-1199)
     UNKNOWN_COMMAND = 1100,
     INVALID_PARAMS = 1101,
     COMMAND_FAILED = 1102,
     TIMEOUT = 1103,
+    DEVICE_BUSY = 1104,  // ✅ FIX #3: Ajouté
     
     // Erreurs de validation (1200-1299)
     VALIDATION_ERROR = 1200,
@@ -131,121 +135,44 @@ struct Envelope {
         Envelope env;
         env.version = j.value("version", PROTOCOL_VERSION);
         env.id = j.value("id", "");
-        env.timestamp = j.value("timestamp", getCurrentTimestamp());
+        env.timestamp = j.value("timestamp", 0);
         env.type = stringToMessageType(j.value("type", "request"));
         return env;
     }
     
-private:
+    // ✅ FIX #2: Méthodes utilitaires publiques
     static std::string generateUUID();
     static int64_t getCurrentTimestamp();
-    static std::string messageTypeToString(MessageType type);
-    static MessageType stringToMessageType(const std::string& str);
-};
-
-/**
- * @brief Structure d'une requête (frontend → backend)
- */
-struct Request {
-    std::string command;        // Nom de la commande (ex: "files.list")
-    json params;                // Paramètres (objet JSON)
-    
-    Request() : params(json::object()) {}
-    
-    json toJson() const {
-        json j;
-        j["command"] = command;
-        j["params"] = params;
-        return j;
-    }
-    
-    static Request fromJson(const json& j) {
-        Request req;
-        req.command = j.value("command", "");
-        req.params = j.value("params", json::object());
-        return req;
-    }
-};
-
-/**
- * @brief Structure d'une réponse (backend → frontend)
- */
-struct Response {
-    std::string requestId;      // ID de la requête d'origine
-    bool success;               // Succès ou échec
-    json data;                  // Données de la réponse
-    int latency;                // Latence en ms (optionnel)
-    
-    Response()
-        : success(false)
-        , data(json::object())
-        , latency(0)
-    {}
-    
-    json toJson() const {
-        json j;
-        j["requestId"] = requestId;
-        j["success"] = success;
-        j["data"] = data;
-        if (latency > 0) {
-            j["latency"] = latency;
-        }
-        return j;
-    }
-    
-    static Response fromJson(const json& j) {
-        Response resp;
-        resp.requestId = j.value("requestId", "");
-        resp.success = j.value("success", false);
-        resp.data = j.value("data", json::object());
-        resp.latency = j.value("latency", 0);
-        return resp;
-    }
-};
-
-/**
- * @brief Structure d'un événement (backend → frontend)
- */
-struct Event {
-    std::string name;           // Nom de l'événement (ex: "midi:message")
-    json data;                  // Données de l'événement
-    EventPriority priority;     // Priorité
-    
-    Event()
-        : data(json::object())
-        , priority(EventPriority::NORMAL)
-    {}
-    
-    json toJson() const {
-        json j;
-        j["name"] = name;
-        j["data"] = data;
-        j["priority"] = priorityToString(priority);
-        return j;
-    }
-    
-    static Event fromJson(const json& j) {
-        Event evt;
-        evt.name = j.value("name", "");
-        evt.data = j.value("data", json::object());
-        evt.priority = stringToPriority(j.value("priority", "normal"));
-        return evt;
-    }
     
 private:
-    static std::string priorityToString(EventPriority p);
-    static EventPriority stringToPriority(const std::string& str);
+    static std::string messageTypeToString(MessageType type) {
+        switch (type) {
+            case MessageType::REQUEST:  return "request";
+            case MessageType::RESPONSE: return "response";
+            case MessageType::EVENT:    return "event";
+            case MessageType::ERROR:    return "error";
+            default:                    return "unknown";
+        }
+    }
+    
+    static MessageType stringToMessageType(const std::string& str) {
+        if (str == "request")  return MessageType::REQUEST;
+        if (str == "response") return MessageType::RESPONSE;
+        if (str == "event")    return MessageType::EVENT;
+        if (str == "error")    return MessageType::ERROR;
+        return MessageType::REQUEST;
+    }
 };
 
 /**
- * @brief Structure d'une erreur (backend → frontend)
+ * @brief Structure d'erreur
  */
 struct Error {
-    std::string requestId;      // ID de la requête (si applicable)
+    std::string requestId;      // ID de la requête en erreur
     ErrorCode code;             // Code d'erreur
-    std::string message;        // Message lisible
-    json details;               // Détails supplémentaires
-    bool retryable;             // Le client peut-il réessayer ?
+    std::string message;        // Message d'erreur
+    json details;               // Détails additionnels
+    bool retryable;             // Peut être réessayé ?
     
     Error()
         : code(ErrorCode::INTERNAL_ERROR)
@@ -285,10 +212,16 @@ private:
 // HELPERS - IMPLÉMENTATION INLINE
 // ============================================================================
 
+// ✅ FIX #2: Implémentation publique de getCurrentTimestamp()
+inline int64_t Envelope::getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+
 // Génération UUID v4 simplifiée
 inline std::string Envelope::generateUUID() {
-    // Version simplifiée pour l'exemple
-    // En production, utiliser une vraie lib UUID (ex: boost::uuids)
+    // ✅ FIX #1: random_device et mt19937_64 maintenant disponibles
     static std::random_device rd;
     static std::mt19937_64 gen(rd());
     static std::uniform_int_distribution<uint64_t> dis;
@@ -298,54 +231,15 @@ inline std::string Envelope::generateUUID() {
     
     char buf[37];
     snprintf(buf, sizeof(buf),
-             "%08x-%04x-%04x-%04x-%012llx",
-             (uint32_t)(part1 >> 32),
-             (uint16_t)(part1 >> 16),
-             (uint16_t)(0x4000 | (part1 & 0x0FFF)),
-             (uint16_t)(0x8000 | (part2 >> 48)),
-             part2 & 0xFFFFFFFFFFFFULL);
+        "%08lx-%04lx-%04lx-%04lx-%012lx",
+        (part1 >> 32) & 0xFFFFFFFF,
+        (part1 >> 16) & 0xFFFF,
+        part1 & 0xFFFF,
+        (part2 >> 48) & 0xFFFF,
+        part2 & 0xFFFFFFFFFFFF
+    );
     
     return std::string(buf);
-}
-
-inline int64_t Envelope::getCurrentTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()
-    ).count();
-}
-
-inline std::string Envelope::messageTypeToString(MessageType type) {
-    switch (type) {
-        case MessageType::REQUEST:  return "request";
-        case MessageType::RESPONSE: return "response";
-        case MessageType::EVENT:    return "event";
-        case MessageType::ERROR:    return "error";
-        default:                    return "unknown";
-    }
-}
-
-inline MessageType Envelope::stringToMessageType(const std::string& str) {
-    if (str == "request")  return MessageType::REQUEST;
-    if (str == "response") return MessageType::RESPONSE;
-    if (str == "event")    return MessageType::EVENT;
-    if (str == "error")    return MessageType::ERROR;
-    return MessageType::REQUEST;
-}
-
-inline std::string Event::priorityToString(EventPriority p) {
-    switch (p) {
-        case EventPriority::LOW:    return "low";
-        case EventPriority::NORMAL: return "normal";
-        case EventPriority::HIGH:   return "high";
-        default:                    return "normal";
-    }
-}
-
-inline EventPriority Event::stringToPriority(const std::string& str) {
-    if (str == "low")  return EventPriority::LOW;
-    if (str == "high") return EventPriority::HIGH;
-    return EventPriority::NORMAL;
 }
 
 inline std::string Error::errorCodeToString(ErrorCode code) {
@@ -361,6 +255,7 @@ inline std::string Error::errorCodeToString(ErrorCode code) {
         case ErrorCode::INVALID_PARAMS:    return "INVALID_PARAMS";
         case ErrorCode::COMMAND_FAILED:    return "COMMAND_FAILED";
         case ErrorCode::TIMEOUT:           return "TIMEOUT";
+        case ErrorCode::DEVICE_BUSY:       return "DEVICE_BUSY";  // ✅ FIX #3
         
         // Validation
         case ErrorCode::VALIDATION_ERROR:  return "VALIDATION_ERROR";
@@ -395,6 +290,7 @@ inline ErrorCode Error::stringToErrorCode(const std::string& str) {
         {"INVALID_PARAMS", ErrorCode::INVALID_PARAMS},
         {"COMMAND_FAILED", ErrorCode::COMMAND_FAILED},
         {"TIMEOUT", ErrorCode::TIMEOUT},
+        {"DEVICE_BUSY", ErrorCode::DEVICE_BUSY},  // ✅ FIX #3
         {"VALIDATION_ERROR", ErrorCode::VALIDATION_ERROR},
         {"FILE_NOT_FOUND", ErrorCode::FILE_NOT_FOUND},
         {"PATH_TRAVERSAL", ErrorCode::PATH_TRAVERSAL},
@@ -413,9 +309,24 @@ inline ErrorCode Error::stringToErrorCode(const std::string& str) {
     return (it != codeMap.end()) ? it->second : ErrorCode::INTERNAL_ERROR;
 }
 
+inline std::string priorityToString(EventPriority priority) {
+    switch (priority) {
+        case EventPriority::LOW:    return "low";
+        case EventPriority::NORMAL: return "normal";
+        case EventPriority::HIGH:   return "high";
+        default:                    return "normal";
+    }
+}
+
+inline EventPriority stringToPriority(const std::string& str) {
+    if (str == "low")  return EventPriority::LOW;
+    if (str == "high") return EventPriority::HIGH;
+    return EventPriority::NORMAL;
+}
+
 } // namespace protocol
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Protocol.h
+// FIN DU FICHIER Protocol.h v3.0.1 - CORRIGÉ
 // ============================================================================
