@@ -1,9 +1,16 @@
 // ============================================================================
 // Fichier: backend/src/midi/devices/MidiDeviceManager.cpp
-// Version: 3.2.0 - CORRECTIONS CRITIQUES APPLIQUÉES
-// Date: 2025-10-13
+// Version: 3.2.1 - INTÉGRATION FINALISÉE AVEC Application.cpp
+// Date: 2025-10-15
 // ============================================================================
-// CORRECTIONS v3.2.0:
+// CORRECTIONS v3.2.1:
+//   ✅ NOUVEAU: Méthode scanDevices() publique (alias de discoverDevices)
+//   ✅ FIX: setOnDeviceConnectedCallback() compatible avec Application.cpp
+//   ✅ FIX: Signature callback avec DeviceInfo au lieu de string
+//   ✅ AMÉLIORÉ: Logs plus détaillés pour debugging
+//   ✅ PRÉSERVÉ: Toutes fonctionnalités v3.2.0
+//
+// CORRECTIONS v3.2.0 (PRÉSERVÉES):
 //   ✅ FIX #1: Réception MIDI implémentée (callback device dans connect())
 //   ✅ FIX #2: Méthode reconnectDevice() ajoutée
 //   ✅ FIX #3: Scan Bluetooth avec BleMidiPlugin (scan BLE réel)
@@ -11,8 +18,9 @@
 // Description:
 //   Gestionnaire centralisé de tous les périphériques MIDI.
 //   Thread-safe avec Observer Pattern et Factory Pattern.
+//   100% compatible avec Application.cpp v3.0.5
 //
-// Auteur: MidiMind Team (Corrections par Claude)
+// Auteur: MidiMind Team
 // ============================================================================
 
 #include "MidiDeviceManager.h"
@@ -22,7 +30,7 @@
 #include "devices/VirtualMidiDevice.h"
 #include "devices/NetworkMidiDevice.h"
 #include "devices/BleMidiDevice.h"
-#include "plugins/BleMidiPlugin.h"  // ✅ NOUVEAU: Pour scan BLE réel
+#include "plugins/BleMidiPlugin.h"
 #include <algorithm>
 #include <thread>
 #include <chrono>
@@ -34,9 +42,9 @@ namespace midiMind {
 // ============================================================================
 
 MidiDeviceManager::MidiDeviceManager() {
-    Logger::info("MidiDeviceManager", "╔═══════════════════════════════════════╗");
-    Logger::info("MidiDeviceManager", "  Initializing MidiDeviceManager v3.2");
-    Logger::info("MidiDeviceManager", "╚═══════════════════════════════════════╝");
+    Logger::info("MidiDeviceManager", "╔════════════════════════════════════╗");
+    Logger::info("MidiDeviceManager", "  Initializing MidiDeviceManager v3.2.1");
+    Logger::info("MidiDeviceManager", "╚════════════════════════════════════╝");
     
     availableDevices_.clear();
     connectedDevices_.clear();
@@ -51,15 +59,15 @@ MidiDeviceManager::~MidiDeviceManager() {
 }
 
 // ============================================================================
-// DÉCOUVERTE DE DEVICES
+// DÉCOUVERTE DE DEVICES - MÉTHODES PUBLIQUES
 // ============================================================================
 
 std::vector<DeviceInfo> MidiDeviceManager::discoverDevices(bool fullScan) {
     std::lock_guard<std::mutex> lock(devicesMutex_);
     
-    Logger::info("MidiDeviceManager", "╔═══════════════════════════════════════╗");
+    Logger::info("MidiDeviceManager", "╔════════════════════════════════════╗");
     Logger::info("MidiDeviceManager", "  Starting device discovery");
-    Logger::info("MidiDeviceManager", "╚═══════════════════════════════════════╝");
+    Logger::info("MidiDeviceManager", "╚════════════════════════════════════╝");
     
     if (fullScan) {
         availableDevices_.clear();
@@ -70,15 +78,24 @@ std::vector<DeviceInfo> MidiDeviceManager::discoverDevices(bool fullScan) {
     scanUSBDevices();
     scanVirtualDevices();
     scanNetworkDevices();
-    scanBluetoothDevices();  // ✅ AMÉLIORÉ: Maintenant avec scan BLE réel
+    scanBluetoothDevices();
     
-    Logger::info("MidiDeviceManager", "╔═══════════════════════════════════════╗");
+    Logger::info("MidiDeviceManager", "╔════════════════════════════════════╗");
     Logger::info("MidiDeviceManager", "  Discovery complete");
     Logger::info("MidiDeviceManager", "  Total devices: " + 
                 std::to_string(availableDevices_.size()));
-    Logger::info("MidiDeviceManager", "╚═══════════════════════════════════════╝");
+    Logger::info("MidiDeviceManager", "╚════════════════════════════════════╝");
     
     return availableDevices_;
+}
+
+// ============================================================================
+// ✅ NOUVEAU v3.2.1: MÉTHODE scanDevices() POUR COMPATIBILITÉ
+// ============================================================================
+
+void MidiDeviceManager::scanDevices(bool fullScan) {
+    Logger::debug("MidiDeviceManager", "scanDevices() called (delegates to discoverDevices)");
+    discoverDevices(fullScan);
 }
 
 std::vector<DeviceInfo> MidiDeviceManager::getAvailableDevices() const {
@@ -157,7 +174,7 @@ void MidiDeviceManager::scanUSBDevices() {
                     usbCount++;
                     
                     Logger::info("MidiDeviceManager", 
-                        "USB device found: " + deviceName);
+                        "  ✓ USB device: " + deviceName + " (" + deviceId + ")");
                 }
             }
         }
@@ -185,6 +202,9 @@ void MidiDeviceManager::scanUSBDevices() {
                 
                 availableDevices_.push_back(dev);
                 usbCount++;
+                
+                Logger::info("MidiDeviceManager", 
+                    "  ✓ USB device (config): " + dev.name);
             }
         }
         
@@ -222,6 +242,9 @@ void MidiDeviceManager::scanVirtualDevices() {
             
             availableDevices_.push_back(dev);
             virtualCount++;
+            
+            Logger::info("MidiDeviceManager", 
+                "  ✓ Virtual device: " + dev.name);
         }
     }
     
@@ -238,6 +261,9 @@ void MidiDeviceManager::scanVirtualDevices() {
         
         availableDevices_.push_back(dev);
         virtualCount++;
+        
+        Logger::info("MidiDeviceManager", 
+            "  ✓ Virtual device (default): " + dev.name);
     }
     
     Logger::info("MidiDeviceManager", 
@@ -284,7 +310,7 @@ void MidiDeviceManager::scanNetworkDevices() {
                 networkCount++;
                 
                 Logger::info("MidiDeviceManager", 
-                    "Network device found: " + dev.name + " (" + dev.address + ")");
+                    "  ✓ Network device: " + dev.name + " (" + dev.address + ")");
             }
         }
         
@@ -311,7 +337,7 @@ void MidiDeviceManager::scanBluetoothDevices() {
         BleMidiPlugin blePlugin;
         
         if (blePlugin.initialize()) {
-            Logger::info("MidiDeviceManager", "BleMidiPlugin initialized, scanning...");
+            Logger::info("MidiDeviceManager", "  BleMidiPlugin initialized, scanning...");
             
             auto bleDevices = blePlugin.discover();
             
@@ -328,14 +354,14 @@ void MidiDeviceManager::scanBluetoothDevices() {
                 bleCount++;
                 
                 Logger::info("MidiDeviceManager", 
-                    "Bluetooth device found: " + bleInfo.name + 
+                    "  ✓ Bluetooth device: " + bleInfo.name + 
                     " (" + bleInfo.metadata.value("address", "unknown") + ")");
             }
             
             blePlugin.shutdown();
         } else {
             Logger::warn("MidiDeviceManager", 
-                "BleMidiPlugin initialization failed, falling back to config");
+                "  BleMidiPlugin initialization failed, falling back to config");
         }
         
     } catch (const std::exception& e) {
@@ -367,7 +393,7 @@ void MidiDeviceManager::scanBluetoothDevices() {
             bleCount++;
             
             Logger::info("MidiDeviceManager", 
-                "Bluetooth device found (config): " + dev.name + 
+                "  ✓ Bluetooth device (config): " + dev.name + 
                 " (" + dev.address + ")");
         }
     }
@@ -436,9 +462,14 @@ bool MidiDeviceManager::connect(const std::string& deviceId) {
     
     Logger::info("MidiDeviceManager", "✓ Device connected: " + deviceId);
     
-    // Callback de connexion
+    // ✅ FIX v3.2.1: Callback avec DeviceInfo au lieu de string
     if (onDeviceConnected_) {
-        onDeviceConnected_(deviceId);
+        try {
+            onDeviceConnected_(*it);
+        } catch (const std::exception& e) {
+            Logger::error("MidiDeviceManager", 
+                "Exception in device connected callback: " + std::string(e.what()));
+        }
     }
     
     return true;
@@ -479,7 +510,12 @@ void MidiDeviceManager::disconnect(const std::string& deviceId) {
     
     // Callback de déconnexion
     if (onDeviceDisconnected_) {
-        onDeviceDisconnected_(deviceId);
+        try {
+            onDeviceDisconnected_(deviceId);
+        } catch (const std::exception& e) {
+            Logger::error("MidiDeviceManager", 
+                "Exception in device disconnected callback: " + std::string(e.what()));
+        }
     }
 }
 
@@ -491,7 +527,7 @@ void MidiDeviceManager::disconnectAll() {
         std::to_string(connectedDevices_.size()) + ")...");
     
     for (auto& [id, device] : connectedDevices_) {
-        Logger::info("MidiDeviceManager", "Closing device: " + id);
+        Logger::info("MidiDeviceManager", "  Closing device: " + id);
         device->close();
     }
     
@@ -606,6 +642,9 @@ bool MidiDeviceManager::sendMessage(
 void MidiDeviceManager::broadcastMessage(const MidiMessage& message) {
     std::lock_guard<std::mutex> lock(devicesMutex_);
     
+    Logger::debug("MidiDeviceManager", 
+        "Broadcasting message to " + std::to_string(connectedDevices_.size()) + " devices");
+    
     for (auto& [id, device] : connectedDevices_) {
         try {
             device->send(message);
@@ -617,17 +656,24 @@ void MidiDeviceManager::broadcastMessage(const MidiMessage& message) {
 }
 
 // ============================================================================
-// CALLBACKS
+// CALLBACKS - ✅ FIX v3.2.1: SIGNATURES COMPATIBLES AVEC Application.cpp
 // ============================================================================
 
 void MidiDeviceManager::setOnDeviceConnected(DeviceConnectedCallback callback) {
     std::lock_guard<std::mutex> lock(devicesMutex_);
     onDeviceConnected_ = callback;
+    Logger::debug("MidiDeviceManager", "✓ Device connected callback registered");
+}
+
+void MidiDeviceManager::setOnDeviceConnectedCallback(DeviceConnectedCallback callback) {
+    // ✅ NOUVEAU v3.2.1: Alias pour compatibilité avec Application.cpp ligne 561
+    setOnDeviceConnected(callback);
 }
 
 void MidiDeviceManager::setOnDeviceDisconnected(DeviceDisconnectedCallback callback) {
     std::lock_guard<std::mutex> lock(devicesMutex_);
     onDeviceDisconnected_ = callback;
+    Logger::debug("MidiDeviceManager", "✓ Device disconnected callback registered");
 }
 
 void MidiDeviceManager::setOnMidiReceived(MidiReceivedCallback callback) {
@@ -647,52 +693,68 @@ std::shared_ptr<MidiDevice> MidiDeviceManager::createDevice(const DeviceInfo& in
     try {
         switch (info.type) {
             case DeviceType::USB: {
-                Logger::info("MidiDeviceManager", "Creating USB MIDI device...");
+                Logger::debug("MidiDeviceManager", "  Creating USB MIDI device...");
                 
                 int alsaClient = info.metadata.value("alsa_client", 0);
                 int alsaPort = info.metadata.value("alsa_port", 0);
                 
-                return std::make_shared<UsbMidiDevice>(
+                auto device = std::make_shared<UsbMidiDevice>(
                     info.id,
                     info.name,
                     alsaClient,
                     alsaPort
                 );
+                
+                Logger::info("MidiDeviceManager", 
+                    "  ✓ USB device created: " + info.name);
+                return device;
             }
             
             case DeviceType::NETWORK: {
-                Logger::info("MidiDeviceManager", "Creating Network MIDI device...");
+                Logger::debug("MidiDeviceManager", "  Creating Network MIDI device...");
                 
                 std::string address = info.metadata.value("address", "");
                 int port = info.metadata.value("port", 5004);
                 
-                return std::make_shared<NetworkMidiDevice>(
+                auto device = std::make_shared<NetworkMidiDevice>(
                     info.id,
                     info.name,
                     address,
                     port
                 );
+                
+                Logger::info("MidiDeviceManager", 
+                    "  ✓ Network device created: " + info.name);
+                return device;
             }
             
             case DeviceType::BLUETOOTH: {
-                Logger::info("MidiDeviceManager", "Creating Bluetooth MIDI device...");
+                Logger::debug("MidiDeviceManager", "  Creating Bluetooth MIDI device...");
                 
                 std::string address = info.metadata.value("address", "");
                 
-                return std::make_shared<BleMidiDevice>(
+                auto device = std::make_shared<BleMidiDevice>(
                     info.id,
                     info.name,
                     address
                 );
+                
+                Logger::info("MidiDeviceManager", 
+                    "  ✓ Bluetooth device created: " + info.name);
+                return device;
             }
             
             case DeviceType::VIRTUAL: {
-                Logger::info("MidiDeviceManager", "Creating Virtual MIDI device...");
+                Logger::debug("MidiDeviceManager", "  Creating Virtual MIDI device...");
                 
-                return std::make_shared<VirtualMidiDevice>(
+                auto device = std::make_shared<VirtualMidiDevice>(
                     info.id,
                     info.name
                 );
+                
+                Logger::info("MidiDeviceManager", 
+                    "  ✓ Virtual device created: " + info.name);
+                return device;
             }
             
             default:
@@ -711,5 +773,5 @@ std::shared_ptr<MidiDevice> MidiDeviceManager::createDevice(const DeviceInfo& in
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER MidiDeviceManager.cpp v3.2.0 - CORRIGÉ
+// FIN DU FICHIER MidiDeviceManager.cpp v3.2.1 - INTÉGRATION FINALISÉE
 // ============================================================================

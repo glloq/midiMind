@@ -31,6 +31,7 @@ cd midiMind
 ### Étape 2 : Rendre les Scripts Exécutables
 
 ```bash
+cd scripts/
 chmod +x *.sh
 ```
 

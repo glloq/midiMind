@@ -1,777 +1,558 @@
 // ============================================================================
-// Fichier: src/network/NetworkManager.cpp
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: src/network/networkmanager.h
+// Version: 3.0.0 - COMPLET
+// Date: 2025-10-15
+// ============================================================================
+// Description:
+//   Gestionnaire réseau principal pour MidiMind v3.0
+//   Orchestre tous les modules réseau : WiFi, Bluetooth, mDNS, RTP-MIDI, BLE
+//
+// Architecture:
+//   - Thread-safe avec mutex
+//   - Non-bloquant via callbacks
+//   - Gestion centralisée de tous les composants réseau
+//
+// Composants gérés:
+//   - WifiManager          : Connexion WiFi client
+//   - BluetoothManager     : Découverte/pairing Bluetooth
+//   - WiFiHotspot          : Mode Access Point
+//   - BleMidiDevice        : BLE MIDI
+//   - MdnsDiscovery        : Découverte mDNS/Bonjour
+//   - RtpMidiServer        : Serveur RTP-MIDI
 // ============================================================================
 
-#include "NetworkManager.h"
-#include <chrono>
-#include <algorithm>
-#include <fstream>
-#include <sstream>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <ifaddrs.h>
-#include <net/if.h>
-#include <unistd.h>
+#ifndef MIDIMIND_NETWORKMANAGER_H
+#define MIDIMIND_NETWORKMANAGER_H
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <mutex>
+#include <functional>
+#include <optional>
+#include "../external/json.hpp"
+
+// Composants réseau
+#include "WifiManager.h"
+#include "BluetoothManager.h"
+#include "wifi/WiFiHotspot.h"
+#include "bluetooth/BleMidiDevice.h"
+#include "discovery/MdnsDiscovery.h"
+#include "rtpmidi/RtpMidiServer.h"
 
 namespace midiMind {
 
-// ============================================================================
-// CONSTRUCTION
-// ============================================================================
-
-NetworkManager::NetworkManager() {
-    Logger::info("NetworkManager", "═══════════════════════════════════════");
-    Logger::info("NetworkManager", "  Initializing NetworkManager v3.0");
-    Logger::info("NetworkManager", "═══════════════════════════════════════");
-    
-    try {
-        // Créer les composants
-        Logger::info("NetworkManager", "Creating RTP-MIDI Server...");
-        rtpMidiServer_ = std::make_unique<RtpMidiServer>();
-        Logger::info("NetworkManager", "✓ RTP-MIDI Server created");
-        
-        Logger::info("NetworkManager", "Creating mDNS Discovery...");
-        mdnsDiscovery_ = std::make_unique<MdnsDiscovery>();
-        Logger::info("NetworkManager", "✓ mDNS Discovery created");
-        
-        Logger::info("NetworkManager", "Creating BLE MIDI Device...");
-        bleMidiDevice_ = std::make_unique<BleMidiDevice>();
-        Logger::info("NetworkManager", "✓ BLE MIDI Device created");
-        
-        Logger::info("NetworkManager", "Creating WiFi Hotspot...");
-        wifiHotspot_ = std::make_unique<WiFiHotspot>();
-        Logger::info("NetworkManager", "✓ WiFi Hotspot created");
-        
-        // Initialiser les statistiques
-        stats_ = {};
-        
-        Logger::info("NetworkManager", "✓ NetworkManager initialized successfully");
-        
-    } catch (const std::exception& e) {
-        Logger::error("NetworkManager", "Initialization failed: " + std::string(e.what()));
-        throw;
-    }
-}
-
-NetworkManager::~NetworkManager() {
-    Logger::info("NetworkManager", "Shutting down NetworkManager...");
-    
-    // Arrêter tous les services
-    stopRtpMidi();
-    stopDiscovery();
-    stopBleMidi();
-    stopWiFiHotspot();
-    
-    Logger::info("NetworkManager", "✓ NetworkManager destroyed");
-}
+using json = nlohmann::json;
 
 // ============================================================================
-// CONTRÔLE DES SERVICES - RTP-MIDI
+// ÉNUMÉRATIONS
 // ============================================================================
 
-bool NetworkManager::startRtpMidi(uint16_t port, const std::string& serviceName) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Starting RTP-MIDI service...");
-    Logger::info("NetworkManager", "  Port: " + std::to_string(port));
-    Logger::info("NetworkManager", "  Service: " + serviceName);
-    
-    if (rtpMidiServer_->isRunning()) {
-        Logger::warn("NetworkManager", "RTP-MIDI already running");
-        return false;
-    }
-    
-    // Configurer les callbacks
-    rtpMidiServer_->setOnMidiReceived([this](const MidiMessage& msg, const std::string& sessionId) {
-        Logger::debug("NetworkManager", "MIDI received from RTP session: " + sessionId);
-        // TODO: Router vers MidiRouter
-    });
-    
-    rtpMidiServer_->setOnClientConnected([this](const std::string& sessionId, const std::string& clientName) {
-        Logger::info("NetworkManager", "RTP-MIDI client connected: " + clientName);
-        
-        NetworkDeviceInfo info;
-        info.id = sessionId;
-        info.name = clientName;
-        info.type = NetworkDeviceType::RTP_MIDI;
-        info.connected = true;
-        info.lastSeen = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-        ).count();
-        
-        handleDeviceConnected(sessionId);
-        
-        if (onDeviceConnected_) {
-            onDeviceConnected_(sessionId);
-        }
-    });
-    
-    rtpMidiServer_->setOnClientDisconnected([this](const std::string& sessionId) {
-        Logger::info("NetworkManager", "RTP-MIDI client disconnected: " + sessionId);
-        handleDeviceDisconnected(sessionId);
-        
-        if (onDeviceDisconnected_) {
-            onDeviceDisconnected_(sessionId);
-        }
-    });
-    
-    // Démarrer le serveur
-    if (rtpMidiServer_->start(port, serviceName)) {
-        Logger::info("NetworkManager", "✓ RTP-MIDI service started");
-        return true;
-    }
-    
-    Logger::error("NetworkManager", "Failed to start RTP-MIDI service");
-    return false;
-}
-
-void NetworkManager::stopRtpMidi() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (rtpMidiServer_ && rtpMidiServer_->isRunning()) {
-        Logger::info("NetworkManager", "Stopping RTP-MIDI service...");
-        rtpMidiServer_->stop();
-        Logger::info("NetworkManager", "✓ RTP-MIDI service stopped");
-    }
-}
-
-bool NetworkManager::isRtpMidiRunning() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return rtpMidiServer_ && rtpMidiServer_->isRunning();
-}
+/**
+ * @brief Type de device réseau
+ */
+enum class NetworkDeviceType {
+    UNKNOWN,
+    RTP_MIDI,           ///< Device RTP-MIDI (réseau)
+    BLE_MIDI,           ///< Device BLE MIDI (Bluetooth)
+    WIFI_CLIENT,        ///< Client WiFi connecté au hotspot
+    BLUETOOTH_DEVICE    ///< Device Bluetooth générique
+};
 
 // ============================================================================
-// CONTRÔLE DES SERVICES - DÉCOUVERTE mDNS
+// STRUCTURES
 // ============================================================================
 
-bool NetworkManager::startDiscovery() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Starting mDNS discovery...");
-    
-    if (mdnsDiscovery_->isRunning()) {
-        Logger::warn("NetworkManager", "mDNS discovery already running");
-        return false;
-    }
-    
-    // Configurer les callbacks
-    mdnsDiscovery_->setOnServiceDiscovered([this](const ServiceInfo& info) {
-        Logger::info("NetworkManager", "Service discovered: " + info.name + 
-                    " at " + info.address + ":" + std::to_string(info.port));
-        
-        // Convertir en NetworkDeviceInfo
-        NetworkDeviceInfo deviceInfo;
-        deviceInfo.id = info.name;
-        deviceInfo.name = info.name;
-        deviceInfo.type = NetworkDeviceType::RTP_MIDI;
-        deviceInfo.address = info.address;
-        deviceInfo.port = info.port;
-        deviceInfo.connected = false;
-        deviceInfo.lastSeen = info.lastSeen;
-        
-        handleDeviceDiscovered(deviceInfo);
-        
-        if (onDeviceDiscovered_) {
-            onDeviceDiscovered_(deviceInfo);
-        }
-    });
-    
-    mdnsDiscovery_->setOnServiceRemoved([this](const std::string& serviceName) {
-        Logger::info("NetworkManager", "Service removed: " + serviceName);
-        
-        // Retirer de la liste des devices découverts
-        auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-            [&serviceName](const NetworkDeviceInfo& info) {
-                return info.id == serviceName;
-            });
-        
-        if (it != discoveredDevices_.end()) {
-            discoveredDevices_.erase(it);
-        }
-    });
-    
-    // Démarrer la découverte
-    if (mdnsDiscovery_->start()) {
-        // Rechercher les services RTP-MIDI
-        mdnsDiscovery_->browse("_apple-midi._udp");
-        
-        Logger::info("NetworkManager", "✓ mDNS discovery started");
-        return true;
-    }
-    
-    Logger::error("NetworkManager", "Failed to start mDNS discovery");
-    return false;
-}
+/**
+ * @brief Informations sur un device réseau
+ */
+struct NetworkDeviceInfo {
+    std::string id;                 ///< Identifiant unique
+    std::string name;               ///< Nom du device
+    NetworkDeviceType type;         ///< Type de device
+    std::string address;            ///< Adresse (IP, MAC, etc.)
+    uint16_t port;                  ///< Port (si applicable)
+    bool connected;                 ///< État de connexion
+    uint64_t lastSeen;              ///< Timestamp dernière activité (ms)
+};
 
-void NetworkManager::stopDiscovery() {
-    std::lock_guard<std::mutex> lock(mutex_);
+/**
+ * @brief Statistiques réseau globales
+ */
+struct NetworkStatistics {
+    // RTP-MIDI
+    size_t rtpDevicesDiscovered;
+    size_t rtpDevicesConnected;
+    uint64_t rtpBytesReceived;
+    uint64_t rtpBytesSent;
     
-    if (mdnsDiscovery_ && mdnsDiscovery_->isRunning()) {
-        Logger::info("NetworkManager", "Stopping mDNS discovery...");
-        mdnsDiscovery_->stop();
-        Logger::info("NetworkManager", "✓ mDNS discovery stopped");
-    }
-}
+    // BLE MIDI
+    size_t bleDevicesConnected;
+    uint64_t bleBytesReceived;
+    uint64_t bleBytesSent;
+    
+    // WiFi Hotspot
+    bool hotspotActive;
+    size_t hotspotClients;
+    
+    // WiFi Client
+    bool wifiConnected;
+    std::string wifiSsid;
+    int wifiSignalStrength;
+    
+    // Bluetooth
+    size_t bluetoothDevicesDiscovered;
+    size_t bluetoothDevicesPaired;
+};
 
 // ============================================================================
-// CONTRÔLE DES SERVICES - BLUETOOTH MIDI
+// CLASSE NETWORKMANAGER
 // ============================================================================
 
-bool NetworkManager::startBleMidi(const std::string& deviceName) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Starting BLE MIDI...");
-    Logger::info("NetworkManager", "  Device name: " + deviceName);
-    
-    if (bleMidiDevice_->isRunning()) {
-        Logger::warn("NetworkManager", "BLE MIDI already running");
-        return false;
-    }
-    
-    // Configurer les callbacks
-    bleMidiDevice_->setOnMidiReceived([this](const MidiMessage& msg) {
-        Logger::debug("NetworkManager", "MIDI received from BLE");
-        // TODO: Router vers MidiRouter
-    });
-    
-    bleMidiDevice_->setOnClientConnected([this](const std::string& address) {
-        Logger::info("NetworkManager", "BLE client connected: " + address);
-        
-        NetworkDeviceInfo info;
-        info.id = "ble_" + address;
-        info.name = "BLE MIDI Client";
-        info.type = NetworkDeviceType::BLE_MIDI;
-        info.address = address;
-        info.connected = true;
-        info.lastSeen = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-        ).count();
-        
-        handleDeviceConnected(info.id);
-        
-        if (onDeviceConnected_) {
-            onDeviceConnected_(info.id);
-        }
-    });
-    
-    bleMidiDevice_->setOnClientDisconnected([this](const std::string& address) {
-        Logger::info("NetworkManager", "BLE client disconnected: " + address);
-        handleDeviceDisconnected("ble_" + address);
-        
-        if (onDeviceDisconnected_) {
-            onDeviceDisconnected_("ble_" + address);
-        }
-    });
-    
-    // Démarrer BLE MIDI
-    if (bleMidiDevice_->start(deviceName)) {
-        Logger::info("NetworkManager", "✓ BLE MIDI started");
-        return true;
-    }
-    
-    Logger::error("NetworkManager", "Failed to start BLE MIDI");
-    return false;
-}
-
-void NetworkManager::stopBleMidi() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (bleMidiDevice_ && bleMidiDevice_->isRunning()) {
-        Logger::info("NetworkManager", "Stopping BLE MIDI...");
-        bleMidiDevice_->stop();
-        Logger::info("NetworkManager", "✓ BLE MIDI stopped");
-    }
-}
-
-bool NetworkManager::isBleMidiRunning() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return bleMidiDevice_ && bleMidiDevice_->isRunning();
-}
-
-// ============================================================================
-// CONTRÔLE DES SERVICES - WIFI HOTSPOT
-// ============================================================================
-
-bool NetworkManager::startWiFiHotspot(const std::string& ssid, 
-                                     const std::string& password,
-                                     uint8_t channel) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Starting WiFi Hotspot...");
-    Logger::info("NetworkManager", "  SSID: " + ssid);
-    Logger::info("NetworkManager", "  Channel: " + std::to_string(channel));
-    
-    if (wifiHotspot_->isRunning()) {
-        Logger::warn("NetworkManager", "WiFi Hotspot already running");
-        return false;
-    }
-    
-    // Configurer les callbacks
-    wifiHotspot_->setOnClientConnected([this](const WiFiClient& client) {
-        Logger::info("NetworkManager", "WiFi client connected: " + client.ipAddress + 
-                    " (" + client.macAddress + ")");
-        
-        stats_.hotspotClients++;
-    });
-    
-    wifiHotspot_->setOnClientDisconnected([this](const std::string& macAddress) {
-        Logger::info("NetworkManager", "WiFi client disconnected: " + macAddress);
-        
-        if (stats_.hotspotClients > 0) {
-            stats_.hotspotClients--;
-        }
-    });
-    
-    // Démarrer le hotspot
-    if (wifiHotspot_->start(ssid, password, channel)) {
-        stats_.hotspotActive = true;
-        Logger::info("NetworkManager", "✓ WiFi Hotspot started");
-        return true;
-    }
-    
-    Logger::error("NetworkManager", "Failed to start WiFi Hotspot");
-    return false;
-}
-
-void NetworkManager::stopWiFiHotspot() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (wifiHotspot_ && wifiHotspot_->isRunning()) {
-        Logger::info("NetworkManager", "Stopping WiFi Hotspot...");
-        wifiHotspot_->stop();
-        stats_.hotspotActive = false;
-        stats_.hotspotClients = 0;
-        Logger::info("NetworkManager", "✓ WiFi Hotspot stopped");
-    }
-}
-
-bool NetworkManager::isWiFiHotspotRunning() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return wifiHotspot_ && wifiHotspot_->isRunning();
-}
-
-// ============================================================================
-// GESTION DES DEVICES
-// ============================================================================
-
-std::vector<NetworkDeviceInfo> NetworkManager::listDevices() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return discoveredDevices_;
-}
-
-bool NetworkManager::connectDevice(const std::string& deviceId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Connecting to device: " + deviceId);
-    
-    // Trouver le device
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&deviceId](const NetworkDeviceInfo& info) {
-            return info.id == deviceId;
-        });
-    
-    if (it == discoveredDevices_.end()) {
-        Logger::error("NetworkManager", "Device not found: " + deviceId);
-        return false;
-    }
-    
-    // Pour RTP-MIDI, la connexion se fait automatiquement
-    // Le client doit se connecter à notre serveur
-    
-    Logger::info("NetworkManager", "Device connection initiated");
-    return true;
-}
-
-bool NetworkManager::disconnectDevice(const std::string& deviceId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    Logger::info("NetworkManager", "Disconnecting device: " + deviceId);
-    
-    // Fermer la session RTP-MIDI si c'est un device RTP
-    if (rtpMidiServer_ && rtpMidiServer_->isRunning()) {
-        rtpMidiServer_->closeSession(deviceId);
-    }
-    
-    // Mettre à jour l'état
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&deviceId](const NetworkDeviceInfo& info) {
-            return info.id == deviceId;
-        });
-    
-    if (it != discoveredDevices_.end()) {
-        it->connected = false;
-    }
-    
-    Logger::info("NetworkManager", "Device disconnected");
-    return true;
-}
-
-std::optional<NetworkDeviceInfo> NetworkManager::getDevice(const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&deviceId](const NetworkDeviceInfo& info) {
-            return info.id == deviceId;
-        });
-    
-    if (it != discoveredDevices_.end()) {
-        return *it;
-    }
-    
-    return std::nullopt;
-}
-
-// ============================================================================
-// CALLBACKS
-// ============================================================================
-
-void NetworkManager::setOnDeviceDiscovered(DeviceDiscoveredCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    onDeviceDiscovered_ = callback;
-}
-
-void NetworkManager::setOnDeviceConnected(DeviceConnectedCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    onDeviceConnected_ = callback;
-}
-
-void NetworkManager::setOnDeviceDisconnected(DeviceDisconnectedCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    onDeviceDisconnected_ = callback;
-}
-
-// ============================================================================
-// STATISTIQUES
-// ============================================================================
-
-NetworkStatistics NetworkManager::getStatistics() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    NetworkStatistics stats = stats_;
-    
-    // Mettre à jour avec les stats des composants
-    if (rtpMidiServer_ && rtpMidiServer_->isRunning()) {
-        auto rtpStats = rtpMidiServer_->getStatistics();
-        stats.rtpDevicesDiscovered = discoveredDevices_.size();
-        stats.rtpDevicesConnected = rtpStats["active_sessions"].get<size_t>();
-        stats.rtpBytesReceived = rtpStats["bytes_received"].get<uint64_t>();
-        stats.rtpBytesSent = rtpStats["bytes_sent"].get<uint64_t>();
-    }
-    
-    if (bleMidiDevice_ && bleMidiDevice_->isRunning()) {
-        auto bleStats = bleMidiDevice_->getStatistics();
-        stats.bleDevicesConnected = bleStats["connected_clients"].get<size_t>();
-        stats.bleBytesReceived = bleStats["bytes_received"].get<uint64_t>();
-        stats.bleBytesSent = bleStats["bytes_sent"].get<uint64_t>();
-    }
-    
-    if (wifiHotspot_ && wifiHotspot_->isRunning()) {
-        auto wifiStats = wifiHotspot_->getStatistics();
-        stats.hotspotActive = wifiStats["running"].get<bool>();
-        stats.hotspotClients = wifiStats["connected_clients"].get<size_t>();
-    }
-    
-    return stats;
-}
-
-std::string NetworkManager::getLocalIpAddress() const {
-    return detectLocalIpAddress();
-}
-
-json NetworkManager::getNetworkInfo() const {
-    json info;
-    
-    // IP Address
-    info["ip_address"] = detectLocalIpAddress();
-    info["mac_address"] = detectMacAddress();
-    
-    // Hostname
-    char hostname[256];
-    if (gethostname(hostname, sizeof(hostname)) == 0) {
-        info["hostname"] = std::string(hostname);
-    } else {
-        info["hostname"] = "unknown";
-    }
-    
-    // Mode réseau
-    if (wifiHotspot_ && wifiHotspot_->isRunning()) {
-        info["network_mode"] = "hotspot";
-    } else {
-        info["network_mode"] = "client";
-    }
-    
+/**
+ * @brief Gestionnaire réseau principal
+ * 
+ * Orchestre tous les modules réseau de MidiMind :
+ * - WiFi (client et hotspot)
+ * - Bluetooth (découverte, pairing, BLE MIDI)
+ * - mDNS (découverte de services)
+ * - RTP-MIDI (serveur réseau)
+ * 
+ * @note Thread-safe, toutes les opérations sont protégées par mutex
+ */
+class NetworkManager {
+public:
     // ========================================================================
-    // AMÉLIORATION: Détection réelle du WiFi
+    // TYPES
     // ========================================================================
     
-    // État WiFi connecté (via wpa_cli)
-    bool wifiConnected = false;
-    std::string wifiSsid = "";
-    int wifiSignal = 0;
+    /**
+     * @brief Callback appelé lors de la découverte d'un device
+     */
+    using DeviceDiscoveredCallback = std::function<void(const NetworkDeviceInfo&)>;
     
-    FILE* pipe = popen("wpa_cli -i wlan0 status 2>/dev/null", "r");
-    if (pipe) {
-        char buffer[256];
-        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-            std::string line(buffer);
-            
-            // Supprimer le retour à la ligne
-            if (!line.empty() && line.back() == '\n') {
-                line.pop_back();
-            }
-            
-            // Parser wpa_state=COMPLETED
-            if (line.find("wpa_state=COMPLETED") != std::string::npos) {
-                wifiConnected = true;
-            }
-            
-            // Parser ssid=MonReseau
-            if (line.find("ssid=") == 0) {
-                wifiSsid = line.substr(5);
-            }
-        }
-        pclose(pipe);
-    }
+    /**
+     * @brief Callback appelé lors de la connexion d'un device
+     */
+    using DeviceConnectedCallback = std::function<void(const std::string& deviceId)>;
     
-    // Obtenir la force du signal WiFi (si connecté)
-    if (wifiConnected) {
-        pipe = popen("iw dev wlan0 link 2>/dev/null | grep signal | awk '{print $2}'", "r");
-        if (pipe) {
-            char buffer[32];
-            if (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-                try {
-                    wifiSignal = std::stoi(std::string(buffer));
-                } catch (...) {
-                    wifiSignal = 0;
-                }
-            }
-            pclose(pipe);
-        }
-    }
-    
-    info["wifi_connected"] = wifiConnected;
-    info["wifi_ssid"] = wifiSsid;
-    info["wifi_signal"] = wifiSignal;
+    /**
+     * @brief Callback appelé lors de la déconnexion d'un device
+     */
+    using DeviceDisconnectedCallback = std::function<void(const std::string& deviceId)>;
     
     // ========================================================================
-    // Interfaces réseau disponibles
+    // CONSTRUCTION / DESTRUCTION
     // ========================================================================
     
-    json interfaces = json::array();
+    /**
+     * @brief Constructeur
+     * 
+     * Initialise tous les sous-gestionnaires réseau.
+     * 
+     * @throws std::runtime_error Si l'initialisation échoue
+     */
+    NetworkManager();
     
-    struct ifaddrs* ifAddrStruct = nullptr;
-    getifaddrs(&ifAddrStruct);
+    /**
+     * @brief Destructeur
+     * 
+     * Arrête tous les services et libère les ressources proprement.
+     */
+    ~NetworkManager();
     
-    for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr) {
-            continue;
-        }
-        
-        if (ifa->ifa_addr->sa_family == AF_INET) { // IPv4
-            json iface;
-            iface["name"] = std::string(ifa->ifa_name);
-            
-            // IP Address
-            void* tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            iface["ip"] = std::string(addressBuffer);
-            
-            // Type d'interface
-            std::string ifname = ifa->ifa_name;
-            if (ifname.find("lo") == 0) {
-                iface["type"] = "loopback";
-            } else if (ifname.find("eth") == 0) {
-                iface["type"] = "ethernet";
-            } else if (ifname.find("wlan") == 0) {
-                iface["type"] = "wifi";
-            } else {
-                iface["type"] = "other";
-            }
-            
-            interfaces.push_back(iface);
-        }
-    }
-    
-    if (ifAddrStruct != nullptr) {
-        freeifaddrs(ifAddrStruct);
-    }
-    
-    info["interfaces"] = interfaces;
+    // Désactiver copie
+    NetworkManager(const NetworkManager&) = delete;
+    NetworkManager& operator=(const NetworkManager&) = delete;
     
     // ========================================================================
-    // Statistiques réseau globales
+    // WIFI CLIENT
     // ========================================================================
     
-    // Lire /proc/net/dev pour les stats
-    std::ifstream netDev("/proc/net/dev");
-    if (netDev.is_open()) {
-        std::string line;
-        std::getline(netDev, line); // Skip header 1
-        std::getline(netDev, line); // Skip header 2
-        
-        uint64_t totalRx = 0;
-        uint64_t totalTx = 0;
-        
-        while (std::getline(netDev, line)) {
-            // Format: interface: rx_bytes rx_packets ... tx_bytes tx_packets ...
-            size_t colonPos = line.find(':');
-            if (colonPos != std::string::npos) {
-                std::string ifname = line.substr(0, colonPos);
-                
-                // Trim whitespace
-                ifname.erase(0, ifname.find_first_not_of(" \t"));
-                ifname.erase(ifname.find_last_not_of(" \t") + 1);
-                
-                // Ignorer loopback
-                if (ifname == "lo") continue;
-                
-                std::istringstream iss(line.substr(colonPos + 1));
-                uint64_t rxBytes, rxPackets, rxErrs, rxDrop;
-                uint64_t txBytes, txPackets, txErrs, txDrop;
-                
-                // Lire les colonnes importantes
-                if (iss >> rxBytes >> rxPackets >> rxErrs >> rxDrop) {
-                    // Skip 4 columns
-                    uint64_t dummy;
-                    iss >> dummy >> dummy >> dummy >> dummy;
-                    
-                    if (iss >> txBytes >> txPackets) {
-                        totalRx += rxBytes;
-                        totalTx += txBytes;
-                    }
-                }
-            }
-        }
-        
-        info["total_bytes_received"] = totalRx;
-        info["total_bytes_sent"] = totalTx;
-        
-        netDev.close();
-    }
+    /**
+     * @brief Lance un scan des réseaux WiFi disponibles
+     * 
+     * @return true Si le scan a été lancé
+     * 
+     * @note Asynchrone, utiliser WifiManager::setOnScanComplete()
+     */
+    bool startWifiScan();
     
-    return info;
-}
+    /**
+     * @brief Se connecte à un réseau WiFi
+     * 
+     * @param ssid SSID du réseau
+     * @param password Mot de passe
+     * @param autoReconnect Activer la reconnexion automatique
+     * 
+     * @return true Si la connexion a été lancée
+     */
+    bool connectWifi(const std::string& ssid, 
+                     const std::string& password,
+                     bool autoReconnect = true);
+    
+    /**
+     * @brief Se déconnecte du réseau WiFi actuel
+     */
+    bool disconnectWifi();
+    
+    /**
+     * @brief Vérifie si connecté à un réseau WiFi
+     */
+    bool isWifiConnected() const;
+    
+    /**
+     * @brief Récupère les réseaux WiFi découverts
+     */
+    std::vector<WiFiNetwork> getWifiNetworks() const;
+    
+    // ========================================================================
+    // WIFI HOTSPOT
+    // ========================================================================
+    
+    /**
+     * @brief Démarre le hotspot WiFi
+     * 
+     * @param ssid SSID du hotspot
+     * @param password Mot de passe (min. 8 caractères)
+     * @param channel Canal WiFi (1-11)
+     * 
+     * @return true Si le hotspot a démarré
+     * 
+     * @note Nécessite les privilèges root ou capabilities
+     */
+    bool startWiFiHotspot(const std::string& ssid, 
+                         const std::string& password,
+                         uint8_t channel = 6);
+    
+    /**
+     * @brief Arrête le hotspot WiFi
+     */
+    void stopWiFiHotspot();
+    
+    /**
+     * @brief Vérifie si le hotspot est actif
+     */
+    bool isWiFiHotspotRunning() const;
+    
+    /**
+     * @brief Liste les clients connectés au hotspot
+     */
+    std::vector<WiFiClient> getHotspotClients() const;
+    
+    // ========================================================================
+    // BLUETOOTH
+    // ========================================================================
+    
+    /**
+     * @brief Lance un scan des appareils Bluetooth
+     * 
+     * @param duration Durée du scan en secondes (0 = infini)
+     * 
+     * @return true Si le scan a été lancé
+     */
+    bool startBluetoothScan(int duration = 10);
+    
+    /**
+     * @brief Arrête le scan Bluetooth
+     */
+    void stopBluetoothScan();
+    
+    /**
+     * @brief Appaire avec un appareil Bluetooth
+     * 
+     * @param address Adresse MAC de l'appareil
+     * @param pin Code PIN si nécessaire
+     * 
+     * @return true Si le pairing a réussi
+     */
+    bool pairBluetoothDevice(const std::string& address, const std::string& pin = "");
+    
+    /**
+     * @brief Connecte à un appareil Bluetooth
+     * 
+     * @param address Adresse MAC de l'appareil
+     * 
+     * @return true Si la connexion a réussi
+     */
+    bool connectBluetoothDevice(const std::string& address);
+    
+    /**
+     * @brief Déconnecte un appareil Bluetooth
+     */
+    bool disconnectBluetoothDevice(const std::string& address);
+    
+    /**
+     * @brief Récupère les appareils Bluetooth découverts
+     */
+    std::vector<BluetoothDevice> getBluetoothDevices() const;
+    
+    // ========================================================================
+    // BLE MIDI
+    // ========================================================================
+    
+    /**
+     * @brief Démarre le service BLE MIDI
+     * 
+     * @param deviceName Nom du device BLE visible
+     * 
+     * @return true Si le service a démarré
+     */
+    bool startBleMidi(const std::string& deviceName = "MidiMind");
+    
+    /**
+     * @brief Arrête le service BLE MIDI
+     */
+    void stopBleMidi();
+    
+    /**
+     * @brief Vérifie si le service BLE MIDI est actif
+     */
+    bool isBleMidiRunning() const;
+    
+    // ========================================================================
+    // RTP-MIDI
+    // ========================================================================
+    
+    /**
+     * @brief Démarre le serveur RTP-MIDI
+     * 
+     * @param port Port UDP pour les connexions (défaut: 5004)
+     * 
+     * @return true Si le serveur a démarré
+     */
+    bool startRtpMidi(uint16_t port = 5004);
+    
+    /**
+     * @brief Arrête le serveur RTP-MIDI
+     */
+    void stopRtpMidi();
+    
+    /**
+     * @brief Vérifie si le serveur RTP-MIDI est actif
+     */
+    bool isRtpMidiRunning() const;
+    
+    // ========================================================================
+    // mDNS DISCOVERY
+    // ========================================================================
+    
+    /**
+     * @brief Démarre la découverte mDNS
+     * 
+     * @return true Si la découverte a démarré
+     */
+    bool startDiscovery();
+    
+    /**
+     * @brief Arrête la découverte mDNS
+     */
+    void stopDiscovery();
+    
+    /**
+     * @brief Publie un service mDNS
+     * 
+     * @param name Nom du service
+     * @param type Type de service (ex: "_apple-midi._udp")
+     * @param port Port du service
+     * 
+     * @return true Si le service a été publié
+     */
+    bool publishService(const std::string& name, 
+                       const std::string& type,
+                       uint16_t port);
+    
+    // ========================================================================
+    // GESTION DES DEVICES
+    // ========================================================================
+    
+    /**
+     * @brief Liste tous les devices réseau découverts
+     * 
+     * @return Liste des devices (RTP-MIDI, BLE, WiFi, Bluetooth)
+     */
+    std::vector<NetworkDeviceInfo> listDevices() const;
+    
+    /**
+     * @brief Connecte à un device réseau
+     * 
+     * @param deviceId Identifiant du device
+     * 
+     * @return true Si la connexion a été lancée
+     */
+    bool connectDevice(const std::string& deviceId);
+    
+    /**
+     * @brief Déconnecte un device réseau
+     * 
+     * @param deviceId Identifiant du device
+     * 
+     * @return true Si la déconnexion a réussi
+     */
+    bool disconnectDevice(const std::string& deviceId);
+    
+    /**
+     * @brief Récupère les informations d'un device
+     * 
+     * @param deviceId Identifiant du device
+     * 
+     * @return Informations du device ou nullopt si non trouvé
+     */
+    std::optional<NetworkDeviceInfo> getDevice(const std::string& deviceId) const;
+    
+    // ========================================================================
+    // STATISTIQUES & INFORMATIONS
+    // ========================================================================
+    
+    /**
+     * @brief Récupère les statistiques réseau globales
+     * 
+     * Agrège les statistiques de tous les modules réseau.
+     * 
+     * @return Statistiques complètes
+     */
+    NetworkStatistics getStatistics() const;
+    
+    /**
+     * @brief Récupère l'adresse IP locale
+     * 
+     * @return Adresse IP (ex: "192.168.1.100")
+     */
+    std::string getLocalIpAddress() const;
+    
+    /**
+     * @brief Récupère les informations réseau complètes
+     * 
+     * Inclut : IP, MAC, hostname, mode réseau, interfaces, trafic
+     * 
+     * @return Informations JSON
+     */
+    json getNetworkInfo() const;
+    
+    // ========================================================================
+    // CALLBACKS
+    // ========================================================================
+    
+    /**
+     * @brief Définit le callback de découverte de device
+     * 
+     * Appelé lorsqu'un nouveau device est découvert sur le réseau.
+     * 
+     * @param callback Fonction à appeler
+     */
+    void setOnDeviceDiscovered(DeviceDiscoveredCallback callback);
+    
+    /**
+     * @brief Définit le callback de connexion de device
+     * 
+     * @param callback Fonction à appeler
+     */
+    void setOnDeviceConnected(DeviceConnectedCallback callback);
+    
+    /**
+     * @brief Définit le callback de déconnexion de device
+     * 
+     * @param callback Fonction à appeler
+     */
+    void setOnDeviceDisconnected(DeviceDisconnectedCallback callback);
+    
+    // ========================================================================
+    // ACCÈS AUX GESTIONNAIRES (pour usage avancé)
+    // ========================================================================
+    
+    /**
+     * @brief Accès direct au WifiManager
+     * 
+     * @return Référence au gestionnaire WiFi
+     * 
+     * @note Pour usage avancé uniquement
+     */
+    WifiManager& getWifiManager() { return *wifiManager_; }
+    
+    /**
+     * @brief Accès direct au BluetoothManager
+     */
+    BluetoothManager& getBluetoothManager() { return *bluetoothManager_; }
+    
+    /**
+     * @brief Accès direct au WiFiHotspot
+     */
+    WiFiHotspot& getWiFiHotspot() { return *wifiHotspot_; }
+    
+    /**
+     * @brief Accès direct au BleMidiDevice
+     */
+    BleMidiDevice& getBleMidiDevice() { return *bleMidiDevice_; }
+    
+    /**
+     * @brief Accès direct au MdnsDiscovery
+     */
+    MdnsDiscovery& getMdnsDiscovery() { return *mdnsDiscovery_; }
+    
+    /**
+     * @brief Accès direct au RtpMidiServer
+     */
+    RtpMidiServer& getRtpMidiServer() { return *rtpMidiServer_; }
 
-
-// ============================================================================
-// MÉTHODES PRIVÉES
-// ============================================================================
-
-void NetworkManager::handleDeviceDiscovered(const NetworkDeviceInfo& info) {
-    // Ajouter à la liste si pas déjà présent
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&info](const NetworkDeviceInfo& d) {
-            return d.id == info.id;
-        });
+private:
+    // ========================================================================
+    // MÉTHODES PRIVÉES
+    // ========================================================================
     
-    if (it == discoveredDevices_.end()) {
-        discoveredDevices_.push_back(info);
-        stats_.rtpDevicesDiscovered++;
-    } else {
-        // Mettre à jour
-        *it = info;
-    }
-}
-
-void NetworkManager::handleDeviceConnected(const std::string& deviceId) {
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&deviceId](const NetworkDeviceInfo& info) {
-            return info.id == deviceId;
-        });
+    /**
+     * @brief Gère la découverte d'un device
+     */
+    void handleDeviceDiscovered(const NetworkDeviceInfo& info);
     
-    if (it != discoveredDevices_.end()) {
-        it->connected = true;
-        it->lastSeen = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-        ).count();
-    }
-}
-
-void NetworkManager::handleDeviceDisconnected(const std::string& deviceId) {
-    auto it = std::find_if(discoveredDevices_.begin(), discoveredDevices_.end(),
-        [&deviceId](const NetworkDeviceInfo& info) {
-            return info.id == deviceId;
-        });
+    /**
+     * @brief Gère la connexion d'un device
+     */
+    void handleDeviceConnected(const std::string& deviceId);
     
-    if (it != discoveredDevices_.end()) {
-        it->connected = false;
-    }
-}
-
-std::string NetworkManager::detectLocalIpAddress() const {
-    struct ifaddrs* ifAddrStruct = nullptr;
-    struct ifaddrs* ifa = nullptr;
-    void* tmpAddrPtr = nullptr;
-    std::string result = "127.0.0.1";
+    /**
+     * @brief Gère la déconnexion d'un device
+     */
+    void handleDeviceDisconnected(const std::string& deviceId);
     
-    getifaddrs(&ifAddrStruct);
+    /**
+     * @brief Détecte l'adresse IP locale
+     */
+    std::string detectLocalIpAddress() const;
     
-    for (ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr) {
-            continue;
-        }
-        
-        // IPv4
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            
-            std::string addr(addressBuffer);
-            
-            // Ignorer loopback
-            if (addr != "127.0.0.1" && addr.find("127.") != 0) {
-                result = addr;
-                break;
-            }
-        }
-    }
+    /**
+     * @brief Détecte l'adresse MAC
+     */
+    std::string detectMacAddress() const;
     
-    if (ifAddrStruct != nullptr) {
-        freeifaddrs(ifAddrStruct);
-    }
+    // ========================================================================
+    // MEMBRES PRIVÉS
+    // ========================================================================
     
-    return result;
-}
-
-std::string NetworkManager::detectMacAddress() const {
-    struct ifaddrs* ifAddrStruct = nullptr;
-    std::string result = "00:00:00:00:00:00";
+    // Thread-safety
+    mutable std::mutex mutex_;
     
-    getifaddrs(&ifAddrStruct);
+    // Gestionnaires réseau
+    std::unique_ptr<WifiManager> wifiManager_;
+    std::unique_ptr<BluetoothManager> bluetoothManager_;
+    std::unique_ptr<WiFiHotspot> wifiHotspot_;
+    std::unique_ptr<BleMidiDevice> bleMidiDevice_;
+    std::unique_ptr<MdnsDiscovery> mdnsDiscovery_;
+    std::unique_ptr<RtpMidiServer> rtpMidiServer_;
     
-    for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr) {
-            continue;
-        }
-        
-        // Chercher wlan0 ou eth0
-        std::string ifname(ifa->ifa_name);
-        if (ifname == "wlan0" || ifname == "eth0") {
-            // Lire l'adresse MAC depuis /sys/class/net/
-            std::string path = "/sys/class/net/" + ifname + "/address";
-            std::ifstream macFile(path);
-            
-            if (macFile.is_open()) {
-                std::getline(macFile, result);
-                macFile.close();
-                break;
-            }
-        }
-    }
+    // État
+    std::vector<NetworkDeviceInfo> discoveredDevices_;
+    NetworkStatistics stats_;
     
-    if (ifAddrStruct != nullptr) {
-        freeifaddrs(ifAddrStruct);
-    }
-    
-    return result;
-}
+    // Callbacks
+    DeviceDiscoveredCallback onDeviceDiscovered_;
+    DeviceConnectedCallback onDeviceConnected_;
+    DeviceDisconnectedCallback onDeviceDisconnected_;
+};
 
 } // namespace midiMind
 
+#endif // MIDIMIND_NETWORKMANAGER_H
+
 // ============================================================================
-// FIN DU FICHIER NetworkManager.cpp
+// FIN DU FICHIER networkmanager.h v3.0.0
 // ============================================================================

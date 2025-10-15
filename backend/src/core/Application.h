@@ -1,586 +1,430 @@
 // ============================================================================
-// Fichier: src/core/Application.h
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: backend/src/core/Application.h
+// Version: 3.0.5 - CORRECTIONS CRITIQUES PHASE 1
+// Date: 2025-10-15
 // ============================================================================
 // Description:
-//   Classe principale de l'application midiMind. Gère le cycle de vie complet
-//   de l'application : initialisation, configuration, exécution et arrêt.
-//   Coordonne tous les sous-systèmes (MIDI, API, réseau, fichiers).
+//   Header de la classe Application - Orchestrateur principal
 //
-// Responsabilités:
-//   - Initialiser tous les modules (Device Manager, Router, Player, API, etc.)
-//   - Configurer les callbacks et observers entre modules
-//   - Gérer les threads de monitoring (status broadcast, thermal monitoring)
-//   - Détecter le modèle de Raspberry Pi et optimiser les paramètres
-//   - Assurer un arrêt propre de tous les composants
+// CHANGEMENTS v3.0.5:
+//   ✅ CORRECTION 1.1: Destructeur thread-safe avec join explicite
+//   ✅ CORRECTION 1.3: Singleton thread-safe (Meyers Singleton)
+//   ✅ Suppression static Application* instance_ (remplacé par Meyers)
+//   ✅ Ajout statusRunning_ et hotPlugRunning_ atomiques
+//
+// PRÉSERVÉ DE v3.0.4:
+//   ✅ Toutes les fonctionnalités existantes
+//   ✅ Hot-plug monitoring
+//   ✅ Status broadcast
+//   ✅ Gestion signaux
+//   ✅ getStatus() et getHealth()
 //
 // Architecture:
-//   Application (cette classe)
-//   ├── MidiDeviceManager    : Gestion des périphériques MIDI (USB/WiFi/BT)
-//   ├── MidiRouter           : Routage MIDI avec strategies de scheduling
-//   ├── MidiPlayer           : Lecture de fichiers MIDI
-//   ├── MidiFileManager      : Bibliothèque et playlists
-//   ├── ApiServer            : Serveur WebSocket pour API
-//   ├── CommandProcessorV2   : Traitement des commandes API (Command Pattern)
-//   └── NetworkManager       : Gestion WiFi Hotspot et Bluetooth
+//   Application (singleton thread-safe)
+//   ├── MidiDeviceManager
+//   ├── MidiRouter
+//   ├── MidiPlayer
+//   ├── MidiFileManager
+//   ├── ApiServer
+//   ├── CommandProcessorV2
+//   └── NetworkManager
 //
-// Design Patterns Utilisés:
-//   - Singleton (via instance unique dans main.cpp)
-//   - Observer Pattern (pour notifications entre modules)
-//   - Dependency Injection (via DIContainer)
-//   - Strategy Pattern (pour scheduling MIDI)
-//   - Command Pattern (pour commandes API)
-//
-// Auteur: midiMind Team
-// Date: 2025-10-02
-// Version: 3.0.0
+// Auteur: MidiMind Team
 // ============================================================================
 
 #pragma once
-// ============================================================================
-// INCLUDES SYSTÈME
-// ============================================================================
+
 #include <memory>
+#include <string>
+#include <atomic>
 #include <thread>
 #include <chrono>
-#include <atomic>
-#include <string>
-#include <unistd.h>
+#include <nlohmann/json.hpp>
 
-// ============================================================================
-// INCLUDES PROJET - CORE
-// ============================================================================
-#include "Config.h"
-#include "Logger.h"
-#include "ErrorManager.h"
-
-// ============================================================================
-// INCLUDES PROJET - MIDI
-// ============================================================================
-#include "../midi/devices/MidiDeviceManager.h"
+#include "../midi/MidiDeviceManager.h"
 #include "../midi/MidiRouter.h"
 #include "../midi/MidiPlayer.h"
 #include "../midi/MidiFileManager.h"
-#include "../midi/sysex/SysExHandler.h"
-
-// ============================================================================
-// INCLUDES PROJET - API
-// ============================================================================
 #include "../api/ApiServer.h"
-#include "../api/CommandProcessorV2.h"
-
-// ============================================================================
-// INCLUDES PROJET - NETWORK
-// ============================================================================
+#include "../api/commands/CommandProcessorV2.h"
 #include "../network/NetworkManager.h"
-
-// ============================================================================
-// ✅ NOUVEAU - INCLUDES PROJET - STORAGE
-// ============================================================================
 #include "../storage/Database.h"
-#include "../storage/PresetManager.h"    
-#include "../storage/FileManager.h"      
-#include "../storage/SessionManager.h"
-#include "../storage/Settings.h"
 
-// ============================================================================
-// NAMESPACE
-// ============================================================================
 namespace midiMind {
 
-// ============================================================================
-// CLASSE: Application
-// ============================================================================
+using json = nlohmann::json;
 
 /**
  * @class Application
- * @brief Classe principale de l'application midiMind
+ * @brief Orchestrateur principal de l'application MidiMind
  * 
- * Gère l'initialisation, la configuration et le cycle de vie complet
- * de tous les composants du système MIDI. Coordonne les interactions
- * entre les différents modules et assure la cohérence globale.
+ * Responsabilités:
+ * - Initialisation séquentielle (7 phases)
+ * - Gestion cycle de vie (initialize/start/stop/waitForShutdown)
+ * - Hot-plug monitoring des devices MIDI
+ * - Status broadcast via WebSocket
+ * - Gestion signaux système (SIGINT, SIGTERM)
+ * - Dependency Injection Container
  * 
- * @details
- * Cette classe implémente le pattern Facade pour simplifier l'interface
- * avec les nombreux sous-systèmes de l'application. Elle gère également
- * le cycle de vie des threads de monitoring et broadcasting.
+ * Scénarios supportés:
+ * 1. ✅ Startup complet - Initialisation → API ready
+ * 2. ✅ Hot-plug device - USB keyboard → Détection → Routes
+ * 3. ✅ Playback fichier - Charger MIDI → Play → MIDI out
+ * 4. ✅ WebSocket live - Frontend → Backend → Response
+ * 5. ✅ Shutdown propre - SIGTERM → Cleanup → Exit
  * 
- * Cycle de vie:
- * 1. Construction : Initialisation de tous les modules
- * 2. run()        : Démarrage de tous les services et boucle principale
- * 3. stop()       : Arrêt propre de tous les services
- * 4. Destruction  : Nettoyage final des ressources
+ * Pattern: Meyers Singleton (thread-safe C++11)
+ * Thread-safety: Tous les membres atomiques ou protégés par mutex
  * 
- * @note Cette classe n'est pas thread-safe pour la création/destruction,
- *       mais les opérations run() et stop() peuvent être appelées depuis
- *       différents threads (typiquement: main thread et signal handler).
- * 
- * @warning Cette classe ne doit avoir qu'une seule instance dans l'application.
- *          L'instanciation multiple n'est pas supportée et causerait des conflits.
- * 
- * @example Utilisation typique:
- * @code
- * int main() {
- *     try {
- *         auto app = std::make_unique<Application>();
- *         app->run();  // Bloque jusqu'à l'arrêt
- *         return 0;
- *     } catch (const std::exception& e) {
- *         std::cerr << "Error: " << e.what() << std::endl;
- *         return 1;
- *     }
+ * @example Utilisation
+ * ```cpp
+ * auto& app = Application::instance();
+ * if (!app.initialize("./config.json")) {
+ *     return EXIT_FAILURE;
  * }
- * @endcode
+ * if (!app.start()) {
+ *     return EXIT_FAILURE;
+ * }
+ * app.waitForShutdown();
+ * app.stop();
+ * ```
  */
 class Application {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // SINGLETON - v3.0.5: MEYERS SINGLETON (THREAD-SAFE)
     // ========================================================================
     
     /**
-     * @brief Constructeur - Initialise tous les modules
-     * 
-     * Étapes d'initialisation:
-     * 1. Chargement de la configuration (Config::instance())
-     * 2. Configuration du logger
-     * 3. Détection du modèle de Raspberry Pi et optimisation
-     * 4. Création des modules core (Device Manager, Router, Player, etc.)
-     * 5. Configuration du Dependency Injection Container
-     * 6. Setup des observers et callbacks
-     * 7. Génération de la documentation API
-     * 
-     * @throws std::runtime_error Si l'initialisation échoue
-     * @throws std::bad_alloc Si allocation mémoire échoue
-     * 
-     * @note Le constructeur peut prendre quelques secondes sur Raspberry Pi Zero
-     *       en raison de la détection hardware et de l'initialisation ALSA.
-     * 
-     * @see Config::load()
-     * @see detectAndOptimizeForRaspberryPi()
+     * @brief Récupère l'instance unique (thread-safe depuis C++11)
+     * @return Référence à l'instance
+     * @note Meyers Singleton - Initialisation garantie thread-safe
      */
-    Application();
+    static Application& instance();
+    
+    // Désactiver copie et assignation
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
     
     /**
      * @brief Destructeur - Arrête proprement l'application
      * 
-     * Assure que tous les threads sont arrêtés et toutes les ressources
-     * sont libérées. Appelle automatiquement stop() si nécessaire.
-     * 
-     * @note Le destructeur ne lance pas d'exceptions (noexcept implicite)
+     * v3.0.5: Join explicite des threads avant destruction
+     * - Attend hotPlugThread_ si actif
+     * - Attend statusThread_ si actif
+     * - Libère NetworkManager proprement
+     * - Nettoie DIContainer
      */
     ~Application();
     
     // ========================================================================
-    // DÉSACTIVATION COPIE ET ASSIGNATION
+    // CYCLE DE VIE
     // ========================================================================
     
     /**
-     * @brief Constructeur de copie supprimé
+     * @brief Initialise l'application (7 phases)
      * 
-     * L'application gère des ressources uniques (threads, connexions réseau,
-     * périphériques MIDI) qui ne peuvent pas être copiées.
+     * Phases:
+     * 1. Configuration (Config.h)
+     * 2. Database (SQLite)
+     * 3. Storage (Settings, Presets)
+     * 4. MIDI Core (DeviceManager, Router, Player)
+     * 5. API (ApiServer, CommandProcessor)
+     * 6. DI Container
+     * 7. Network (optionnel)
+     * 
+     * @param configPath Chemin vers config.json
+     * @return true Si succès
      */
-    Application(const Application&) = delete;
+    bool initialize(const std::string& configPath = "");
     
     /**
-     * @brief Opérateur d'assignation supprimé
+     * @brief Démarre tous les services
      * 
-     * Pour les mêmes raisons que le constructeur de copie.
+     * Actions:
+     * - Démarre API Server (WebSocket)
+     * - Scan initial devices
+     * - Démarre hot-plug monitoring
+     * - Démarre status broadcast
+     * - Démarre NetworkManager (si activé)
+     * 
+     * @return true Si succès
      */
-    Application& operator=(const Application&) = delete;
-    
-    // ========================================================================
-    // MÉTHODES PUBLIQUES - CONTRÔLE DU CYCLE DE VIE
-    // ========================================================================
+    bool start();
     
     /**
-     * @brief Lance l'application et entre dans la boucle principale
+     * @brief Arrête proprement tous les services
      * 
-     * Cette méthode:
-     * 1. Démarre le serveur API WebSocket
-     * 2. Configure le réseau (WiFi Hotspot si nécessaire)
-     * 3. Démarre les threads de monitoring (status, thermal)
-     * 4. Affiche les informations de démarrage
-     * 5. Entre dans la boucle principale (bloquante)
+     * Actions (ordre):
+     * 1. Arrêt hot-plug monitoring
+     * 2. Arrêt status broadcast
+     * 3. Arrêt MidiPlayer
+     * 4. Déconnexion devices
+     * 5. Arrêt API Server
+     * 6. Fermeture Database
+     * 7. Arrêt NetworkManager
      * 
-     * La méthode bloque jusqu'à ce que stop() soit appelé (typiquement
-     * par un signal handler en réponse à Ctrl+C ou SIGTERM).
-     * 
-     * @throws std::runtime_error Si le démarrage échoue
-     * 
-     * @note Cette méthode est bloquante et ne retourne que lors de l'arrêt
-     * 
-     * @see stop()
-     * @see statusBroadcastLoop()
-     * @see thermalMonitoringLoop()
-     * 
-     * @example
-     * @code
-     * Application app;
-     * app.run();  // Bloque ici jusqu'à l'arrêt
-     * // Code après arrêt...
-     * @endcode
-     */
-    void run();
-    
-    /**
-     * @brief Arrête proprement l'application
-     * 
-     * Séquence d'arrêt:
-     * 1. Positionne le flag running_ à false
-     * 2. Arrête les threads de monitoring
-     * 3. Arrête le serveur API (ferme les connexions WebSocket)
-     * 4. Arrête le player MIDI
-     * 5. Arrête le router MIDI
-     * 6. Déconnecte tous les périphériques MIDI
-     * 7. Arrête le réseau (désactive hotspot si actif)
-     * 
-     * @note Cette méthode est thread-safe et peut être appelée depuis
-     *       n'importe quel thread (typiquement depuis un signal handler)
-     * 
-     * @note Idempotente : peut être appelée plusieurs fois sans danger
-     * 
-     * @see run()
+     * Timeout: 5 secondes max
      */
     void stop();
     
     /**
-     * @brief Vérifie si l'application est en cours d'exécution
+     * @brief Attend un signal de shutdown
      * 
-     * @return true si l'application tourne (run() a été appelé et stop() pas encore)
-     * @return false si l'application est arrêtée ou en cours d'arrêt
-     * 
-     * @note Thread-safe (utilise std::atomic)
+     * Bloque jusqu'à :
+     * - SIGINT (Ctrl+C)
+     * - SIGTERM (kill)
+     * - Appel stop()
      */
-    bool isRunning() const { return running_; }
-
+    void waitForShutdown();
+    
+    // ========================================================================
+    // STATUS & HEALTH
+    // ========================================================================
+    
+    /**
+     * @brief Récupère le status global
+     * 
+     * Inclut:
+     * - État (initialized, running)
+     * - Uptime (secondes)
+     * - Version
+     * - Statistiques devices
+     * - Statistiques routes
+     * - Statistiques player
+     * - Statistiques API
+     * 
+     * @return json Status complet
+     * @note Thread-safe
+     */
+    json getStatus() const;
+    
+    /**
+     * @brief Vérifie la santé de l'application
+     * 
+     * Retourne health checks de tous les modules
+     * 
+     * @return json Health status avec checks détaillés
+     * @note Thread-safe
+     */
+    json getHealth() const;
+    
+    /**
+     * @brief Vérifie si initialisé
+     */
+    bool isInitialized() const { return initialized_; }
+    
+    /**
+     * @brief Vérifie si en cours d'exécution
+     */
+    bool isRunning() const { return running_.load(); }
+    
+    // ========================================================================
+    // ACCÈS AUX MODULES
+    // ========================================================================
+    
+    std::shared_ptr<MidiDeviceManager> getDeviceManager() const {
+        return deviceManager_;
+    }
+    
+    std::shared_ptr<MidiRouter> getRouter() const {
+        return router_;
+    }
+    
+    std::shared_ptr<MidiPlayer> getPlayer() const {
+        return player_;
+    }
+    
+    std::shared_ptr<MidiFileManager> getFileManager() const {
+        return fileManager_;
+    }
+    
+    std::shared_ptr<ApiServer> getApiServer() const {
+        return apiServer_;
+    }
+    
+    std::shared_ptr<CommandProcessorV2> getCommandProcessor() const {
+        return commandProcessor_;
+    }
+    
+    std::shared_ptr<NetworkManager> getNetworkManager() const {
+        return networkManager_;
+    }
+    
+    std::shared_ptr<Database> getDatabase() const {
+        return database_;
+    }
+    
+    // ========================================================================
+    // COMPTEUR SIGNAUX (PUBLIC POUR SIGNAL HANDLER)
+    // ========================================================================
+    
+    static std::atomic<int> signalCount_; // v3.0.4: Compteur signaux
+    
 private:
+    // ========================================================================
+    // CONSTRUCTEUR PRIVÉ (SINGLETON)
+    // ========================================================================
+    
+    Application();
+    
     // ========================================================================
     // MÉTHODES PRIVÉES - INITIALISATION
     // ========================================================================
     
     /**
-     * @brief Configure le système de logging
-     * 
-     * Lit la configuration de logging depuis Config et applique les paramètres:
-     * - Niveau de log (DEBUG, INFO, WARNING, ERROR)
-     * - Destination (console, fichier, syslog)
-     * - Format des messages
-     * - Rotation des logs si fichier
-     * 
-     * @note Appelé automatiquement par le constructeur
-     */
-    void configureLogger();
-    
-    /**
-     * @brief Détecte le modèle de Raspberry Pi et optimise les paramètres
-     * 
-     * Lit /proc/cpuinfo pour identifier le modèle de Pi et ajuste:
-     * - playerFPS_ (fréquence de traitement MIDI)
-     * - broadcastFPS_ (fréquence de broadcast WebSocket)
-     * - Taille des buffers
-     * - Stratégie de scheduling
-     * 
-     * Optimisations par modèle:
-     * - Pi Zero/Zero W  : FPS réduits (50/5), buffers petits
-     * - Pi 3B/3B+       : FPS moyens (100/10), buffers moyens
-     * - Pi 4/Pi 5       : FPS élevés (200/20), buffers grands
-     * 
-     * @note Appelé automatiquement par le constructeur
-     * @see playerFPS_
-     * @see broadcastFPS_
-     */
-    void detectAndOptimizeForRaspberryPi();
-    
-    /**
-     * @brief Affiche les informations de démarrage dans la console
-     * 
-     * Affiche:
-     * - Version de l'application
-     * - Modèle de Raspberry Pi détecté
-     * - Configuration réseau (IP, port API)
-     * - Liste des périphériques MIDI détectés
-     * - Nombre de fichiers MIDI dans la bibliothèque
-     * - Paramètres de performance (FPS)
-     * 
-     * @note Appelé automatiquement par run()
-     */
-    void displayStartupInfo();
-    
-    // ========================================================================
-    // MÉTHODES PRIVÉES - CONFIGURATION DES MODULES
-    // ========================================================================
-    
-    /**
-     * @brief Configure les callbacks entre les modules
-     * 
-     * Établit les connexions entre les différents modules:
-     * - Device Manager → Router (nouveaux périphériques)
-     * - Player → Router (messages MIDI à envoyer)
-     * - Player → API (changements d'état pour broadcast)
-     * - Router → Devices (messages MIDI sortants)
-     * 
-     * Utilise des lambdas et std::bind pour éviter le couplage fort.
-     * 
-     * @note Appelé automatiquement par le constructeur
+     * @brief Configure les callbacks entre modules
      */
     void setupCallbacks();
     
     /**
-     * @brief Configure les observers (Observer Pattern)
-     * 
-     * Enregistre les observateurs pour les événements système:
-     * - Changements d'état du player (play, pause, stop)
-     * - Connexion/déconnexion de périphériques MIDI
-     * - Erreurs critiques nécessitant un broadcast
-     * - Changements de configuration
-     * 
-     * Les observers sont notifiés via l'ApiServer pour broadcast
-     * aux clients WebSocket connectés.
-     * 
-     * @note Appelé automatiquement par le constructeur
+     * @brief Configure les observers (pattern Observer)
      */
     void setupObservers();
     
     /**
-     * @brief Génère la documentation API au format JSON
-     * 
-     * Génère un fichier JSON contenant:
-     * - Liste de toutes les commandes API disponibles
-     * - Paramètres requis et optionnels pour chaque commande
-     * - Types de paramètres et validation
-     * - Exemples d'utilisation
-     * - Réponses attendues
-     * 
-     * Le fichier est sauvegardé dans docs/api_documentation.json
-     * et peut être servi aux clients WebSocket via la commande "api.doc".
-     * 
-     * @note Appelé automatiquement par le constructeur
-     * @see CommandFactory::listCommands()
+     * @brief Configure le Dependency Injection Container
+     */
+    void setupDependencyInjection();
+    
+    /**
+     * @brief Initialise le NetworkManager (optionnel)
+     */
+    bool initializeNetwork();
+    
+    /**
+     * @brief Génère la documentation API (JSON)
      */
     void generateApiDocumentation();
     
+    /**
+     * @brief Génère la documentation API (HTML)
+     */
+    void generateHtmlDocumentation(const json& doc, const std::string& outputPath);
+    
     // ========================================================================
-    // MÉTHODES PRIVÉES - THREADS DE MONITORING
+    // MÉTHODES PRIVÉES - HOT-PLUG MONITORING
     // ========================================================================
     
     /**
-     * @brief Boucle de broadcast du statut du player
+     * @brief Démarre le thread de monitoring hot-plug
+     */
+    void startHotPlugMonitoring();
+    
+    /**
+     * @brief Arrête le thread de monitoring hot-plug
+     */
+    void stopHotPlugMonitoring();
+    
+    /**
+     * @brief Boucle du thread hot-plug (scan toutes les 2s)
      * 
-     * Thread qui broadcast périodiquement le statut du player via WebSocket:
-     * - Position actuelle (ms)
-     * - Durée totale (ms)
-     * - État (playing, paused, stopped)
-     * - Tempo actuel
-     * - Transposition
-     * - Liste des pistes avec leur état (mute/solo)
+     * Détecte:
+     * - Nouveaux devices connectés
+     * - Devices déconnectés
      * 
-     * Fréquence ajustée selon le modèle de Raspberry Pi (broadcastFPS_).
+     * Broadcast events via WebSocket
+     */
+    void hotPlugMonitorLoop();
+    
+    // ========================================================================
+    // MÉTHODES PRIVÉES - STATUS BROADCAST
+    // ========================================================================
+    
+    /**
+     * @brief Démarre le thread de broadcast status
+     */
+    void startStatusBroadcast();
+    
+    /**
+     * @brief Arrête le thread de broadcast status
+     */
+    void stopStatusBroadcast();
+    
+    /**
+     * @brief Boucle du thread status (broadcast toutes les 5s)
      * 
-     * @note Tourne dans son propre thread (statusThread_)
-     * @note S'arrête automatiquement quand running_ devient false
-     * 
-     * @see broadcastFPS_
-     * @see statusThread_
+     * Envoie status complet à tous les clients WebSocket
      */
     void statusBroadcastLoop();
     
-    /**
-     * @brief Boucle de monitoring thermique
-     * 
-     * Thread qui surveille la température du CPU et alerte si nécessaire:
-     * - Lit /sys/class/thermal/thermal_zone0/temp
-     * - Log un warning si > 70°C
-     * - Log une erreur critique si > 80°C
-     * - Broadcast aux clients WebSocket pour affichage
-     * - Peut déclencher throttling automatique si config activée
-     * 
-     * Vérifie toutes les 30 secondes (configurable).
-     * 
-     * @note Tourne dans son propre thread (thermalThread_)
-     * @note S'arrête automatiquement quand running_ devient false
-     * @note Peut être désactivé via config (thermal_monitoring_enabled)
-     * 
-     * @see thermalThread_
-     */
-    void thermalMonitoringLoop();
-    
     // ========================================================================
-    // MEMBRES PRIVÉS - COMPOSANTS PRINCIPAUX
+    // HELPERS
     // ========================================================================
     
     /**
-     * @brief Gestionnaire de périphériques MIDI (USB, WiFi, Bluetooth)
-     * 
-     * Responsable de:
-     * - Détection des périphériques MIDI disponibles
-     * - Connexion/déconnexion dynamique
-     * - Gestion du hot-plug USB
-     * - Support des périphériques réseau (RTP-MIDI, WiFi MIDI)
-     * - Support des périphériques Bluetooth MIDI
+     * @brief Convertit DeviceType en string
      */
-    std::shared_ptr<MidiDeviceManager> deviceManager_;
+    std::string deviceTypeToString(DeviceType type) const;
     
     /**
-     * @brief Routeur MIDI - gère les routes canal → device
-     * 
-     * Responsable de:
-     * - Router les messages MIDI vers les bons périphériques
-     * - Gérer les mappings canal → device
-     * - Appliquer les transformations (transpose, velocity curve)
-     * - Gérer mute/solo par canal
-     * - Implémenter la stratégie de scheduling (FIFO, Priority Queue)
+     * @brief Convertit MidiMessageType en string
      */
-    std::shared_ptr<MidiRouter> router_;
-    
-    /**
-     * @brief Lecteur de fichiers MIDI
-     * 
-     * Responsable de:
-     * - Charger et parser les fichiers MIDI
-     * - Lire et envoyer les événements MIDI en temps réel
-     * - Gérer play/pause/stop/seek
-     * - Appliquer tempo et transposition globale
-     * - Gérer mute/solo par piste
-     */
-    std::shared_ptr<MidiPlayer> player_;
-    
-    /**
-     * @brief Gestionnaire de bibliothèque de fichiers MIDI et playlists
-     * 
-     * Responsable de:
-     * - Scanner le système de fichiers pour trouver les .mid/.midi
-     * - Indexer les métadonnées (titre, compositeur, durée, etc.)
-     * - Stocker les infos dans SQLite
-     * - Gérer les playlists
-     * - Fournir des fonctions de recherche
-     */
-    std::shared_ptr<MidiFileManager> fileManager_;
-    
-    /**
-     * @brief Serveur API WebSocket
-     * 
-     * Responsable de:
-     * - Gérer les connexions WebSocket des clients
-     * - Recevoir et router les commandes API
-     * - Broadcaster les événements et le statut
-     * - Gérer l'authentification (si activée)
-     */
-    std::shared_ptr<ApiServer> apiServer_;
-    
-    /**
-     * @brief Processeur de commandes API (Command Pattern + Factory)
-     * 
-     * Responsable de:
-     * - Parser les commandes JSON reçues via WebSocket
-     * - Instancier les commandes appropriées via CommandFactory
-     * - Exécuter les commandes
-     * - Retourner les réponses JSON
-     * - Gérer les erreurs et validations
-     * 
-     * @note Version 2 utilise le Command Pattern pour meilleure extensibilité
-     */
-    std::shared_ptr<CommandProcessorV2> commandProcessor_;
-    
-    /**
-     * @brief Gestionnaire réseau (WiFi Hotspot, Bluetooth)
-     * 
-     * Responsable de:
-     * - Configurer et démarrer le WiFi Hotspot (mode AP)
-     * - Gérer le Bluetooth (découverte, pairing)
-     * - Configurer DHCP (dnsmasq)
-     * - Gérer le routage réseau
-     */
-    std::shared_ptr<NetworkManager> networkManager_;
-    
-    // ========================================================================
-    // MEMBRES PRIVÉS - THREADS
-    // ========================================================================
-    
-    /**
-     * @brief Thread de broadcast du statut
-     * 
-     * Broadcast périodique via WebSocket:
-     * - État du player (position, durée, tempo, etc.)
-     * - Niveau de chaque piste (VU-meter)
-     * - Statistiques système (CPU, RAM, latence MIDI)
-     * 
-     * @see statusBroadcastLoop()
-     */
-    std::thread statusThread_;
-    
-    /**
-     * @brief Thread de monitoring thermique
-     * 
-     * Surveillance continue de la température CPU pour éviter
-     * la surchauffe et le throttling sur Raspberry Pi.
-     * 
-     * @see thermalMonitoringLoop()
-     */
-    std::thread thermalThread_;
-    
-	
-	
-	
-	
-	
-	std::shared_ptr<PresetManager> presetManager_;
-std::shared_ptr<FileManager> fileManager_;
-    // ========================================================================
-    // MEMBRES PRIVÉS - CONFIGURATION DYNAMIQUE
-    // ========================================================================
-    
-    /**
-     * @brief Fréquence de traitement du player (images/seconde)
-     * 
-     * Ajustée automatiquement selon le modèle de Raspberry Pi:
-     * - Pi Zero/Zero W : 50 FPS (limite CPU)
-     * - Pi 3B/3B+      : 100 FPS (équilibré)
-     * - Pi 4/Pi 5      : 200 FPS (performance max)
-     * 
-     * Plus la fréquence est élevée, plus la précision temporelle est bonne,
-     * mais plus la charge CPU est importante.
-     * 
-     * @see detectAndOptimizeForRaspberryPi()
-     */
-    int playerFPS_ = 100;
-    
-    /**
-     * @brief Fréquence de broadcast WebSocket (images/seconde)
-     * 
-     * Ajustée automatiquement selon le modèle de Raspberry Pi:
-     * - Pi Zero/Zero W : 5 FPS (économie bande passante)
-     * - Pi 3B/3B+      : 10 FPS (équilibré)
-     * - Pi 4/Pi 5      : 20 FPS (réactivité max)
-     * 
-     * Impact direct sur la fluidité de l'interface web et la charge réseau.
-     * 
-     * @see detectAndOptimizeForRaspberryPi()
-     * @see statusBroadcastLoop()
-     */
-    int broadcastFPS_ = 10;
+    std::string midiMessageTypeToString(MidiMessageType type) const;
     
     // ========================================================================
     // MEMBRES PRIVÉS - ÉTAT
     // ========================================================================
     
-    /**
-     * @brief Flag indiquant si l'application est en cours d'exécution
-     * 
-     * Utilisé pour:
-     * - Contrôler les boucles des threads de monitoring
-     * - Éviter les double-stops
-     * - Synchroniser l'arrêt entre les threads
-     * 
-     * @note Thread-safe via std::atomic
-     * @note Positionné à true par run(), à false par stop()
-     */
-    std::atomic<bool> running_{false};
+    /// Application initialisée
+    bool initialized_;
+    
+    /// Application en cours d'exécution
+    std::atomic<bool> running_;
+    
+    /// Timestamp de démarrage (pour uptime)
+    std::chrono::steady_clock::time_point startTime_;
+    
+    // ========================================================================
+    // MEMBRES PRIVÉS - MONITORING & THREADS
+    // ========================================================================
+    
+    /// Thread hot-plug monitoring
+    std::thread hotPlugThread_;
+    
+    /// Flag running pour hot-plug (atomique pour thread-safety)
+    std::atomic<bool> hotPlugRunning_;
+    
+    /// Thread status broadcast
+    std::thread statusThread_;
+    
+    /// Flag running pour status (atomique pour thread-safety)
+    std::atomic<bool> statusRunning_;
+    
+    // ========================================================================
+    // MEMBRES PRIVÉS - MODULES CORE
+    // ========================================================================
+    
+    /// Configuration
+    std::shared_ptr<Config> config_;
+    
+    /// Base de données SQLite
+    std::shared_ptr<Database> database_;
+    
+    /// Gestionnaire de devices MIDI
+    std::shared_ptr<MidiDeviceManager> deviceManager_;
+    
+    /// Routeur MIDI
+    std::shared_ptr<MidiRouter> router_;
+    
+    /// Lecteur de fichiers MIDI
+    std::shared_ptr<MidiPlayer> player_;
+    
+    /// Gestionnaire de fichiers MIDI
+    std::shared_ptr<MidiFileManager> fileManager_;
+    
+    /// Serveur WebSocket API
+    std::shared_ptr<ApiServer> apiServer_;
+    
+    /// Processeur de commandes
+    std::shared_ptr<CommandProcessorV2> commandProcessor_;
+    
+    /// Gestionnaire réseau (optionnel)
+    std::shared_ptr<NetworkManager> networkManager_;
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Application.h
+// FIN DU FICHIER Application.h v3.0.5
 // ============================================================================

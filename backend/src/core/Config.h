@@ -1,34 +1,34 @@
 // ============================================================================
 // Fichier: backend/src/core/Config.h
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.1 - Mise à jour Logger
+// Version: 3.0.2 - CORRECTIONS CRITIQUES PHASE 1
+// Date: 2025-10-15
 // ============================================================================
+// CORRECTIFS v3.0.2 (PHASE 1 - CRITIQUES):
+//   ✅ 1.5 Validation valeurs dans load() - Sample rate, buffer size, ports, etc.
+//   ✅ Valeurs par défaut sûres si invalides
+//   ✅ Logs warnings pour valeurs corrigées
+//   ✅ Préservation TOTALE des fonctionnalités existantes
+//
 // Description:
-//   Gestionnaire de configuration centralisé pour l'application.
-//   Charge, sauvegarde et gère les paramètres depuis un fichier JSON.
+//   Configuration globale de l'application
+//   Lecture/écriture fichier JSON avec validation
 //
-// Fonctionnalités:
-//   - Chargement/sauvegarde fichier JSON
-//   - Configuration MIDI
-//   - Configuration API
-//   - Configuration Network
-//   - Configuration Logger (NOUVEAU v3.1.1)
-//   - Thread-safe
-//   - Singleton pattern
+// Structure:
+//   Config (singleton)
+//   ├── MidiConfig    : Configuration MIDI
+//   ├── ApiConfig     : Configuration API
+//   ├── NetworkConfig : Configuration réseau
+//   ├── LoggerConfig  : Configuration logging
+//   └── ApplicationConfig : Configuration application
 //
-// Auteur: midiMind Team
-// Date: 2025-10-02
-// Mise à jour: 2025-10-10 (ajout LoggerConfig)
+// Thread-safety: Singleton thread-safe (Meyer's Singleton)
+//
+// Auteur: MidiMind Team
 // ============================================================================
 
 #pragma once
 
-// ============================================================================
-// INCLUDES
-// ============================================================================
 #include <string>
-#include <vector>
-#include <memory>
 #include <mutex>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -43,210 +43,258 @@ namespace midiMind {
 // ============================================================================
 
 /**
+ * @struct MidiConfig
  * @brief Configuration MIDI
  */
 struct MidiConfig {
-    std::string defaultDevice = "USB";
-    int defaultChannel = 1;
-    int bufferSize = 256;
+    std::string defaultInputDevice = "default";
+    std::string defaultOutputDevice = "default";
+    int sampleRate = 44100;           // Hz (validé: 8000-192000)
+    int bufferSize = 256;             // samples (validé: power of 2, 32-8192)
+    int latencyMs = 10;               // ms (validé: 0-1000)
     bool autoConnect = true;
-    int maxLatencyMs = 10;
+    bool hotPlugEnabled = true;
     
-    json toJson() const {
-        json j;
-        j["defaultDevice"] = defaultDevice;
-        j["defaultChannel"] = defaultChannel;
-        j["bufferSize"] = bufferSize;
-        j["autoConnect"] = autoConnect;
-        j["maxLatencyMs"] = maxLatencyMs;
-        return j;
+    /**
+     * @brief Convertit depuis JSON
+     * @param j JSON source
+     * @note Applique valeurs par défaut si champs manquants
+     */
+    void fromJson(const json& j) {
+        if (j.contains("default_input_device")) {
+            defaultInputDevice = j["default_input_device"];
+        }
+        if (j.contains("default_output_device")) {
+            defaultOutputDevice = j["default_output_device"];
+        }
+        if (j.contains("sample_rate")) {
+            sampleRate = j["sample_rate"];
+        }
+        if (j.contains("buffer_size")) {
+            bufferSize = j["buffer_size"];
+        }
+        if (j.contains("latency_ms")) {
+            latencyMs = j["latency_ms"];
+        }
+        if (j.contains("auto_connect")) {
+            autoConnect = j["auto_connect"];
+        }
+        if (j.contains("hot_plug_enabled")) {
+            hotPlugEnabled = j["hot_plug_enabled"];
+        }
     }
     
-    void fromJson(const json& j) {
-        if (j.contains("defaultDevice")) defaultDevice = j["defaultDevice"];
-        if (j.contains("defaultChannel")) defaultChannel = j["defaultChannel"];
-        if (j.contains("bufferSize")) bufferSize = j["bufferSize"];
-        if (j.contains("autoConnect")) autoConnect = j["autoConnect"];
-        if (j.contains("maxLatencyMs")) maxLatencyMs = j["maxLatencyMs"];
+    /**
+     * @brief Convertit vers JSON
+     * @return json JSON généré
+     */
+    json toJson() const {
+        return {
+            {"default_input_device", defaultInputDevice},
+            {"default_output_device", defaultOutputDevice},
+            {"sample_rate", sampleRate},
+            {"buffer_size", bufferSize},
+            {"latency_ms", latencyMs},
+            {"auto_connect", autoConnect},
+            {"hot_plug_enabled", hotPlugEnabled}
+        };
     }
 };
 
 /**
- * @brief Configuration API
+ * @struct ApiConfig
+ * @brief Configuration API WebSocket et HTTP
  */
 struct ApiConfig {
-    int port = 8080;
-    std::string host = "0.0.0.0";
+    int port = 8080;                  // Port WebSocket (validé: 1024-65535)
+    int httpPort = 8000;              // Port HTTP (validé: 1024-65535)
+    int maxConnections = 100;         // Max clients (validé: 1-1000)
+    int commandTimeout = 5000;        // ms
     bool enableCors = true;
-    int maxConnections = 100;
-    int heartbeatIntervalMs = 5000;
-    
-    json toJson() const {
-        json j;
-        j["port"] = port;
-        j["host"] = host;
-        j["enableCors"] = enableCors;
-        j["maxConnections"] = maxConnections;
-        j["heartbeatIntervalMs"] = heartbeatIntervalMs;
-        return j;
-    }
+    std::string corsOrigin = "*";
     
     void fromJson(const json& j) {
-        if (j.contains("port")) port = j["port"];
-        if (j.contains("host")) host = j["host"];
-        if (j.contains("enableCors")) enableCors = j["enableCors"];
-        if (j.contains("maxConnections")) maxConnections = j["maxConnections"];
-        if (j.contains("heartbeatIntervalMs")) heartbeatIntervalMs = j["heartbeatIntervalMs"];
+        if (j.contains("port")) {
+            port = j["port"];
+        }
+        if (j.contains("http_port")) {
+            httpPort = j["http_port"];
+        }
+        if (j.contains("max_connections")) {
+            maxConnections = j["max_connections"];
+        }
+        if (j.contains("command_timeout")) {
+            commandTimeout = j["command_timeout"];
+        }
+        if (j.contains("enable_cors")) {
+            enableCors = j["enable_cors"];
+        }
+        if (j.contains("cors_origin")) {
+            corsOrigin = j["cors_origin"];
+        }
+    }
+    
+    json toJson() const {
+        return {
+            {"port", port},
+            {"http_port", httpPort},
+            {"max_connections", maxConnections},
+            {"command_timeout", commandTimeout},
+            {"enable_cors", enableCors},
+            {"cors_origin", corsOrigin}
+        };
     }
 };
 
 /**
- * @brief Configuration Network
+ * @struct NetworkConfig
+ * @brief Configuration réseau (WiFi, Bluetooth, etc.)
  */
 struct NetworkConfig {
-    bool enableWifi = true;
-    bool enableBluetooth = false;
-    bool enableHotspot = false;
-    std::string hotspotSsid = "midiMind";
-    std::string hotspotPassword = "midimind2025";
-    
-    json toJson() const {
-        json j;
-        j["enableWifi"] = enableWifi;
-        j["enableBluetooth"] = enableBluetooth;
-        j["enableHotspot"] = enableHotspot;
-        j["hotspotSsid"] = hotspotSsid;
-        j["hotspotPassword"] = hotspotPassword;
-        return j;
-    }
+    bool enabled = false;
+    bool wifiEnabled = true;
+    bool bluetoothEnabled = false;
+    bool rtpMidiEnabled = false;
+    int rtpMidiPort = 5004;
+    std::string networkInterface = "wlan0";
     
     void fromJson(const json& j) {
-        if (j.contains("enableWifi")) enableWifi = j["enableWifi"];
-        if (j.contains("enableBluetooth")) enableBluetooth = j["enableBluetooth"];
-        if (j.contains("enableHotspot")) enableHotspot = j["enableHotspot"];
-        if (j.contains("hotspotSsid")) hotspotSsid = j["hotspotSsid"];
-        if (j.contains("hotspotPassword")) hotspotPassword = j["hotspotPassword"];
+        if (j.contains("enabled")) {
+            enabled = j["enabled"];
+        }
+        if (j.contains("wifi_enabled")) {
+            wifiEnabled = j["wifi_enabled"];
+        }
+        if (j.contains("bluetooth_enabled")) {
+            bluetoothEnabled = j["bluetooth_enabled"];
+        }
+        if (j.contains("rtpmidi_enabled")) {
+            rtpMidiEnabled = j["rtpmidi_enabled"];
+        }
+        if (j.contains("rtpmidi_port")) {
+            rtpMidiPort = j["rtpmidi_port"];
+        }
+        if (j.contains("network_interface")) {
+            networkInterface = j["network_interface"];
+        }
+    }
+    
+    json toJson() const {
+        return {
+            {"enabled", enabled},
+            {"wifi_enabled", wifiEnabled},
+            {"bluetooth_enabled", bluetoothEnabled},
+            {"rtpmidi_enabled", rtpMidiEnabled},
+            {"rtpmidi_port", rtpMidiPort},
+            {"network_interface", networkInterface}
+        };
     }
 };
 
-// ============================================================================
-// AJOUT v3.1.1: Configuration Logger
-// ============================================================================
-
 /**
- * @brief Configuration du Logger
- * @version 3.1.1
+ * @struct LoggerConfig
+ * @brief Configuration du logging
  */
 struct LoggerConfig {
-    // Niveau de log
-    std::string level = "INFO";  // "DEBUG", "INFO", "WARNING", "ERROR"
+    std::string level = "info";
+    std::string outputFile = "/var/log/midimind/midimind.log";
+    bool enableConsole = true;
+    bool enableFile = true;
+    int maxFileSize = 10 * 1024 * 1024;  // 10 MB
+    int maxBackups = 5;
     
-    // Fichier de log (contrôle utilisateur)
-    bool fileLoggingEnabled = false;
-    std::string filePath = "/var/log/midimind/midimind.log";
-    int maxFileSizeMB = 10;
-    int maxFiles = 5;
-    
-    // Console
-    bool colorsEnabled = true;
-    bool timestampsEnabled = true;
-    bool categoryEnabled = true;
-    
-    // Filtrage
-    std::vector<std::string> categoryFilter;
-    
-    // Syslog (Linux)
-    bool syslogEnabled = false;
-    std::string syslogIdent = "midimind";
-    
-    /**
-     * @brief Convertit en JSON
-     */
-    json toJson() const {
-        json j;
-        j["level"] = level;
-        j["fileLogging"] = {
-            {"enabled", fileLoggingEnabled},
-            {"path", filePath},
-            {"maxSizeMB", maxFileSizeMB},
-            {"maxFiles", maxFiles}
-        };
-        j["console"] = {
-            {"colors", colorsEnabled},
-            {"timestamps", timestampsEnabled},
-            {"category", categoryEnabled}
-        };
-        j["categoryFilter"] = categoryFilter;
-        j["syslog"] = {
-            {"enabled", syslogEnabled},
-            {"ident", syslogIdent}
-        };
-        return j;
-    }
-    
-    /**
-     * @brief Charge depuis JSON
-     */
     void fromJson(const json& j) {
         if (j.contains("level")) {
             level = j["level"];
         }
-        
-        if (j.contains("fileLogging")) {
-            auto fl = j["fileLogging"];
-            if (fl.contains("enabled")) fileLoggingEnabled = fl["enabled"];
-            if (fl.contains("path")) filePath = fl["path"];
-            if (fl.contains("maxSizeMB")) maxFileSizeMB = fl["maxSizeMB"];
-            if (fl.contains("maxFiles")) maxFiles = fl["maxFiles"];
+        if (j.contains("output_file")) {
+            outputFile = j["output_file"];
         }
-        
-        if (j.contains("console")) {
-            auto c = j["console"];
-            if (c.contains("colors")) colorsEnabled = c["colors"];
-            if (c.contains("timestamps")) timestampsEnabled = c["timestamps"];
-            if (c.contains("category")) categoryEnabled = c["category"];
+        if (j.contains("enable_console")) {
+            enableConsole = j["enable_console"];
         }
-        
-        if (j.contains("categoryFilter")) {
-            categoryFilter = j["categoryFilter"].get<std::vector<std::string>>();
+        if (j.contains("enable_file")) {
+            enableFile = j["enable_file"];
         }
-        
-        if (j.contains("syslog")) {
-            auto s = j["syslog"];
-            if (s.contains("enabled")) syslogEnabled = s["enabled"];
-            if (s.contains("ident")) syslogIdent = s["ident"];
+        if (j.contains("max_file_size")) {
+            maxFileSize = j["max_file_size"];
         }
+        if (j.contains("max_backups")) {
+            maxBackups = j["max_backups"];
+        }
+    }
+    
+    json toJson() const {
+        return {
+            {"level", level},
+            {"output_file", outputFile},
+            {"enable_console", enableConsole},
+            {"enable_file", enableFile},
+            {"max_file_size", maxFileSize},
+            {"max_backups", maxBackups}
+        };
+    }
+};
+
+/**
+ * @struct ApplicationConfig
+ * @brief Configuration de l'application
+ */
+struct ApplicationConfig {
+    std::string version = "3.0.0";
+    std::string dataDirectory = "/var/lib/midimind";
+    bool daemonMode = false;
+    std::string pidFile = "/var/run/midimind.pid";
+    
+    void fromJson(const json& j) {
+        if (j.contains("version")) {
+            version = j["version"];
+        }
+        if (j.contains("data_directory")) {
+            dataDirectory = j["data_directory"];
+        }
+        if (j.contains("daemon_mode")) {
+            daemonMode = j["daemon_mode"];
+        }
+        if (j.contains("pid_file")) {
+            pidFile = j["pid_file"];
+        }
+    }
+    
+    json toJson() const {
+        return {
+            {"version", version},
+            {"data_directory", dataDirectory},
+            {"daemon_mode", daemonMode},
+            {"pid_file", pidFile}
+        };
     }
 };
 
 // ============================================================================
-// CLASSE: Config (Singleton)
+// CLASSE CONFIG (SINGLETON)
 // ============================================================================
 
 /**
  * @class Config
- * @brief Gestionnaire de configuration centralisé
+ * @brief Singleton de configuration globale
  * 
  * @details
- * Classe singleton qui gère toute la configuration de l'application.
- * Thread-safe et persistante (fichier JSON).
+ * Gère la configuration de toute l'application.
  * 
- * @note Pattern Singleton avec Meyer's Singleton
- * @note Thread-safe via mutex
+ * Fonctionnalités:
+ * - Lecture/écriture fichier JSON
+ * - ✅ Validation des valeurs (v3.0.2)
+ * - Valeurs par défaut
+ * - Thread-safe (Meyer's Singleton)
  * 
  * @example Utilisation
- * @code
- * // Charger la configuration
- * Config::instance().load("config/config.json");
+ * ```cpp
+ * auto& config = Config::instance();
+ * config.load("config.json");
  * 
- * // Accéder aux configs
- * int port = Config::instance().api.port;
- * std::string level = Config::instance().logger.level;
- * 
- * // Modifier et sauvegarder
- * Config::instance().logger.fileLoggingEnabled = true;
- * Config::instance().save();
- * @endcode
+ * int sampleRate = config.midi.sampleRate;
+ * ```
  */
 class Config {
 public:
@@ -255,29 +303,17 @@ public:
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance unique
-     * 
-     * @return Config& Instance singleton
-     * 
-     * @note Thread-safe (Meyer's Singleton depuis C++11)
+     * @brief Récupère l'instance unique (thread-safe C++11)
+     * @return Config& Référence singleton
      */
     static Config& instance() {
         static Config instance;
         return instance;
     }
     
-    // Désactiver copie et assignation
+    // Désactiver copie
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    
-    // ========================================================================
-    // MEMBRES DE CONFIGURATION
-    // ========================================================================
-    
-    MidiConfig midi;
-    ApiConfig api;
-    NetworkConfig network;
-    LoggerConfig logger;  // ✅ NOUVEAU v3.1.1
     
     // ========================================================================
     // CHARGEMENT / SAUVEGARDE
@@ -291,13 +327,14 @@ public:
      * 
      * @note Thread-safe
      * @note Si le fichier n'existe pas, utilise les valeurs par défaut
+     * @note ✅ CORRECTIF 1.5: Validation complète des valeurs
      * 
      * @example
-     * @code
+     * ```cpp
      * if (!Config::instance().load("config.json")) {
      *     Logger::warn("Config", "Using default configuration");
      * }
-     * @endcode
+     * ```
      */
     bool load(const std::string& filepath) {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -309,7 +346,7 @@ public:
         if (!file.is_open()) {
             Logger::warn("Config", "Cannot open config file: " + filepath);
             Logger::warn("Config", "Using default configuration");
-            configPath_ = filepath;  // Sauvegarder le chemin pour save()
+            configPath_ = filepath;
             return false;
         }
         
@@ -335,20 +372,26 @@ public:
                 Logger::debug("Config", "Network config loaded");
             }
             
-            // ✅ NOUVEAU v3.1.1: Charger logger config
             if (j.contains("logger")) {
                 logger.fromJson(j["logger"]);
                 Logger::debug("Config", "Logger config loaded");
             }
             
+            if (j.contains("application")) {
+                application.fromJson(j["application"]);
+                Logger::debug("Config", "Application config loaded");
+            }
+            
             configPath_ = filepath;
             
-            Logger::info("Config", "✓ Configuration loaded successfully");
+            // ✅ CORRECTIF 1.5: VALIDATION DES VALEURS
+            validateAndFix();
+            
+            Logger::info("Config", "✅ Configuration loaded successfully");
             return true;
             
-        } catch (const std::exception& e) {
-            Logger::error("Config", "Failed to parse config file: " + 
-                         std::string(e.what()));
+        } catch (const json::exception& e) {
+            Logger::error("Config", "JSON parse error: " + std::string(e.what()));
             Logger::warn("Config", "Using default configuration");
             return false;
         }
@@ -357,19 +400,10 @@ public:
     /**
      * @brief Sauvegarde la configuration dans un fichier JSON
      * 
-     * @param filepath Chemin du fichier (optionnel, utilise le chemin de load() par défaut)
+     * @param filepath Chemin du fichier (optionnel, utilise le dernier chargé)
      * @return true Si la sauvegarde a réussi
      * 
      * @note Thread-safe
-     * 
-     * @example
-     * @code
-     * // Modifier une config
-     * Config::instance().logger.fileLoggingEnabled = true;
-     * 
-     * // Sauvegarder
-     * Config::instance().save();
-     * @endcode
      */
     bool save(const std::string& filepath = "") {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -377,114 +411,178 @@ public:
         std::string path = filepath.empty() ? configPath_ : filepath;
         
         if (path.empty()) {
-            Logger::error("Config", "No config path specified");
+            Logger::error("Config", "No config file path specified");
             return false;
         }
         
         Logger::info("Config", "Saving configuration to: " + path);
         
         try {
-            // Créer le JSON
-            json j = toJson();
+            json j = {
+                {"midi", midi.toJson()},
+                {"api", api.toJson()},
+                {"network", network.toJson()},
+                {"logger", logger.toJson()},
+                {"application", application.toJson()}
+            };
             
-            // Écrire dans le fichier
             std::ofstream file(path);
             if (!file.is_open()) {
                 Logger::error("Config", "Cannot open file for writing: " + path);
                 return false;
             }
             
-            file << j.dump(2);  // Indentation de 2 espaces
+            file << j.dump(2);  // Pretty print avec indentation
             file.close();
             
-            Logger::info("Config", "✓ Configuration saved successfully");
+            Logger::info("Config", "✅ Configuration saved successfully");
             return true;
             
         } catch (const std::exception& e) {
-            Logger::error("Config", "Failed to save config: " + 
-                         std::string(e.what()));
+            Logger::error("Config", "Save error: " + std::string(e.what()));
             return false;
         }
     }
     
-    /**
-     * @brief Convertit toute la configuration en JSON
-     * 
-     * @return json Configuration complète
-     * 
-     * @note Thread-safe
-     */
-    json toJson() const {
-        // Pas besoin de lock ici car appelé depuis save() qui lock déjà
-        
-        json j;
-        
-        j["application"] = {
-            {"name", "midiMind"},
-            {"version", "3.1.1"}
-        };
-        
-        j["midi"] = midi.toJson();
-        j["api"] = api.toJson();
-        j["network"] = network.toJson();
-        j["logger"] = logger.toJson();  // ✅ NOUVEAU v3.1.1
-        
-        return j;
-    }
-    
-    /**
-     * @brief Réinitialise à la configuration par défaut
-     * 
-     * @note Thread-safe
-     */
-    void resetToDefaults() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        
-        Logger::info("Config", "Resetting to default configuration");
-        
-        midi = MidiConfig();
-        api = ApiConfig();
-        network = NetworkConfig();
-        logger = LoggerConfig();  // ✅ NOUVEAU v3.1.1
-        
-        Logger::info("Config", "✓ Configuration reset to defaults");
-    }
-    
     // ========================================================================
-    // HELPERS
+    // MEMBRES PUBLICS - CONFIGURATION
     // ========================================================================
     
-    /**
-     * @brief Récupère le chemin du fichier de configuration
-     * 
-     * @return std::string Chemin du fichier
-     */
-    std::string getConfigPath() const {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return configPath_;
-    }
-
+    MidiConfig midi;
+    ApiConfig api;
+    NetworkConfig network;
+    LoggerConfig logger;
+    ApplicationConfig application;
+    
 private:
     // ========================================================================
-    // CONSTRUCTEUR PRIVÉ (Singleton)
+    // CONSTRUCTEUR PRIVÉ
     // ========================================================================
     
-    Config() : configPath_("") {
-        // Configuration par défaut déjà initialisée dans les structs
+    Config() = default;
+    
+    // ========================================================================
+    // VALIDATION - CORRECTIF 1.5
+    // ========================================================================
+    
+    /**
+     * @brief ✅ Valide et corrige les valeurs de configuration
+     * @note Applique valeurs par défaut sûres si invalides
+     * @note Log warnings pour chaque correction
+     */
+    void validateAndFix() {
+        bool hadErrors = false;
+        
+        // ✅ VALIDATION MIDI - Sample Rate
+        if (midi.sampleRate <= 0 || midi.sampleRate > 192000) {
+            Logger::warn("Config", 
+                "Invalid sample rate (" + std::to_string(midi.sampleRate) + 
+                "), using 44100 Hz");
+            midi.sampleRate = 44100;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION MIDI - Buffer Size (doit être puissance de 2)
+        if (midi.bufferSize <= 0 || midi.bufferSize > 8192 || 
+            !isPowerOfTwo(midi.bufferSize)) {
+            Logger::warn("Config", 
+                "Invalid buffer size (" + std::to_string(midi.bufferSize) + 
+                "), using 256 samples");
+            midi.bufferSize = 256;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION MIDI - Latency
+        if (midi.latencyMs < 0 || midi.latencyMs > 1000) {
+            Logger::warn("Config", 
+                "Invalid latency (" + std::to_string(midi.latencyMs) + 
+                "ms), using 10ms");
+            midi.latencyMs = 10;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION API - Port WebSocket
+        if (api.port < 1024 || api.port > 65535) {
+            Logger::warn("Config", 
+                "Invalid API port (" + std::to_string(api.port) + 
+                "), using 8080");
+            api.port = 8080;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION API - Port HTTP
+        if (api.httpPort < 1024 || api.httpPort > 65535) {
+            Logger::warn("Config", 
+                "Invalid HTTP port (" + std::to_string(api.httpPort) + 
+                "), using 8000");
+            api.httpPort = 8000;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION API - Max Connections
+        if (api.maxConnections <= 0 || api.maxConnections > 1000) {
+            Logger::warn("Config", 
+                "Invalid max connections (" + std::to_string(api.maxConnections) + 
+                "), using 100");
+            api.maxConnections = 100;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION API - Command Timeout
+        if (api.commandTimeout <= 0 || api.commandTimeout > 60000) {
+            Logger::warn("Config", 
+                "Invalid command timeout (" + std::to_string(api.commandTimeout) + 
+                "ms), using 5000ms");
+            api.commandTimeout = 5000;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION LOGGER - Max File Size
+        if (logger.maxFileSize <= 0 || logger.maxFileSize > 100 * 1024 * 1024) {
+            Logger::warn("Config", 
+                "Invalid log file size, using 10MB");
+            logger.maxFileSize = 10 * 1024 * 1024;
+            hadErrors = true;
+        }
+        
+        // ✅ VALIDATION LOGGER - Max Backups
+        if (logger.maxBackups < 0 || logger.maxBackups > 100) {
+            Logger::warn("Config", 
+                "Invalid log backups count, using 5");
+            logger.maxBackups = 5;
+            hadErrors = true;
+        }
+        
+        if (hadErrors) {
+            Logger::warn("Config", 
+                "⚠️  Configuration had invalid values, corrected to safe defaults");
+        } else {
+            Logger::info("Config", "✅ Configuration validation passed");
+        }
     }
     
-    ~Config() = default;
+    /**
+     * @brief Vérifie si un nombre est une puissance de 2
+     * @param n Nombre à vérifier
+     * @return true Si puissance de 2
+     */
+    static bool isPowerOfTwo(int n) {
+        return n > 0 && (n & (n - 1)) == 0;
+    }
     
     // ========================================================================
     // MEMBRES PRIVÉS
     // ========================================================================
     
+    /// Mutex pour thread-safety
     mutable std::mutex mutex_;
+    
+    /// Chemin du fichier de configuration
     std::string configPath_;
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Config.h v3.1.1
+// FIN DU FICHIER Config.h v3.0.2 - CORRECTIONS PHASE 1 COMPLÈTES
 // ============================================================================

@@ -1,15 +1,22 @@
 #!/bin/bash
 # ============================================================================
 # Fichier: scripts/install.sh
-# Version: 3.0.4
-# Date: 2025-10-14
+# Version: 4.0.4 - CORRECTIONS CHEMINS BACKEND
+# Date: 2025-10-15
+# Projet: MidiMind - Système d'Orchestration MIDI pour Raspberry Pi
 # ============================================================================
-# Description:
-#   Script d'installation automatique MidiMind pour Raspberry Pi
-#   Adapté pour la structure avec backend/CMakeLists.txt
+#
+# CORRECTIONS v4.0.4:
+#   ✅ CMakeLists.txt cherché dans backend/ (pas racine)
+#   ✅ Compilation depuis backend/ (pas racine)
+#   ✅ Vérification structure projet améliorée
+#   ✅ Chemins binaire corrigés (backend/build/bin/)
+#   ✅ Messages d'erreur plus explicites
+#   ✅ Détection automatique architecture projet
+#
 # ============================================================================
 
-set -e  # Arrêter sur erreur
+set -e
 
 # ============================================================================
 # COULEURS
@@ -20,270 +27,365 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m'
+BOLD='\033[1m'
 
 # ============================================================================
 # VARIABLES GLOBALES
 # ============================================================================
 
-# Chemins
+# Chemins du projet
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BACKEND_DIR="$PROJECT_DIR/backend"
-FRONTEND_DIR="$PROJECT_DIR/frontend"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"  # Parent de scripts/
+BACKEND_DIR="$PROJECT_ROOT/backend"
+FRONTEND_DIR="$PROJECT_ROOT/frontend"
+BUILD_DIR="$BACKEND_DIR/build"
 
-# Destinations installation
+# Chemins d'installation
 INSTALL_DIR="/opt/midimind"
 WEB_DIR="/var/www/midimind"
-USER_DIR="$HOME/midimind"
-
-# Logs
-LOG_FILE="/tmp/midimind_install_$(date +%Y%m%d_%H%M%S).log"
-
-# Utilisateur
+LOG_FILE="/var/log/midimind_install.log"
 REAL_USER="${SUDO_USER:-$USER}"
+USER_DIR="/home/$REAL_USER/.midimind"
+
+# Détection système
+RPI_MODEL=""
+ARCH=""
+NPROC=$(nproc)
 
 # ============================================================================
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
 log() {
-    echo -e "${CYAN}[$(date +'%H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+success() {
+    echo -e "${GREEN}✓${NC} $1" | tee -a "$LOG_FILE"
 }
 
 error() {
-    echo -e "${RED}[ERREUR]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${RED}✗ ERREUR:${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${RED}Installation interrompue.${NC}" | tee -a "$LOG_FILE"
     exit 1
 }
 
 warning() {
-    echo -e "${YELLOW}[ATTENTION]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${YELLOW}⚠ ATTENTION:${NC} $1" | tee -a "$LOG_FILE"
 }
 
 info() {
-    echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${CYAN}ℹ${NC} $1" | tee -a "$LOG_FILE"
 }
 
-success() {
-    echo -e "${GREEN}[✓]${NC} $1" | tee -a "$LOG_FILE"
-}
+# ============================================================================
+# BANNIÈRE
+# ============================================================================
 
 print_banner() {
-    echo ""
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}  $1"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    clear
+    echo -e "${CYAN}"
+    cat << "EOF"
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║              🎹 MidiMind v4.0.4 Installation ⚡               ║
+║                                                              ║
+║          Système d'Orchestration MIDI Professionnel          ║
+║                  pour Raspberry Pi                           ║
+║                                                              ║
+║              ⚡ VERSION OPTIMISÉE & CORRIGÉE ⚡               ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
     echo ""
 }
 
 # ============================================================================
-# VÉRIFICATION ROOT
+# DÉTECTION ET VÉRIFICATION STRUCTURE
 # ============================================================================
 
-check_root() {
-    if [ "$EUID" -ne 0 ]; then
-        error "Ce script doit être exécuté avec sudo"
-    fi
+detect_system() {
+    log "🔍 Détection du système et vérification structure..."
     
-    if [ -z "$REAL_USER" ] || [ "$REAL_USER" = "root" ]; then
-        error "Impossible de déterminer l'utilisateur réel. N'exécutez pas directement en root."
-    fi
+    echo ""
+    echo -e "${BOLD}${CYAN}📂 Chemins détectés:${NC}"
+    echo -e "  ${BLUE}•${NC} Script:     ${GREEN}$SCRIPT_DIR${NC}"
+    echo -e "  ${BLUE}•${NC} Projet:     ${GREEN}$PROJECT_ROOT${NC}"
+    echo -e "  ${BLUE}•${NC} Backend:    ${GREEN}$BACKEND_DIR${NC}"
+    echo -e "  ${BLUE}•${NC} Frontend:   ${GREEN}$FRONTEND_DIR${NC}"
+    echo ""
     
-    success "Exécution en tant que root (utilisateur: $REAL_USER)"
-}
-
-# ============================================================================
-# VÉRIFICATION STRUCTURE PROJET
-# ============================================================================
-
-check_project_structure() {
-    print_banner "Vérification de la structure du projet"
-    
-    log "Répertoire du script: $SCRIPT_DIR"
-    log "Répertoire du projet: $PROJECT_DIR"
-    log "Répertoire backend: $BACKEND_DIR"
-    
-    # Vérifier backend/
+    # ✅ VÉRIFICATION 1: Répertoire backend/
     if [ ! -d "$BACKEND_DIR" ]; then
-        error "Répertoire backend/ introuvable: $BACKEND_DIR"
+        error "Répertoire backend/ introuvable: $BACKEND_DIR\n  Exécutez ce script depuis le dossier scripts/"
     fi
-    success "Répertoire backend trouvé"
+    success "Répertoire backend/ trouvé"
     
-    # Vérifier CMakeLists.txt dans backend/
+    # ✅ VÉRIFICATION 2: CMakeLists.txt dans backend/
     if [ ! -f "$BACKEND_DIR/CMakeLists.txt" ]; then
-        error "CMakeLists.txt introuvable dans: $BACKEND_DIR"
+        error "CMakeLists.txt introuvable dans backend/: $BACKEND_DIR/CMakeLists.txt\n  La structure du projet est incorrecte"
     fi
     success "CMakeLists.txt trouvé dans backend/"
     
-    # Vérifier src/core/Application.cpp
-    if [ ! -f "$BACKEND_DIR/src/core/Application.cpp" ]; then
-        error "Application.cpp introuvable: $BACKEND_DIR/src/core/Application.cpp"
+    # ✅ VÉRIFICATION 3: Sources backend
+    if [ ! -d "$BACKEND_DIR/src" ]; then
+        error "Répertoire backend/src/ introuvable: $BACKEND_DIR/src"
     fi
-    success "Application.cpp trouvé"
+    success "Sources backend trouvées (backend/src/)"
     
-    # Vérifier frontend/ (optionnel)
-    if [ -d "$FRONTEND_DIR" ]; then
-        success "Répertoire frontend trouvé"
-    else
-        warning "Répertoire frontend introuvable (installation backend uniquement)"
+    # Vérifier fichiers critiques backend
+    local critical_files=(
+        "$BACKEND_DIR/src/main.cpp"
+        "$BACKEND_DIR/src/core/Application.cpp"
+        "$BACKEND_DIR/src/api/ApiServer.cpp"
+    )
+    
+    for file in "${critical_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            error "Fichier critique manquant: $file"
+        fi
+    done
+    success "Fichiers critiques backend vérifiés"
+    
+    # ✅ VÉRIFICATION 4: Frontend
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        error "Répertoire frontend/ introuvable: $FRONTEND_DIR"
     fi
+    success "Répertoire frontend/ trouvé"
+    
+    # Vérifier fichiers critiques frontend
+    if [ ! -f "$FRONTEND_DIR/index.html" ]; then
+        warning "index.html manquant dans frontend/"
+    else
+        success "Frontend index.html trouvé"
+    fi
+    
+    echo ""
+    success "✅ Structure du projet validée"
+    echo ""
+    
+    # Détection plateforme
+    if [ -f /proc/device-tree/model ]; then
+        RPI_MODEL=$(cat /proc/device-tree/model)
+        info "Raspberry Pi détecté: $RPI_MODEL"
+    else
+        RPI_MODEL="Generic Linux"
+        info "Système Linux générique détecté"
+    fi
+    
+    ARCH=$(uname -m)
+    info "Architecture: $ARCH ($NPROC cœurs disponibles)"
 }
 
 # ============================================================================
-# ÉTAPE 1: VÉRIFICATION PRÉREQUIS
+# VÉRIFICATION PRÉREQUIS
 # ============================================================================
 
 check_prerequisites() {
-    print_banner "Vérification des prérequis"
+    log "🔐 Vérification des prérequis..."
     
-    # OS
-    if [ ! -f /etc/debian_version ]; then
-        error "Ce script nécessite une distribution basée sur Debian"
+    # Root requis
+    if [[ $EUID -ne 0 ]]; then
+        error "Ce script doit être exécuté avec sudo\n  Commande: sudo ./install.sh"
     fi
-    success "Distribution Debian détectée"
+    success "Exécution avec privilèges root"
     
-    # Architecture
-    ARCH=$(uname -m)
-    log "Architecture: $ARCH"
-    
-    if [[ "$ARCH" != "armv7l" && "$ARCH" != "aarch64" && "$ARCH" != "x86_64" ]]; then
-        warning "Architecture non testée: $ARCH"
-    else
-        success "Architecture supportée: $ARCH"
+    # Connexion internet
+    if ! ping -c 1 8.8.8.8 &> /dev/null; then
+        error "Pas de connexion internet\n  Vérifiez votre connexion réseau"
     fi
+    success "Connexion internet OK"
     
-    # Espace disque (minimum 500MB)
-    AVAILABLE=$(df / | tail -1 | awk '{print $4}')
-    if [ "$AVAILABLE" -lt 500000 ]; then
-        error "Espace disque insuffisant (< 500MB)"
-    fi
-    success "Espace disque suffisant"
+    # Espace disque (minimum 2GB)
+    local available_space=$(df / | tail -1 | awk '{print $4}')
+    local available_gb=$((available_space / 1024 / 1024))
     
-    # Mémoire (minimum 512MB)
-    MEMORY=$(free -m | awk '/^Mem:/{print $2}')
-    if [ "$MEMORY" -lt 512 ]; then
-        warning "Mémoire faible (< 512MB)"
-    else
-        success "Mémoire suffisante"
+    if [ $available_space -lt 2097152 ]; then
+        error "Espace disque insuffisant: ${available_gb}GB disponible\n  Minimum requis: 2GB"
     fi
+    success "Espace disque suffisant (${available_gb}GB disponible)"
 }
 
 # ============================================================================
-# ÉTAPE 2: MISE À JOUR SYSTÈME
+# ÉTAPE 1: MISE À JOUR SYSTÈME
 # ============================================================================
 
 update_system() {
-    print_banner "Mise à jour du système"
+    log "⚙️ ÉTAPE 1/10: Mise à jour du système"
     
-    info "Mise à jour des paquets..."
-    apt-get update 2>&1 | tee -a "$LOG_FILE" || error "Échec apt-get update"
-    success "Liste des paquets mise à jour"
+    info "Mise à jour de la liste des paquets..."
+    apt-get update -qq 2>&1 | tee -a "$LOG_FILE" || error "Échec apt-get update"
     
-    info "Mise à jour des paquets installés..."
-    apt-get upgrade -y 2>&1 | tee -a "$LOG_FILE" || warning "Certains paquets n'ont pas pu être mis à jour"
-    success "Paquets mis à jour"
+    info "Mise à niveau des paquets installés..."
+    apt-get upgrade -y -qq 2>&1 | tee -a "$LOG_FILE" || warning "Certains paquets n'ont pas pu être mis à jour"
+    
+    success "Système mis à jour"
 }
 
 # ============================================================================
-# ÉTAPE 3: INSTALLATION DÉPENDANCES SYSTÈME
+# ÉTAPE 2: INSTALLATION DÉPENDANCES SYSTÈME
 # ============================================================================
 
 install_system_dependencies() {
-    print_banner "Installation des dépendances système"
+    log "📦 ÉTAPE 2/10: Installation des dépendances système"
     
-    info "Installation des outils de build..."
-    apt-get install -y \
-        build-essential \
-        cmake \
-        git \
-        pkg-config \
-        2>&1 | tee -a "$LOG_FILE" || error "Échec installation outils de build"
-    success "Outils de build installés"
+    info "Installation des outils de compilation..."
+    apt-get install -y -qq \
+        build-essential cmake g++ gcc make pkg-config \
+        git wget curl unzip \
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation build tools"
     
-    info "Installation des bibliothèques MIDI et audio..."
-    apt-get install -y \
-        libasound2-dev \
+    info "Installation des bibliothèques Audio/MIDI..."
+    apt-get install -y -qq \
+        libasound2-dev alsa-utils alsa-tools \
         libjack-jackd2-dev \
-        2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques MIDI/audio"
-    success "Bibliothèques MIDI/audio installées"
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation ALSA"
     
     info "Installation des bibliothèques système..."
-    apt-get install -y \
-        sqlite3 \
-        libsqlite3-dev \
-        libssl-dev \
-        libcurl4-openssl-dev \
+    apt-get install -y -qq \
+        sqlite3 libsqlite3-dev \
+        libatomic1 libpthread-stubs0-dev \
         zlib1g-dev \
+        libssl-dev libcurl4-openssl-dev \
         2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques système"
-    success "Bibliothèques système installées"
     
     info "Installation des bibliothèques réseau..."
-    apt-get install -y \
+    apt-get install -y -qq \
         libboost-all-dev \
-        avahi-daemon \
-        libavahi-client-dev \
-        libavahi-common-dev \
-        2>&1 | tee -a "$LOG_FILE" || warning "Certaines bibliothèques réseau n'ont pas pu être installées"
-    success "Bibliothèques réseau installées"
+        avahi-daemon libavahi-client-dev libavahi-common-dev \
+        bluez libbluetooth-dev bluetooth \
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques réseau"
     
     info "Installation du serveur web..."
-    apt-get install -y \
-        nginx \
-        2>&1 | tee -a "$LOG_FILE" || warning "Nginx non installé"
-    success "Serveur web installé"
+    apt-get install -y -qq nginx 2>&1 | tee -a "$LOG_FILE" || error "Échec installation nginx"
+    
+    info "Installation Node.js LTS via NodeSource..."
+    if command -v node &> /dev/null; then
+        local node_version=$(node --version)
+        success "Node.js déjà installé: $node_version"
+    else
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - 2>&1 | tee -a "$LOG_FILE" || {
+            warning "NodeSource échoué, fallback sur dépôts standard..."
+            apt-get install -y -qq nodejs npm 2>&1 | tee -a "$LOG_FILE"
+        }
+        
+        apt-get install -y -qq nodejs 2>&1 | tee -a "$LOG_FILE" || error "Échec installation Node.js"
+        
+        local node_version=$(node --version)
+        local npm_version=$(npm --version)
+        success "Node.js $node_version installé (npm $npm_version)"
+    fi
+    
+    success "✅ Dépendances système installées"
 }
 
 # ============================================================================
-# ÉTAPE 4: INSTALLATION DÉPENDANCES C++
+# ÉTAPE 3: INSTALLATION DÉPENDANCES C++
 # ============================================================================
 
 install_cpp_dependencies() {
-    print_banner "Installation des dépendances C++"
+    log "🔧 ÉTAPE 3/10: Installation des dépendances C++"
     
     # nlohmann/json
     info "Installation de nlohmann/json..."
-    if apt-get install -y nlohmann-json3-dev 2>&1 | tee -a "$LOG_FILE"; then
-        success "nlohmann/json installé via apt"
-    else
-        warning "Installation via apt échouée, installation manuelle..."
-        mkdir -p /usr/local/include/nlohmann
-        wget -q -O /usr/local/include/nlohmann/json.hpp \
-            https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp \
-            || error "Échec téléchargement nlohmann/json"
-        success "nlohmann/json installé manuellement"
+    if ! dpkg -l | grep -q nlohmann-json3-dev; then
+        apt-get install -y -qq nlohmann-json3-dev 2>&1 | tee -a "$LOG_FILE" || {
+            warning "Installation via apt échouée, installation manuelle..."
+            wget -q -O /tmp/json.hpp https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
+            mkdir -p /usr/local/include/nlohmann
+            cp /tmp/json.hpp /usr/local/include/nlohmann/
+        }
     fi
+    success "nlohmann/json installé"
     
-    # WebSocketpp (optionnel)
+    # WebSocketpp
     info "Installation de WebSocketpp..."
-    if apt-get install -y libwebsocketpp-dev 2>&1 | tee -a "$LOG_FILE"; then
-        success "WebSocketpp installé"
-    else
-        warning "WebSocketpp non installé (peut être optionnel)"
-    fi
+    apt-get install -y -qq libwebsocketpp-dev 2>&1 | tee -a "$LOG_FILE" || {
+        warning "Installation via apt échouée, installation manuelle..."
+        cd /tmp
+        git clone --depth 1 https://github.com/zaphoyd/websocketpp.git
+        cd websocketpp
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make install
+    }
+    success "WebSocketpp installé"
+    
+    success "Dépendances C++ installées"
 }
 
 # ============================================================================
-# ÉTAPE 5: CONFIGURATION PERMISSIONS
+# ÉTAPE 4: CONFIGURATION PERMISSIONS
 # ============================================================================
 
 configure_permissions() {
-    print_banner "Configuration des permissions"
+    log "🔒 ÉTAPE 4/10: Configuration des permissions"
     
-    info "Ajout de $REAL_USER aux groupes nécessaires..."
-    usermod -a -G audio "$REAL_USER" 2>/dev/null || true
-    usermod -a -G dialout "$REAL_USER" 2>/dev/null || true
-    usermod -a -G bluetooth "$REAL_USER" 2>/dev/null || true
+    info "Ajout de l'utilisateur $REAL_USER aux groupes..."
+    usermod -a -G audio "$REAL_USER"
+    usermod -a -G dialout "$REAL_USER"
+    usermod -a -G bluetooth "$REAL_USER"
     usermod -a -G gpio "$REAL_USER" 2>/dev/null || true
-    success "Groupes configurés"
     
-    info "Configuration des limites temps réel..."
-    cat > /etc/security/limits.d/99-midimind.conf << EOF
-# MidiMind real-time permissions
-$REAL_USER    -    rtprio    95
-$REAL_USER    -    memlock   unlimited
-$REAL_USER    -    nice      -19
+    info "Configuration des permissions temps réel..."
+    cat >> /etc/security/limits.conf << EOF
+
+# MidiMind real-time permissions (v4.0.4)
+@audio   -  rtprio     95
+@audio   -  memlock    unlimited
+@audio   -  nice       -19
+$REAL_USER   -  rtprio     95
+$REAL_USER   -  memlock    unlimited
+$REAL_USER   -  nice       -19
 EOF
-    success "Limites temps réel configurées"
+    
+    success "Permissions configurées"
+}
+
+# ============================================================================
+# ÉTAPE 5: OPTIMISATIONS SYSTÈME
+# ============================================================================
+
+configure_system_optimizations() {
+    log "⚡ ÉTAPE 5/10: Optimisations système"
+    
+    # CPU Governor
+    info "Configuration CPU Governor..."
+    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
+        echo "performance" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+        
+        cat > /etc/systemd/system/cpufreq-performance.service << EOF
+[Unit]
+Description=Set CPU Governor to performance
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl enable cpufreq-performance.service
+    fi
+    
+    # IRQ Balance
+    info "Configuration IRQ Balance..."
+    systemctl disable irqbalance 2>/dev/null || true
+    
+    # Audio tweaks
+    info "Configuration audio..."
+    cat >> /etc/modprobe.d/alsa-base.conf << EOF
+
+# MidiMind audio optimizations (v4.0.4)
+options snd-usb-audio nrpacks=1
+EOF
+    
+    success "Optimisations système configurées"
 }
 
 # ============================================================================
@@ -291,104 +393,80 @@ EOF
 # ============================================================================
 
 create_directories() {
-    print_banner "Création de la structure de répertoires"
+    log "📁 ÉTAPE 6/10: Création des répertoires"
     
     info "Création des répertoires principaux..."
     mkdir -p "$INSTALL_DIR"/{bin,lib,config,logs,data,backups}
+    mkdir -p "$WEB_DIR"
     mkdir -p "$USER_DIR"/{midi_files,playlists,backups,logs}
     mkdir -p /var/log/midimind
     mkdir -p /etc/midimind
-    success "Répertoires créés"
     
     info "Configuration des permissions..."
     chown -R "$REAL_USER:audio" "$INSTALL_DIR"
     chown -R "$REAL_USER:audio" "$USER_DIR"
+    chown -R www-data:www-data "$WEB_DIR"
     chown -R "$REAL_USER:audio" /var/log/midimind
     chown -R "$REAL_USER:audio" /etc/midimind
-    success "Permissions configurées"
+    
+    success "Répertoires créés"
 }
 
 # ============================================================================
-# ÉTAPE 7: COMPILATION BACKEND (ADAPTÉ POUR backend/)
+# ÉTAPE 7: COMPILATION BACKEND ✅ CORRIGÉE
 # ============================================================================
 
 compile_backend() {
-    print_banner "Compilation du backend"
+    log "🔨 ÉTAPE 7/10: Compilation du backend"
     
-    # Vérifier que backend/ existe
-    if [ ! -d "$BACKEND_DIR" ]; then
-        error "Répertoire backend introuvable: $BACKEND_DIR"
-    fi
-    
-    # Vérifier que CMakeLists.txt est dans backend/
+    # ✅ Vérifier CMakeLists.txt dans backend/
     if [ ! -f "$BACKEND_DIR/CMakeLists.txt" ]; then
-        error "CMakeLists.txt introuvable dans: $BACKEND_DIR"
+        error "CMakeLists.txt introuvable: $BACKEND_DIR/CMakeLists.txt"
     fi
     
-    info "Répertoire backend: $BACKEND_DIR"
-    
-    # Se déplacer dans backend/
-    cd "$BACKEND_DIR" || error "Impossible d'accéder à $BACKEND_DIR"
-    log "Working directory: $(pwd)"
-    
-    # Nettoyer build précédent
-    if [ -d "build" ]; then
-        info "Nettoyage du build précédent..."
-        rm -rf build
+    # ✅ Vérifier sources backend
+    if [ ! -d "$BACKEND_DIR/src" ]; then
+        error "Répertoire src/ introuvable: $BACKEND_DIR/src"
     fi
     
-    # Créer répertoire build
-    info "Création du répertoire build..."
+    # ✅ Se placer dans le répertoire backend
+    cd "$BACKEND_DIR"
+    
+    info "Configuration CMake depuis backend/..."
+    info "  Répertoire courant: $(pwd)"
+    info "  CMakeLists.txt: $BACKEND_DIR/CMakeLists.txt"
+    
+    # ✅ Créer build/ dans backend/
     mkdir -p build
-    cd build || error "Impossible de créer build/"
+    cd build
     
-    # Configuration CMake
-    info "Configuration CMake..."
-    log "Exécution: cmake .. -DCMAKE_BUILD_TYPE=Release"
+    info "Exécution de CMake..."
+    cmake .. -DCMAKE_BUILD_TYPE=Release 2>&1 | tee -a "$LOG_FILE" || error "Échec de cmake"
     
-    if cmake .. -DCMAKE_BUILD_TYPE=Release 2>&1 | tee -a "$LOG_FILE"; then
-        success "Configuration CMake réussie"
-    else
-        error "Échec de la configuration CMake"
+    success "Configuration CMake terminée"
+    
+    info "Compilation (utilisation de $NPROC cœurs, peut prendre 5-10 min)..."
+    make -j$NPROC 2>&1 | tee -a "$LOG_FILE" || error "Échec de make"
+    
+    success "Compilation terminée"
+    
+    # ✅ Vérifier le binaire compilé (dans backend/build/bin/)
+    if [ ! -f "bin/midimind" ]; then
+        error "Binaire non généré: $BUILD_DIR/bin/midimind"
     fi
     
-    # Compilation
-    info "Compilation (cela peut prendre plusieurs minutes)..."
-    NPROC=$(nproc)
-    log "Compilation avec $NPROC jobs"
-    
-    START_TIME=$(date +%s)
-    
-    if make -j"$NPROC" 2>&1 | tee -a "$LOG_FILE"; then
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
-        success "Compilation réussie en ${DURATION}s"
-    else
-        error "Échec de la compilation"
-    fi
-    
-    # Vérifier binaire
-    if [ ! -f "midimind" ]; then
-        error "Binaire midimind non trouvé après compilation"
-    fi
-    
-    BINARY_SIZE=$(du -h midimind | cut -f1)
-    success "Binaire créé: $BINARY_SIZE"
-    
-    # Installation du binaire
     info "Installation du binaire..."
-    cp midimind "$INSTALL_DIR/bin/" || error "Échec copie binaire"
-    success "Binaire installé dans $INSTALL_DIR/bin/"
+    cp bin/midimind "$INSTALL_DIR/bin/" || error "Échec copie binaire"
     
-    # Lien symbolique
-    info "Création du lien symbolique..."
+    # Créer lien symbolique
     ln -sf "$INSTALL_DIR/bin/midimind" /usr/local/bin/midimind
-    success "Lien symbolique créé"
     
     # Capabilities pour temps réel
-    info "Configuration des capabilities..."
-    setcap cap_sys_nice+ep "$INSTALL_DIR/bin/midimind" || warning "Échec setcap"
-    success "Capabilities configurées"
+    setcap cap_sys_nice+ep "$INSTALL_DIR/bin/midimind"
+    
+    success "✅ Backend compilé et installé"
+    info "  Binaire: $INSTALL_DIR/bin/midimind"
+    info "  Taille: $(du -h $INSTALL_DIR/bin/midimind | cut -f1)"
 }
 
 # ============================================================================
@@ -396,18 +474,24 @@ compile_backend() {
 # ============================================================================
 
 install_frontend() {
-    print_banner "Installation du frontend"
+    log "🌐 ÉTAPE 8/10: Installation du frontend"
     
     if [ ! -d "$FRONTEND_DIR" ]; then
-        warning "Répertoire frontend introuvable, installation ignorée"
-        return 0
+        error "Répertoire frontend introuvable: $FRONTEND_DIR"
     fi
     
     info "Copie des fichiers frontend..."
-    mkdir -p "$WEB_DIR"
-    cp -r "$FRONTEND_DIR"/* "$WEB_DIR/" || warning "Échec copie frontend"
+    cp -r "$FRONTEND_DIR"/* "$WEB_DIR/"
+    
+    # Installation dépendances npm si package.json existe
+    if [ -f "$WEB_DIR/package.json" ]; then
+        info "Installation des dépendances npm..."
+        cd "$WEB_DIR"
+        npm install --production --no-optional 2>&1 | tee -a "$LOG_FILE" || warning "npm install a échoué"
+    fi
     
     chown -R www-data:www-data "$WEB_DIR"
+    
     success "Frontend installé"
 }
 
@@ -416,136 +500,135 @@ install_frontend() {
 # ============================================================================
 
 configure_nginx() {
-    print_banner "Configuration Nginx"
-    
-    if ! command -v nginx &> /dev/null; then
-        warning "Nginx non installé, configuration ignorée"
-        return 0
-    fi
+    log "🌐 ÉTAPE 9/10: Configuration de Nginx"
     
     info "Création de la configuration Nginx..."
     cat > /etc/nginx/sites-available/midimind << 'EOF'
 server {
-    listen 80;
-    server_name localhost;
-    
+    listen 8000;
+    server_name _;
     root /var/www/midimind;
     index index.html;
     
-    location / {
-        try_files $uri $uri/ /index.html;
+    access_log /var/log/nginx/midimind_access.log;
+    error_log /var/log/nginx/midimind_error.log;
+    
+    # Cache statique
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
     }
     
-    location /api {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
+    # Pas de cache HTML
+    location ~* \.html$ {
+        expires -1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
     }
     
+    # WebSocket proxy
     location /ws {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+    
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
 EOF
     
-    # Activer le site
     ln -sf /etc/nginx/sites-available/midimind /etc/nginx/sites-enabled/
     rm -f /etc/nginx/sites-enabled/default
     
-    # Tester configuration
-    if nginx -t 2>&1 | tee -a "$LOG_FILE"; then
-        systemctl restart nginx
-        success "Nginx configuré et redémarré"
-    else
-        error "Configuration Nginx invalide"
-    fi
+    nginx -t || error "Configuration Nginx invalide"
+    
+    systemctl restart nginx
+    systemctl enable nginx
+    
+    success "Nginx configuré"
 }
 
 # ============================================================================
-# ÉTAPE 10: SERVICE SYSTEMD
+# ÉTAPE 10: CONFIGURATION SERVICE SYSTEMD
 # ============================================================================
 
 configure_systemd_service() {
-    print_banner "Configuration du service systemd"
+    log "⚙️ ÉTAPE 10/10: Configuration du service systemd"
     
-    info "Création du service midimind..."
+    info "Création du service systemd..."
     cat > /etc/systemd/system/midimind.service << EOF
 [Unit]
-Description=MidiMind MIDI Orchestration System
+Description=MidiMind MIDI Orchestration System v4.0.4
 After=network.target sound.target
 
 [Service]
 Type=simple
 User=$REAL_USER
+Group=audio
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/bin/midimind
-Restart=on-failure
-RestartSec=5
+Restart=always
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
 # Real-time scheduling
-Nice=-19
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=50
+
+# Resource limits
 LimitRTPRIO=95
 LimitMEMLOCK=infinity
+LimitNICE=-19
 
 [Install]
 WantedBy=multi-user.target
 EOF
     
-    # Recharger systemd
     systemctl daemon-reload
-    success "Service systemd créé"
-    
-    info "Activation du service au démarrage..."
     systemctl enable midimind.service
-    success "Service activé au démarrage"
+    
+    success "Service systemd configuré"
 }
 
 # ============================================================================
-# ÉTAPE 11: FICHIERS DE CONFIGURATION
+# CRÉATION FICHIERS CONFIGURATION
 # ============================================================================
 
 create_config_files() {
-    print_banner "Création des fichiers de configuration"
+    log "📝 Création des fichiers de configuration..."
     
-    # Config principal
-    if [ ! -f "$INSTALL_DIR/config/config.json" ]; then
-        info "Création de config.json..."
-        cat > "$INSTALL_DIR/config/config.json" << EOF
+    cat > /etc/midimind/config.json << 'EOF'
 {
-    "system": {
-        "name": "MidiMind",
-        "version": "3.0.0",
-        "log_level": "info"
+    "version": "4.0.4",
+    "midi": {
+        "buffer_size": 256,
+        "sample_rate": 48000
     },
     "api": {
         "port": 8080,
         "host": "0.0.0.0"
     },
+    "web": {
+        "port": 8000
+    },
     "database": {
-        "path": "$USER_DIR/midimind.db"
-    },
-    "midi": {
-        "default_device": "auto",
-        "buffer_size": 256
-    },
-    "paths": {
-        "midi_files": "$USER_DIR/midi_files",
-        "logs": "/var/log/midimind"
+        "path": "/opt/midimind/data/midimind.db"
     }
 }
 EOF
-        chown "$REAL_USER:audio" "$INSTALL_DIR/config/config.json"
-        success "config.json créé"
-    else
-        info "config.json existe déjà"
-    fi
+    
+    chown "$REAL_USER:audio" /etc/midimind/config.json
+    chmod 644 /etc/midimind/config.json
+    
+    success "Fichiers de configuration créés"
 }
 
 # ============================================================================
@@ -553,95 +636,110 @@ EOF
 # ============================================================================
 
 print_final_info() {
-    print_banner "Installation terminée!"
+    echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║                                                              ║${NC}"
+    echo -e "${GREEN}║              ✅ INSTALLATION TERMINÉE AVEC SUCCÈS ✅          ║${NC}"
+    echo -e "${GREEN}║                                                              ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
     
+    echo -e "${CYAN}📂 Chemins du projet (CORRIGÉS v4.0.4):${NC}"
     echo ""
-    echo -e "${GREEN}✓ MidiMind a été installé avec succès!${NC}"
+    echo -e "  ${BLUE}•${NC} Projet:            ${GREEN}$PROJECT_ROOT${NC}"
+    echo -e "  ${BLUE}•${NC} Backend source:    ${GREEN}$BACKEND_DIR${NC}"
+    echo -e "  ${BLUE}•${NC} CMakeLists.txt:    ${GREEN}$BACKEND_DIR/CMakeLists.txt${NC}"
+    echo -e "  ${BLUE}•${NC} Build directory:   ${GREEN}$BUILD_DIR${NC}"
+    echo -e "  ${BLUE}•${NC} Frontend source:   ${GREEN}$FRONTEND_DIR${NC}"
     echo ""
-    echo "Informations importantes:"
+    
+    echo -e "${CYAN}📊 Informations importantes:${NC}"
     echo ""
-    echo "  • Binaire: $INSTALL_DIR/bin/midimind"
-    echo "  • Configuration: $INSTALL_DIR/config/config.json"
-    echo "  • Données utilisateur: $USER_DIR"
-    echo "  • Logs: /var/log/midimind"
+    echo -e "  ${BLUE}•${NC} Binaire:           ${GREEN}$INSTALL_DIR/bin/midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Interface web:     ${GREEN}http://$(hostname -I | awk '{print $1}'):8000${NC}"
+    echo -e "  ${BLUE}•${NC} WebSocket API:     ${GREEN}ws://$(hostname -I | awk '{print $1}'):8080${NC}"
+    echo -e "  ${BLUE}•${NC} Configuration:     ${GREEN}/etc/midimind/config.json${NC}"
+    echo -e "  ${BLUE}•${NC} Logs:              ${GREEN}/var/log/midimind/${NC}"
+    echo -e "  ${BLUE}•${NC} Fichiers MIDI:     ${GREEN}$USER_DIR/midi_files/${NC}"
     echo ""
-    echo "Commandes utiles:"
+    
+    echo -e "${YELLOW}⚡ Optimisations Raspberry Pi activées:${NC}"
+    echo -e "  ${BLUE}•${NC} CPU Governor: performance"
+    echo -e "  ${BLUE}•${NC} Permissions temps réel: activées"
+    echo -e "  ${BLUE}•${NC} Latence audio: optimisée"
     echo ""
-    echo "  Démarrer le service:"
-    echo "    sudo systemctl start midimind"
+    
+    echo -e "${CYAN}🚀 Commandes utiles:${NC}"
     echo ""
-    echo "  Arrêter le service:"
-    echo "    sudo systemctl stop midimind"
+    echo -e "  ${BLUE}•${NC} Démarrer:      ${GREEN}sudo systemctl start midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Arrêter:       ${GREEN}sudo systemctl stop midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Redémarrer:    ${GREEN}sudo systemctl restart midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Status:        ${GREEN}sudo systemctl status midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Logs:          ${GREEN}sudo journalctl -u midimind -f${NC}"
     echo ""
-    echo "  Voir le statut:"
-    echo "    sudo systemctl status midimind"
+    
+    echo -e "${YELLOW}⚠️ Important:${NC}"
+    echo -e "  ${RED}•${NC} Redémarrez le système pour appliquer toutes les optimisations"
+    echo -e "  ${BLUE}•${NC} Commande: ${GREEN}sudo reboot${NC}"
     echo ""
-    echo "  Voir les logs:"
-    echo "    sudo journalctl -u midimind -f"
-    echo ""
-    echo "  Interface web:"
-    echo "    http://$(hostname -I | awk '{print $1}')"
-    echo ""
-    echo -e "${YELLOW}Note: Vous devez vous reconnecter ou redémarrer pour que"
-    echo -e "      les permissions de groupe prennent effet.${NC}"
+    
+    echo -e "${GREEN}Installation log: $LOG_FILE${NC}"
     echo ""
 }
 
 # ============================================================================
-# FONCTION PRINCIPALE
+# FONCTION MAIN
 # ============================================================================
 
 main() {
-    print_banner "Installation MidiMind v3.0"
+    print_banner
     
-    log "Début de l'installation: $(date)"
-    log "Log file: $LOG_FILE"
+    # Initialisation log
+    echo "==================================" > "$LOG_FILE"
+    echo "MidiMind Installation v4.0.4 - $(date)" >> "$LOG_FILE"
+    echo "==================================" >> "$LOG_FILE"
+    log "Installation démarrée: $(date)"
     
-    # Exécution des étapes
-    check_root
-    check_project_structure
+    # Détection et vérifications
+    detect_system
     check_prerequisites
+    
+    # Installation étape par étape
+    echo ""
     update_system
+    echo ""
     install_system_dependencies
+    echo ""
     install_cpp_dependencies
+    echo ""
     configure_permissions
+    echo ""
+    configure_system_optimizations
+    echo ""
     create_directories
-    compile_backend
+    echo ""
+    compile_backend  # ✅ CORRIGÉE
+    echo ""
     install_frontend
+    echo ""
     configure_nginx
+    echo ""
     configure_systemd_service
+    echo ""
     create_config_files
     
     # Informations finales
     print_final_info
     
     log "Installation terminée: $(date)"
-    
-    echo ""
-    echo -e "${GREEN}Logs complets disponibles dans: $LOG_FILE${NC}"
-    echo ""
 }
 
 # ============================================================================
 # POINT D'ENTRÉE
 # ============================================================================
 
-# Vérifier arguments
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: sudo ./install.sh"
-    echo ""
-    echo "Script d'installation automatique MidiMind v3.0"
-    echo ""
-    echo "Ce script doit être exécuté avec sudo depuis le répertoire scripts/"
-    echo ""
-    exit 0
-fi
-
-# Démarrer installation
 main 2>&1 | tee -a "$LOG_FILE"
 
 # ============================================================================
-# FIN
+# FIN DU FICHIER install.sh v4.0.4 - CORRECTIONS APPLIQUÉES
 # ============================================================================
-
-exit 0

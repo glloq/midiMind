@@ -1,18 +1,25 @@
 // ============================================================================
 // Fichier: backend/src/api/commands/editor.cpp
-// Version: 3.0.1 - NOUVEAU FICHIER
-// Date: 2025-10-12
+// Version: 3.1.0-corrections
+// Date: 2025-10-15
 // ============================================================================
 // Description:
 //   Handlers pour les commandes d'édition MIDI.
 //   Édition de fichiers MIDI au format JsonMidi.
 //
-// Commandes:
+// CORRECTIONS v3.1.0:
+//   ✅ Suppression de la struct EditorState locale obsolète
+//   ✅ Utilisation de la vraie classe EditorState via EditorStateManager
+//   ✅ Cohérence avec EditorState.h/.cpp existant
+//   ✅ Gestion propre des états multiples avec singleton
+//   ✅ Format de retour harmonisé
+//   ✅ Logging amélioré
+//
+// Commandes implémentées (7 commandes):
 //   - editor.load      : Charger un fichier en JsonMidi pour édition
 //   - editor.save      : Sauvegarder les modifications
 //   - editor.addNote   : Ajouter une note MIDI
 //   - editor.deleteNote : Supprimer des notes
-//   - editor.modifyNote : Modifier une note existante
 //   - editor.addCC     : Ajouter un Control Change
 //   - editor.undo      : Annuler la dernière action
 //   - editor.redo      : Refaire une action annulée
@@ -22,44 +29,136 @@
 
 #include "../../core/commands/CommandFactory.h"
 #include "../../midi/MidiFileManager.h"
+#include "../editor/EditorState.h"  
 #include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
-#include <stack>
+#include <memory>
+#include <unordered_map>
+#include <mutex>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
 // ============================================================================
-// GESTION DE L'HISTORIQUE D'ÉDITION (pour undo/redo)
+// GESTIONNAIRE D'ÉTATS D'ÉDITION (Singleton)
 // ============================================================================
 
 /**
- * @struct EditorState
- * @brief État d'édition pour un fichier
+ * @class EditorStateManager
+ * @brief Gestionnaire centralisé des états d'édition par fichier
+ * 
+ * Maintient une map des EditorState actifs, un par fichier ouvert.
+ * Thread-safe avec mutex interne.
  */
-struct EditorState {
-    std::string fileId;
-    json currentData;
-    std::stack<json> undoStack;
-    std::stack<json> redoStack;
+class EditorStateManager {
+private:
+    std::unordered_map<std::string, std::shared_ptr<EditorState>> states_;
+    mutable std::mutex mutex_;
     
-    void pushUndo(const json& state) {
-        undoStack.push(state);
-        // Clear redo stack when new action
-        while (!redoStack.empty()) redoStack.pop();
+    // Constructeur privé (Singleton)
+    EditorStateManager() = default;
+    
+public:
+    // Désactiver copie
+    EditorStateManager(const EditorStateManager&) = delete;
+    EditorStateManager& operator=(const EditorStateManager&) = delete;
+    
+    /**
+     * @brief Accès à l'instance unique
+     */
+    static EditorStateManager& instance() {
+        static EditorStateManager manager;
+        return manager;
+    }
+    
+    /**
+     * @brief Récupère ou crée un état pour un fichier
+     * 
+     * @param fileId ID unique du fichier
+     * @return Pointeur partagé vers EditorState
+     */
+    std::shared_ptr<EditorState> getOrCreate(const std::string& fileId) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = states_.find(fileId);
+        if (it != states_.end()) {
+            return it->second;
+        }
+        
+        // Créer nouvel état
+        auto state = std::make_shared<EditorState>();
+        states_[fileId] = state;
+        
+        Logger::debug("EditorStateManager", 
+            "Created new EditorState for: " + fileId);
+        
+        return state;
+    }
+    
+    /**
+     * @brief Vérifie si un état existe pour un fichier
+     */
+    bool has(const std::string& fileId) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return states_.find(fileId) != states_.end();
+    }
+    
+    /**
+     * @brief Supprime l'état d'un fichier
+     * 
+     * @param fileId ID du fichier
+     * @param saveIfModified Sauvegarder avant suppression si modifié
+     */
+    void remove(const std::string& fileId, bool saveIfModified = false) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = states_.find(fileId);
+        if (it != states_.end()) {
+            if (saveIfModified && it->second->isModified()) {
+                // Unlock temporairement pour save()
+                mutex_.unlock();
+                it->second->save();
+                mutex_.lock();
+            }
+            
+            states_.erase(it);
+            
+            Logger::debug("EditorStateManager", 
+                "Removed EditorState for: " + fileId);
+        }
+    }
+    
+    /**
+     * @brief Nombre d'états actifs
+     */
+    size_t count() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return states_.size();
+    }
+    
+    /**
+     * @brief Liste des fichiers actuellement en édition
+     */
+    std::vector<std::string> listActiveFiles() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        std::vector<std::string> files;
+        files.reserve(states_.size());
+        
+        for (const auto& [fileId, state] : states_) {
+            files.push_back(fileId);
+        }
+        
+        return files;
     }
 };
 
-// Map globale des états d'édition (en mémoire)
-// TODO: Passer à un système plus robuste avec sessions
-static std::unordered_map<std::string, EditorState> editorStates;
-static std::mutex editorMutex;
-
 // ============================================================================
 // FONCTION: registerEditorCommands()
-// Enregistre toutes les commandes d'édition (8 commandes)
+// Enregistre toutes les commandes d'édition (7 commandes)
 // ============================================================================
+
 void registerEditorCommands(CommandFactory& factory, 
                             std::shared_ptr<MidiFileManager> fileManager) {
     
@@ -68,6 +167,7 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.load - Charger un fichier en mode édition
     // ========================================================================
+    
     factory.registerCommand("editor.load",
         [fileManager](const json& params) -> json {
             Logger::debug("EditorAPI", "Loading file for editing...");
@@ -83,25 +183,37 @@ void registerEditorCommands(CommandFactory& factory,
                 
                 std::string fileId = params["file_id"];
                 
-                // Charger le fichier en JsonMidi
-                auto jsonMidi = fileManager->loadAsJsonMidi(fileId);
+                Logger::info("EditorAPI", "Loading file: " + fileId);
                 
-                // Initialiser l'état d'édition
-                std::lock_guard<std::mutex> lock(editorMutex);
-                EditorState& state = editorStates[fileId];
-                state.fileId = fileId;
-                state.currentData = jsonMidi;
-                // Clear undo/redo stacks
-                while (!state.undoStack.empty()) state.undoStack.pop();
-                while (!state.redoStack.empty()) state.redoStack.pop();
+                // Récupérer ou créer l'état d'édition
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                Logger::info("EditorAPI", "File loaded for editing: " + fileId);
+                // Charger le fichier via MidiFileManager
+                auto jsonMidiOpt = fileManager->loadAsJsonMidi(fileId);
+                
+                if (!jsonMidiOpt) {
+                    Logger::error("EditorAPI", "Failed to load JsonMidi for: " + fileId);
+                    return {
+                        {"success", false},
+                        {"error", "Failed to load file"}
+                    };
+                }
+                
+                json jsonMidi = *jsonMidiOpt;
+                
+                // Obtenir le chemin du fichier
+                std::string filepath = fileManager->getFilePath(fileId);
+                
+                // Charger dans EditorState
+                state->load(fileId, filepath, jsonMidi);
+                
+                Logger::info("EditorAPI", "✓ File loaded successfully: " + fileId);
                 
                 return {
                     {"success", true},
-                    {"message", "File loaded for editing"},
                     {"data", {
                         {"file_id", fileId},
+                        {"filepath", filepath},
                         {"jsonmidi", jsonMidi}
                     }}
                 };
@@ -120,8 +232,9 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.save - Sauvegarder les modifications
     // ========================================================================
+    
     factory.registerCommand("editor.save",
-        [fileManager](const json& params) -> json {
+        [](const json& params) -> json {
             Logger::debug("EditorAPI", "Saving file...");
             
             try {
@@ -135,42 +248,51 @@ void registerEditorCommands(CommandFactory& factory,
                 
                 std::string fileId = params["file_id"];
                 
-                // Récupérer l'état d'édition
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                // Vérifier que le fichier est chargé
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor: " + fileId}
+                        {"error", "File not loaded in editor"}
                     };
                 }
                 
-                const json& jsonMidi = it->second.currentData;
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Sauvegarder via FileManager
-                bool success = fileManager->saveFromJsonMidi(fileId, jsonMidi);
+                // Vérifier si modifié
+                if (!state->isModified()) {
+                    Logger::debug("EditorAPI", "File not modified, skip save");
+                    return {
+                        {"success", true},
+                        {"message", "File not modified (nothing to save)"}
+                    };
+                }
+                
+                Logger::info("EditorAPI", "Saving file: " + fileId);
+                
+                // Sauvegarder via EditorState (qui utilise MidiFileManager)
+                bool success = state->save();
                 
                 if (!success) {
+                    Logger::error("EditorAPI", "Save failed for: " + fileId);
                     return {
                         {"success", false},
                         {"error", "Failed to save file"}
                     };
                 }
                 
-                Logger::info("EditorAPI", "File saved: " + fileId);
+                Logger::info("EditorAPI", "✓ File saved successfully: " + fileId);
                 
                 return {
                     {"success", true},
-                    {"message", "File saved successfully"},
-                    {"file_id", fileId}
+                    {"message", "File saved successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("EditorAPI", 
-                    "Failed to save file: " + std::string(e.what()));
+                    "Failed to save: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to save file: " + std::string(e.what())}
+                    {"error", "Failed to save: " + std::string(e.what())}
                 };
             }
         }
@@ -179,19 +301,24 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.addNote - Ajouter une note MIDI
     // ========================================================================
+    
     factory.registerCommand("editor.addNote",
         [](const json& params) -> json {
             Logger::debug("EditorAPI", "Adding note...");
             
             try {
-                // Validation des paramètres
-                if (!params.contains("file_id") || !params.contains("track") ||
-                    !params.contains("tick") || !params.contains("note") ||
-                    !params.contains("velocity") || !params.contains("duration")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameters"}
-                    };
+                // Validation des paramètres requis
+                std::vector<std::string> required = {
+                    "file_id", "track", "tick", "note", "velocity", "duration"
+                };
+                
+                for (const auto& field : required) {
+                    if (!params.contains(field)) {
+                        return {
+                            {"success", false},
+                            {"error", "Missing required parameter: " + field}
+                        };
+                    }
                 }
                 
                 std::string fileId = params["file_id"];
@@ -210,23 +337,31 @@ void registerEditorCommands(CommandFactory& factory,
                     };
                 }
                 
+                if (duration <= 0) {
+                    return {
+                        {"success", false},
+                        {"error", "Duration must be positive"}
+                    };
+                }
+                
                 // Récupérer l'état d'édition
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
                         {"error", "File not loaded in editor"}
                     };
                 }
                 
-                EditorState& state = it->second;
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Sauvegarder l'état actuel pour undo
-                state.pushUndo(state.currentData);
+                // ✅ Sauvegarder l'état actuel pour undo
+                state->pushUndo("Add note");
                 
-                // Ajouter la note dans le JsonMidi
-                json& tracks = state.currentData["tracks"];
+                // Modifier le JsonMidi
+                json& data = state->getData();
+                json& tracks = data["tracks"];
+                
+                // Validation du numéro de track
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
@@ -255,10 +390,12 @@ void registerEditorCommands(CommandFactory& factory,
                 tracks[track]["events"].push_back(noteOn);
                 tracks[track]["events"].push_back(noteOff);
                 
-                // TODO: Trier les événements par tick
+                // Marquer comme modifié
+                state->markModified();
                 
                 Logger::info("EditorAPI", 
-                    "Note added: " + std::to_string(note) + " at tick " + std::to_string(tick));
+                    "Note added: " + std::to_string(note) + 
+                    " at tick " + std::to_string(tick));
                 
                 return {
                     {"success", true},
@@ -266,7 +403,9 @@ void registerEditorCommands(CommandFactory& factory,
                     {"data", {
                         {"track", track},
                         {"tick", tick},
-                        {"note", note}
+                        {"note", note},
+                        {"velocity", velocity},
+                        {"duration", duration}
                     }}
                 };
                 
@@ -284,6 +423,7 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.deleteNote - Supprimer des notes
     // ========================================================================
+    
     factory.registerCommand("editor.deleteNote",
         [](const json& params) -> json {
             Logger::debug("EditorAPI", "Deleting note(s)...");
@@ -305,19 +445,22 @@ void registerEditorCommands(CommandFactory& factory,
                 int note = params.value("note", -1);
                 
                 // Récupérer l'état d'édition
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
                         {"error", "File not loaded in editor"}
                     };
                 }
                 
-                EditorState& state = it->second;
-                state.pushUndo(state.currentData);
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                json& tracks = state.currentData["tracks"];
+                // Sauvegarder pour undo
+                state->pushUndo("Delete notes");
+                
+                json& data = state->getData();
+                json& tracks = data["tracks"];
+                
+                // Validation du track
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
@@ -347,6 +490,7 @@ void registerEditorCommands(CommandFactory& factory,
                 }
                 
                 tracks[track]["events"] = newEvents;
+                state->markModified();
                 
                 Logger::info("EditorAPI", 
                     "Deleted " + std::to_string(deletedCount) + " note events");
@@ -371,19 +515,24 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.addCC - Ajouter un Control Change
     // ========================================================================
+    
     factory.registerCommand("editor.addCC",
         [](const json& params) -> json {
             Logger::debug("EditorAPI", "Adding Control Change...");
             
             try {
                 // Validation
-                if (!params.contains("file_id") || !params.contains("track") ||
-                    !params.contains("tick") || !params.contains("controller") ||
-                    !params.contains("value")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameters"}
-                    };
+                std::vector<std::string> required = {
+                    "file_id", "track", "tick", "controller", "value"
+                };
+                
+                for (const auto& field : required) {
+                    if (!params.contains(field)) {
+                        return {
+                            {"success", false},
+                            {"error", "Missing required parameter: " + field}
+                        };
+                    }
                 }
                 
                 std::string fileId = params["file_id"];
@@ -393,7 +542,7 @@ void registerEditorCommands(CommandFactory& factory,
                 int value = params["value"];
                 int channel = params.value("channel", 0);
                 
-                // Validation
+                // Validation des valeurs
                 if (controller < 0 || controller > 127 || value < 0 || value > 127) {
                     return {
                         {"success", false},
@@ -402,19 +551,20 @@ void registerEditorCommands(CommandFactory& factory,
                 }
                 
                 // Récupérer l'état
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
                         {"error", "File not loaded in editor"}
                     };
                 }
                 
-                EditorState& state = it->second;
-                state.pushUndo(state.currentData);
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                json& tracks = state.currentData["tracks"];
+                state->pushUndo("Add CC");
+                
+                json& data = state->getData();
+                json& tracks = data["tracks"];
+                
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
@@ -432,6 +582,7 @@ void registerEditorCommands(CommandFactory& factory,
                 };
                 
                 tracks[track]["events"].push_back(ccEvent);
+                state->markModified();
                 
                 Logger::info("EditorAPI", "Control Change added: CC" + 
                     std::to_string(controller) + "=" + std::to_string(value));
@@ -455,6 +606,7 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.undo - Annuler la dernière action
     // ========================================================================
+    
     factory.registerCommand("editor.undo",
         [](const json& params) -> json {
             Logger::debug("EditorAPI", "Undo...");
@@ -469,30 +621,32 @@ void registerEditorCommands(CommandFactory& factory,
                 
                 std::string fileId = params["file_id"];
                 
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
                         {"error", "File not loaded in editor"}
                     };
                 }
                 
-                EditorState& state = it->second;
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                if (state.undoStack.empty()) {
+                // Vérifier si undo possible
+                if (!state->canUndo()) {
                     return {
                         {"success", false},
                         {"error", "Nothing to undo"}
                     };
                 }
                 
-                // Push current to redo
-                state.redoStack.push(state.currentData);
+                // Effectuer undo
+                bool success = state->undo();
                 
-                // Pop from undo
-                state.currentData = state.undoStack.top();
-                state.undoStack.pop();
+                if (!success) {
+                    return {
+                        {"success", false},
+                        {"error", "Undo operation failed"}
+                    };
+                }
                 
                 Logger::info("EditorAPI", "Undo performed");
                 
@@ -500,7 +654,7 @@ void registerEditorCommands(CommandFactory& factory,
                     {"success", true},
                     {"message", "Undo performed successfully"},
                     {"data", {
-                        {"jsonmidi", state.currentData}
+                        {"jsonmidi", state->getDataCopy()}
                     }}
                 };
                 
@@ -518,6 +672,7 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     // editor.redo - Refaire une action annulée
     // ========================================================================
+    
     factory.registerCommand("editor.redo",
         [](const json& params) -> json {
             Logger::debug("EditorAPI", "Redo...");
@@ -532,30 +687,32 @@ void registerEditorCommands(CommandFactory& factory,
                 
                 std::string fileId = params["file_id"];
                 
-                std::lock_guard<std::mutex> lock(editorMutex);
-                auto it = editorStates.find(fileId);
-                if (it == editorStates.end()) {
+                if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
                         {"error", "File not loaded in editor"}
                     };
                 }
                 
-                EditorState& state = it->second;
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                if (state.redoStack.empty()) {
+                // Vérifier si redo possible
+                if (!state->canRedo()) {
                     return {
                         {"success", false},
                         {"error", "Nothing to redo"}
                     };
                 }
                 
-                // Push current to undo
-                state.undoStack.push(state.currentData);
+                // Effectuer redo
+                bool success = state->redo();
                 
-                // Pop from redo
-                state.currentData = state.redoStack.top();
-                state.redoStack.pop();
+                if (!success) {
+                    return {
+                        {"success", false},
+                        {"error", "Redo operation failed"}
+                    };
+                }
                 
                 Logger::info("EditorAPI", "Redo performed");
                 
@@ -563,7 +720,7 @@ void registerEditorCommands(CommandFactory& factory,
                     {"success", true},
                     {"message", "Redo performed successfully"},
                     {"data", {
-                        {"jsonmidi", state.currentData}
+                        {"jsonmidi", state->getDataCopy()}
                     }}
                 };
                 
@@ -578,11 +735,11 @@ void registerEditorCommands(CommandFactory& factory,
         }
     );
     
-    Logger::info("EditorHandlers", "✓ Registered 7 editor commands");
+    Logger::info("EditorHandlers", "✅ Editor commands registered (7 commands)");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER editor.cpp
+// FIN DU FICHIER editor.cpp v3.1.0-corrections
 // ============================================================================

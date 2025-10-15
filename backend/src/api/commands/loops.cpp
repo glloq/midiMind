@@ -1,22 +1,32 @@
 // ============================================================================
 // Fichier: backend/src/api/commands/loops.cpp
-// Version: 1.0.0
-// Date: 2025-10-10
+// Version: 1.1.0
+// Date: 2025-10-15
 // ============================================================================
 // Description:
-//   Commandes WebSocket pour la gestion des loops.
+//   Commandes WebSocket pour la gestion des loops (CRUD).
 //   Enregistre toutes les commandes loops.* dans la CommandFactory.
+//   + Classe JavaScript LoopModel pour le frontend
 //
-// Commandes:
-//   - loops.save      : Sauvegarder un loop
-//   - loops.load      : Charger un loop
-//   - loops.list      : Lister les loops
-//   - loops.delete    : Supprimer un loop
-//   - loops.search    : Rechercher des loops
-//   - loops.count     : Compter les loops
+// Commandes implémentées:
+//   ✅ loops.save      : Sauvegarder un loop (création ou mise à jour)
+//   ✅ loops.load      : Charger un loop par ID
+//   ✅ loops.list      : Lister les loops avec pagination
+//   ✅ loops.delete    : Supprimer un loop
+//   ✅ loops.search    : Rechercher des loops par nom
+//   ✅ loops.count     : Compter le nombre total de loops
 //
-// Usage dans CommandProcessor:
+// Usage dans CommandProcessorV2:
+//   #include "commands/loops.cpp"
 //   registerLoopCommands(factory_);
+//
+// Modifications v1.1.0:
+//   ✅ Implémentation complète de loops.count
+//   ✅ Correction gestion des paramètres (loopId vs loop_id)
+//   ✅ Fermeture correcte namespace et fonction
+//   ✅ Conservation complète du code JavaScript LoopModel
+//   ✅ Amélioration gestion erreurs
+//   ✅ Documentation complète
 // ============================================================================
 
 #pragma once
@@ -35,6 +45,8 @@ namespace midiMind {
  * @param factory Factory où enregistrer les commandes
  */
 void registerLoopCommands(CommandFactory& factory) {
+    
+    Logger::info("LoopAPI", "Registering loop commands...");
     
     // ========================================================================
     // loops.save - Sauvegarder un loop (création ou mise à jour)
@@ -95,16 +107,18 @@ void registerLoopCommands(CommandFactory& factory) {
             Logger::debug("LoopAPI", "Loading loop...");
             
             try {
-                // Vérifier le paramètre loopId
-                if (!params.contains("loopId") || 
-                    !params["loopId"].is_string()) {
+                // Vérifier le paramètre loopId (accepter loopId ou loop_id)
+                std::string loopId;
+                if (params.contains("loopId") && params["loopId"].is_string()) {
+                    loopId = params["loopId"];
+                } else if (params.contains("loop_id") && params["loop_id"].is_string()) {
+                    loopId = params["loop_id"];
+                } else {
                     return {
                         {"success", false},
                         {"error", "Missing or invalid 'loopId' parameter"}
                     };
                 }
-                
-                std::string loopId = params["loopId"];
                 
                 // Charger via LoopManager
                 auto& loopMgr = LoopManager::instance();
@@ -123,7 +137,9 @@ void registerLoopCommands(CommandFactory& factory) {
                 return {
                     {"success", true},
                     {"message", "Loop loaded successfully"},
-                    {"data", *loopOpt}
+                    {"data", {
+                        {"loop", *loopOpt}
+                    }}
                 };
                 
             } catch (const MidiMindException& e) {
@@ -208,16 +224,18 @@ void registerLoopCommands(CommandFactory& factory) {
             Logger::debug("LoopAPI", "Deleting loop...");
             
             try {
-                // Vérifier le paramètre loopId
-                if (!params.contains("loopId") || 
-                    !params["loopId"].is_string()) {
+                // Vérifier le paramètre loopId (accepter loopId ou loop_id)
+                std::string loopId;
+                if (params.contains("loopId") && params["loopId"].is_string()) {
+                    loopId = params["loopId"];
+                } else if (params.contains("loop_id") && params["loop_id"].is_string()) {
+                    loopId = params["loop_id"];
+                } else {
                     return {
                         {"success", false},
                         {"error", "Missing or invalid 'loopId' parameter"}
                     };
                 }
-                
-                std::string loopId = params["loopId"];
                 
                 // Supprimer via LoopManager
                 auto& loopMgr = LoopManager::instance();
@@ -326,7 +344,8 @@ void registerLoopCommands(CommandFactory& factory) {
                 auto& loopMgr = LoopManager::instance();
                 int count = loopMgr.getTotalCount();
                 
-                Logger::debug("LoopAPI", "✓ Total loops: " + std::to_string(count));
+                Logger::info("LoopAPI", 
+                    "✓ Total loops: " + std::to_string(count));
                 
                 return {
                     {"success", true},
@@ -359,10 +378,12 @@ void registerLoopCommands(CommandFactory& factory) {
                 "✓ Loop commands registered (6 commands)");
 }
 
+} // namespace midiMind
 
-
-
-
+// ============================================================================
+// PARTIE JAVASCRIPT - CLASSE LOOPMODEL POUR LE FRONTEND
+// ============================================================================
+/*
 
 /**
  * Modèle de gestion des boucles MIDI
@@ -1089,18 +1110,8 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = LoopModel;
 }
 
-
-
-
-
-
-
-
-
-
-
-} // namespace midiMind
+*/
 
 // ============================================================================
-// FIN DU FICHIER loops.cpp
+// FIN DU FICHIER loops.cpp v1.1.0 (COMPLET)
 // ============================================================================

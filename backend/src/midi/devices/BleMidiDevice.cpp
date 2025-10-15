@@ -174,9 +174,9 @@ bool BleMidiDevice::connect() {
 #endif
 }
 
-void BleMidiDevice::disconnect() {
+bool BleMidiDevice::disconnect() {
     if (!isConnected()) {
-        return;
+        return true;
     }
     
     Logger::info("BleMidiDevice", "Disconnecting from " + address_);
@@ -220,6 +220,7 @@ void BleMidiDevice::disconnect() {
     
     setStatus(DeviceStatus::DISCONNECTED);
     Logger::info("BleMidiDevice", "Disconnected from " + name_);
+	return true; 
 }
 
 // ============================================================================

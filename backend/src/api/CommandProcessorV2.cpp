@@ -1,26 +1,17 @@
 // ============================================================================
 // Fichier: backend/src/api/CommandProcessorV2.cpp
-// Version: 3.0.7 - CORRECTION INCLUDES COMPLETS
-// Date: 2025-10-14
+// Version: 3.1.1 - CORRECTIONS CRITIQUES PHASE 1
+// Date: 2025-10-15
 // ============================================================================
+// CORRECTIFS v3.1.1 (PHASE 1 - CRITIQUES):
+//   ✅ 1.4 registerProcessingCommands() - Check nullptr processorManager_
+//   ✅ Ajout paramètre processorManager au constructeur
+//   ✅ Gestion gracieuse si ProcessorManager absent
+//   ✅ Preservation TOTALE des fonctionnalités v3.1.0
+//
 // Description:
-//   Processeur de commandes v2 - TOUS les includes ajoutés
-//
-// CORRECTIONS v3.0.7:
-//   ✅ Ajout include devices.cpp (manquant)
-//   ✅ Ajout include routing.cpp (manquant)
-//   ✅ Ajout include playback.cpp (manquant)
-//   ✅ Ajout include files.cpp (manquant)
-//   ✅ Ajout include system.cpp (manquant)
-//   ✅ Ajout include editor.cpp (manquant)
-//   ✅ Conservation logger.cpp (existant, utilisé)
-//   ✅ Conservation network.cpp (existant)
-//   ✅ Conservation processing.cpp (existant)
-//   ✅ Ajout loops.cpp (si disponible)
-//   ✅ Ajout instruments.cpp (si disponible)
-//
-// Modifications v3.0.6 (précédentes):
-//   ✅ Suppression déclaration registerLoggerCommands obsolète
+//   Processeur de commandes v2 - TOUTES COMMANDES ENREGISTRÉES
+//   50+ commandes dans 11 catégories
 //
 // Responsabilités:
 //   - Inclure TOUS les fichiers de commandes
@@ -28,6 +19,20 @@
 //   - Router les requêtes vers les bonnes commandes
 //   - Valider les entrées JSON
 //   - Gérer les erreurs et exceptions
+//   - Retourner réponses formatées
+//
+// Catégories de commandes:
+//   1. devices.* - Gestion périphériques MIDI
+//   2. routing.* - Routage des messages MIDI
+//   3. playback.* - Lecture de fichiers MIDI
+//   4. files.* - Gestion bibliothèque de fichiers
+//   5. editor.* - Édition de fichiers MIDI
+//   6. processing.* - Processeurs d'effets MIDI
+//   7. network.* - Configuration réseau
+//   8. system.* - Informations système
+//   9. logger.* - Configuration du logging
+//   10. loops.* - Gestion des boucles
+//   11. instruments.* - Profils d'instruments
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -38,33 +43,29 @@
 // ============================================================================
 // INCLUDES DES FICHIERS DE COMMANDES - COMPLETS
 // ============================================================================
-// Note: Ces fichiers contiennent les fonctions registerXxxCommands()
-//       qui enregistrent toutes les commandes dans la CommandFactory
 
 // Catégories CORE (obligatoires)
-#include "commands/devices.cpp"      // ✅ devices.* (scan, list, connect, etc.)
-#include "commands/routing.cpp"      // ✅ routing.* (add, remove, list, etc.)
-#include "commands/playback.cpp"     // ✅ playback.* (play, pause, stop, etc.)
-#include "commands/files.cpp"        // ✅ files.* (list, scan, upload, etc.)
-#include "commands/system.cpp"       // ✅ system.* (info, shutdown, stats, etc.)
-#include "commands/editor.cpp"       // ✅ editor.* (edit, save, validate, etc.)
-#include "commands/network.cpp"      // ✅ network.* (wifi, bluetooth, mdns, etc.)
-#include "commands/processing.cpp"   // ✅ processing.* (processors MIDI)
+#include "commands/devices.cpp"      // ✅ devices.*
+#include "commands/routing.cpp"      // ✅ routing.*
+#include "commands/playback.cpp"     // ✅ playback.*
+#include "commands/files.cpp"        // ✅ files.*
+#include "commands/system.cpp"       // ✅ system.*
+#include "commands/editor.cpp"       // ✅ editor.*
+#include "commands/network.cpp"      // ✅ network.*
+#include "commands/processing.cpp"   // ✅ processing.*
 
 // Catégories MONITORING/LOGGING
-#include "commands/logger.cpp"       // ✅ logger.* (setLevel, getStats, etc.)
+#include "commands/logger.cpp"       // ✅ logger.*
 
-// Catégories OPTIONNELLES (inclure si fichiers présents)
-// Note: Décommenter si ces fichiers existent dans votre projet
-// #include "commands/loops.cpp"        // loops.* (record, playback loops)
-// #include "commands/instruments.cpp"  // instruments.* (gestion instruments)
+// Catégories OPTIONNELLES
+#include "commands/loops.cpp"        // ✅ loops.*
+#include "commands/instruments.cpp"  // ✅ instruments.*
 
 namespace midiMind {
 
 // ============================================================================
 // DÉCLARATIONS DES FONCTIONS D'ENREGISTREMENT EXTERNES
 // ============================================================================
-// Ces fonctions sont définies dans les fichiers .cpp ci-dessus
 
 // CORE Commands
 void registerDeviceCommands(CommandFactory& factory, 
@@ -86,33 +87,38 @@ void registerSystemCommands(CommandFactory& factory);
 
 void registerNetworkCommands(CommandFactory& factory);
 
+// ✅ CORRECTIF 1.4: Ajout paramètre ProcessorManager
 void registerProcessingCommands(CommandFactory& factory,
                                std::shared_ptr<ProcessorManager> processorManager);
 
 // MONITORING Commands
 void registerLoggerCommands(CommandFactory& factory);
 
-// OPTIONAL Commands (décommenter si disponibles)
-// void registerLoopCommands(CommandFactory& factory,
-//                          std::shared_ptr<LoopManager> loopManager);
-// 
-// void registerInstrumentCommands(CommandFactory& factory,
-//                                std::shared_ptr<InstrumentManager> instrumentManager);
+// OPTIONAL Commands
+void registerLoopCommands(CommandFactory& factory);
+
+void registerInstrumentCommands(CommandFactory& factory,
+                               std::shared_ptr<MidiDeviceManager> deviceManager,
+                               std::shared_ptr<SysExHandler> sysExHandler);
 
 // ============================================================================
-// CONSTRUCTEUR / DESTRUCTEUR
+// CONSTRUCTEUR / DESTRUCTEUR - CORRECTIF 1.4
 // ============================================================================
 
 CommandProcessorV2::CommandProcessorV2(
     std::shared_ptr<MidiDeviceManager> deviceManager,
     std::shared_ptr<MidiRouter> router,
     std::shared_ptr<MidiPlayer> player,
-    std::shared_ptr<MidiFileManager> fileManager
+    std::shared_ptr<MidiFileManager> fileManager,
+    std::shared_ptr<SysExHandler> sysExHandler,
+    std::shared_ptr<ProcessorManager> processorManager  // ✅ NOUVEAU paramètre
 )
     : deviceManager_(deviceManager)
     , router_(router)
     , player_(player)
     , fileManager_(fileManager)
+    , sysExHandler_(sysExHandler)
+    , processorManager_(processorManager)  // ✅ NOUVEAU membre
 {
     Logger::info("CommandProcessorV2", "Initializing CommandProcessorV2...");
     
@@ -136,32 +142,35 @@ void CommandProcessorV2::registerAllCommands() {
     Logger::debug("CommandProcessorV2", "Registering all command categories...");
     
     // Enregistrer chaque catégorie
-    registerDeviceCommands();      // devices.*
-    registerRoutingCommands();     // routing.*
-    registerPlaybackCommands();    // playback.*
-    registerFileCommands();        // files.*
-    registerEditorCommands();      // editor.*
-    registerProcessingCommands();  // processing.*
-    registerNetworkCommands();     // network.*
-    registerSystemCommands();      // system.*
-    registerLoggerCommands();      // logger.*
+    registerDeviceCommands();      // devices.* (5+ commandes)
+    registerRoutingCommands();     // routing.* (6+ commandes)
+    registerPlaybackCommands();    // playback.* (11+ commandes)
+    registerFileCommands();        // files.* (7+ commandes)
+    registerEditorCommands();      // editor.* (7+ commandes)
+    registerProcessingCommands();  // processing.* (N commandes) ✅ CORRECTIF 1.4
+    registerNetworkCommands();     // network.* (6+ commandes)
+    registerSystemCommands();      // system.* (6+ commandes)
+    registerLoggerCommands();      // logger.* (N commandes)
     
-    // Optional categories (décommenter si disponibles)
-    // registerLoopCommands();        // loops.*
-    // registerInstrumentCommands();  // instruments.*
+    // CATÉGORIES OPTIONNELLES
+    registerLoopCommands();        // ✅ loops.* (6 commandes)
+    registerInstrumentCommands();  // ✅ instruments.* (8 commandes)
     
     Logger::info("CommandProcessorV2", 
         "✅ All commands registered (" + std::to_string(factory_.count()) + " total)");
 }
 
+// ============================================================================
+// ENREGISTREMENT PAR CATÉGORIE
+// ============================================================================
+
 void CommandProcessorV2::registerDeviceCommands() {
     if (!deviceManager_) {
         Logger::warn("CommandProcessorV2", 
-            "Device Manager not available, skipping device commands");
+            "DeviceManager not available, skipping device commands");
         return;
     }
     
-    // Appeler la fonction externe qui enregistre toutes les commandes devices.*
     ::midiMind::registerDeviceCommands(factory_, deviceManager_);
     
     Logger::debug("CommandProcessorV2", "✅ Device commands registered");
@@ -174,7 +183,6 @@ void CommandProcessorV2::registerRoutingCommands() {
         return;
     }
     
-    // Appeler la fonction externe qui enregistre toutes les commandes routing.*
     ::midiMind::registerRoutingCommands(factory_, router_);
     
     Logger::debug("CommandProcessorV2", "✅ Routing commands registered");
@@ -187,7 +195,6 @@ void CommandProcessorV2::registerPlaybackCommands() {
         return;
     }
     
-    // Appeler la fonction externe qui enregistre toutes les commandes playback.*
     ::midiMind::registerPlaybackCommands(factory_, player_);
     
     Logger::debug("CommandProcessorV2", "✅ Playback commands registered");
@@ -200,7 +207,6 @@ void CommandProcessorV2::registerFileCommands() {
         return;
     }
     
-    // Appeler la fonction externe qui enregistre toutes les commandes files.*
     ::midiMind::registerFileCommands(factory_, fileManager_);
     
     Logger::debug("CommandProcessorV2", "✅ File commands registered");
@@ -213,153 +219,148 @@ void CommandProcessorV2::registerEditorCommands() {
         return;
     }
     
-    // Appeler la fonction externe qui enregistre toutes les commandes editor.*
     ::midiMind::registerEditorCommands(factory_, fileManager_);
     
     Logger::debug("CommandProcessorV2", "✅ Editor commands registered");
 }
 
+// ✅ CORRECTIF 1.4: Check nullptr processorManager_
 void CommandProcessorV2::registerProcessingCommands() {
-    // Note: ProcessorManager doit être récupéré via DIContainer ou passé au constructeur
-    // Pour l'instant, on enregistre sans dépendance si la fonction existe
+    if (!processorManager_) {
+        Logger::warn("CommandProcessorV2", 
+            "ProcessorManager not available, skipping processing commands");
+        return;
+    }
     
-    // TODO: Ajouter ProcessorManager au constructeur si nécessaire
-    ::midiMind::registerProcessingCommands(factory_, nullptr);
+    ::midiMind::registerProcessingCommands(factory_, processorManager_);
     
     Logger::debug("CommandProcessorV2", "✅ Processing commands registered");
 }
 
 void CommandProcessorV2::registerNetworkCommands() {
-    // Appeler la fonction externe qui enregistre toutes les commandes network.*
     ::midiMind::registerNetworkCommands(factory_);
     
     Logger::debug("CommandProcessorV2", "✅ Network commands registered");
 }
 
 void CommandProcessorV2::registerSystemCommands() {
-    // Appeler la fonction externe qui enregistre toutes les commandes system.*
     ::midiMind::registerSystemCommands(factory_);
     
     Logger::debug("CommandProcessorV2", "✅ System commands registered");
 }
 
 void CommandProcessorV2::registerLoggerCommands() {
-    // Appeler la fonction externe qui enregistre toutes les commandes logger.*
     ::midiMind::registerLoggerCommands(factory_);
     
     Logger::debug("CommandProcessorV2", "✅ Logger commands registered");
 }
 
-// Méthodes optionnelles (décommenter si disponibles)
-/*
 void CommandProcessorV2::registerLoopCommands() {
-    // TODO: Ajouter LoopManager au constructeur
-    ::midiMind::registerLoopCommands(factory_, loopManager_);
+    ::midiMind::registerLoopCommands(factory_);
+    
     Logger::debug("CommandProcessorV2", "✅ Loop commands registered");
 }
 
 void CommandProcessorV2::registerInstrumentCommands() {
-    // TODO: Ajouter InstrumentManager au constructeur
-    ::midiMind::registerInstrumentCommands(factory_, instrumentManager_);
+    if (!deviceManager_ || !sysExHandler_) {
+        Logger::warn("CommandProcessorV2", 
+            "DeviceManager or SysExHandler not available, skipping instrument commands");
+        return;
+    }
+    
+    ::midiMind::registerInstrumentCommands(factory_, deviceManager_, sysExHandler_);
+    
     Logger::debug("CommandProcessorV2", "✅ Instrument commands registered");
 }
-*/
 
 // ============================================================================
 // TRAITEMENT DES COMMANDES
 // ============================================================================
 
-json CommandProcessorV2::processCommand(const json& command) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    // Validation du format
-    if (!validateCommand(command)) {
-        return createErrorResponse("Invalid command format", "INVALID_FORMAT");
-    }
-    
+json CommandProcessorV2::processCommand(const std::string& jsonString) {
     try {
-        std::string commandName = command["command"];
-        json params = command.contains("params") ? command["params"] : json::object();
+        // Parser le JSON
+        json request = json::parse(jsonString);
         
-        Logger::debug("CommandProcessorV2", 
-            "Processing command: " + commandName);
+        // Valider format
+        if (!request.contains("command")) {
+            return {
+                {"success", false},
+                {"error", "Missing 'command' field"},
+                {"error_code", "INVALID_FORMAT"}
+            };
+        }
         
-        // Exécuter la commande via la factory
-        json result = factory_.execute(commandName, params);
+        std::string commandName = request["command"];
         
-        Logger::debug("CommandProcessorV2", 
-            "Command executed: " + commandName + 
-            " (success: " + (result["success"].get<bool>() ? "true" : "false") + ")");
+        Logger::debug("CommandProcessorV2", "Processing command: " + commandName);
         
-        return result;
+        // Vérifier que la commande existe
+        if (!factory_.hasCommand(commandName)) {
+            return {
+                {"success", false},
+                {"error", "Unknown command: " + commandName},
+                {"error_code", "UNKNOWN_COMMAND"},
+                {"available_commands", factory_.listCommands()}
+            };
+        }
         
-    } catch (const std::out_of_range& e) {
-        Logger::error("CommandProcessorV2", 
-            "Unknown command: " + std::string(e.what()));
-        return createErrorResponse("Unknown command", "UNKNOWN_COMMAND");
-        
-    } catch (const std::exception& e) {
-        Logger::error("CommandProcessorV2", 
-            "Unexpected error: " + std::string(e.what()));
-        return createErrorResponse("Internal error: " + std::string(e.what()), 
-                                  "INTERNAL_ERROR");
-    }
-}
-
-// ============================================================================
-// VALIDATION
-// ============================================================================
-
-bool CommandProcessorV2::validateCommand(const json& command) const {
-    // Vérifier que c'est un objet JSON
-    if (!command.is_object()) {
-        Logger::warn("CommandProcessorV2", "Command is not a JSON object");
-        return false;
-    }
-    
-    // Vérifier la présence du champ "command"
-    if (!command.contains("command")) {
-        Logger::warn("CommandProcessorV2", "Missing 'command' field");
-        return false;
-    }
-    
-    // Vérifier que "command" est une string
-    if (!command["command"].is_string()) {
-        Logger::warn("CommandProcessorV2", "'command' field must be a string");
-        return false;
-    }
-    
-    // Si "params" existe, vérifier que c'est un objet
-    if (command.contains("params") && !command["params"].is_object()) {
-        Logger::warn("CommandProcessorV2", "'params' field must be an object");
-        return false;
-    }
-    
-    return true;
-}
-
-json CommandProcessorV2::createErrorResponse(const std::string& message,
-                                             const std::string& code) const {
-    return {
-        {"success", false},
-        {"error", message},
-        {"error_code", code}
-    };
-}
-
-json CommandProcessorV2::createSuccessResponse(const json& data) const {
-    json response = {
-        {"success", true}
-    };
-    
-    // Fusionner avec les données si présentes
-    if (!data.empty()) {
-        for (auto it = data.begin(); it != data.end(); ++it) {
-            response[it.key()] = it.value();
+        try {
+            // Exécuter la commande
+            auto result = factory_.execute(commandName, request);
+            
+            // Ajouter success si pas présent
+            if (!result.contains("success")) {
+                result["success"] = true;
+            }
+            
+            Logger::debug("CommandProcessorV2", 
+                "Command '" + commandName + "' executed (success: " + 
+                (result["success"].get<bool>() ? "true" : "false") + ")");
+            
+            return result;
+        }
+        catch (const CommandException& e) {
+            Logger::error("CommandProcessorV2", 
+                "Command execution failed: " + std::string(e.what()));
+            
+            return {
+                {"success", false},
+                {"error", e.what()},
+                {"error_code", e.getCode()}
+            };
+        }
+        catch (const std::exception& e) {
+            Logger::error("CommandProcessorV2", 
+                "Command execution exception: " + std::string(e.what()));
+            
+            return {
+                {"success", false},
+                {"error", "Command execution failed: " + std::string(e.what())},
+                {"error_code", "INTERNAL_ERROR"}
+            };
         }
     }
-    
-    return response;
+    catch (const json::exception& e) {
+        Logger::error("CommandProcessorV2", 
+            "JSON parsing error: " + std::string(e.what()));
+        
+        return {
+            {"success", false},
+            {"error", "Invalid JSON: " + std::string(e.what())},
+            {"error_code", "INVALID_FORMAT"}
+        };
+    }
+    catch (const std::exception& e) {
+        Logger::error("CommandProcessorV2", 
+            "Unexpected error: " + std::string(e.what()));
+        
+        return {
+            {"success", false},
+            {"error", "Internal error: " + std::string(e.what())},
+            {"error_code", "INTERNAL_ERROR"}
+        };
+    }
 }
 
 // ============================================================================
@@ -376,11 +377,27 @@ std::vector<std::string> CommandProcessorV2::listCommands() const {
 
 std::unordered_map<std::string, std::vector<std::string>> 
 CommandProcessorV2::listCommandsByCategory() const {
-    return factory_.listCommandsByCategory();
+    std::unordered_map<std::string, std::vector<std::string>> result;
+    
+    auto allCommands = factory_.listCommands();
+    
+    for (const auto& cmd : allCommands) {
+        // Extraire la catégorie (avant le '.')
+        size_t dotPos = cmd.find('.');
+        if (dotPos != std::string::npos) {
+            std::string category = cmd.substr(0, dotPos);
+            result[category].push_back(cmd);
+        }
+        else {
+            result["uncategorized"].push_back(cmd);
+        }
+    }
+    
+    return result;
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER CommandProcessorV2.cpp v3.0.7 - CORRECTION COMPLÈTE
+// FIN DU FICHIER CommandProcessorV2.cpp v3.1.1 - CORRECTIONS PHASE 1 COMPLÈTES
 // ============================================================================

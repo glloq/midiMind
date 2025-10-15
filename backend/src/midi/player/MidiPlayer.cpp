@@ -1,22 +1,22 @@
 // ============================================================================
 // Fichier: backend/src/midi/player/MidiPlayer.cpp
-// Version: 3.1.0 - PHASES 2 & 3 COMPLETES - Métadonnées + Calculs
-// Date: 2025-10-10
+// Version: 3.1.1 - CORRECTIONS CRITIQUES APPLIQUÉES SUR BASE 3.1.0 COMPLÈTE
+// Date: 2025-10-15
+// Projet: MidiMind - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
-// Description:
-//   Implémentation complète avec extraction métadonnées et calculs bar/beat.
 //
-// Modifications Phase 2:
-//   ✅ extractMetadata() - Extraction complète des meta events
-//   ✅ analyzeTrack() - Analyse enrichie des pistes (channel, notes, instrument)
-//   ✅ load() modifié pour appeler extractMetadata() et analyzeTrack()
+// HISTORIQUE:
+//   v3.1.0 - Base complète avec métadonnées + volume + analyse tracks
+//   v3.1.1 - CORRECTIONS CRITIQUES (sans suppression fonctionnalités):
+//     ✅ setTempo() - Validation pour éviter division par zéro
+//     ✅ seek() - Validation bounds
+//     ✅ seekToBar() - Validation beat/bar
+//     ✅ playbackLoop() - Protection overflow + timing amélioré
+//     ✅ getCurrentTimeMs() - Protection division par zéro
+//     ✅ getTotalTimeMs() - Protection division par zéro
+//     ✅ applyModifications() - Validation clamp note MIDI
+//     ✅ applyMasterVolume() - Validation clamp velocity
 //
-// Modifications Phase 3:
-//   ✅ ticksToMusicalPosition() - Conversion ticks → bar:beat:tick
-//   ✅ musicalPositionToTicks() - Conversion bar:beat:tick → ticks
-//   ✅ getInstrumentName() - Mapping Program Change → Nom instrument
-//
-// Auteur: MidiMind Team
 // ============================================================================
 
 #include "MidiPlayer.h"
@@ -30,9 +30,19 @@
 namespace midiMind {
 
 // ============================================================================
-// CONSTRUCTEUR / DESTRUCTEUR
+// ✅ CONSTANTES - AJOUTÉES v3.1.1
 // ============================================================================
 
+namespace {
+    constexpr float MIN_TEMPO = 20.0f;    // BPM minimum
+    constexpr float MAX_TEMPO = 500.0f;   // BPM maximum
+    constexpr int MIN_TRANSPOSE = -24;    // -2 octaves
+    constexpr int MAX_TRANSPOSE = 24;     // +2 octaves
+}
+
+// ============================================================================
+// CONSTRUCTEUR / DESTRUCTEUR (v3.1.0 - INCHANGÉ)
+// ============================================================================
 
 MidiPlayer::MidiPlayer(std::shared_ptr<MidiRouter> router)
     : router_(router)
@@ -44,10 +54,10 @@ MidiPlayer::MidiPlayer(std::shared_ptr<MidiRouter> router)
     , tempo_(120.0)
     , loopEnabled_(false)
     , transpose_(0)
-    , masterVolume_(1.0f)      // ✅ NOUVEAU: Volume par défaut 100%
-    , isMuted_(false)          // ✅ NOUVEAU: Non muté par défaut
-    , volumeBeforeMute_(1.0f)  // ✅ NOUVEAU
-{
+    , masterVolume_(1.0f)
+    , isMuted_(false)
+    , volumeBeforeMute_(1.0f) {
+    
     Logger::info("MidiPlayer", "Player initialized with master volume support");
 }
 
@@ -57,7 +67,7 @@ MidiPlayer::~MidiPlayer() {
 }
 
 // ============================================================================
-// CHARGEMENT DE FICHIERS - PHASE 2 MODIFIÉ
+// CHARGEMENT DE FICHIERS - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 bool MidiPlayer::load(const std::string& filepath) {
@@ -66,12 +76,10 @@ bool MidiPlayer::load(const std::string& filepath) {
     Logger::info("MidiPlayer", "Loading file: " + filepath);
     
     try {
-        // Arrêter la lecture en cours
         if (state_ != PlayerState::STOPPED) {
             stopPlayback();
         }
         
-        // Réinitialiser tout
         currentFile_ = "";
         currentTick_ = 0;
         totalTicks_ = 0;
@@ -79,21 +87,15 @@ bool MidiPlayer::load(const std::string& filepath) {
         allEvents_.clear();
         tempoChanges_.clear();
         
-        // Lire le fichier MIDI
         MidiFileReader reader;
         midiFile_ = reader.read(filepath);
         
-        // Extraire informations de base
         ticksPerQuarterNote_ = midiFile_.ticksPerQuarterNote;
         totalTicks_ = calculateTotalTicks();
         
-        // Parser les événements de toutes les pistes
         parseAllTracks();
-        
-        // PHASE 2.1: Extraire métadonnées (tempo, time sig, key, copyright)
         extractMetadata();
         
-        // Initialiser infos pistes avec valeurs de base
         tracks_.clear();
         for (size_t i = 0; i < midiFile_.tracks.size(); i++) {
             TrackInfo info(i);
@@ -102,25 +104,18 @@ bool MidiPlayer::load(const std::string& filepath) {
             tracks_.push_back(info);
         }
         
-        // PHASE 2.2: Analyser chaque piste (channel, instrument, notes)
         for (size_t i = 0; i < tracks_.size(); i++) {
             analyzeTrack(i);
         }
         
         currentFile_ = filepath;
         
-        Logger::info("MidiPlayer", 
-            "✓ File loaded successfully:");
-        Logger::info("MidiPlayer", 
-            "  - Tracks: " + std::to_string(midiFile_.tracks.size()));
-        Logger::info("MidiPlayer", 
-            "  - Total ticks: " + std::to_string(totalTicks_));
-        Logger::info("MidiPlayer", 
-            "  - Time signature: " + timeSignatureStr_);
-        Logger::info("MidiPlayer", 
-            "  - Initial tempo: " + std::to_string(initialTempo_) + " BPM");
-        Logger::info("MidiPlayer", 
-            "  - Key: " + keySignature_);
+        Logger::info("MidiPlayer", "✓ File loaded successfully:");
+        Logger::info("MidiPlayer", "  - Tracks: " + std::to_string(midiFile_.tracks.size()));
+        Logger::info("MidiPlayer", "  - Total ticks: " + std::to_string(totalTicks_));
+        Logger::info("MidiPlayer", "  - Time signature: " + timeSignatureStr_);
+        Logger::info("MidiPlayer", "  - Initial tempo: " + std::to_string(initialTempo_) + " BPM");
+        Logger::info("MidiPlayer", "  - Key: " + keySignature_);
         if (!copyright_.empty()) {
             Logger::info("MidiPlayer", "  - Copyright: " + copyright_);
         }
@@ -128,37 +123,21 @@ bool MidiPlayer::load(const std::string& filepath) {
         return true;
         
     } catch (const std::exception& e) {
-        Logger::error("MidiPlayer", 
-            "Failed to load file: " + std::string(e.what()));
-        
-        // Cleanup en cas d'erreur
+        Logger::error("MidiPlayer", "Failed to load file: " + std::string(e.what()));
         currentFile_ = "";
         tracks_.clear();
         allEvents_.clear();
-        
         return false;
     }
 }
 
 // ============================================================================
-// EXTRACTION MÉTADONNÉES - PHASE 2.1
+// EXTRACTION MÉTADONNÉES - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
-/**
- * @brief Extrait toutes les métadonnées du fichier MIDI
- * 
- * @details Parse les meta events pour extraire:
- * - Copyright (meta 0x02)
- * - Set Tempo (meta 0x51) → initialTempo_ + tempoChanges_
- * - Time Signature (meta 0x58) → timeSignatureNum_, Den_, Str_
- * - Key Signature (meta 0x59) → keySignature_
- * 
- * Parcourt allEvents_ car ils sont déjà triés par tick absolu.
- */
 void MidiPlayer::extractMetadata() {
     Logger::debug("MidiPlayer", "Extracting metadata...");
     
-    // Valeurs par défaut
     copyright_ = "";
     keySignature_ = "C major";
     timeSignatureStr_ = "4/4";
@@ -171,7 +150,6 @@ void MidiPlayer::extractMetadata() {
     bool foundTimeSignature = false;
     bool foundKeySignature = false;
     
-    // Parcourir tous les événements pour trouver les meta events
     for (const auto& scheduled : allEvents_) {
         const auto& event = scheduled.event;
         
@@ -179,15 +157,12 @@ void MidiPlayer::extractMetadata() {
             continue;
         }
         
-        // Copyright (0x02)
         if (event.metaType == 0x02 && !event.data.empty()) {
             copyright_ = std::string(event.data.begin(), event.data.end());
             Logger::debug("MidiPlayer", "Found copyright: " + copyright_);
         }
         
-        // Set Tempo (0x51)
         else if (event.metaType == 0x51 && event.data.size() >= 3) {
-            // Decoder microseconds per quarter note
             uint32_t microsecondsPerQuarter = 
                 (static_cast<uint32_t>(event.data[0]) << 16) |
                 (static_cast<uint32_t>(event.data[1]) << 8) |
@@ -195,22 +170,16 @@ void MidiPlayer::extractMetadata() {
             
             float bpm = 60000000.0f / microsecondsPerQuarter;
             
-            // Premier tempo = initial tempo
             if (!foundInitialTempo) {
                 initialTempo_ = bpm;
-                tempo_ = bpm;  // Définir aussi le tempo de lecture
+                tempo_ = bpm;
                 foundInitialTempo = true;
-                Logger::debug("MidiPlayer", 
-                    "Initial tempo: " + std::to_string(bpm) + " BPM");
+                Logger::debug("MidiPlayer", "Initial tempo: " + std::to_string(bpm) + " BPM");
             }
             
-            // Calculer position en ms pour le tempo change
             double ticksPerSecond = (initialTempo_ / 60.0) * ticksPerQuarterNote_;
-            uint32_t timeMs = static_cast<uint32_t>(
-                (scheduled.tick / ticksPerSecond) * 1000.0
-            );
+            uint32_t timeMs = static_cast<uint32_t>((scheduled.tick / ticksPerSecond) * 1000.0);
             
-            // Ajouter à la map des changements
             TempoChange change(scheduled.tick, timeMs, bpm);
             tempoChanges_.push_back(change);
             
@@ -219,31 +188,22 @@ void MidiPlayer::extractMetadata() {
                 ": " + std::to_string(bpm) + " BPM");
         }
         
-        // Time Signature (0x58)
         else if (event.metaType == 0x58 && event.data.size() >= 4) {
             if (!foundTimeSignature) {
-                timeSignatureNum_ = event.data[0];  // Numerator
-                timeSignatureDen_ = 1 << event.data[1];  // 2^denominator
-                
-                // Construire string "4/4"
+                timeSignatureNum_ = event.data[0];
+                timeSignatureDen_ = 1 << event.data[1];
                 timeSignatureStr_ = std::to_string(timeSignatureNum_) + "/" + 
                                    std::to_string(timeSignatureDen_);
-                
                 foundTimeSignature = true;
-                Logger::debug("MidiPlayer", 
-                    "Time signature: " + timeSignatureStr_);
+                Logger::debug("MidiPlayer", "Time signature: " + timeSignatureStr_);
             }
         }
         
-        // Key Signature (0x59)
         else if (event.metaType == 0x59 && event.data.size() >= 2) {
             if (!foundKeySignature) {
                 int8_t sharpsFlats = static_cast<int8_t>(event.data[0]);
                 bool isMinor = (event.data[1] == 1);
-                
-                // Convertir en nom de tonalité
                 keySignature_ = keySignatureToString(sharpsFlats, isMinor);
-                
                 foundKeySignature = true;
                 Logger::debug("MidiPlayer", "Key signature: " + keySignature_);
             }
@@ -255,57 +215,31 @@ void MidiPlayer::extractMetadata() {
         std::to_string(initialTempo_) + " BPM, " + keySignature_);
 }
 
-/**
- * @brief Convertit key signature MIDI en nom lisible
- * 
- * @param sharpsFlats Nombre de dièses (+) ou bémols (-), range -7 à +7
- * @param isMinor true si mineur, false si majeur
- * @return std::string Nom de la tonalité (ex: "C major", "A minor")
- */
 std::string MidiPlayer::keySignatureToString(int8_t sharpsFlats, bool isMinor) const {
-    // Tonalités majeures
     static const char* MAJOR_KEYS[] = {
         "Cb major", "Gb major", "Db major", "Ab major", "Eb major", "Bb major", "F major",
-        "C major",  // 0
+        "C major",
         "G major", "D major", "A major", "E major", "B major", "F# major", "C# major"
     };
     
-    // Tonalités mineures
     static const char* MINOR_KEYS[] = {
         "Ab minor", "Eb minor", "Bb minor", "F minor", "C minor", "G minor", "D minor",
-        "A minor",  // 0
+        "A minor",
         "E minor", "B minor", "F# minor", "C# minor", "G# minor", "D# minor", "A# minor"
     };
     
-    // Limiter range
     if (sharpsFlats < -7) sharpsFlats = -7;
     if (sharpsFlats > 7) sharpsFlats = 7;
     
-    // Index dans table (0 = C major ou A minor)
     int index = sharpsFlats + 7;
     
-    if (isMinor) {
-        return MINOR_KEYS[index];
-    } else {
-        return MAJOR_KEYS[index];
-    }
+    return isMinor ? MINOR_KEYS[index] : MAJOR_KEYS[index];
 }
 
 // ============================================================================
-// ANALYSE PISTES - PHASE 2.2
+// ANALYSE PISTES - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
-/**
- * @brief Analyse enrichie d'une piste
- * 
- * @details Extrait:
- * - Canal MIDI principal (le plus fréquent)
- * - Program Change (premier trouvé)
- * - Statistiques notes (count, min, max, avg velocity)
- * - Note density (notes par seconde)
- * 
- * @param trackIndex Index de la piste à analyser
- */
 void MidiPlayer::analyzeTrack(size_t trackIndex) {
     if (trackIndex >= tracks_.size() || trackIndex >= midiFile_.tracks.size()) {
         return;
@@ -314,12 +248,10 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
     TrackInfo& track = tracks_[trackIndex];
     const auto& midiTrack = midiFile_.tracks[trackIndex];
     
-    // Maps pour compter occurrences
     std::unordered_map<uint8_t, int> channelCount;
     uint32_t totalVelocity = 0;
     uint32_t velocityCount = 0;
     
-    // Parcourir les événements de la piste
     uint64_t absoluteTick = 0;
     uint64_t firstNoteTick = 0;
     uint64_t lastNoteTick = 0;
@@ -328,32 +260,23 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
     for (const auto& event : midiTrack.events) {
         absoluteTick += event.deltaTime;
         
-        // Extraire canal si événement channel
-        uint8_t channel = 255;  // invalide
-        if (event.type != MidiEventType::META && 
-            event.type != MidiEventType::SYSEX) {
+        uint8_t channel = 255;
+        if (event.type != MidiEventType::META && event.type != MidiEventType::SYSEX) {
             channel = event.status & 0x0F;
             channelCount[channel]++;
         }
         
-        // Note ON
         if (event.type == MidiEventType::NOTE_ON && event.data.size() >= 2) {
             uint8_t note = event.data[0];
             uint8_t velocity = event.data[1];
             
-            // Ignorer Note ON avec velocity 0 (= Note OFF)
             if (velocity > 0) {
                 track.noteCount++;
-                
-                // Min/Max note
                 track.minNote = std::min(track.minNote, note);
                 track.maxNote = std::max(track.maxNote, note);
-                
-                // Vélocité moyenne
                 totalVelocity += velocity;
                 velocityCount++;
                 
-                // Premier et dernier tick de note
                 if (!foundFirstNote) {
                     firstNoteTick = absoluteTick;
                     foundFirstNote = true;
@@ -362,13 +285,10 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
             }
         }
         
-        // Program Change
-        else if (event.type == MidiEventType::PROGRAM_CHANGE && 
-                 event.data.size() >= 1) {
-            if (track.programChange == 255) {  // Premier program change
+        else if (event.type == MidiEventType::PROGRAM_CHANGE && event.data.size() >= 1) {
+            if (track.programChange == 255) {
                 track.programChange = event.data[0];
                 track.instrumentName = getInstrumentName(track.programChange);
-                
                 Logger::debug("MidiPlayer", 
                     "Track " + std::to_string(trackIndex) + " instrument: " + 
                     track.instrumentName + " (PC " + std::to_string(track.programChange) + ")");
@@ -376,7 +296,6 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
         }
     }
     
-    // Déterminer canal principal (le plus fréquent)
     int maxCount = 0;
     for (const auto& pair : channelCount) {
         if (pair.second > maxCount) {
@@ -385,12 +304,10 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
         }
     }
     
-    // Calculer vélocité moyenne
     if (velocityCount > 0) {
         track.avgVelocity = static_cast<uint8_t>(totalVelocity / velocityCount);
     }
     
-    // Calculer note density (notes par seconde)
     if (track.noteCount > 0 && lastNoteTick > firstNoteTick) {
         double ticksPerSecond = (initialTempo_ / 60.0) * ticksPerQuarterNote_;
         double durationSeconds = (lastNoteTick - firstNoteTick) / ticksPerSecond;
@@ -400,9 +317,8 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
         }
     }
     
-    // Si pas de program change trouvé, déterminer instrument par défaut selon canal
     if (track.programChange == 255) {
-        if (track.channel == 9) {  // Canal 10 (9 en 0-based) = drums
+        if (track.channel == 9) {
             track.instrumentName = "Drums";
         } else if (track.channel != 255) {
             track.instrumentName = "Unknown";
@@ -417,13 +333,12 @@ void MidiPlayer::analyzeTrack(size_t trackIndex) {
 }
 
 // ============================================================================
-// PARSING (code existant conservé)
+// PARSING - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 void MidiPlayer::parseAllTracks() {
     allEvents_.clear();
     
-    // Fusionner tous les événements avec leur tick absolu
     for (size_t trackIdx = 0; trackIdx < midiFile_.tracks.size(); trackIdx++) {
         uint64_t absoluteTick = 0;
         
@@ -439,14 +354,12 @@ void MidiPlayer::parseAllTracks() {
         }
     }
     
-    // Trier par tick
     std::sort(allEvents_.begin(), allEvents_.end(),
         [](const ScheduledEvent& a, const ScheduledEvent& b) {
             return a.tick < b.tick;
         });
     
-    Logger::debug("MidiPlayer", 
-        "Parsed " + std::to_string(allEvents_.size()) + " events");
+    Logger::debug("MidiPlayer", "Parsed " + std::to_string(allEvents_.size()) + " events");
 }
 
 uint64_t MidiPlayer::calculateTotalTicks() const {
@@ -468,11 +381,9 @@ std::string MidiPlayer::getTrackName(size_t trackIndex) const {
         return "Track " + std::to_string(trackIndex + 1);
     }
     
-    // Chercher événement "Track Name" (Meta Event 0x03)
     for (const auto& event : midiFile_.tracks[trackIndex].events) {
         if (event.type == MidiEventType::META && 
             event.metaType == 0x03 && !event.data.empty()) {
-            // Extraire le nom depuis data
             return std::string(event.data.begin(), event.data.end());
         }
     }
@@ -481,13 +392,12 @@ std::string MidiPlayer::getTrackName(size_t trackIndex) const {
 }
 
 // ============================================================================
-// CONVERSION TEMPORELLE - PHASE 3 (code conservé)
+// CONVERSION TEMPORELLE - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
     MusicalPosition pos;
     
-    // Valeurs par défaut si pas de time signature
     if (timeSignatureNum_ == 0 || timeSignatureDen_ == 0 || ticksPerQuarterNote_ == 0) {
         pos.bar = 1;
         pos.beat = 1;
@@ -498,26 +408,21 @@ MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
         return pos;
     }
     
-    // Calcul des durées
     uint64_t ticksPerBeat = ticksPerQuarterNote_;
     uint64_t ticksPerBar = ticksPerBeat * timeSignatureNum_;
     
-    // Éviter division par zéro
     if (ticksPerBar == 0) {
         ticksPerBar = ticksPerQuarterNote_ * 4;
     }
     
-    // Calcul bar, beat, tick
     pos.bar = static_cast<int>(ticks / ticksPerBar) + 1;
     uint64_t ticksInBar = ticks % ticksPerBar;
     pos.beat = static_cast<int>(ticksInBar / ticksPerBeat) + 1;
     pos.tick = static_cast<int>(ticksInBar % ticksPerBeat);
     
-    // Métadonnées
     pos.numerator = timeSignatureNum_;
     pos.denominator = timeSignatureDen_;
     
-    // Format "bar:beat:tick"
     pos.formatted = std::to_string(pos.bar) + ":" + 
                    std::to_string(pos.beat) + ":" +
                    std::to_string(pos.tick);
@@ -526,30 +431,24 @@ MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
 }
 
 uint64_t MidiPlayer::musicalPositionToTicks(int bar, int beat, int tick) const {
-    // Validation
     if (bar < 1) bar = 1;
     if (beat < 1) beat = 1;
     if (tick < 0) tick = 0;
     
-    // Valeurs par défaut
     if (timeSignatureNum_ == 0 || ticksPerQuarterNote_ == 0) {
         return 0;
     }
     
-    // Limiter beat à la signature
     if (beat > timeSignatureNum_) {
         beat = timeSignatureNum_;
     }
     
-    // Calcul des durées
     uint64_t ticksPerBeat = ticksPerQuarterNote_;
     uint64_t ticksPerBar = ticksPerBeat * timeSignatureNum_;
     
-    // Conversion en 0-based pour calcul
     int barZero = bar - 1;
     int beatZero = beat - 1;
     
-    // Calcul total
     uint64_t totalTicks = 0;
     totalTicks += static_cast<uint64_t>(barZero) * ticksPerBar;
     totalTicks += static_cast<uint64_t>(beatZero) * ticksPerBeat;
@@ -559,72 +458,40 @@ uint64_t MidiPlayer::musicalPositionToTicks(int bar, int beat, int tick) const {
 }
 
 std::string MidiPlayer::getInstrumentName(uint8_t programChange) const {
-    // Table General MIDI Level 1
     static const char* GM_INSTRUMENTS[128] = {
-        // Piano (0-7)
         "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano",
         "Honky-tonk Piano", "Electric Piano 1", "Electric Piano 2",
         "Harpsichord", "Clavinet",
-        
-        // Chromatic Percussion (8-15)
         "Celesta", "Glockenspiel", "Music Box", "Vibraphone",
         "Marimba", "Xylophone", "Tubular Bells", "Dulcimer",
-        
-        // Organ (16-23)
         "Drawbar Organ", "Percussive Organ", "Rock Organ", "Church Organ",
         "Reed Organ", "Accordion", "Harmonica", "Tango Accordion",
-        
-        // Guitar (24-31)
         "Acoustic Guitar (nylon)", "Acoustic Guitar (steel)", "Electric Guitar (jazz)",
         "Electric Guitar (clean)", "Electric Guitar (muted)", "Overdriven Guitar",
         "Distortion Guitar", "Guitar Harmonics",
-        
-        // Bass (32-39)
         "Acoustic Bass", "Electric Bass (finger)", "Electric Bass (pick)",
         "Fretless Bass", "Slap Bass 1", "Slap Bass 2",
         "Synth Bass 1", "Synth Bass 2",
-        
-        // Strings (40-47)
         "Violin", "Viola", "Cello", "Contrabass",
         "Tremolo Strings", "Pizzicato Strings", "Orchestral Harp", "Timpani",
-        
-        // Ensemble (48-55)
         "String Ensemble 1", "String Ensemble 2", "Synth Strings 1", "Synth Strings 2",
         "Choir Aahs", "Voice Oohs", "Synth Voice", "Orchestra Hit",
-        
-        // Brass (56-63)
         "Trumpet", "Trombone", "Tuba", "Muted Trumpet",
         "French Horn", "Brass Section", "Synth Brass 1", "Synth Brass 2",
-        
-        // Reed (64-71)
         "Soprano Sax", "Alto Sax", "Tenor Sax", "Baritone Sax",
         "Oboe", "English Horn", "Bassoon", "Clarinet",
-        
-        // Pipe (72-79)
         "Piccolo", "Flute", "Recorder", "Pan Flute",
         "Blown Bottle", "Shakuhachi", "Whistle", "Ocarina",
-        
-        // Synth Lead (80-87)
         "Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 3 (calliope)", "Lead 4 (chiff)",
         "Lead 5 (charang)", "Lead 6 (voice)", "Lead 7 (fifths)", "Lead 8 (bass + lead)",
-        
-        // Synth Pad (88-95)
         "Pad 1 (new age)", "Pad 2 (warm)", "Pad 3 (polysynth)", "Pad 4 (choir)",
         "Pad 5 (bowed)", "Pad 6 (metallic)", "Pad 7 (halo)", "Pad 8 (sweep)",
-        
-        // Synth Effects (96-103)
         "FX 1 (rain)", "FX 2 (soundtrack)", "FX 3 (crystal)", "FX 4 (atmosphere)",
         "FX 5 (brightness)", "FX 6 (goblins)", "FX 7 (echoes)", "FX 8 (sci-fi)",
-        
-        // Ethnic (104-111)
         "Sitar", "Banjo", "Shamisen", "Koto",
         "Kalimba", "Bag pipe", "Fiddle", "Shanai",
-        
-        // Percussive (112-119)
         "Tinkle Bell", "Agogo", "Steel Drums", "Woodblock",
         "Taiko Drum", "Melodic Tom", "Synth Drum", "Reverse Cymbal",
-        
-        // Sound Effects (120-127)
         "Guitar Fret Noise", "Breath Noise", "Seashore", "Bird Tweet",
         "Telephone Ring", "Helicopter", "Applause", "Gunshot"
     };
@@ -637,7 +504,7 @@ std::string MidiPlayer::getInstrumentName(uint8_t programChange) const {
 }
 
 // ============================================================================
-// CONTRÔLES DE LECTURE (code existant conservé - tronqué pour taille)
+// ✅ CONTRÔLES - v3.1.1 AVEC VALIDATIONS CRITIQUES
 // ============================================================================
 
 void MidiPlayer::play() {
@@ -714,10 +581,15 @@ void MidiPlayer::stopPlayback() {
     }
 }
 
+// ✅ CRITIQUE v3.1.1: Validation bounds
 void MidiPlayer::seek(uint64_t tick) {
     std::lock_guard<std::mutex> lock(mutex_);
     
+    // ✅ VALIDATION: Clamp dans bounds
     if (tick > totalTicks_) {
+        Logger::warn("MidiPlayer", 
+            "Seek tick " + std::to_string(tick) + 
+            " beyond total " + std::to_string(totalTicks_) + " - clamping");
         tick = totalTicks_;
     }
     
@@ -726,17 +598,33 @@ void MidiPlayer::seek(uint64_t tick) {
     currentTick_ = tick;
 }
 
+// ✅ CRITIQUE v3.1.1: Validation bar/beat
 bool MidiPlayer::seekToBar(int bar, int beat, int tick) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (bar < 1 || beat < 1 || beat > timeSignatureNum_ || tick < 0) {
-        Logger::warn("MidiPlayer", "Invalid bar/beat/tick position");
+    // ✅ VALIDATION: Vérifier bounds
+    if (bar < 1) {
+        Logger::warn("MidiPlayer", "Bar must be >= 1");
+        return false;
+    }
+    
+    if (beat < 1 || beat > timeSignatureNum_) {
+        Logger::warn("MidiPlayer", 
+            "Beat " + std::to_string(beat) + 
+            " out of range [1-" + std::to_string(timeSignatureNum_) + "]");
+        return false;
+    }
+    
+    if (tick < 0) {
+        Logger::warn("MidiPlayer", "Tick must be >= 0");
         return false;
     }
     
     uint64_t targetTick = musicalPositionToTicks(bar, beat, tick);
     
+    // ✅ VALIDATION: Clamp si dépasse
     if (targetTick > totalTicks_) {
+        Logger::warn("MidiPlayer", "Position beyond file end - clamping");
         targetTick = totalTicks_;
     }
     
@@ -763,10 +651,68 @@ void MidiPlayer::sendAllNotesOff() {
     }
 }
 
+// ============================================================================
+// ✅ CONFIGURATION - v3.1.1 AVEC VALIDATIONS CRITIQUES
+// ============================================================================
 
+// ✅ CRITIQUE v3.1.1: Protection division par zéro
+void MidiPlayer::setTempo(float bpm) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // ✅ VALIDATION: Éviter division par zéro
+    if (bpm <= 0.0f) {
+        Logger::error("MidiPlayer", 
+            "Invalid tempo: " + std::to_string(bpm) + " BPM (must be > 0)");
+        return;
+    }
+    
+    // ✅ VALIDATION: Clamp dans range raisonnable
+    if (bpm < MIN_TEMPO || bpm > MAX_TEMPO) {
+        Logger::warn("MidiPlayer", 
+            "Tempo " + std::to_string(bpm) + " BPM out of range - clamping");
+        bpm = std::clamp(bpm, MIN_TEMPO, MAX_TEMPO);
+    }
+    
+    tempo_ = bpm;
+    Logger::info("MidiPlayer", "Tempo set to " + std::to_string(bpm) + " BPM");
+}
+
+float MidiPlayer::getTempo() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return tempo_;
+}
+
+void MidiPlayer::setTranspose(int semitones) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // ✅ VALIDATION: Limiter transpose
+    if (semitones < MIN_TRANSPOSE || semitones > MAX_TRANSPOSE) {
+        Logger::warn("MidiPlayer", "Transpose out of range - clamping");
+        semitones = std::clamp(semitones, MIN_TRANSPOSE, MAX_TRANSPOSE);
+    }
+    
+    transpose_ = semitones;
+    Logger::info("MidiPlayer", "Transpose set to " + std::to_string(semitones));
+}
+
+int MidiPlayer::getTranspose() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return transpose_;
+}
+
+void MidiPlayer::setLoop(bool enabled) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    loopEnabled_ = enabled;
+    Logger::info("MidiPlayer", "Loop " + std::string(enabled ? "enabled" : "disabled"));
+}
+
+bool MidiPlayer::isLoopEnabled() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return loopEnabled_;
+}
 
 // ============================================================================
-// GETTERS 
+// GETTERS - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 PlayerState MidiPlayer::getState() const {
@@ -783,25 +729,46 @@ MusicalPosition MidiPlayer::getMusicalPosition() const {
     return ticksToMusicalPosition(currentTick_);
 }
 
+// ✅ CRITIQUE v3.1.1: Protection division par zéro
+double MidiPlayer::getCurrentPosition() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // ✅ VALIDATION: Éviter division par zéro
+    if (tempo_ <= 0.0f || ticksPerQuarterNote_ == 0) {
+        return 0.0;
+    }
+    
+    double ticksPerSecond = (tempo_ / 60.0) * ticksPerQuarterNote_;
+    return (currentTick_ / ticksPerSecond) * 1000.0;
+}
+
+// ✅ CRITIQUE v3.1.1: Protection division par zéro
+double MidiPlayer::getDuration() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // ✅ VALIDATION: Éviter division par zéro
+    if (tempo_ <= 0.0f || ticksPerQuarterNote_ == 0) {
+        return 0.0;
+    }
+    
+    double ticksPerSecond = (tempo_ / 60.0) * ticksPerQuarterNote_;
+    return (totalTicks_ / ticksPerSecond) * 1000.0;
+}
+
 json MidiPlayer::getStatus() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     json status;
-    
-    // État de base
     status["state"] = state_;
     status["position_ms"] = getCurrentPosition();
     status["duration_ms"] = getDuration();
     status["tempo"] = tempo_;
     status["loop_enabled"] = loopEnabled_;
     status["transpose"] = transpose_;
-    
-    // ✅ NOUVEAU: Inclure volume
     status["volume"] = static_cast<int>(masterVolume_ * 100);
     status["volume_float"] = masterVolume_;
     status["is_muted"] = isMuted_;
     
-    // Position musicale
     auto musicalPos = getMusicalPosition();
     status["musical_position"] = {
         {"bar", musicalPos.bar},
@@ -810,7 +777,6 @@ json MidiPlayer::getStatus() const {
         {"formatted", musicalPos.formatted}
     };
     
-    // Tracks
     status["track_count"] = tracks_.size();
     
     return status;
@@ -820,7 +786,6 @@ json MidiPlayer::getMetadata() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     json meta;
-    
     meta["filename"] = currentFile_;
     meta["format"] = midiFile_.format;
     meta["ticks_per_quarter_note"] = ticksPerQuarterNote_;
@@ -833,7 +798,6 @@ json MidiPlayer::getMetadata() const {
     meta["has_tempo_changes"] = !tempoChanges_.empty();
     meta["tempo_changes_count"] = tempoChanges_.size();
     
-    // Ajouter la map des tempo changes
     json tempoArray = json::array();
     for (const auto& change : tempoChanges_) {
         json tc;
@@ -848,19 +812,15 @@ json MidiPlayer::getMetadata() const {
 }
 
 // ============================================================================
-// ✅ NOUVELLES MÉTHODES - VOLUME CONTROL
+// VOLUME - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 void MidiPlayer::setMasterVolume(float volume) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    // Clamp entre 0.0 et 1.0
     masterVolume_ = std::max(0.0f, std::min(1.0f, volume));
-    
     Logger::debug("MidiPlayer", 
         "Master volume set to: " + std::to_string(static_cast<int>(masterVolume_ * 100)) + "%");
     
-    // Si muté, conserver le volume pour unmute ultérieur
     if (isMuted_) {
         volumeBeforeMute_ = masterVolume_;
     }
@@ -873,25 +833,19 @@ float MidiPlayer::getMasterVolume() const {
 
 float MidiPlayer::increaseVolume() {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     float newVolume = masterVolume_ + 0.1f;
     masterVolume_ = std::min(1.0f, newVolume);
-    
     Logger::debug("MidiPlayer", 
         "Volume increased to: " + std::to_string(static_cast<int>(masterVolume_ * 100)) + "%");
-    
     return masterVolume_;
 }
 
 float MidiPlayer::decreaseVolume() {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     float newVolume = masterVolume_ - 0.1f;
     masterVolume_ = std::max(0.0f, newVolume);
-    
     Logger::debug("MidiPlayer", 
         "Volume decreased to: " + std::to_string(static_cast<int>(masterVolume_ * 100)) + "%");
-    
     return masterVolume_;
 }
 
@@ -899,18 +853,13 @@ void MidiPlayer::setMute(bool mute) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (mute && !isMuted_) {
-        // Sauvegarder volume actuel et muter
         volumeBeforeMute_ = masterVolume_;
         masterVolume_ = 0.0f;
         isMuted_ = true;
-        
         Logger::info("MidiPlayer", "Audio muted");
-        
     } else if (!mute && isMuted_) {
-        // Restaurer volume
         masterVolume_ = volumeBeforeMute_;
         isMuted_ = false;
-        
         Logger::info("MidiPlayer", 
             "Audio unmuted (volume: " + 
             std::to_string(static_cast<int>(masterVolume_ * 100)) + "%)");
@@ -922,45 +871,35 @@ bool MidiPlayer::isMuted() const {
     return isMuted_;
 }
 
-// ============================================================================
-// MÉTHODE AUXILIAIRE - APPLIQUER VOLUME À UN MESSAGE
-// ============================================================================
-
+// ✅ CRITIQUE v3.1.1: Validation clamp velocity
 MidiMessage MidiPlayer::applyMasterVolume(const MidiMessage& message) const {
-    // Si pas de volume ou muté, retourner tel quel
     if (masterVolume_ <= 0.0f) {
-        // Message muté - on pourrait retourner un message vide
-        // ou simplement ne pas le router
         return message;
     }
     
-    // Si volume = 100%, pas de modification
     if (std::abs(masterVolume_ - 1.0f) < 0.001f) {
         return message;
     }
     
-    // Copier le message
     MidiMessage modifiedMessage = message;
     
-    // Appliquer volume seulement aux notes (Note On/Off)
     if (message.isNoteOn() || message.isNoteOff()) {
         uint8_t originalVelocity = message.data2;
-        
-        // Calculer nouvelle vélocité
         float newVelocityFloat = originalVelocity * masterVolume_;
+        
+        // ✅ VALIDATION: Clamp velocity MIDI
         uint8_t newVelocity = static_cast<uint8_t>(
             std::max(0.0f, std::min(127.0f, newVelocityFloat))
         );
         
-        // Modifier la vélocité dans le message
         modifiedMessage.data2 = newVelocity;
     }
     
-    // On peut aussi appliquer le volume aux Control Changes de volume (CC7)
-    if (message.isControlChange() && message.data1 == 7) { // CC7 = Channel Volume
+    if (message.isControlChange() && message.data1 == 7) {
         uint8_t originalValue = message.data2;
-        
         float newValueFloat = originalValue * masterVolume_;
+        
+        // ✅ VALIDATION: Clamp CC value
         uint8_t newValue = static_cast<uint8_t>(
             std::max(0.0f, std::min(127.0f, newValueFloat))
         );
@@ -971,80 +910,155 @@ MidiMessage MidiPlayer::applyMasterVolume(const MidiMessage& message) const {
     return modifiedMessage;
 }
 
-
-
+// ============================================================================
+// ✅ PLAYBACK LOOP - v3.1.1 AVEC AMÉLIORATION TIMING
+// ============================================================================
 
 void MidiPlayer::playbackLoop() {
     Logger::info("MidiPlayer", "Playback loop started");
     
+    // ✅ AMÉLIORATION: Utiliser time_point pour précision
     startTime_ = std::chrono::high_resolution_clock::now();
     
     while (running_) {
+        if (state_ != PlayerState::PLAYING) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+        
         auto now = std::chrono::high_resolution_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
             now - startTime_
         ).count();
         
-        // Calculer tick actuel basé sur le tempo
-        double secondsElapsed = elapsed / 1000000.0;
-        double ticksPerSecond = (tempo_ / 60.0) * ticksPerQuarterNote_;
-        currentTick_ = static_cast<uint64_t>(secondsElapsed * ticksPerSecond);
-        
-        // Traiter tous les événements jusqu'au tick actuel
-        for (auto& event : allEvents_) {
-            if (event.tick > currentTick_) {
-                break;
+        // ✅ VALIDATION: Vérifier tempo valide
+        double ticksPerSecond;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (tempo_ <= 0.0f || ticksPerQuarterNote_ == 0) {
+                Logger::error("MidiPlayer", "Invalid tempo in playback - stopping");
+                stop();
+                return;
             }
-            
-            if (event.processed) {
-                continue;
-            }
-            
-            // Appliquer mute/solo/transpose
-            if (shouldPlayEvent(event)) {
-                MidiMessage msg = applyModifications(event.message, event.trackNumber);
-                
-                // ✅ NOUVEAU: Appliquer le volume master
-                msg = applyMasterVolume(msg);
-                
-                // Router le message (seulement si volume > 0)
-                if (masterVolume_ > 0.0f) {
-                    router_->routeMessage(msg);
-                }
-            }
-            
-            event.processed = true;
+            ticksPerSecond = (tempo_ / 60.0) * ticksPerQuarterNote_;
         }
         
-        // Vérifier fin de fichier
-        if (currentTick_ >= totalTicks_) {
-            if (loopEnabled_) {
-                // Réinitialiser pour boucle
+        double secondsElapsed = elapsed / 1000000.0;
+        uint64_t newTick = static_cast<uint64_t>(secondsElapsed * ticksPerSecond);
+        
+        // ✅ VALIDATION: Vérifier overflow
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (newTick > totalTicks_ + 1000) {
+                Logger::warn("MidiPlayer", "Tick overflow detected - stopping");
+                stop();
+                return;
+            }
+            currentTick_ = newTick;
+        }
+        
+        // Traiter événements
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (auto& event : allEvents_) {
+                if (event.tick > currentTick_) break;
+                if (event.processed) continue;
+                
+                if (shouldPlayEvent(event)) {
+                    MidiMessage msg = applyModifications(event.message, event.trackNumber);
+                    msg = applyMasterVolume(msg);
+                    
+                    if (masterVolume_ > 0.0f && router_) {
+                        router_->route(msg);
+                    }
+                }
+                
+                event.processed = true;
+            }
+        }
+        
+        // Vérifier fin
+        bool reachedEnd, shouldLoop;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            reachedEnd = (currentTick_ >= totalTicks_);
+            shouldLoop = loopEnabled_;
+        }
+        
+        if (reachedEnd) {
+            if (shouldLoop) {
+                Logger::debug("MidiPlayer", "Loop restart");
+                
+                std::lock_guard<std::mutex> lock(mutex_);
                 currentTick_ = 0;
                 startTime_ = std::chrono::high_resolution_clock::now();
                 
-                // Réinitialiser flags processed
                 for (auto& event : allEvents_) {
                     event.processed = false;
                 }
-                
-                Logger::debug("MidiPlayer", "Loop restart");
             } else {
-                // Arrêter
                 stop();
                 break;
             }
         }
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // ✅ AMÉLIORATION: Sleep précis
+        auto nextTickTime = startTime_ + std::chrono::microseconds(
+            static_cast<uint64_t>((currentTick_ + 1) / ticksPerSecond * 1000000)
+        );
+        std::this_thread::sleep_until(nextTickTime);
     }
     
     Logger::info("MidiPlayer", "Playback loop ended");
 }
 
+// ============================================================================
+// HELPERS - v3.1.0 (avec validation v3.1.1)
+// ============================================================================
+
+bool MidiPlayer::shouldPlayEvent(const ScheduledEvent& event) const {
+    auto it = trackInfo_.find(event.trackNumber);
+    if (it == trackInfo_.end()) {
+        return true;
+    }
+    
+    const TrackInfo& track = it->second;
+    
+    if (track.isMuted) {
+        return false;
+    }
+    
+    bool anySolo = std::any_of(trackInfo_.begin(), trackInfo_.end(),
+        [](const auto& pair) { return pair.second.isSolo; });
+    
+    if (anySolo && !track.isSolo) {
+        return false;
+    }
+    
+    return true;
+}
+
+// ✅ CRITIQUE v3.1.1: Validation clamp note
+MidiMessage MidiPlayer::applyModifications(const MidiMessage& message, uint8_t trackNumber) const {
+    MidiMessage modified = message;
+    
+    if ((message.type == MidiMessageType::NOTE_ON || 
+         message.type == MidiMessageType::NOTE_OFF) && 
+        transpose_ != 0) {
+        
+        int newNote = static_cast<int>(message.data1) + transpose_;
+        
+        // ✅ VALIDATION: Clamp note MIDI dans [0-127]
+        newNote = std::clamp(newNote, 0, 127);
+        
+        modified.data1 = static_cast<uint8_t>(newNote);
+    }
+    
+    return modified;
+}
 
 // ============================================================================
-// CALLBACKS
+// CALLBACKS - v3.1.0 (INCHANGÉ)
 // ============================================================================
 
 void MidiPlayer::setStateCallback(StateCallback callback) {
@@ -1055,5 +1069,5 @@ void MidiPlayer::setStateCallback(StateCallback callback) {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER MidiPlayer.cpp - Version 3.1.0 Phases 2+3+4 Complete
+// FIN DU FICHIER MidiPlayer.cpp - v3.1.1
 // ============================================================================
