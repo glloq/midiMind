@@ -1,83 +1,35 @@
-In file included from /home/pi/midiMind/backend/src/core/../midi/devices/../sysex/SysExHandler.h:35,
-                 from /home/pi/midiMind/backend/src/core/../midi/devices/MidiDevice.h:31,
-                 from /home/pi/midiMind/backend/src/core/../midi/devices/MidiDeviceManager.h:25,
-                 from /home/pi/midiMind/backend/src/core/Application.h:26,
-                 from /home/pi/midiMind/backend/src/core/Application.cpp:39:
-/home/pi/midiMind/backend/src/core/../midi/devices/../sysex/SysExBuilder.h:28:10: fatal error: ../core/Logger.h: No such file or directory
-   28 | #include "../core/Logger.h"
-      |          ^~~~~~~~~~~~~~~~~~
-compilation terminated.
-In file included from /home/pi/midiMind/backend/src/core/../midi/devices/../sysex/SysExHandler.h:35,
-                 from /home/pi/midiMind/backend/src/core/../midi/devices/MidiDevice.h:31,
-                 from /home/pi/midiMind/backend/src/core/../midi/devices/MidiDeviceManager.h:25,
-                 from /home/pi/midiMind/backend/src/core/Application.h:26,
+In file included from /home/pi/midiMind/backend/src/core/Application.h:26,
                  from /home/pi/midiMind/backend/src/main.cpp:35:
-/home/pi/midiMind/backend/src/core/../midi/devices/../sysex/SysExBuilder.h:28:10: fatal error: ../core/Logger.h: No such file or directory
-   28 | #include "../core/Logger.h"
-      |          ^~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/../midi/devices/MidiDeviceManager.h:26:10: fatal error: DeviceInfo.h: No such file or directory
+   26 | #include "DeviceInfo.h"
+      |          ^~~~~~~~~~~~~~
+compilation terminated.
+In file included from /home/pi/midiMind/backend/src/core/Application.h:26,
+                 from /home/pi/midiMind/backend/src/core/Application.cpp:39:
+/home/pi/midiMind/backend/src/core/../midi/devices/MidiDeviceManager.h:26:10: fatal error: DeviceInfo.h: No such file or directory
+   26 | #include "DeviceInfo.h"
+      |          ^~~~~~~~~~~~~~
 compilation terminated.
 make[2]: *** [CMakeFiles/midimind.dir/build.make:79: CMakeFiles/midimind.dir/src/main.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
 make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
-In file included from /home/pi/midiMind/backend/src/api/../midi/devices/../sysex/SysExHandler.h:35,
-                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDevice.h:31,
-                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDeviceManager.h:25,
-                 from /home/pi/midiMind/backend/src/api/CommandProcessorV2.h:47,
+In file included from /home/pi/midiMind/backend/src/api/CommandProcessorV2.h:47,
                  from /home/pi/midiMind/backend/src/api/CommandProcessorV2.cpp:40:
-/home/pi/midiMind/backend/src/api/../midi/devices/../sysex/SysExBuilder.h:28:10: fatal error: ../core/Logger.h: No such file or directory
-   28 | #include "../core/Logger.h"
-      |          ^~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/../midi/devices/MidiDeviceManager.h:26:10: fatal error: DeviceInfo.h: No such file or directory
+   26 | #include "DeviceInfo.h"
+      |          ^~~~~~~~~~~~~~
 compilation terminated.
 make[2]: *** [CMakeFiles/midimind.dir/build.make:121: CMakeFiles/midimind.dir/src/api/CommandProcessorV2.cpp.o] Error 1
-In file included from /home/pi/midiMind/backend/src/api/ApiServer.cpp:40:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:277:21: error: ‘Request’ in namespace ‘midiMind::protocol’ does not name a type
-  277 |     const protocol::Request& getRequest() const;
-      |                     ^~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:282:21: error: ‘Response’ in namespace ‘midiMind::protocol’ does not name a type
-  282 |     const protocol::Response& getResponse() const;
-      |                     ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:287:21: error: ‘Event’ in namespace ‘midiMind::protocol’ does not name a type
-  287 |     const protocol::Event& getEvent() const;
-      |                     ^~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:328:29: error: ‘Request’ is not a member of ‘midiMind::protocol’
-  328 |     std::optional<protocol::Request> request_;
-      |                             ^~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:328:36: error: template argument 1 is invalid
-  328 |     std::optional<protocol::Request> request_;
-      |                                    ^
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:329:29: error: ‘Response’ is not a member of ‘midiMind::protocol’
-  329 |     std::optional<protocol::Response> response_;
-      |                             ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:329:37: error: template argument 1 is invalid
-  329 |     std::optional<protocol::Response> response_;
-      |                                     ^
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:330:29: error: ‘Event’ is not a member of ‘midiMind::protocol’
-  330 |     std::optional<protocol::Event> event_;
-      |                             ^~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:330:34: error: template argument 1 is invalid
-  330 |     std::optional<protocol::Event> event_;
-      |                                  ^
-/home/pi/midiMind/backend/src/api/ApiServer.cpp: In member function ‘void midiMind::ApiServer::onMessage(websocketpp::connection_hdl, message_ptr)’:
-/home/pi/midiMind/backend/src/api/ApiServer.cpp:286:25: error: ‘Request’ in namespace ‘midiMind::protocol’ does not name a type
-  286 |         const protocol::Request& request = envelope.getRequest();
-      |                         ^~~~~~~
-/home/pi/midiMind/backend/src/api/ApiServer.cpp:290:38: error: ‘request’ was not declared in this scope; did you mean ‘websocketpp::http::parser::request’?
-  290 |             "Processing command: " + request.command +
-      |                                      ^~~~~~~
-      |                                      websocketpp::http::parser::request
-In file included from /usr/include/websocketpp/config/core.hpp:43,
-                 from /usr/include/websocketpp/config/asio_no_tls.hpp:31,
-                 from /home/pi/midiMind/backend/src/api/ApiServer.h:23,
+In file included from /home/pi/midiMind/backend/src/api/ApiServer.h:32,
                  from /home/pi/midiMind/backend/src/api/ApiServer.cpp:39:
-/usr/include/websocketpp/http/request.hpp:50:7: note: ‘websocketpp::http::parser::request’ declared here
-   50 | class request : public parser {
-      |       ^~~~~~~
-/home/pi/midiMind/backend/src/api/ApiServer.cpp:306:9: error: could not convert ‘{{"command", <expression error>}, {"params", <expression error>}}’ from ‘<brace-enclosed initializer list>’ to ‘midiMind::json’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’}
-  306 |         };
-      |         ^
-      |         |
-      |         <brace-enclosed initializer list>
+/home/pi/midiMind/backend/src/api/Protocol.h: In member function ‘json midiMind::protocol::Event::toJson() const’:
+/home/pi/midiMind/backend/src/api/Protocol.h:253:25: error: ‘priorityToString’ was not declared in this scope
+  253 |         j["priority"] = priorityToString(priority);
+      |                         ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/Protocol.h: In static member function ‘static midiMind::protocol::Event midiMind::protocol::Event::fromJson(const json&)’:
+/home/pi/midiMind/backend/src/api/Protocol.h:261:24: error: ‘stringToPriority’ was not declared in this scope
+  261 |         evt.priority = stringToPriority(j.value("priority", "normal"));
+      |                        ^~~~~~~~~~~~~~~~
 make[2]: *** [CMakeFiles/midimind.dir/build.make:107: CMakeFiles/midimind.dir/src/api/ApiServer.cpp.o] Error 1
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:156: all] Error 2
-
