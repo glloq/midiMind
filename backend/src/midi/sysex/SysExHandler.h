@@ -43,7 +43,7 @@
 #include "SyncClock.h"
 #include "CustomSysExParser.h"
 #include "ManufacturerDatabase.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
 
 using json = nlohmann::json;
 

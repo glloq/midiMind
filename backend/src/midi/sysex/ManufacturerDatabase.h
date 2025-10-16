@@ -19,7 +19,7 @@
 #include <map>
 #include <vector>
 #include <optional>
-#include "../DeviceIdentity.h"
+#include "DeviceIdentity.h"
 
 namespace midiMind {
 

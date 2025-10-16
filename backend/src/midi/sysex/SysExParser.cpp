@@ -5,7 +5,7 @@
 // ============================================================================
 
 #include "SysExParser.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
 #include <algorithm>
 
 namespace midiMind {

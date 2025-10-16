@@ -5,7 +5,7 @@
 // ============================================================================
 
 #include "SysExHandler.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
 
 namespace midiMind {
 

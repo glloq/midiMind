@@ -1,15 +1,16 @@
 // ============================================================================
 // Fichier: backend/src/api/Protocol.h
-// Version: 3.0.1 - CORRECTIONS CRITIQUES
-// Date: 2025-10-15
+// Version: 3.0.2 - AJOUT STRUCTURES REQUEST/RESPONSE/EVENT
+// Date: 2025-10-16
 // ============================================================================
-// CORRECTIONS v3.0.1:
-//   ✅ FIX #1: Ajout #include <random> pour random_device et mt19937_64
-//   ✅ FIX #2: getCurrentTimestamp() déplacé en public
-//   ✅ FIX #3: Ajout ErrorCode::DEVICE_BUSY
+// CORRECTIONS v3.0.2:
+//   ✅ Ajout struct Request (manquante)
+//   ✅ Ajout struct Response (manquante)
+//   ✅ Ajout struct Event (manquante)
+//   ✅ Conserve toutes les corrections de v3.0.1
 //
 // Description:
-//   Protocole WebSocket pour communication client-serveur
+//   Protocole WebSocket complet pour communication client-serveur
 // ============================================================================
 
 #pragma once
@@ -19,7 +20,7 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <map>
-#include <random>  // ✅ FIX #1: Ajouté pour random_device et mt19937_64
+#include <random>
 
 using json = nlohmann::json;
 
@@ -70,7 +71,7 @@ enum class ErrorCode {
     INVALID_PARAMS = 1101,
     COMMAND_FAILED = 1102,
     TIMEOUT = 1103,
-    DEVICE_BUSY = 1104,  // ✅ FIX #3: Ajouté
+    DEVICE_BUSY = 1104,
     
     // Erreurs de validation (1200-1299)
     VALIDATION_ERROR = 1200,
@@ -140,7 +141,7 @@ struct Envelope {
         return env;
     }
     
-    // ✅ FIX #2: Méthodes utilitaires publiques
+    // Méthodes utilitaires publiques
     static std::string generateUUID();
     static int64_t getCurrentTimestamp();
     
@@ -161,6 +162,104 @@ private:
         if (str == "event")    return MessageType::EVENT;
         if (str == "error")    return MessageType::ERROR;
         return MessageType::REQUEST;
+    }
+};
+
+/**
+ * @brief Structure de requête (client → serveur)
+ */
+struct Request {
+    std::string command;        // Nom de la commande
+    json params;                // Paramètres de la commande
+    int timeout;                // Timeout en ms (0 = aucun)
+    
+    Request()
+        : params(json::object())
+        , timeout(0)
+    {}
+    
+    json toJson() const {
+        json j;
+        j["command"] = command;
+        j["params"] = params;
+        if (timeout > 0) {
+            j["timeout"] = timeout;
+        }
+        return j;
+    }
+    
+    static Request fromJson(const json& j) {
+        Request req;
+        req.command = j.value("command", "");
+        req.params = j.value("params", json::object());
+        req.timeout = j.value("timeout", 0);
+        return req;
+    }
+};
+
+/**
+ * @brief Structure de réponse (serveur → client)
+ */
+struct Response {
+    std::string requestId;      // ID de la requête d'origine
+    bool success;               // Succès ou échec
+    json data;                  // Données de réponse
+    int latency;                // Latence en ms
+    
+    Response()
+        : success(false)
+        , data(json::object())
+        , latency(0)
+    {}
+    
+    json toJson() const {
+        json j;
+        j["requestId"] = requestId;
+        j["success"] = success;
+        j["data"] = data;
+        if (latency > 0) {
+            j["latency"] = latency;
+        }
+        return j;
+    }
+    
+    static Response fromJson(const json& j) {
+        Response resp;
+        resp.requestId = j.value("requestId", "");
+        resp.success = j.value("success", false);
+        resp.data = j.value("data", json::object());
+        resp.latency = j.value("latency", 0);
+        return resp;
+    }
+};
+
+/**
+ * @brief Structure d'événement (serveur → client, broadcast)
+ */
+struct Event {
+    std::string name;           // Nom de l'événement
+    json data;                  // Données de l'événement
+    EventPriority priority;     // Priorité
+    
+    Event()
+        : data(json::object())
+        , priority(EventPriority::NORMAL)
+    {}
+    
+    json toJson() const {
+        json j;
+        j["name"] = name;
+        j["data"] = data;
+        j["priority"] = priorityToString(priority);
+        return j;
+    }
+    
+    static Event fromJson(const json& j) {
+        Event evt;
+        evt.name = j.value("name", "");
+        evt.data = j.value("data", json::object());
+        evt.priority = stringToPriority(j.value("priority", "normal"));
+        return evt;
     }
 };
 
@@ -212,16 +311,13 @@ private:
 // HELPERS - IMPLÉMENTATION INLINE
 // ============================================================================
 
-// ✅ FIX #2: Implémentation publique de getCurrentTimestamp()
 inline int64_t Envelope::getCurrentTimestamp() {
     auto now = std::chrono::system_clock::now();
     auto duration = now.time_since_epoch();
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
-// Génération UUID v4 simplifiée
 inline std::string Envelope::generateUUID() {
-    // ✅ FIX #1: random_device et mt19937_64 maintenant disponibles
     static std::random_device rd;
     static std::mt19937_64 gen(rd());
     static std::uniform_int_distribution<uint64_t> dis;
@@ -255,7 +351,7 @@ inline std::string Error::errorCodeToString(ErrorCode code) {
         case ErrorCode::INVALID_PARAMS:    return "INVALID_PARAMS";
         case ErrorCode::COMMAND_FAILED:    return "COMMAND_FAILED";
         case ErrorCode::TIMEOUT:           return "TIMEOUT";
-        case ErrorCode::DEVICE_BUSY:       return "DEVICE_BUSY";  // ✅ FIX #3
+        case ErrorCode::DEVICE_BUSY:       return "DEVICE_BUSY";
         
         // Validation
         case ErrorCode::VALIDATION_ERROR:  return "VALIDATION_ERROR";
@@ -280,7 +376,6 @@ inline std::string Error::errorCodeToString(ErrorCode code) {
 }
 
 inline ErrorCode Error::stringToErrorCode(const std::string& str) {
-    // Map string → ErrorCode
     static const std::map<std::string, ErrorCode> codeMap = {
         {"INVALID_FORMAT", ErrorCode::INVALID_FORMAT},
         {"INVALID_VERSION", ErrorCode::INVALID_VERSION},
@@ -290,7 +385,7 @@ inline ErrorCode Error::stringToErrorCode(const std::string& str) {
         {"INVALID_PARAMS", ErrorCode::INVALID_PARAMS},
         {"COMMAND_FAILED", ErrorCode::COMMAND_FAILED},
         {"TIMEOUT", ErrorCode::TIMEOUT},
-        {"DEVICE_BUSY", ErrorCode::DEVICE_BUSY},  // ✅ FIX #3
+        {"DEVICE_BUSY", ErrorCode::DEVICE_BUSY},
         {"VALIDATION_ERROR", ErrorCode::VALIDATION_ERROR},
         {"FILE_NOT_FOUND", ErrorCode::FILE_NOT_FOUND},
         {"PATH_TRAVERSAL", ErrorCode::PATH_TRAVERSAL},
@@ -328,5 +423,5 @@ inline EventPriority stringToPriority(const std::string& str) {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Protocol.h v3.0.1 - CORRIGÉ
+// FIN DU FICHIER Protocol.h v3.0.2 - COMPLET
 // ============================================================================

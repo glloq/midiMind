@@ -25,7 +25,8 @@
 #include <cstdint>
 #include "SysExMessage.h"
 #include "UniversalSysEx.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
+#include "../../core/Error.h"
 
 namespace midiMind {
 

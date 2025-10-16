@@ -27,7 +27,7 @@
 #pragma once
 
 #include "CustomSysExProtocol.h"
-#include "../Logger.h"
+#include "../../core/Logger.h"
 #include <vector>
 #include <optional>
 #include <cstring>
