@@ -1,50 +1,959 @@
-In file included from /home/pi/midiMind/backend/src/api/commands/../../network/NetworkManager.h:41,
-                 from /home/pi/midiMind/backend/src/api/commands/network.cpp:23,
-                 from /home/pi/midiMind/backend/src/api/CommandProcessorV2.cpp:55:
-/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:38:10: fatal error: asio.hpp: No such file or directory
-   38 | #include <asio.hpp>
-      |          ^~~~~~~~~~
-compilation terminated.
-make[2]: *** [CMakeFiles/midimind.dir/build.make:121: CMakeFiles/midimind.dir/src/api/CommandProcessorV2.cpp.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
-In file included from /home/pi/midiMind/backend/src/core/../network/NetworkManager.h:41,
-                 from /home/pi/midiMind/backend/src/core/Application.h:44,
-                 from /home/pi/midiMind/backend/src/main.cpp:35:
-/home/pi/midiMind/backend/src/core/../network/rtpmidi/RtpMidiServer.h:38:10: fatal error: asio.hpp: No such file or directory
-   38 | #include <asio.hpp>
-      |          ^~~~~~~~~~
-compilation terminated.
-make[2]: *** [CMakeFiles/midimind.dir/build.make:79: CMakeFiles/midimind.dir/src/main.cpp.o] Error 1
-In file included from /home/pi/midiMind/backend/src/core/../network/NetworkManager.h:41,
-                 from /home/pi/midiMind/backend/src/core/Application.h:44,
-                 from /home/pi/midiMind/backend/src/core/Application.cpp:39:
-/home/pi/midiMind/backend/src/core/../network/rtpmidi/RtpMidiServer.h:38:10: fatal error: asio.hpp: No such file or directory
-   38 | #include <asio.hpp>
-      |          ^~~~~~~~~~
-compilation terminated.
-make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:469:27: error: redefinition of ‘const midiMind::protocol::Envelope& midiMind::MessageEnvelope::getEnvelope() const’
-  469 | const protocol::Envelope& MessageEnvelope::getEnvelope() const {
-      |                           ^~~~~~~~~~~~~~~
-In file included from /home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:44:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:272:31: note: ‘const midiMind::protocol::Envelope& midiMind::MessageEnvelope::getEnvelope() const’ previously defined here
-  272 |     const protocol::Envelope& getEnvelope() const { return envelope_; }
-      |                               ^~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:473:13: error: redefinition of ‘std::string midiMind::MessageEnvelope::getId() const’
-  473 | std::string MessageEnvelope::getId() const {
-      |             ^~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:301:17: note: ‘std::string midiMind::MessageEnvelope::getId() const’ previously defined here
-  301 |     std::string getId() const { return envelope_.id; }
-      |                 ^~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:477:9: error: redefinition of ‘int64_t midiMind::MessageEnvelope::getTimestamp() const’
-  477 | int64_t MessageEnvelope::getTimestamp() const {
+/usr/include/asio/impl/use_future.hpp:110:35: error: ‘shared_ptr’ does not name a type
+  110 |   explicit promise_executor(const shared_ptr<std::promise<T>>& p)
+      |                                   ^~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:110:45: error: expected ‘,’ or ‘...’ before ‘<’ token
+  110 |   explicit promise_executor(const shared_ptr<std::promise<T>>& p)
+      |                                             ^
+/usr/include/asio/impl/use_future.hpp:115:3: error: ‘execution_context’ does not name a type
+  115 |   execution_context& query(execution::context_t) const noexcept
+      |   ^~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:120:35: error: ‘execution’ has not been declared
+  120 |   static constexpr Blocking query(execution::blocking_t)
+      |                                   ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:125:23: error: ‘execution’ was not declared in this scope
+  125 |   promise_executor<T, execution::blocking_t::possibly_t>
+      |                       ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:125:23: note: suggested alternatives:
+/usr/include/c++/14/pstl/execution_defs.h:17:11: note:   ‘__pstl::execution’
+   17 | namespace execution
+      |           ^~~~~~~~~
+/usr/include/asio/execution/invocable_archetype.hpp:24:11: note:   ‘asio::execution’
+   24 | namespace execution {
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:125:56: error: template argument 2 is invalid
+  125 |   promise_executor<T, execution::blocking_t::possibly_t>
+      |                                                        ^
+/usr/include/asio/impl/use_future.hpp:126:11: error: ‘execution’ has not been declared
+  126 |   require(execution::blocking_t::possibly_t) const
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:131:23: error: ‘execution’ was not declared in this scope
+  131 |   promise_executor<T, execution::blocking_t::never_t>
+      |                       ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:131:23: note: suggested alternatives:
+/usr/include/c++/14/pstl/execution_defs.h:17:11: note:   ‘__pstl::execution’
+   17 | namespace execution
+      |           ^~~~~~~~~
+/usr/include/asio/execution/invocable_archetype.hpp:24:11: note:   ‘asio::execution’
+   24 | namespace execution {
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:131:53: error: template argument 2 is invalid
+  131 |   promise_executor<T, execution::blocking_t::never_t>
+      |                                                     ^
+/usr/include/asio/impl/use_future.hpp:132:11: error: ‘execution’ has not been declared
+  132 |   require(execution::blocking_t::never_t) const
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:132:3: error: ‘int asio::detail::promise_executor<T, Blocking>::require(int) const’ cannot be overloaded with ‘int asio::detail::promise_executor<T, Blocking>::require(int) const’
+  132 |   require(execution::blocking_t::never_t) const
+      |   ^~~~~~~
+/usr/include/asio/impl/use_future.hpp:126:3: note: previous declaration ‘int asio::detail::promise_executor<T, Blocking>::require(int) const’
+  126 |   require(execution::blocking_t::possibly_t) const
+      |   ^~~~~~~
+/usr/include/asio/impl/use_future.hpp:145:3: error: ‘execution_context’ does not name a type
+  145 |   execution_context& context() const noexcept
+      |   ^~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:187:3: error: ‘shared_ptr’ does not name a type
+  187 |   shared_ptr<std::promise<T>> p_;
+      |   ^~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp: In constructor ‘asio::detail::promise_executor<T, Blocking>::promise_executor(int)’:
+/usr/include/asio/impl/use_future.hpp:111:7: error: class ‘asio::detail::promise_executor<T, Blocking>’ does not have any field named ‘p_’
+  111 |     : p_(p)
+      |       ^~
+/usr/include/asio/impl/use_future.hpp:111:10: error: ‘p’ was not declared in this scope
+  111 |     : p_(p)
+      |          ^
+/usr/include/asio/impl/use_future.hpp: In member function ‘int asio::detail::promise_executor<T, Blocking>::require(int) const’:
+/usr/include/asio/impl/use_future.hpp:128:32: error: ‘execution’ was not declared in this scope
+  128 |     return promise_executor<T, execution::blocking_t::possibly_t>(p_);
+      |                                ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:128:32: note: suggested alternatives:
+/usr/include/c++/14/pstl/execution_defs.h:17:11: note:   ‘__pstl::execution’
+   17 | namespace execution
+      |           ^~~~~~~~~
+/usr/include/asio/execution/invocable_archetype.hpp:24:11: note:   ‘asio::execution’
+   24 | namespace execution {
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:128:65: error: template argument 2 is invalid
+  128 |     return promise_executor<T, execution::blocking_t::possibly_t>(p_);
+      |                                                                 ^
+/usr/include/asio/impl/use_future.hpp:128:67: error: ‘p_’ was not declared in this scope
+  128 |     return promise_executor<T, execution::blocking_t::possibly_t>(p_);
+      |                                                                   ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘int asio::detail::promise_executor<T, Blocking>::require(int) const’:
+/usr/include/asio/impl/use_future.hpp:134:32: error: ‘execution’ was not declared in this scope
+  134 |     return promise_executor<T, execution::blocking_t::never_t>(p_);
+      |                                ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:134:32: note: suggested alternatives:
+/usr/include/c++/14/pstl/execution_defs.h:17:11: note:   ‘__pstl::execution’
+   17 | namespace execution
+      |           ^~~~~~~~~
+/usr/include/asio/execution/invocable_archetype.hpp:24:11: note:   ‘asio::execution’
+   24 | namespace execution {
+      |           ^~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:134:62: error: template argument 2 is invalid
+  134 |     return promise_executor<T, execution::blocking_t::never_t>(p_);
+      |                                                              ^
+/usr/include/asio/impl/use_future.hpp:134:64: error: ‘p_’ was not declared in this scope
+  134 |     return promise_executor<T, execution::blocking_t::never_t>(p_);
+      |                                                                ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘void asio::detail::promise_executor<T, Blocking>::execute(F&&) const’:
+/usr/include/asio/impl/use_future.hpp:140:19: error: there are no arguments to ‘system_executor’ that depend on a template parameter, so a declaration of ‘system_executor’ must be available [-fpermissive]
+  140 |     asio::require(system_executor(), Blocking()).execute(
+      |                   ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:141:9: error: ‘promise_invoker’ was not declared in this scope; did you mean ‘asio::detail::promise_invoker’?
+  141 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)));
       |         ^~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:306:13: note: ‘int64_t midiMind::MessageEnvelope::getTimestamp() const’ previously defined here
-  306 |     int64_t getTimestamp() const { return envelope_.timestamp; }
-      |             ^~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:481:23: error: redefinition of ‘midiMind::protocol::MessageType midiMind::MessageEnvelope::getType() const’
-  481 | protocol::MessageType MessageEnvelope::getType() const {
-      |                       ^~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.h:311:27: note: ‘midiMind::protocol::MessageType midiMind::MessageEnvelope::getType() const’ previously defined here
-  311 |     protocol::MessageType getType() const { return envelope_.type; }
-      |                           ^~~~~~~
+      |         asio::detail::promise_invoker
+/usr/include/asio/impl/use_future.hpp:74:7: note: ‘asio::detail::promise_invoker’ declared here
+   74 | class promise_invoker
+      |       ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:141:26: error: expected primary-expression before ‘,’ token
+  141 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)));
+      |                          ^
+/usr/include/asio/impl/use_future.hpp:141:29: error: expected primary-expression before ‘>’ token
+  141 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)));
+      |                             ^
+/usr/include/asio/impl/use_future.hpp:141:31: error: ‘p_’ was not declared in this scope
+  141 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)));
+      |                               ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘void asio::detail::promise_executor<T, Blocking>::dispatch(F&&, const A&) const’:
+/usr/include/asio/impl/use_future.hpp:156:5: error: ‘promise_invoker’ was not declared in this scope; did you mean ‘asio::detail::promise_invoker’?
+  156 |     promise_invoker<T, F>(p_, static_cast<F&&>(f))();
+      |     ^~~~~~~~~~~~~~~
+      |     asio::detail::promise_invoker
+/usr/include/asio/impl/use_future.hpp:74:7: note: ‘asio::detail::promise_invoker’ declared here
+   74 | class promise_invoker
+      |       ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:156:22: error: expected primary-expression before ‘,’ token
+  156 |     promise_invoker<T, F>(p_, static_cast<F&&>(f))();
+      |                      ^
+/usr/include/asio/impl/use_future.hpp:156:25: error: expected primary-expression before ‘>’ token
+  156 |     promise_invoker<T, F>(p_, static_cast<F&&>(f))();
+      |                         ^
+/usr/include/asio/impl/use_future.hpp:156:27: error: ‘p_’ was not declared in this scope
+  156 |     promise_invoker<T, F>(p_, static_cast<F&&>(f))();
+      |                           ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘void asio::detail::promise_executor<T, Blocking>::post(F&&, const A&) const’:
+/usr/include/asio/impl/use_future.hpp:162:5: error: there are no arguments to ‘system_executor’ that depend on a template parameter, so a declaration of ‘system_executor’ must be available [-fpermissive]
+  162 |     system_executor().post(
+      |     ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:163:9: error: ‘promise_invoker’ was not declared in this scope; did you mean ‘asio::detail::promise_invoker’?
+  163 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |         ^~~~~~~~~~~~~~~
+      |         asio::detail::promise_invoker
+/usr/include/asio/impl/use_future.hpp:74:7: note: ‘asio::detail::promise_invoker’ declared here
+   74 | class promise_invoker
+      |       ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:163:26: error: expected primary-expression before ‘,’ token
+  163 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                          ^
+/usr/include/asio/impl/use_future.hpp:163:29: error: expected primary-expression before ‘>’ token
+  163 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                             ^
+/usr/include/asio/impl/use_future.hpp:163:31: error: ‘p_’ was not declared in this scope
+  163 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                               ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘void asio::detail::promise_executor<T, Blocking>::defer(F&&, const A&) const’:
+/usr/include/asio/impl/use_future.hpp:169:5: error: there are no arguments to ‘system_executor’ that depend on a template parameter, so a declaration of ‘system_executor’ must be available [-fpermissive]
+  169 |     system_executor().defer(
+      |     ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:170:9: error: ‘promise_invoker’ was not declared in this scope; did you mean ‘asio::detail::promise_invoker’?
+  170 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |         ^~~~~~~~~~~~~~~
+      |         asio::detail::promise_invoker
+/usr/include/asio/impl/use_future.hpp:74:7: note: ‘asio::detail::promise_invoker’ declared here
+   74 | class promise_invoker
+      |       ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:170:26: error: expected primary-expression before ‘,’ token
+  170 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                          ^
+/usr/include/asio/impl/use_future.hpp:170:29: error: expected primary-expression before ‘>’ token
+  170 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                             ^
+/usr/include/asio/impl/use_future.hpp:170:31: error: ‘p_’ was not declared in this scope
+  170 |         promise_invoker<T, F>(p_, static_cast<F&&>(f)), a);
+      |                               ^~
+/usr/include/asio/impl/use_future.hpp: At global scope:
+/usr/include/asio/impl/use_future.hpp:195:11: error: ‘promise_executor’ does not name a type
+  195 |   typedef promise_executor<T> executor_type;
+      |           ^~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:197:3: error: ‘executor_type’ does not name a type; did you mean ‘executor_op’?
+  197 |   executor_type get_executor() const noexcept
+      |   ^~~~~~~~~~~~~
+      |   executor_op
+/usr/include/asio/impl/use_future.hpp:217:3: error: ‘shared_ptr’ does not name a type
+  217 |   shared_ptr<std::promise<T>> p_;
+      |   ^~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp: In member function ‘asio::detail::promise_creator<T>::future_type asio::detail::promise_creator<T>::get_future()’:
+/usr/include/asio/impl/use_future.hpp:206:12: error: ‘p_’ was not declared in this scope
+  206 |     return p_->get_future();
+      |            ^~
+/usr/include/asio/impl/use_future.hpp: In member function ‘void asio::detail::promise_creator<T>::create_promise(const Allocator&)’:
+/usr/include/asio/impl/use_future.hpp:214:5: error: ‘p_’ was not declared in this scope
+  214 |     p_ = std::allocate_shared<std::promise<T>>(b, std::allocator_arg, b);
+      |     ^~
+/usr/include/asio/impl/use_future.hpp: At global scope:
+/usr/include/asio/impl/use_future.hpp:222:27: error: expected template-name before ‘<’ token
+  222 |   : public promise_creator<void>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:222:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:222:27: error: expected unqualified-id before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:233:27: error: expected template-name before ‘<’ token
+  233 |   : public promise_creator<void>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:233:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:233:27: error: expected unqualified-id before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:253:27: error: expected template-name before ‘<’ token
+  253 |   : public promise_creator<void>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:253:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:253:27: error: expected unqualified-id before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:272:27: error: expected template-name before ‘<’ token
+  272 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:272:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:285:27: error: expected template-name before ‘<’ token
+  285 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:285:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:306:27: error: expected template-name before ‘<’ token
+  306 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:306:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:323:27: error: expected template-name before ‘<’ token
+  323 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:323:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:338:27: error: expected template-name before ‘<’ token
+  338 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:338:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:362:27: error: expected template-name before ‘<’ token
+  362 |   : public promise_creator<T>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:362:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:385:7: error: ‘promise_handler_selector’ is not a class template
+  385 | class promise_handler_selector<void()>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:385:38: error: template specifiers not specified in declaration of ‘template<class> class asio::detail::promise_handler_selector’
+  385 | class promise_handler_selector<void()>
+      |                                      ^
+/usr/include/asio/impl/use_future.hpp:386:30: error: expected class-name before ‘{’ token
+  386 |   : public promise_handler_0 {};
+      |                              ^
+/usr/include/asio/impl/use_future.hpp:389:7: error: ‘promise_handler_selector’ is not a class template
+  389 | class promise_handler_selector<void(asio::error_code)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:389:54: error: template specifiers not specified in declaration of ‘template<class> class asio::detail::promise_handler_selector’
+  389 | class promise_handler_selector<void(asio::error_code)>
+      |                                                      ^
+/usr/include/asio/impl/use_future.hpp:390:33: error: expected class-name before ‘{’ token
+  390 |   : public promise_handler_ec_0 {};
+      |                                 ^
+/usr/include/asio/impl/use_future.hpp:393:7: error: ‘promise_handler_selector’ is not a class template
+  393 | class promise_handler_selector<void(std::exception_ptr)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:393:56: error: template specifiers not specified in declaration of ‘template<class> class asio::detail::promise_handler_selector’
+  393 | class promise_handler_selector<void(std::exception_ptr)>
+      |                                                        ^
+/usr/include/asio/impl/use_future.hpp:394:33: error: expected class-name before ‘{’ token
+  394 |   : public promise_handler_ex_0 {};
+      |                                 ^
+/usr/include/asio/impl/use_future.hpp:397:7: error: ‘promise_handler_selector’ is not a class template
+  397 | class promise_handler_selector<void(Arg)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:398:29: error: expected template-name before ‘<’ token
+  398 |   : public promise_handler_1<Arg> {};
+      |                             ^
+/usr/include/asio/impl/use_future.hpp:398:29: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:401:7: error: ‘promise_handler_selector’ is not a class template
+  401 | class promise_handler_selector<void(asio::error_code, Arg)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:402:32: error: expected template-name before ‘<’ token
+  402 |   : public promise_handler_ec_1<Arg> {};
+      |                                ^
+/usr/include/asio/impl/use_future.hpp:402:32: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:405:7: error: ‘promise_handler_selector’ is not a class template
+  405 | class promise_handler_selector<void(std::exception_ptr, Arg)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:406:32: error: expected template-name before ‘<’ token
+  406 |   : public promise_handler_ex_1<Arg> {};
+      |                                ^
+/usr/include/asio/impl/use_future.hpp:406:32: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:409:7: error: ‘promise_handler_selector’ is not a class template
+  409 | class promise_handler_selector<void(Arg...)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:382:11: error: template parameter ‘class<template-parameter-1-1>’
+  382 | template <typename> class promise_handler_selector;
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:408:11: note: redeclared here as ‘class ... Arg’
+  408 | template <typename... Arg>
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:410:29: error: expected template-name before ‘<’ token
+  410 |   : public promise_handler_n<std::tuple<Arg...>> {};
+      |                             ^
+/usr/include/asio/impl/use_future.hpp:413:7: error: ‘promise_handler_selector’ is not a class template
+  413 | class promise_handler_selector<void(asio::error_code, Arg...)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:382:11: error: template parameter ‘class<template-parameter-1-1>’
+  382 | template <typename> class promise_handler_selector;
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:412:11: note: redeclared here as ‘class ... Arg’
+  412 | template <typename... Arg>
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:414:32: error: expected template-name before ‘<’ token
+  414 |   : public promise_handler_ec_n<std::tuple<Arg...>> {};
+      |                                ^
+/usr/include/asio/impl/use_future.hpp:417:7: error: ‘promise_handler_selector’ is not a class template
+  417 | class promise_handler_selector<void(std::exception_ptr, Arg...)>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:382:11: error: template parameter ‘class<template-parameter-1-1>’
+  382 | template <typename> class promise_handler_selector;
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:416:11: note: redeclared here as ‘class ... Arg’
+  416 | template <typename... Arg>
+      |           ^~~~~~~~
+/usr/include/asio/impl/use_future.hpp:418:32: error: expected template-name before ‘<’ token
+  418 |   : public promise_handler_ex_n<std::tuple<Arg...>> {};
+      |                                ^
+/usr/include/asio/impl/use_future.hpp:424:36: error: expected template-name before ‘<’ token
+  424 |   : public promise_handler_selector<Signature>
+      |                                    ^
+/usr/include/asio/impl/use_future.hpp:424:36: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:471:11: error: ‘promise_handler’ does not name a type
+  471 |   typedef promise_handler<Signature, Allocator> completion_handler_type;
+      |           ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:472:20: error: ‘completion_handler_type’ has not been declared
+  472 |   typedef typename completion_handler_type::future_type return_type;
+      |                    ^~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:474:56: error: expected ‘)’ before ‘&’ token
+  474 |   explicit promise_async_result(completion_handler_type& h)
+      |                                ~                       ^
+      |                                                        )
+/usr/include/asio/impl/use_future.hpp:508:27: error: expected template-name before ‘<’ token
+  508 |   : public promise_creator<Result>
+      |                           ^
+/usr/include/asio/impl/use_future.hpp:508:27: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/use_future.hpp:543:11: error: ‘packaged_handler’ does not name a type
+  543 |   typedef packaged_handler<Function, Allocator, Result> completion_handler_type;
+      |           ^~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:544:20: error: ‘completion_handler_type’ has not been declared
+  544 |   typedef typename completion_handler_type::future_type return_type;
+      |                    ^~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:546:57: error: expected ‘)’ before ‘&’ token
+  546 |   explicit packaged_async_result(completion_handler_type& h)
+      |                                 ~                       ^
+      |                                                         )
+/usr/include/asio/impl/use_future.hpp:563:8: error: ‘detail’ does not name a type
+  563 | inline detail::packaged_token<decay_t<Function>, Allocator>
+      |        ^~~~~~
+/usr/include/asio/impl/use_future.hpp:573:7: error: ‘async_result’ is not a class template
+  573 | class async_result<use_future_t<Allocator>, Result(Args...)>
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:573:20: error: ‘use_future_t’ was not declared in this scope; did you mean ‘asio::use_future_t’?
+  573 | class async_result<use_future_t<Allocator>, Result(Args...)>
+      |                    ^~~~~~~~~~~~
+      |                    asio::use_future_t
+/usr/include/asio/use_future.hpp:58:7: note: ‘asio::use_future_t’ declared here
+   58 | class use_future_t
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:573:7: error: template argument required for ‘class async_result’
+  573 | class async_result<use_future_t<Allocator>, Result(Args...)>
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:589:7: error: ‘async_result’ is not a class template
+  589 | class async_result<detail::packaged_token<Function, Allocator>, Result(Args...)>
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:589:20: error: ‘detail’ was not declared in this scope
+  589 | class async_result<detail::packaged_token<Function, Allocator>, Result(Args...)>
+      |                    ^~~~~~
+/usr/include/asio/impl/use_future.hpp:589:20: note: suggested alternatives:
+/usr/include/nlohmann/detail/meta/void_t.hpp:14:11: note:   ‘nlohmann::json_abi_v3_11_3::detail’
+   14 | namespace detail
+      |           ^~~~~~
+/usr/include/asio/traits/equality_comparable.hpp:35:11: note:   ‘asio::detail’
+   35 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/execution/executor.hpp:34:11: note:   ‘asio::execution::detail’
+   34 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/error.ipp:29:11: note:   ‘asio::error::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/buffer.hpp:2591:11: note:   ‘asio::buffer_literals::detail’
+ 2591 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/generic/detail/endpoint.hpp:27:11: note:   ‘asio::generic::detail’
+   27 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/ip/detail/endpoint.hpp:29:11: note:   ‘asio::ip::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/local/detail/endpoint.hpp:32:11: note:   ‘asio::local::detail’
+   32 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/use_future.hpp:589:80: error: redeclared with 4 template parameters
+  589 | class async_result<detail::packaged_token<Function, Allocator>, Result(Args...)>
+      |                                                                                ^
+/usr/include/asio/async_result.hpp:392:7: note: previous declaration ‘template<class CompletionToken, class ... Signatures> class asio::async_result’ used 2 template parameters
+  392 | class async_result :
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/use_future.hpp:590:12: error: ‘detail’ has not been declared
+  590 |   : public detail::packaged_async_result<Function, Allocator,
+      |            ^~~~~~
+In file included from /usr/include/asio.hpp:195:
+/usr/include/asio/writable_pipe.hpp:28:9: error: ‘basic_writable_pipe’ does not name a type
+   28 | typedef basic_writable_pipe<> writable_pipe;
+      |         ^~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/asio.hpp:197:
+/usr/include/asio/write_at.hpp:274:22: error: ‘basic_streambuf’ has not been declared
+  274 |     uint64_t offset, basic_streambuf<Allocator>& b);
+      |                      ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:274:37: error: expected ‘,’ or ‘...’ before ‘<’ token
+  274 |     uint64_t offset, basic_streambuf<Allocator>& b);
+      |                                     ^
+/usr/include/asio/write_at.hpp:307:22: error: ‘basic_streambuf’ has not been declared
+  307 |     uint64_t offset, basic_streambuf<Allocator>& b,
+      |                      ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:307:37: error: expected ‘,’ or ‘...’ before ‘<’ token
+  307 |     uint64_t offset, basic_streambuf<Allocator>& b,
+      |                                     ^
+/usr/include/asio/write_at.hpp:351:5: error: ‘basic_streambuf’ has not been declared
+  351 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition);
+      |     ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:351:20: error: expected ‘,’ or ‘...’ before ‘<’ token
+  351 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition);
+      |                    ^
+/usr/include/asio/write_at.hpp:395:5: error: ‘basic_streambuf’ has not been declared
+  395 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition,
+      |     ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:395:20: error: expected ‘,’ or ‘...’ before ‘<’ token
+  395 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition,
+      |                    ^
+/usr/include/asio/write_at.hpp:486:34: error: ‘default_completion_token_t’ does not name a type; did you mean ‘default_completion_token’?
+  486 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  default_completion_token
+/usr/include/asio/write_at.hpp:486:60: error: expected ‘>’ before ‘<’ token
+  486 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                                            ^
+/usr/include/asio/write_at.hpp:490:26: error: ‘default_completion_token_t’ was not declared in this scope; did you mean ‘default_completion_token’?
+  490 |     WriteToken&& token = default_completion_token_t<
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                          default_completion_token
+/usr/include/asio/write_at.hpp:491:59: error: expected ‘(’ before ‘>’ token
+  491 |       typename AsyncRandomAccessWriteDevice::executor_type>())
+      |                                                           ^
+      |                                                           (
+/usr/include/asio/write_at.hpp:491:61: error: expected primary-expression before ‘)’ token
+  491 |       typename AsyncRandomAccessWriteDevice::executor_type>())
+      |                                                             ^
+/usr/include/asio/write_at.hpp:493:5: error: ‘async_initiate’ was not declared in this scope
+  493 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:493:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/write_at.hpp:493:30: error: expected primary-expression before ‘,’ token
+  493 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/write_at.hpp:494:7: error: expected primary-expression before ‘void’
+  494 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/write_at.hpp:590:34: error: ‘default_completion_token_t’ does not name a type; did you mean ‘default_completion_token’?
+  590 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  default_completion_token
+/usr/include/asio/write_at.hpp:590:60: error: expected ‘>’ before ‘<’ token
+  590 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                                            ^
+/usr/include/asio/write_at.hpp:595:26: error: ‘default_completion_token_t’ was not declared in this scope; did you mean ‘default_completion_token’?
+  595 |     WriteToken&& token = default_completion_token_t<
+      |                          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                          default_completion_token
+/usr/include/asio/write_at.hpp:596:59: error: expected ‘(’ before ‘>’ token
+  596 |       typename AsyncRandomAccessWriteDevice::executor_type>())
+      |                                                           ^
+      |                                                           (
+/usr/include/asio/write_at.hpp:596:61: error: expected primary-expression before ‘)’ token
+  596 |       typename AsyncRandomAccessWriteDevice::executor_type>())
+      |                                                             ^
+/usr/include/asio/write_at.hpp:598:5: error: ‘async_initiate’ was not declared in this scope
+  598 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:598:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/write_at.hpp:598:30: error: expected primary-expression before ‘,’ token
+  598 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/write_at.hpp:599:7: error: expected primary-expression before ‘void’
+  599 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/write_at.hpp:672:34: error: ‘default_completion_token_t’ does not name a type; did you mean ‘default_completion_token’?
+  672 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  default_completion_token
+/usr/include/asio/write_at.hpp:672:60: error: expected ‘>’ before ‘<’ token
+  672 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                                            ^
+/usr/include/asio/write_at.hpp:675:22: error: ‘basic_streambuf’ has not been declared
+  675 |     uint64_t offset, basic_streambuf<Allocator>& b,
+      |                      ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:675:37: error: expected ‘,’ or ‘...’ before ‘<’ token
+  675 |     uint64_t offset, basic_streambuf<Allocator>& b,
+      |                                     ^
+/usr/include/asio/write_at.hpp:679:5: error: ‘async_initiate’ was not declared in this scope
+  679 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:679:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/write_at.hpp:679:30: error: expected primary-expression before ‘,’ token
+  679 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/write_at.hpp:680:7: error: expected primary-expression before ‘void’
+  680 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/write_at.hpp:764:34: error: ‘default_completion_token_t’ does not name a type; did you mean ‘default_completion_token’?
+  764 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |                                  default_completion_token
+/usr/include/asio/write_at.hpp:764:60: error: expected ‘>’ before ‘<’ token
+  764 |       std::size_t)) WriteToken = default_completion_token_t<
+      |                                                            ^
+/usr/include/asio/write_at.hpp:767:5: error: ‘basic_streambuf’ has not been declared
+  767 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition,
+      |     ^~~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:767:20: error: expected ‘,’ or ‘...’ before ‘<’ token
+  767 |     basic_streambuf<Allocator>& b, CompletionCondition completion_condition,
+      |                    ^
+/usr/include/asio/write_at.hpp:771:5: error: ‘async_initiate’ was not declared in this scope
+  771 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/write_at.hpp:771:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/write_at.hpp:771:30: error: expected primary-expression before ‘,’ token
+  771 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/write_at.hpp:772:7: error: expected primary-expression before ‘void’
+  772 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+In file included from /usr/include/asio/write_at.hpp:787:
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at_buffer_sequence(SyncRandomAccessWriteDevice&, uint64_t, const ConstBufferSequence&, const ConstBufferIterator&, CompletionCondition, asio::error_code&)’:
+/usr/include/asio/impl/write_at.hpp:46:37: error: ‘const_buffer’ was not declared in this scope; did you mean ‘asio::const_buffer’?
+   46 |     asio::detail::consuming_buffers<const_buffer,
+      |                                     ^~~~~~~~~~~~
+      |                                     asio::const_buffer
+/usr/include/asio/buffer.hpp:212:7: note: ‘asio::const_buffer’ declared here
+  212 | class const_buffer
+      |       ^~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:47:49: error: template argument 1 is invalid
+   47 |         ConstBufferSequence, ConstBufferIterator> tmp(buffers);
+      |                                                 ^
+/usr/include/asio/impl/write_at.hpp:48:17: error: request for member ‘empty’ in ‘tmp’, which is of non-class type ‘int’
+   48 |     while (!tmp.empty())
+      |                 ^~~~~
+/usr/include/asio/impl/write_at.hpp:50:34: error: ‘detail’ has not been declared
+   50 |       if (std::size_t max_size = detail::adapt_completion_condition_result(
+      |                                  ^~~~~~
+/usr/include/asio/impl/write_at.hpp:51:42: error: request for member ‘total_consumed’ in ‘tmp’, which is of non-class type ‘int’
+   51 |             completion_condition(ec, tmp.total_consumed())))
+      |                                          ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:53:13: error: request for member ‘consume’ in ‘tmp’, which is of non-class type ‘int’
+   53 |         tmp.consume(d.write_some_at(offset + tmp.total_consumed(),
+      |             ^~~~~~~
+/usr/include/asio/impl/write_at.hpp:53:50: error: request for member ‘total_consumed’ in ‘tmp’, which is of non-class type ‘int’
+   53 |         tmp.consume(d.write_some_at(offset + tmp.total_consumed(),
+      |                                                  ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:54:19: error: request for member ‘prepare’ in ‘tmp’, which is of non-class type ‘int’
+   54 |               tmp.prepare(max_size), ec));
+      |                   ^~~~~~~
+/usr/include/asio/impl/write_at.hpp:59:16: error: request for member ‘total_consumed’ in ‘tmp’, which is of non-class type ‘int’
+   59 |     return tmp.total_consumed();
+      |                ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at(SyncRandomAccessWriteDevice&, uint64_t, const ConstBufferSequence&, CompletionCondition, asio::error_code&)’:
+/usr/include/asio/impl/write_at.hpp:69:10: error: ‘detail’ has not been declared
+   69 |   return detail::write_at_buffer_sequence(d, offset, buffers,
+      |          ^~~~~~
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at(SyncRandomAccessWriteDevice&, uint64_t, const ConstBufferSequence&)’:
+/usr/include/asio/impl/write_at.hpp:80:27: error: there are no arguments to ‘transfer_all’ that depend on a template parameter, so a declaration of ‘transfer_all’ must be available [-fpermissive]
+   80 |       d, offset, buffers, transfer_all(), ec);
+      |                           ^~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at(SyncRandomAccessWriteDevice&, uint64_t, const ConstBufferSequence&, asio::error_code&)’:
+/usr/include/asio/impl/write_at.hpp:90:39: error: there are no arguments to ‘transfer_all’ that depend on a template parameter, so a declaration of ‘transfer_all’ must be available [-fpermissive]
+   90 |   return write_at(d, offset, buffers, transfer_all(), ec);
+      |                                       ^~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at(SyncRandomAccessWriteDevice&, uint64_t, asio::basic_streambuf<Allocator>&)’:
+/usr/include/asio/impl/write_at.hpp:126:58: error: there are no arguments to ‘transfer_all’ that depend on a template parameter, so a declaration of ‘transfer_all’ must be available [-fpermissive]
+  126 |   std::size_t bytes_transferred = write_at(d, offset, b, transfer_all(), ec);
+      |                                                          ^~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp: In function ‘std::size_t midiMind::write_at(SyncRandomAccessWriteDevice&, uint64_t, asio::basic_streambuf<Allocator>&, asio::error_code&)’:
+/usr/include/asio/impl/write_at.hpp:136:33: error: there are no arguments to ‘transfer_all’ that depend on a template parameter, so a declaration of ‘transfer_all’ must be available [-fpermissive]
+  136 |   return write_at(d, offset, b, transfer_all(), ec);
+      |                                 ^~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp: At global scope:
+/usr/include/asio/impl/write_at.hpp:161:42: error: expected template-name before ‘<’ token
+  161 |     : public base_from_cancellation_state<WriteHandler>,
+      |                                          ^
+/usr/include/asio/impl/write_at.hpp:161:42: error: expected ‘{’ before ‘<’ token
+/usr/include/asio/impl/write_at.hpp:254:7: error: redeclaration of ‘template<class AsyncRandomAccessWriteDevice, class ConstBufferSequence, class ConstBufferIterator, class CompletionCondition, class WriteHandler> bool asio::detail::asio_handler_is_continuation’
+  254 |       write_at_op<AsyncRandomAccessWriteDevice, ConstBufferSequence,
+      |       ^~~~~~~~~~~
+/usr/include/asio/impl/append.hpp:66:13: note: previous declaration ‘template<class Handler> bool asio::detail::asio_handler_is_continuation<Handler>’
+   66 | inline bool asio_handler_is_continuation(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:255:64: error: expected primary-expression before ‘*’ token
+  255 |         ConstBufferIterator, CompletionCondition, WriteHandler>* this_handler)
+      |                                                                ^
+/usr/include/asio/impl/write_at.hpp:255:66: error: ‘this_handler’ was not declared in this scope; did you mean ‘wait_handler’?
+  255 |         ConstBufferIterator, CompletionCondition, WriteHandler>* this_handler)
+      |                                                                  ^~~~~~~~~~~~
+      |                                                                  wait_handler
+/usr/include/asio/impl/write_at.hpp:255:79: error: expected ‘;’ before ‘{’ token
+  255 |         ConstBufferIterator, CompletionCondition, WriteHandler>* this_handler)
+      |                                                                               ^
+      |                                                                               ;
+  256 |   {
+      |   ~                                                                            
+/usr/include/asio/impl/write_at.hpp: In function ‘void midiMind::start_write_at_op(AsyncRandomAccessWriteDevice&, uint64_t, const ConstBufferSequence&, const ConstBufferIterator&, CompletionCondition&, WriteHandler&)’:
+/usr/include/asio/impl/write_at.hpp:270:5: error: ‘detail’ has not been declared
+  270 |     detail::write_at_op<AsyncRandomAccessWriteDevice, ConstBufferSequence,
+      |     ^~~~~~
+/usr/include/asio/impl/write_at.hpp:270:53: error: expected primary-expression before ‘,’ token
+  270 |     detail::write_at_op<AsyncRandomAccessWriteDevice, ConstBufferSequence,
+      |                                                     ^
+/usr/include/asio/impl/write_at.hpp:270:74: error: expected primary-expression before ‘,’ token
+  270 |     detail::write_at_op<AsyncRandomAccessWriteDevice, ConstBufferSequence,
+      |                                                                          ^
+/usr/include/asio/impl/write_at.hpp:271:26: error: expected primary-expression before ‘,’ token
+  271 |       ConstBufferIterator, CompletionCondition, WriteHandler>(
+      |                          ^
+/usr/include/asio/impl/write_at.hpp:271:47: error: expected primary-expression before ‘,’ token
+  271 |       ConstBufferIterator, CompletionCondition, WriteHandler>(
+      |                                               ^
+/usr/include/asio/impl/write_at.hpp:271:61: error: expected primary-expression before ‘>’ token
+  271 |       ConstBufferIterator, CompletionCondition, WriteHandler>(
+      |                                                             ^
+/usr/include/asio/impl/write_at.hpp: In member function ‘void asio::detail::initiate_async_write_at< <template-parameter-1-1> >::operator()(WriteHandler&&, uint64_t, const ConstBufferSequence&, CompletionCondition&&) const’:
+/usr/include/asio/impl/write_at.hpp:302:7: error: ‘non_const_lvalue’ was not declared in this scope; did you mean ‘asio::detail::non_const_lvalue’?
+  302 |       non_const_lvalue<WriteHandler> handler2(handler);
+      |       ^~~~~~~~~~~~~~~~
+      |       asio::detail::non_const_lvalue
+/usr/include/asio/detail/non_const_lvalue.hpp:27:8: note: ‘asio::detail::non_const_lvalue’ declared here
+   27 | struct non_const_lvalue
+      |        ^~~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:302:36: error: expected primary-expression before ‘>’ token
+  302 |       non_const_lvalue<WriteHandler> handler2(handler);
+      |                                    ^
+/usr/include/asio/impl/write_at.hpp:303:43: error: expected primary-expression before ‘>’ token
+  303 |       non_const_lvalue<CompletionCondition> completion_cond2(completion_cond);
+      |                                           ^
+/usr/include/asio/impl/write_at.hpp:306:11: error: ‘completion_cond2’ was not declared in this scope; did you mean ‘completion_cond’?
+  306 |           completion_cond2.value, handler2.value);
+      |           ^~~~~~~~~~~~~~~~
+      |           completion_cond
+/usr/include/asio/impl/write_at.hpp:306:35: error: ‘handler2’ was not declared in this scope; did you mean ‘handler’?
+  306 |           completion_cond2.value, handler2.value);
+      |                                   ^~~~~~~~
+      |                                   handler
+/usr/include/asio/impl/write_at.hpp: At global scope:
+/usr/include/asio/impl/write_at.hpp:320:8: error: ‘associator’ is not a class template
+  320 | struct associator<Associator,
+      |        ^~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:321:5: error: ‘detail’ was not declared in this scope
+  321 |     detail::write_at_op<AsyncRandomAccessWriteDevice, ConstBufferSequence,
+      |     ^~~~~~
+/usr/include/asio/impl/write_at.hpp:321:5: note: suggested alternatives:
+/usr/include/nlohmann/detail/meta/void_t.hpp:14:11: note:   ‘nlohmann::json_abi_v3_11_3::detail’
+   14 | namespace detail
+      |           ^~~~~~
+/usr/include/asio/traits/equality_comparable.hpp:35:11: note:   ‘asio::detail’
+   35 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/execution/executor.hpp:34:11: note:   ‘asio::execution::detail’
+   34 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/error.ipp:29:11: note:   ‘asio::error::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/buffer.hpp:2591:11: note:   ‘asio::buffer_literals::detail’
+ 2591 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/generic/detail/endpoint.hpp:27:11: note:   ‘asio::generic::detail’
+   27 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/ip/detail/endpoint.hpp:29:11: note:   ‘asio::ip::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/local/detail/endpoint.hpp:32:11: note:   ‘asio::local::detail’
+   32 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/write_at.hpp:323:21: error: redeclared with 7 template parameters
+  323 |     DefaultCandidate>
+      |                     ^
+/usr/include/asio/associator.hpp:27:8: note: previous declaration ‘template<template<class, class> class Associator, class T, class DefaultCandidate> struct asio::associator’ used 3 template parameters
+   27 | struct associator
+      |        ^~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:355:5: error: ‘async_initiate’ was not declared in this scope
+  355 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:355:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/impl/write_at.hpp:355:30: error: expected primary-expression before ‘,’ token
+  355 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/impl/write_at.hpp:356:7: error: expected primary-expression before ‘void’
+  356 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/impl/write_at.hpp:375:5: error: ‘async_initiate’ was not declared in this scope
+  375 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:375:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/impl/write_at.hpp:375:30: error: expected primary-expression before ‘,’ token
+  375 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/impl/write_at.hpp:376:7: error: expected primary-expression before ‘void’
+  376 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/impl/write_at.hpp:430:7: error: redeclaration of ‘template<class Allocator, class WriteHandler> bool asio::detail::asio_handler_is_continuation’
+  430 |       write_at_streambuf_op<Allocator, WriteHandler>* this_handler)
+      |       ^~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/append.hpp:66:13: note: previous declaration ‘template<class Handler> bool asio::detail::asio_handler_is_continuation<Handler>’
+   66 | inline bool asio_handler_is_continuation(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:430:53: error: expected primary-expression before ‘*’ token
+  430 |       write_at_streambuf_op<Allocator, WriteHandler>* this_handler)
+      |                                                     ^
+/usr/include/asio/impl/write_at.hpp:430:55: error: ‘this_handler’ was not declared in this scope; did you mean ‘wait_handler’?
+  430 |       write_at_streambuf_op<Allocator, WriteHandler>* this_handler)
+      |                                                       ^~~~~~~~~~~~
+      |                                                       wait_handler
+/usr/include/asio/impl/write_at.hpp:430:68: error: expected ‘;’ before ‘{’ token
+  430 |       write_at_streambuf_op<Allocator, WriteHandler>* this_handler)
+      |                                                                    ^
+      |                                                                    ;
+  431 |   {
+      |   ~                                                                 
+/usr/include/asio/impl/write_at.hpp:456:26: error: ‘basic_streambuf’ has not been declared
+  456 |         uint64_t offset, basic_streambuf<Allocator>* b,
+      |                          ^~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:456:41: error: expected ‘,’ or ‘...’ before ‘<’ token
+  456 |         uint64_t offset, basic_streambuf<Allocator>* b,
+      |                                         ^
+/usr/include/asio/impl/write_at.hpp: In member function ‘void asio::detail::initiate_async_write_at_streambuf< <template-parameter-1-1> >::operator()(WriteHandler&&, uint64_t, int) const’:
+/usr/include/asio/impl/write_at.hpp:463:7: error: ‘non_const_lvalue’ was not declared in this scope; did you mean ‘asio::detail::non_const_lvalue’?
+  463 |       non_const_lvalue<WriteHandler> handler2(handler);
+      |       ^~~~~~~~~~~~~~~~
+      |       asio::detail::non_const_lvalue
+/usr/include/asio/detail/non_const_lvalue.hpp:27:8: note: ‘asio::detail::non_const_lvalue’ declared here
+   27 | struct non_const_lvalue
+      |        ^~~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:463:36: error: expected primary-expression before ‘>’ token
+  463 |       non_const_lvalue<WriteHandler> handler2(handler);
+      |                                    ^
+/usr/include/asio/impl/write_at.hpp:464:39: error: ‘b’ was not declared in this scope
+  464 |       async_write_at(device_, offset, b->data(),
+      |                                       ^
+/usr/include/asio/impl/write_at.hpp:465:46: error: ‘completion_condition’ was not declared in this scope; did you mean ‘CompletionCondition’?
+  465 |           static_cast<CompletionCondition&&>(completion_condition),
+      |                                              ^~~~~~~~~~~~~~~~~~~~
+      |                                              CompletionCondition
+/usr/include/asio/impl/write_at.hpp:466:11: error: ‘write_at_streambuf_op’ was not declared in this scope; did you mean ‘asio::detail::write_at_streambuf_op’?
+  466 |           write_at_streambuf_op<Allocator, decay_t<WriteHandler>>(
+      |           ^~~~~~~~~~~~~~~~~~~~~
+      |           asio::detail::write_at_streambuf_op
+/usr/include/asio/impl/write_at.hpp:393:9: note: ‘asio::detail::write_at_streambuf_op’ declared here
+  393 |   class write_at_streambuf_op
+      |         ^~~~~~~~~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:466:42: error: expected primary-expression before ‘,’ token
+  466 |           write_at_streambuf_op<Allocator, decay_t<WriteHandler>>(
+      |                                          ^
+/usr/include/asio/impl/write_at.hpp:466:44: error: ‘decay_t’ was not declared in this scope
+  466 |           write_at_streambuf_op<Allocator, decay_t<WriteHandler>>(
+      |                                            ^~~~~~~
+/usr/include/asio/impl/write_at.hpp:466:44: note: suggested alternatives:
+/usr/include/c++/14/type_traits:2707:11: note:   ‘std::decay_t’
+ 2707 |     using decay_t = typename decay<_Tp>::type;
+      |           ^~~~~~~
+/usr/include/asio/detail/type_traits.hpp:55:7: note:   ‘asio::decay_t’
+   55 | using decay_t = typename std::decay<T>::type;
+      |       ^~~~~~~
+/usr/include/asio/detail/type_traits.hpp:55:7: note:   ‘asio::decay_t’
+/usr/include/asio/detail/type_traits.hpp:55:7: note:   ‘asio::decay_t’
+/usr/include/asio/detail/type_traits.hpp:55:7: note:   ‘asio::decay_t’
+/usr/include/asio/detail/type_traits.hpp:55:7: note:   ‘asio::decay_t’
+/usr/include/asio/impl/write_at.hpp:466:64: error: expected primary-expression before ‘>>’ token
+  466 |           write_at_streambuf_op<Allocator, decay_t<WriteHandler>>(
+      |                                                                ^~
+/usr/include/asio/impl/write_at.hpp:467:17: error: ‘handler2’ was not declared in this scope; did you mean ‘handler’?
+  467 |             *b, handler2.value));
+      |                 ^~~~~~~~
+      |                 handler
+/usr/include/asio/impl/write_at.hpp: At global scope:
+/usr/include/asio/impl/write_at.hpp:479:8: error: ‘associator’ is not a class template
+  479 | struct associator<Associator,
+      |        ^~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:480:5: error: ‘detail’ was not declared in this scope
+  480 |     detail::write_at_streambuf_op<Executor, WriteHandler>,
+      |     ^~~~~~
+/usr/include/asio/impl/write_at.hpp:480:5: note: suggested alternatives:
+/usr/include/nlohmann/detail/meta/void_t.hpp:14:11: note:   ‘nlohmann::json_abi_v3_11_3::detail’
+   14 | namespace detail
+      |           ^~~~~~
+/usr/include/asio/traits/equality_comparable.hpp:35:11: note:   ‘asio::detail’
+   35 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/execution/executor.hpp:34:11: note:   ‘asio::execution::detail’
+   34 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/error.ipp:29:11: note:   ‘asio::error::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/buffer.hpp:2591:11: note:   ‘asio::buffer_literals::detail’
+ 2591 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/generic/detail/endpoint.hpp:27:11: note:   ‘asio::generic::detail’
+   27 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/ip/detail/endpoint.hpp:29:11: note:   ‘asio::ip::detail’
+   29 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/local/detail/endpoint.hpp:32:11: note:   ‘asio::local::detail’
+   32 | namespace detail {
+      |           ^~~~~~
+/usr/include/asio/impl/write_at.hpp:481:21: error: redeclared with 4 template parameters
+  481 |     DefaultCandidate>
+      |                     ^
+/usr/include/asio/associator.hpp:27:8: note: previous declaration ‘template<template<class, class> class Associator, class T, class DefaultCandidate> struct asio::associator’ used 3 template parameters
+   27 | struct associator
+      |        ^~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:509:5: error: ‘async_initiate’ was not declared in this scope
+  509 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:509:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/impl/write_at.hpp:509:30: error: expected primary-expression before ‘,’ token
+  509 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/impl/write_at.hpp:510:7: error: expected primary-expression before ‘void’
+  510 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+/usr/include/asio/impl/write_at.hpp:531:5: error: ‘async_initiate’ was not declared in this scope
+  531 |     async_initiate<WriteToken,
+      |     ^~~~~~~~~~~~~~
+/usr/include/asio/impl/write_at.hpp:531:5: error: ‘async_initiate’ was not declared in this scope
+/usr/include/asio/impl/write_at.hpp:531:30: error: expected primary-expression before ‘,’ token
+  531 |     async_initiate<WriteToken,
+      |                              ^
+/usr/include/asio/impl/write_at.hpp:532:7: error: expected primary-expression before ‘void’
+  532 |       void (asio::error_code, std::size_t)>(
+      |       ^~~~
+In file included from /home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:42:
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:82:51: error: ‘socket’ is not a member of ‘asio::ip::tcp’
+   82 |                    std::shared_ptr<asio::ip::tcp::socket> controlSocket,
+      |                                                   ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:82:57: error: template argument 1 is invalid
+   82 |                    std::shared_ptr<asio::ip::tcp::socket> controlSocket,
+      |                                                         ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:83:51: error: ‘socket’ is not a member of ‘asio::ip::udp’
+   83 |                    std::shared_ptr<asio::ip::udp::socket> dataSocket,
+      |                                                   ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:83:57: error: template argument 1 is invalid
+   83 |                    std::shared_ptr<asio::ip::udp::socket> dataSocket,
+      |                                                         ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:84:41: error: ‘endpoint’ in ‘class asio::ip::udp’ does not name a type
+   84 |                    const asio::ip::udp::endpoint& clientEndpoint);
+      |                                         ^~~~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:236:36: error: ‘socket’ is not a member of ‘asio::ip::tcp’
+  236 |     std::shared_ptr<asio::ip::tcp::socket> controlSocket_;
+      |                                    ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:236:42: error: template argument 1 is invalid
+  236 |     std::shared_ptr<asio::ip::tcp::socket> controlSocket_;
+      |                                          ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:237:36: error: ‘socket’ is not a member of ‘asio::ip::udp’
+  237 |     std::shared_ptr<asio::ip::udp::socket> dataSocket_;
+      |                                    ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:237:42: error: template argument 1 is invalid
+  237 |     std::shared_ptr<asio::ip::udp::socket> dataSocket_;
+      |                                          ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:238:20: error: ‘endpoint’ in ‘class asio::ip::udp’ does not name a type
+  238 |     asio::ip::udp::endpoint clientEndpoint_;
+      |                    ^~~~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h: In member function ‘std::string midiMind::RtpMidiSession::getClientAddress() const’:
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiSession.h:159:16: error: ‘clientEndpoint_’ was not declared in this scope
+  159 |         return clientEndpoint_.address().to_string();
+      |                ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h: At global scope:
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:276:61: error: ‘socket’ is not a member of ‘asio::ip::tcp’
+  276 |     void handleNewConnection(std::shared_ptr<asio::ip::tcp::socket> socket);
+      |                                                             ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:276:67: error: template argument 1 is invalid
+  276 |     void handleNewConnection(std::shared_ptr<asio::ip::tcp::socket> socket);
+      |                                                                   ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:294:36: error: ‘acceptor’ is not a member of ‘asio::ip::tcp’
+  294 |     std::unique_ptr<asio::ip::tcp::acceptor> controlAcceptor_;
+      |                                    ^~~~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:294:44: error: template argument 1 is invalid
+  294 |     std::unique_ptr<asio::ip::tcp::acceptor> controlAcceptor_;
+      |                                            ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:294:44: error: template argument 2 is invalid
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:297:36: error: ‘socket’ is not a member of ‘asio::ip::udp’
+  297 |     std::unique_ptr<asio::ip::udp::socket> dataSocket_;
+      |                                    ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:297:42: error: template argument 1 is invalid
+  297 |     std::unique_ptr<asio::ip::udp::socket> dataSocket_;
+      |                                          ^
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:297:42: error: template argument 2 is invalid
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:347:5: error: non-member ‘sequenceMutex_’ cannot be declared ‘mutable’
+  347 |     mutable std::mutex sequenceMutex_;
+      |     ^~~~~~~
+/home/pi/midiMind/backend/src/api/commands/../../network/rtpmidi/RtpMidiServer.h:375:1: error: expected declaration before ‘}’ token
+  375 | } // namespace midiMind
+      | ^
+/home/pi/midiMind/backend/src/api/commands/network.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/commands/network.cpp:95:44: error: ‘const struct midiMind::WiFiNetwork’ has no member named ‘signal’
+   95 |                         {"signal", network.signal},
+      |                                            ^~~~~~
+/home/pi/midiMind/backend/src/api/commands/network.cpp:93:43: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::push_back(<brace-enclosed initializer list>)’
+   93 |                     networksJson.push_back({
+      |                     ~~~~~~~~~~~~~~~~~~~~~~^~
+   94 |                         {"ssid", network.ssid},
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~
+   95 |                         {"signal", network.signal},
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   96 |                         {"security", network.security}
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   97 |                     });
+      |                     ~~                     
+/usr/include/nlohmann/json.hpp:3088:10: note: candidate: ‘void nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::push_back(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 3088 |     void push_back(basic_json&& val)
+      |          ^~~~~~~~~
+/usr/include/nlohmann/json.hpp:3088:33: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>&&’
+ 3088 |     void push_back(basic_json&& val)
+      |                    ~~~~~~~~~~~~~^~~
+/usr/include/nlohmann/json.hpp:3121:10: note: candidate: ‘void nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::push_back(const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 3121 |     void push_back(const basic_json& val)
+      |          ^~~~~~~~~
+/usr/include/nlohmann/json.hpp:3121:38: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘const nlohmann::json_abi_v3_11_3::basic_json<>&’
+ 3121 |     void push_back(const basic_json& val)
+      |                    ~~~~~~~~~~~~~~~~~~^~~
+/usr/include/nlohmann/json.hpp:3153:10: note: candidate: ‘void nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::push_back(const typename object_t::value_type&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; typename object_t::value_type = std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<> >; object_t = std::map<std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<>, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<> > > >]’
+ 3153 |     void push_back(const typename object_t::value_type& val)
+      |          ^~~~~~~~~
+/usr/include/nlohmann/json.hpp:3153:57: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘const std::map<std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<>, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<> > > >::value_type&’ {aka ‘const std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_11_3::basic_json<> >&’}
+ 3153 |     void push_back(const typename object_t::value_type& val)
+      |                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~
+/usr/include/nlohmann/json.hpp:3184:10: note: candidate: ‘void nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::push_back(initializer_list_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; initializer_list_t = std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >]’
+ 3184 |     void push_back(initializer_list_t init)
+      |          ^~~~~~~~~
+/usr/include/nlohmann/json.hpp:3184:39: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>::initializer_list_t’ {aka ‘std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >’}
+ 3184 |     void push_back(initializer_list_t init)
+      |                    ~~~~~~~~~~~~~~~~~~~^~~~
+In file included from /home/pi/midiMind/backend/src/api/CommandProcessorV2.cpp:63:
+/home/pi/midiMind/backend/src/api/commands/instruments.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/commands/instruments.cpp:218:47: error: ‘using std::__shared_ptr_access<midiMind::SysExHandler, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::SysExHandler’ {aka ‘class midiMind::SysExHandler’} has no member named ‘getIdentity’; did you mean ‘requestIdentity’?
+  218 |                 auto identity = sysExHandler->getIdentity(deviceId);
+      |                                               ^~~~~~~~~~~
+      |                                               requestIdentity
+/home/pi/midiMind/backend/src/api/commands/instruments.cpp:225:21: error: no match for ‘operator=’ (operand types are ‘nlohmann::json_abi_v3_11_3::basic_json<>::value_type’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’} and ‘<brace-enclosed initializer list>’)
+  225 |                     };
+      |                     ^
+/usr/include/nlohmann/json.hpp:1231:17: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>& nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::operator=(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1231 |     basic_json& operator=(basic_json other) noexcept (
+      |                 ^~~~~~~~
+/usr/include/nlohmann/json.hpp:1231:38: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>’
+ 1231 |     basic_json& operator=(basic_json other) noexcept (
+      |                           ~~~~~~~~~~~^~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:121: CMakeFiles/midimind.dir/src/api/CommandProcessorV2.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
+make: *** [Makefile:156: all] Error 2
