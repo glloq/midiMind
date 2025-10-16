@@ -1,47 +1,36 @@
 // ============================================================================
 // File: backend/src/core/EventBus.cpp
-// Version: 4.1.0
+// Version: 4.1.0 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
-//   Implementation file for EventBus. Minimal implementation as most
-//   functionality is template-based in the header file.
+//   Implementation of EventBus utility functions.
+//   Main class methods are inline in header.
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-10-17
 //
 // Changes v4.1.0:
-//   - Simplified to minimal implementation
-//   - Removed async threading (kept synchronous for v4.1.0)
-//   - Added helper functions
-//   - Improved logging
+//   - Fixed method calls (getEventTypeCount, getTotalEventsPublished)
+//   - All functions now correctly reference EventBus methods
 //
 // ============================================================================
 
 #include "EventBus.h"
-#include "Logger.h"
+#include <sstream>
+#include <iomanip>
 
 namespace midiMind {
 
 // ============================================================================
-// SUBSCRIPTION IMPLEMENTATION
+// UTILITY FUNCTIONS
 // ============================================================================
-
-// Note: Subscription class is fully implemented in header (inline)
-// No additional implementation needed here
-
-// ============================================================================
-// EVENTBUS - HELPER FUNCTIONS
-// ============================================================================
-
-// Note: EventBus is primarily template-based and implemented in header
-// This file provides any non-template utility functions if needed
 
 /**
- * @brief Helper function to format event statistics
+ * @brief Format EventBus statistics as string
  * @param bus EventBus instance
- * @return Formatted statistics string
+ * @return std::string Formatted statistics
  */
 std::string formatEventBusStatistics(const EventBus& bus) {
     std::ostringstream oss;
@@ -56,5 +45,5 @@ std::string formatEventBusStatistics(const EventBus& bus) {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE EventBus.cpp v4.1.0
+// END OF FILE EventBus.cpp
 // ============================================================================

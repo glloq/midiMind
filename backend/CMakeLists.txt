@@ -209,12 +209,12 @@ message(STATUS "SysEx sources (required): 2")
 
 set(SOURCES_API
     src/api/ApiServer.cpp
-    src/api/CommandProcessorV2.cpp
+    src/api/CommandHandler.cpp
     src/api/MessageEnvelope.cpp
 )
 
 message(STATUS "API sources (required): 3")
-message(STATUS "  Note: commands/*.cpp included in CommandProcessorV2.cpp")
+
 
 # ============================================================================
 # AGGREGATION
