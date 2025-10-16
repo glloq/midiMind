@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/storage/Database.h
-// Version: 4.1.0
+// Version: 4.1.1 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -22,13 +22,10 @@
 //   - Error handling
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-10-17
 //
-// Changes v4.1.0:
-//   - Singleton pattern for global access
-//   - Enhanced migration system
-//   - Improved error handling
-//   - Statistics and monitoring
+// Changes v4.1.1:
+//   - Fixed: queryScalar, getTables, getSchemaVersion now const
 //
 // ============================================================================
 
@@ -234,109 +231,81 @@ public:
                         const std::vector<std::string>& params = {});
     
     /**
-     * @brief Execute query and return first row
-     * @param sql SQL SELECT statement
-     * @param params Parameter values
-     * @return DatabaseRow (empty if no results)
+     * @brief Query single scalar value
+     * @param sql SQL query returning single value
+     * @param params Parameter values (optional)
+     * @return String value (empty if no result)
      * @note Thread-safe
+     * @note FIXED: Now const
      * 
      * Example:
      * ```cpp
-     * auto row = db.queryOne("SELECT * FROM users WHERE id = ?", {"1"});
-     * if (!row.empty()) {
-     *     std::cout << row.at("name") << std::endl;
-     * }
-     * ```
-     */
-    DatabaseRow queryOne(const std::string& sql,
-                        const std::vector<std::string>& params = {});
-    
-    /**
-     * @brief Execute query and return single scalar value
-     * @param sql SQL SELECT statement
-     * @param params Parameter values
-     * @return std::string value (empty if no result)
-     * @note Thread-safe
-     * 
-     * Example:
-     * ```cpp
-     * std::string count = db.queryScalar("SELECT COUNT(*) FROM users");
+     * auto count = db.queryScalar("SELECT COUNT(*) FROM users");
      * ```
      */
     std::string queryScalar(const std::string& sql,
-                           const std::vector<std::string>& params = {});
+                           const std::vector<std::string>& params = {}) const;
     
     // ========================================================================
-    // TRANSACTIONS
+    // TRANSACTION SUPPORT
     // ========================================================================
-    
-    /**
-     * @brief Begin transaction
-     * @return true if successful
-     * @note Thread-safe
-     */
-    bool beginTransaction();
-    
-    /**
-     * @brief Commit transaction
-     * @return true if successful
-     * @note Thread-safe
-     */
-    bool commit();
-    
-    /**
-     * @brief Rollback transaction
-     * @return true if successful
-     * @note Thread-safe
-     */
-    bool rollback();
     
     /**
      * @brief Execute function within transaction
-     * @param fn Function to execute
-     * @return true if transaction committed, false if rolled back
+     * @param func Function to execute
+     * @return true if transaction committed successfully
      * @note Thread-safe
-     * @note Automatically commits on success, rolls back on exception
+     * @note Automatically rolls back on exception
      * 
      * Example:
      * ```cpp
      * bool success = db.transaction([&]() {
-     *     db.execute("INSERT INTO table1 VALUES (...)");
-     *     db.execute("INSERT INTO table2 VALUES (...)");
+     *     db.execute("INSERT INTO table1 ...");
+     *     db.execute("INSERT INTO table2 ...");
      * });
      * ```
      */
-    bool transaction(std::function<void()> fn);
+    bool transaction(std::function<void()> func);
+    
+    /**
+     * @brief Begin transaction manually
+     * @note Thread-safe
+     * @note Use transaction() method instead for automatic rollback
+     */
+    void beginTransaction();
+    
+    /**
+     * @brief Commit transaction
+     * @note Thread-safe
+     */
+    void commit();
+    
+    /**
+     * @brief Rollback transaction
+     * @note Thread-safe
+     */
+    void rollback();
     
     // ========================================================================
     // SCHEMA MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Run all pending migrations
-     * @return true if all migrations successful
+     * @brief Run database migrations
+     * @param migrationDir Directory containing .sql migration files
+     * @return true if migrations successful
      * @note Thread-safe
-     * @note Looks for .sql files in data/migrations/
+     * @note Migration files must be named: 001_description.sql, 002_...
      */
-    bool migrate();
+    bool runMigrations(const std::string& migrationDir);
     
     /**
      * @brief Get current schema version
-     * @return Current version number
+     * @return Schema version number
      * @note Thread-safe
+     * @note FIXED: Now const
      */
-    int getSchemaVersion();
-    
-    /**
-     * @brief Initialize schema (create version table)
-     * @note Thread-safe
-     * @note Called automatically by migrate()
-     */
-    void initializeSchema();
-    
-    // ========================================================================
-    // UTILITY METHODS
-    // ========================================================================
+    int getSchemaVersion() const;
     
     /**
      * @brief Check if table exists
@@ -344,14 +313,15 @@ public:
      * @return true if table exists
      * @note Thread-safe
      */
-    bool tableExists(const std::string& tableName);
+    bool tableExists(const std::string& tableName) const;
     
     /**
      * @brief Get list of all tables
      * @return Vector of table names
      * @note Thread-safe
+     * @note FIXED: Now const
      */
-    std::vector<std::string> getTables();
+    std::vector<std::string> getTables() const;
     
     /**
      * @brief Truncate table (delete all rows)
@@ -399,52 +369,46 @@ private:
     Database();
     
     // ========================================================================
-    // PRIVATE HELPER METHODS
+    // PRIVATE HELPERS
     // ========================================================================
     
     /**
-     * @brief Prepare SQL statement
-     * @param sql SQL with placeholders
-     * @return sqlite3_stmt pointer
-     * @throws std::runtime_error on error
+     * @brief Bind parameters to prepared statement
      */
-    sqlite3_stmt* prepareStatement(const std::string& sql);
+    void bindParameters(sqlite3_stmt* stmt, 
+                       const std::vector<std::string>& params);
     
     /**
-     * @brief Bind parameters to prepared statement
-     * @param stmt Statement handle
-     * @param params Parameter values
+     * @brief Execute prepared statement
      */
-    void bindParameters(sqlite3_stmt* stmt, const std::vector<std::string>& params);
+    DatabaseResult executeStatement(const std::string& sql,
+                                   const std::vector<std::string>& params,
+                                   bool isQuery);
+    
+    /**
+     * @brief Get migration files sorted by version
+     */
+    std::vector<std::string> getMigrationFiles(const std::string& dir);
     
     /**
      * @brief Execute migration file
-     * @param filepath Path to .sql file
-     * @return true if successful
      */
-    bool executeMigrationFile(const std::string& filepath);
-    
-    /**
-     * @brief Get migration files in order
-     * @return Sorted list of migration file paths
-     */
-    std::vector<std::string> getMigrationFiles();
+    bool executeMigration(const std::string& filepath, int version);
     
     // ========================================================================
     // MEMBER VARIABLES
     // ========================================================================
     
-    // Database connection
-    sqlite3* db_;
-    std::string filepath_;
-    bool isConnected_;
-    
-    // Thread synchronization
-    mutable std::mutex mutex_;
+    mutable std::mutex mutex_;         ///< Thread synchronization
+    sqlite3* db_ = nullptr;            ///< SQLite database handle
+    std::string filepath_;             ///< Database file path
+    bool isConnected_ = false;         ///< Connection status
     
     // Statistics
-    mutable uint64_t queryCount_;
-    mutable uint64_t errorCount_;
+    mutable uint64_t queryCount_ = 0;  ///< Total queries executed
+    mutable uint64_t errorCount_ = 0;  ///< Total errors encountered
 };
 
 } // namespace midiMind
+
+#endif // DATABASE_H

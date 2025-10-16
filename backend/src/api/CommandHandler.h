@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "../midi/device/MidiDeviceManager.h"
+#include "../midi/devices/MidiDeviceManager.h"
 #include "../midi/MidiRouter.h"
 #include "../midi/MidiPlayer.h"
 #include "../storage/FileManager.h"
