@@ -17,8 +17,10 @@ Système d'Orchestration MIDI Professionnel pour Raspberry Pi
 # Cloner le dépôt
 git clone https://github.com/glloq/midiMind.git
 cd midiMind
+cd script
 
 # Lancer l'installation
+chmod +x install.sh
 sudo ./scripts/install.sh
 ```
 
