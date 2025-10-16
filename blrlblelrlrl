@@ -1,0 +1,267 @@
+In file included from /home/pi/midiMind/backend/src/core/EventBus.cpp:22:
+/home/pi/midiMind/backend/src/core/EventBus.h:282:37: warning: "/*" within comment [-Wcomment]
+  282 |      *     [](const MidiEvent& e) { /* handle */ },
+/home/pi/midiMind/backend/src/core/EventBus.h:286:8: error: stray ‘@’ in program
+  286 |      * @endcode
+      |        ^
+In file included from /home/pi/midiMind/backend/src/core/Application.cpp:39:
+/home/pi/midiMind/backend/src/core/EventBus.h:282:37: warning: "/*" within comment [-Wcomment]
+  282 |      *     [](const MidiEvent& e) { /* handle */ },
+/home/pi/midiMind/backend/src/core/EventBus.h:286:8: error: stray ‘@’ in program
+  286 |      * @endcode
+      |        ^
+In file included from /home/pi/midiMind/backend/src/core/Application.cpp:46:
+/home/pi/midiMind/backend/src/core/../midi/devices/MidiDeviceManager.h:30:10: fatal error: devices/MidiDevice.h: No such file or directory
+   30 | #include "devices/MidiDevice.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+In file included from /home/pi/midiMind/backend/src/main.cpp:37:
+/home/pi/midiMind/backend/src/core/Application.h:260:5: error: ‘json’ does not name a type
+  260 |     json getStatus() const;
+      |     ^~~~
+/home/pi/midiMind/backend/src/main.cpp: In function ‘int main(int, char**)’:
+/home/pi/midiMind/backend/src/main.cpp:154:31: error: cannot convert ‘std::string’ {aka ‘std::__cxx11::basic_string<char>’} to ‘midiMind::Logger::Level’
+  154 |         Logger::setLevel(args.logLevel);
+      |                          ~~~~~^~~~~~~~
+      |                               |
+      |                               std::string {aka std::__cxx11::basic_string<char>}
+In file included from /home/pi/midiMind/backend/src/main.cpp:38:
+/home/pi/midiMind/backend/src/core/Logger.h:166:32: note:   initializing argument 1 of ‘static void midiMind::Logger::setLevel(Level)’
+  166 |     static void setLevel(Level level) {
+      |                          ~~~~~~^~~~~
+/home/pi/midiMind/backend/src/main.cpp:157:21: error: ‘setOutputToFile’ is not a member of ‘midiMind::Logger’
+  157 |             Logger::setOutputToFile(true);
+      |                     ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/main.cpp:158:21: error: ‘setLogFile’ is not a member of ‘midiMind::Logger’
+  158 |             Logger::setLogFile("/var/log/midimind/midimind.log");
+      |                     ^~~~~~~~~~
+/home/pi/midiMind/backend/src/main.cpp:210:20: error: ISO C++ forbids declaration of ‘MidiMindError’ with no type [-fpermissive]
+  210 |     } catch (const MidiMindError& e) {
+      |                    ^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/main.cpp:210:33: error: expected ‘)’ before ‘&’ token
+  210 |     } catch (const MidiMindError& e) {
+      |             ~                   ^
+      |                                 )
+/home/pi/midiMind/backend/src/main.cpp:210:33: error: expected ‘{’ before ‘&’ token
+/home/pi/midiMind/backend/src/main.cpp:210:35: error: ‘e’ was not declared in this scope
+  210 |     } catch (const MidiMindError& e) {
+      |                                   ^
+/home/pi/midiMind/backend/src/main.cpp:216:7: error: expected primary-expression before ‘catch’
+  216 |     } catch (const std::exception& e) {
+      |       ^~~~~
+/home/pi/midiMind/backend/src/main.cpp:222:7: error: expected primary-expression before ‘catch’
+  222 |     } catch (...) {
+      |       ^~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In destructor ‘midiMind::EventBus::~EventBus()’:
+/home/pi/midiMind/backend/src/core/EventBus.h:196:42: error: ‘mutex_’ was not declared in this scope
+  196 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:197:9: error: ‘handlers_’ was not declared in this scope
+  197 |         handlers_.clear();
+      |         ^~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In member function ‘midiMind::Subscription midiMind::EventBus::subscribe(std::function<void(const EventType&)>, int)’:
+/home/pi/midiMind/backend/src/core/EventBus.h:230:42: error: ‘mutex_’ was not declared in this scope
+  230 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:233:23: error: ‘nextId_’ was not declared in this scope
+  233 |         uint64_t id = nextId_++;
+      |                       ^~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:251:9: error: ‘HandlerInfo’ was not declared in this scope
+  251 |         HandlerInfo info;
+      |         ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:252:9: error: ‘info’ was not declared in this scope
+  252 |         info.id = id;
+      |         ^~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:256:9: error: ‘handlers_’ was not declared in this scope; did you mean ‘handler’?
+  256 |         handlers_[typeIdx].push_back(std::move(info));
+      |         ^~~~~~~~~
+      |         handler
+/home/pi/midiMind/backend/src/core/EventBus.h:260:22: error: ‘HandlerInfo’ does not name a type
+  260 |             [](const HandlerInfo& a, const HandlerInfo& b) {
+      |                      ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In lambda function:
+/home/pi/midiMind/backend/src/core/EventBus.h:262:15: error: expected ‘{’ before ‘;’ token
+  262 |             });
+      |               ^
+/home/pi/midiMind/backend/src/core/EventBus.h: In member function ‘midiMind::Subscription midiMind::EventBus::subscribe(std::function<void(const EventType&)>, int)’:
+/home/pi/midiMind/backend/src/core/EventBus.h:262:15: error: expected ‘)’ before ‘;’ token
+/home/pi/midiMind/backend/src/core/EventBus.h:259:18: note: to match this ‘(’
+  259 |         std::sort(handlers_[typeIdx].begin(), handlers_[typeIdx].end(),
+      |                  ^
+/home/pi/midiMind/backend/src/core/EventBus.h: In lambda function:
+/home/pi/midiMind/backend/src/core/EventBus.h:266:13: error: there are no arguments to ‘unsubscribe’ that depend on a template parameter, so a declaration of ‘unsubscribe’ must be available [-fpermissive]
+  266 |             unsubscribe(typeIdx, id);
+      |             ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:266:13: note: (if you use ‘-fpermissive’, G++ will accept your code, but allowing the use of an undeclared name is deprecated)
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:282:51: error: expected unqualified-id before ‘,’ token
+  282 |      *     [](const MidiEvent& e) { /* handle */ },
+      |                                                   ^
+/home/pi/midiMind/backend/src/core/EventBus.h:283:12: error: expected unqualified-id before ‘[’ token
+  283 |      *     [](const MidiEvent& e) { return e.velocity > 50; },  // Filter
+      |            ^
+/home/pi/midiMind/backend/src/core/EventBus.h:283:62: error: expected unqualified-id before ‘,’ token
+  283 |      *     [](const MidiEvent& e) { return e.velocity > 50; },  // Filter
+      |                                                              ^
+/home/pi/midiMind/backend/src/core/EventBus.h:285:6: error: expected constructor, destructor, or type conversion before ‘*’ token
+  285 |      * );
+      |      ^
+/home/pi/midiMind/backend/src/core/EventBus.h:287:6: error: expected constructor, destructor, or type conversion before ‘*’ token
+  287 |      */
+      |      ^
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘size_t midiMind::publish(const EventType&)’:
+/home/pi/midiMind/backend/src/core/EventBus.h:355:46: error: ‘mutex_’ was not declared in this scope
+  355 |             std::lock_guard<std::mutex> lock(mutex_);
+      |                                              ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:357:23: error: ‘handlers_’ was not declared in this scope; did you mean ‘handlersCopy’?
+  357 |             auto it = handlers_.find(typeIdx);
+      |                       ^~~~~~~~~
+      |                       handlersCopy
+/home/pi/midiMind/backend/src/core/EventBus.h:374:9: error: ‘totalEventsPublished_’ was not declared in this scope
+  374 |         totalEventsPublished_++;
+      |         ^~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:389:33: error: non-member function ‘size_t midiMind::getSubscriberCount()’ cannot have cv-qualifier
+  389 |     size_t getSubscriberCount() const {
+      |                                 ^~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘size_t midiMind::getSubscriberCount()’:
+/home/pi/midiMind/backend/src/core/EventBus.h:390:42: error: ‘mutex_’ was not declared in this scope
+  390 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:393:19: error: ‘handlers_’ was not declared in this scope
+  393 |         auto it = handlers_.find(typeIdx);
+      |                   ^~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:402:32: error: non-member function ‘size_t midiMind::getEventTypeCount()’ cannot have cv-qualifier
+  402 |     size_t getEventTypeCount() const {
+      |                                ^~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘size_t midiMind::getEventTypeCount()’:
+/home/pi/midiMind/backend/src/core/EventBus.h:403:42: error: ‘mutex_’ was not declared in this scope
+  403 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:404:16: error: ‘handlers_’ was not declared in this scope
+  404 |         return handlers_.size();
+      |                ^~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:411:40: error: non-member function ‘uint64_t midiMind::getTotalEventsPublished()’ cannot have cv-qualifier
+  411 |     uint64_t getTotalEventsPublished() const {
+      |                                        ^~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘uint64_t midiMind::getTotalEventsPublished()’:
+/home/pi/midiMind/backend/src/core/EventBus.h:412:16: error: ‘totalEventsPublished_’ was not declared in this scope; did you mean ‘getTotalEventsPublished’?
+  412 |         return totalEventsPublished_.load();
+      |                ^~~~~~~~~~~~~~~~~~~~~
+      |                getTotalEventsPublished
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘void midiMind::clear()’:
+/home/pi/midiMind/backend/src/core/EventBus.h:420:42: error: ‘mutex_’ was not declared in this scope
+  420 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:421:9: error: ‘handlers_’ was not declared in this scope
+  421 |         handlers_.clear();
+      |         ^~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:425:1: error: expected unqualified-id before ‘private’
+  425 | private:
+      | ^~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In function ‘void midiMind::unsubscribe(std::type_index, uint64_t)’:
+/home/pi/midiMind/backend/src/core/EventBus.h:450:42: error: ‘mutex_’ was not declared in this scope
+  450 |         std::lock_guard<std::mutex> lock(mutex_);
+      |                                          ^~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:452:19: error: ‘handlers_’ was not declared in this scope
+  452 |         auto it = handlers_.find(typeIdx);
+      |                   ^~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:460:28: error: ‘HandlerInfo’ does not name a type
+  460 |                 [id](const HandlerInfo& info) {
+      |                            ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h: In lambda function:
+/home/pi/midiMind/backend/src/core/EventBus.h:462:19: error: expected ‘{’ before ‘,’ token
+  462 |                 }),
+      |                   ^
+/home/pi/midiMind/backend/src/core/EventBus.h: At global scope:
+/home/pi/midiMind/backend/src/core/EventBus.h:476:5: error: non-member ‘mutex_’ cannot be declared ‘mutable’
+  476 |     mutable std::mutex mutex_;
+      |     ^~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:477:43: error: ‘HandlerInfo’ was not declared in this scope
+  477 |     std::map<std::type_index, std::vector<HandlerInfo>> handlers_;
+      |                                           ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.h:477:43: error: template argument 1 is invalid
+/home/pi/midiMind/backend/src/core/EventBus.h:477:43: error: template argument 2 is invalid
+/home/pi/midiMind/backend/src/core/EventBus.h:477:54: error: template argument 2 is invalid
+  477 |     std::map<std::type_index, std::vector<HandlerInfo>> handlers_;
+      |                                                      ^~
+/home/pi/midiMind/backend/src/core/EventBus.h:477:54: error: template argument 4 is invalid
+/home/pi/midiMind/backend/src/core/EventBus.h:482:1: error: expected declaration before ‘}’ token
+  482 | } // namespace midiMind
+      | ^
+/home/pi/midiMind/backend/src/core/EventBus.cpp: In function ‘std::string midiMind::formatEventBusStatistics(const EventBus&)’:
+/home/pi/midiMind/backend/src/core/EventBus.cpp:50:37: error: ‘const class midiMind::EventBus’ has no member named ‘getEventTypeCount’
+   50 |     oss << "  Event types: " << bus.getEventTypeCount() << "\n";
+      |                                     ^~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/EventBus.cpp:51:48: error: ‘const class midiMind::EventBus’ has no member named ‘getTotalEventsPublished’
+   51 |     oss << "  Total events published: " << bus.getTotalEventsPublished() << "\n";
+      |                                                ^~~~~~~~~~~~~~~~~~~~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:79: CMakeFiles/midimind.dir/src/main.cpp.o] Error 1
+make[2]: *** [CMakeFiles/midimind.dir/build.make:107: CMakeFiles/midimind.dir/src/core/EventBus.cpp.o] Error 1
+In file included from /home/pi/midiMind/backend/src/core/JsonValidator.cpp:28:
+/home/pi/midiMind/backend/src/core/JsonValidator.h: In constructor ‘midiMind::FieldSchema::FieldSchema(const std::string&, midiMind::JsonType, bool)’:
+/home/pi/midiMind/backend/src/core/JsonValidator.h:99:20: error: ‘INT_MIN’ was not declared in this scope
+   99 |         , minValue(INT_MIN)
+      |                    ^~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:46:1: note: ‘INT_MIN’ is defined in header ‘<climits>’; this is probably fixable by adding ‘#include <climits>’
+   45 | #include "Error.h"
+  +++ |+#include <climits>
+   46 | 
+/home/pi/midiMind/backend/src/core/JsonValidator.h:100:20: error: ‘INT_MAX’ was not declared in this scope
+  100 |         , maxValue(INT_MAX)
+      |                    ^~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:100:20: note: ‘INT_MAX’ is defined in header ‘<climits>’; this is probably fixable by adding ‘#include <climits>’
+/home/pi/midiMind/backend/src/core/JsonValidator.h: At global scope:
+/home/pi/midiMind/backend/src/core/JsonValidator.h:176:44: error: default argument missing for parameter 5 of ‘static bool midiMind::JsonValidator::validateString(const json&, const std::string&, std::string&, size_t, std::string&)’
+  176 |                               std::string& error) {
+      |                               ~~~~~~~~~~~~~^~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:175:59: note: ...following parameter 4 which has a default argument
+  175 |                               std::string& result, size_t maxLength = 0,
+      |                                                    ~~~~~~~^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:283:63: error: default argument missing for parameter 6 of ‘static bool midiMind::JsonValidator::validateArray(const json&, const std::string&, json&, size_t, size_t, std::string&)’
+  283 |                              size_t maxSize = 0, std::string& error) {
+      |                                                  ~~~~~~~~~~~~~^~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:282:51: note: ...following parameter 4 which has a default argument
+  282 |                              json& result, size_t minSize = 0,
+      |                                            ~~~~~~~^~~~~~~~~~~
+In file included from /home/pi/midiMind/backend/src/core/JsonValidator.h:45:
+/home/pi/midiMind/backend/src/core/JsonValidator.h: In member function ‘void midiMind::JsonValidator::validateOrThrow(const json&) const’:
+/home/pi/midiMind/backend/src/core/JsonValidator.h:670:36: error: ‘VALIDATION_FAILED’ is not a member of ‘midiMind::ErrorCode’
+  670 |             THROW_ERROR(ErrorCode::VALIDATION_FAILED,
+      |                                    ^~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/Error.h:403:39: note: in definition of macro ‘THROW_ERROR’
+  403 |     throw midiMind::MidiMindException(code, message)
+      |                                       ^~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.cpp: At global scope:
+/home/pi/midiMind/backend/src/core/JsonValidator.cpp:82:6: error: redefinition of ‘bool midiMind::JsonValidator::validate(const json&, std::string&) const’
+   82 | bool JsonValidator::validate(const json& data, std::string& errorMessage) const {
+      |      ^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:619:10: note: ‘bool midiMind::JsonValidator::validate(const json&, std::string&) const’ previously defined here
+  619 |     bool validate(const json& data, std::string& errorMessage) const {
+      |          ^~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.cpp:140:6: error: redefinition of ‘void midiMind::JsonValidator::validateOrThrow(const json&) const’
+  140 | void JsonValidator::validateOrThrow(const json& data) const {
+      |      ^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:666:10: note: ‘void midiMind::JsonValidator::validateOrThrow(const json&) const’ previously defined here
+  666 |     void validateOrThrow(const json& data) const {
+      |          ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.cpp:165:6: error: redefinition of ‘bool midiMind::JsonValidator::validateType(const json&, const midiMind::FieldSchema&, std::string&) const’
+  165 | bool JsonValidator::validateType(const json& value, const FieldSchema& field,
+      |      ^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:685:10: note: ‘bool midiMind::JsonValidator::validateType(const json&, const midiMind::FieldSchema&, std::string&) const’ previously defined here
+  685 |     bool validateType(const json& value, const FieldSchema& field,
+      |          ^~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.cpp:239:6: error: redefinition of ‘bool midiMind::JsonValidator::validateConstraints(const json&, const midiMind::FieldSchema&, std::string&) const’
+  239 | bool JsonValidator::validateConstraints(const json& value, const FieldSchema& field,
+      |      ^~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/JsonValidator.h:748:10: note: ‘bool midiMind::JsonValidator::validateConstraints(const json&, const midiMind::FieldSchema&, std::string&) const’ previously defined here
+  748 |     bool validateConstraints(const json& value, const FieldSchema& field,
+      |          ^~~~~~~~~~~~~~~~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:121: CMakeFiles/midimind.dir/src/core/JsonValidator.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
+make: *** [Makefile:136: all] Error 2

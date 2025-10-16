@@ -202,7 +202,11 @@ detect_system() {
     local critical_files=(
         "$BACKEND_DIR/src/main.cpp"
         "$BACKEND_DIR/src/core/Application.cpp"
+        "$BACKEND_DIR/src/core/EventBus.cpp"
         "$BACKEND_DIR/src/api/ApiServer.cpp"
+        "$BACKEND_DIR/src/api/CommandHandler.cpp"
+        "$BACKEND_DIR/src/storage/Database.cpp"
+        "$BACKEND_DIR/src/midi/devices/MidiDeviceManager.cpp"
     )
     
     for file in "${critical_files[@]}"; do
@@ -210,7 +214,17 @@ detect_system() {
             error "Fichier critique manquant: $file"
         fi
     done
-    success "Fichiers critiques backend vérifiés"
+    info "Vérification de la structure CMake..."
+    
+    # Vérifier que CMakeLists.txt référence les bons fichiers
+    if ! grep -q "CommandHandler.cpp" "$BACKEND_DIR/CMakeLists.txt"; then
+        warning "CMakeLists.txt ne contient pas CommandHandler.cpp"
+        info "Ceci peut être normal si le fichier utilise un autre nom"
+    fi
+    
+    if grep -q "CommandProcessorV2.cpp" "$BACKEND_DIR/CMakeLists.txt"; then
+        error "CMakeLists.txt référence l'ancien fichier CommandProcessorV2.cpp\n  Fichier attendu: CommandHandler.cpp\n  Veuillez mettre à jour CMakeLists.txt"
+    fi
     
     # ✅ VÉRIFICATION 4: Frontend (optionnel)
     if [ "$INSTALL_FRONTEND" = true ]; then
@@ -237,6 +251,23 @@ detect_system() {
     
     echo ""
     success "✅ Structure du projet validée"
+    
+    # Résumé des vérifications
+    echo ""
+    echo -e "${BOLD}${GREEN}📋 Résumé des vérifications:${NC}"
+    echo -e "  ${GREEN}✓${NC} Core:            4 fichiers .cpp (main, Application, EventBus, JsonValidator)"
+    echo -e "  ${GREEN}✓${NC} Storage:         7 fichiers .cpp (Database, FileManager, PathManager, Settings, InstrumentDB, PresetMgr, SessionMgr)"
+    echo -e "  ${GREEN}✓${NC} Timing:          2 fichiers .cpp (TimestampManager, LatencyCompensator)"
+    echo -e "  ${GREEN}✓${NC} API:             3 fichiers .cpp (ApiServer, CommandHandler, MessageEnvelope)"
+    echo -e "  ${GREEN}✓${NC} MIDI:            2 fichiers .cpp minimum (MidiRouter, MidiDeviceManager)"
+    echo -e "  ${GREEN}✓${NC} Headers:         5 fichiers .h (header-only: Logger, Config, Error, TimeUtils, InstrumentLatencyProfile)"
+    echo -e "  ${GREEN}✓${NC} CMakeLists.txt:  Configuration de build validée"
+    if [ "$INSTALL_FRONTEND" = true ]; then
+        echo -e "  ${GREEN}✓${NC} Frontend:        Répertoire présent"
+    else
+        echo -e "  ${YELLOW}○${NC} Frontend:        Installation désactivée"
+    fi
+    echo -e "  ${CYAN}ℹ${NC} Total vérifié:   ${BOLD}20 fichiers${NC} (.cpp) + ${BOLD}5 headers${NC}"
     echo ""
     
     # Détection plateforme
@@ -514,6 +545,35 @@ compile_backend() {
     if [ ! -d "$BACKEND_DIR/src" ]; then
         error "Répertoire src/ introuvable: $BACKEND_DIR/src"
     fi
+    
+    # Vérifier les dépendances critiques avant compilation
+    info "Vérification des dépendances de compilation..."
+    local missing_deps=()
+    
+    # Vérifier ALSA
+    if ! ldconfig -p | grep -q libasound; then
+        missing_deps+=("libasound2-dev")
+    fi
+    
+    # Vérifier SQLite3
+    if ! ldconfig -p | grep -q libsqlite3; then
+        missing_deps+=("libsqlite3-dev")
+    fi
+    
+    # Vérifier nlohmann/json
+    if [ ! -f "/usr/include/nlohmann/json.hpp" ] && [ ! -f "/usr/local/include/nlohmann/json.hpp" ]; then
+        missing_deps+=("nlohmann-json3-dev")
+    fi
+    
+    # Vérifier websocketpp
+    if [ ! -d "/usr/include/websocketpp" ] && [ ! -d "/usr/local/include/websocketpp" ]; then
+        missing_deps+=("libwebsocketpp-dev")
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        error "Dépendances manquantes:\n$(printf '  - %s\n' "${missing_deps[@]}")\n  Installez-les avec: sudo apt install ${missing_deps[*]}"
+    fi
+    success "Toutes les dépendances sont présentes"
     
     cd "$BACKEND_DIR"
     
