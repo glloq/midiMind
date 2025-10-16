@@ -231,4 +231,138 @@ void printUsage(const char* programName) {
               << "  -l, --log-level LVL  Log level (DEBUG|INFO|WARNING|ERROR)\n"
               << "  -v, --verbose        Verbose output (DEBUG level)\n"
               << "  -h, --help           Show this help\n"
-              << "  -V, --version        Show version\
+              << "  -V, --version        Show version\n"
+              << "\n"
+              << "Example:\n"
+              << "  " << programName << " --config /etc/midimind/config.json\n"
+              << "  " << programName << " --daemon --pid /var/run/midimind.pid\n"
+              << std::endl;
+}
+
+void printVersion() {
+    std::cout << "MidiMind Backend v4.1.0\n"
+              << "MIDI Orchestration System for Raspberry Pi\n"
+              << "Copyright (c) 2025 MidiMind Team\n"
+              << std::endl;
+}
+
+CommandLineArgs parseCommandLine(int argc, char* argv[]) {
+    CommandLineArgs args;
+    
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "-h" || arg == "--help") {
+            args.showHelp = true;
+        }
+        else if (arg == "-V" || arg == "--version") {
+            args.showVersion = true;
+        }
+        else if (arg == "-v" || arg == "--verbose") {
+            args.verbose = true;
+        }
+        else if (arg == "-d" || arg == "--daemon") {
+            args.daemonMode = true;
+        }
+        else if (arg == "-c" || arg == "--config") {
+            if (i + 1 < argc) {
+                args.configPath = argv[++i];
+            } else {
+                std::cerr << "Error: --config requires an argument" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (arg == "-p" || arg == "--pid") {
+            if (i + 1 < argc) {
+                args.pidFile = argv[++i];
+            } else {
+                std::cerr << "Error: --pid requires an argument" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (arg == "-l" || arg == "--log-level") {
+            if (i + 1 < argc) {
+                args.logLevel = argv[++i];
+            } else {
+                std::cerr << "Error: --log-level requires an argument" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+        else {
+            std::cerr << "Error: Unknown option: " << arg << std::endl;
+            std::cerr << "Use --help for usage information" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+    
+    return args;
+}
+
+bool daemonize() {
+    // Fork process
+    pid_t pid = fork();
+    
+    if (pid < 0) {
+        return false;
+    }
+    
+    // Parent exits
+    if (pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+    
+    // Child continues
+    
+    // Create new session
+    if (setsid() < 0) {
+        return false;
+    }
+    
+    // Fork again to prevent acquiring terminal
+    pid = fork();
+    
+    if (pid < 0) {
+        return false;
+    }
+    
+    if (pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+    
+    // Set working directory
+    if (chdir("/") < 0) {
+        return false;
+    }
+    
+    // Close standard file descriptors
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    
+    // Redirect to /dev/null
+    open("/dev/null", O_RDONLY);  // stdin
+    open("/dev/null", O_WRONLY);  // stdout
+    open("/dev/null", O_WRONLY);  // stderr
+    
+    return true;
+}
+
+bool writePidFile(const std::string& pidFile) {
+    std::ofstream ofs(pidFile);
+    if (!ofs) {
+        return false;
+    }
+    
+    ofs << getpid() << std::endl;
+    ofs.close();
+    
+    return true;
+}
+
+void removePidFile(const std::string& pidFile) {
+    unlink(pidFile.c_str());
+}
+
+// ============================================================================
+// END OF FILE main.cpp
+// ============================================================================
