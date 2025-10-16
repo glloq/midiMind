@@ -215,15 +215,27 @@ void registerInstrumentCommands(
                 };
                 
                 // Récupérer identity
-                auto identity = sysExHandler->getIdentity(deviceId);
-                if (identity) {
-                    response["data"]["standard_identity"] = {
-                        {"manufacturer", identity->manufacturer},
-                        {"family", identity->family},
-                        {"model", identity->model},
-                        {"version", identity->version}
-                    };
-                }
+               auto identity = sysExHandler->getDeviceIdentity(deviceId);  // ✅ CORRECT
+
+				if (identity.has_value()) {
+					identityJson = {
+						{"manufacturer", identity->manufacturerName},
+						{"model", identity->modelName},
+						{"version", identity->versionString()},
+						// Champs supplémentaires disponibles (optionnel):
+						{"manufacturer_id", identity->manufacturerId},
+						{"family_code", identity->familyCode},
+						{"device_family", identity->deviceFamily},
+						{"version_major", identity->versionMajor},
+						{"version_minor", identity->versionMinor}
+					};
+				} else {
+					// Cas où l'identité n'est pas encore connue
+					identityJson = {
+						{"error", "Device identity not available"},
+						{"suggestion", "Try requesting identity first"}
+					};
+				}
                 
                 // Récupérer note map
                 auto noteMap = sysExHandler->getNoteMap(deviceId);
