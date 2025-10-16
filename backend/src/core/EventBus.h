@@ -1,12 +1,12 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.1.1 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
 //   Thread-safe publish/subscribe event bus for decoupled communication.
-//   Fixed class structure with proper member placement.
+//   Fixed: Subscription class moved before EventBus to resolve incomplete type.
 //
 // Features:
 //   - Type-safe event publishing
@@ -18,11 +18,9 @@
 // Author: MidiMind Team
 // Date: 2025-10-17
 //
-// Changes v4.1.0:
-//   - Fixed class structure (members in private)
-//   - Fixed HandlerInfo placement
-//   - Fixed method declarations
-//   - All compile errors resolved
+// Changes v4.1.1:
+//   - Moved Subscription class definition before EventBus
+//   - Resolved "incomplete type" compilation error
 //
 // ============================================================================
 
@@ -40,10 +38,62 @@
 namespace midiMind {
 
 // ============================================================================
-// FORWARD DECLARATIONS
+// CLASS: Subscription (RAII) - DÉFINI EN PREMIER
 // ============================================================================
 
-class Subscription;
+/**
+ * @class Subscription
+ * @brief RAII subscription handle
+ * 
+ * Automatically unsubscribes when destroyed.
+ * Move-only (cannot be copied).
+ */
+class Subscription {
+public:
+    /**
+     * @brief Default constructor (empty subscription)
+     */
+    Subscription() = default;
+    
+    /**
+     * @brief Constructor with unsubscribe callback
+     */
+    explicit Subscription(std::function<void()> unsubscribe)
+        : unsubscribe_(std::move(unsubscribe)) {}
+    
+    /**
+     * @brief Destructor - automatically unsubscribes
+     */
+    ~Subscription() {
+        if (unsubscribe_) {
+            unsubscribe_();
+        }
+    }
+    
+    // Move semantics
+    Subscription(Subscription&& other) noexcept
+        : unsubscribe_(std::move(other.unsubscribe_)) {
+        other.unsubscribe_ = nullptr;
+    }
+    
+    Subscription& operator=(Subscription&& other) noexcept {
+        if (this != &other) {
+            if (unsubscribe_) {
+                unsubscribe_();
+            }
+            unsubscribe_ = std::move(other.unsubscribe_);
+            other.unsubscribe_ = nullptr;
+        }
+        return *this;
+    }
+    
+    // Disable copy
+    Subscription(const Subscription&) = delete;
+    Subscription& operator=(const Subscription&) = delete;
+
+private:
+    std::function<void()> unsubscribe_;
+};
 
 // ============================================================================
 // CLASS: EventBus
@@ -338,64 +388,6 @@ private:
     std::map<std::type_index, std::vector<HandlerInfo>> handlers_;
     std::atomic<uint64_t> nextId_{0};
     std::atomic<uint64_t> totalEventsPublished_{0};
-};
-
-// ============================================================================
-// CLASS: Subscription (RAII)
-// ============================================================================
-
-/**
- * @class Subscription
- * @brief RAII subscription handle
- * 
- * Automatically unsubscribes when destroyed.
- * Move-only (cannot be copied).
- */
-class Subscription {
-public:
-    /**
-     * @brief Default constructor (empty subscription)
-     */
-    Subscription() = default;
-    
-    /**
-     * @brief Constructor with unsubscribe callback
-     */
-    explicit Subscription(std::function<void()> unsubscribe)
-        : unsubscribe_(std::move(unsubscribe)) {}
-    
-    /**
-     * @brief Destructor - automatically unsubscribes
-     */
-    ~Subscription() {
-        if (unsubscribe_) {
-            unsubscribe_();
-        }
-    }
-    
-    // Move semantics
-    Subscription(Subscription&& other) noexcept
-        : unsubscribe_(std::move(other.unsubscribe_)) {
-        other.unsubscribe_ = nullptr;
-    }
-    
-    Subscription& operator=(Subscription&& other) noexcept {
-        if (this != &other) {
-            if (unsubscribe_) {
-                unsubscribe_();
-            }
-            unsubscribe_ = std::move(other.unsubscribe_);
-            other.unsubscribe_ = nullptr;
-        }
-        return *this;
-    }
-    
-    // Disable copy
-    Subscription(const Subscription&) = delete;
-    Subscription& operator=(const Subscription&) = delete;
-
-private:
-    std::function<void()> unsubscribe_;
 };
 
 } // namespace midiMind

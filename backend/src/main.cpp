@@ -10,7 +10,7 @@
 //   - Fixed MidiMindError → MidiMindException
 //
 // ============================================================================
-
+#include <thread>
 #include "core/Application.h"
 #include "core/Logger.h"
 #include "core/Error.h"
