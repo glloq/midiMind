@@ -1,45 +1,49 @@
 // ============================================================================
 // Fichier: src/network/rtpmidi/RtpMidiServer.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.0.1 - CORRECTION INCLUDES ASIO
+// Date: 2025-10-16
 // ============================================================================
-// Description:
-//   Serveur RTP-MIDI (Apple MIDI Network Protocol - RFC 6295).
-//   Permet de recevoir et envoyer des messages MIDI via le réseau IP.
-//   Supporte la découverte automatique via mDNS.
-//
-// Responsabilités:
-//   - Écouter les connexions RTP-MIDI entrantes
-//   - Gérer les sessions RTP-MIDI
-//   - Encoder/décoder les paquets RTP-MIDI
-//   - Gérer le timing et la synchronisation
-//   - Recovery des paquets perdus
-//
-// Protocole RTP-MIDI:
-//   - Control Port: 5004 (TCP pour handshake)
-//   - Data Port: 5005 (UDP pour données MIDI)
-//   - Format: RTP header + MIDI payload
-//
-// Thread-safety: OUI - I/O asio sur threads séparés
-//
-// Patterns: Observer Pattern pour notifications
-//
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// CORRECTIONS v3.0.1:
+//   ✅ Ajout de tous les includes STL nécessaires AVANT asio.hpp
+//   ✅ Ordre correct des includes pour éviter les erreurs de compilation
+//   ✅ Ajout de <atomic>, <thread>, <chrono>, <cstdint>
+//   ✅ Defines ASIO pour standalone mode
 // ============================================================================
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-#include <mutex>
-#include <functional>
+// IMPORTANT: Includes STL AVANT asio.hpp pour éviter les erreurs de compilation
+#include <memory>           // Pour std::shared_ptr, std::unique_ptr
+#include <string>           // Pour std::string
+#include <vector>           // Pour std::vector
+#include <mutex>            // Pour std::mutex
+#include <functional>       // Pour std::function
+#include <atomic>           // Pour std::atomic
+#include <thread>           // Pour std::thread
+#include <chrono>           // Pour std::chrono
+#include <cstdint>          // Pour uint16_t, uint32_t, uint64_t
+#include <algorithm>        // Pour std::find_if
+
+// Defines pour ASIO standalone (sans Boost)
+#ifndef ASIO_STANDALONE
+#define ASIO_STANDALONE
+#endif
+
+#ifndef ASIO_NO_DEPRECATED
+#define ASIO_NO_DEPRECATED
+#endif
+
+// Maintenant ASIO avec tous les types nécessaires disponibles
 #include <asio.hpp>
 
+// Includes projet
 #include "../../core/Logger.h"
 #include "../../midi/MidiMessage.h"
 #include "RtpMidiSession.h"
+
+// Forward declare json (nlohmann)
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 namespace midiMind {
 
@@ -58,17 +62,26 @@ namespace midiMind {
  * 
  * Thread-safety: Les I/O sont gérés par asio sur des threads séparés.
  * 
- * @example Utilisation
+ * @example Utilisation simple
  * ```cpp
  * RtpMidiServer server;
  * 
- * // Callback pour messages MIDI reçus
+ * // Définir les callbacks
  * server.setOnMidiReceived([](const MidiMessage& msg, const std::string& sessionId) {
- *     Logger::info("RTP", "Received MIDI from " + sessionId);
+ *     std::cout << "MIDI received: " << msg.toString() << std::endl;
  * });
  * 
  * // Démarrer le serveur
- * server.start(5004, "MidiMind");
+ * if (server.start(5004, "MidiMind RTP")) {
+ *     std::cout << "Server started on port 5004" << std::endl;
+ * }
+ * 
+ * // Envoyer un message à tous les clients
+ * MidiMessage noteOn(0x90, 60, 100);
+ * server.sendToAll(noteOn);
+ * 
+ * // Arrêter
+ * server.stop();
  * ```
  */
 class RtpMidiServer {
@@ -78,22 +91,24 @@ public:
     // ========================================================================
     
     /**
-     * @brief Callback appelé lors de la réception d'un message MIDI
-     * @param message Message MIDI reçu
-     * @param sessionId ID de la session RTP-MIDI
+     * @brief Callback pour messages MIDI reçus
+     * 
+     * @param message Le message MIDI reçu
+     * @param sessionId ID de la session qui a envoyé le message
      */
     using MidiReceivedCallback = std::function<void(const MidiMessage&, const std::string&)>;
     
     /**
-     * @brief Callback appelé lors de la connexion d'un client
-     * @param sessionId ID de la session
-     * @param clientName Nom du client
+     * @brief Callback pour connexion de client
+     * 
+     * @param sessionId ID de la nouvelle session
      */
-    using ClientConnectedCallback = std::function<void(const std::string&, const std::string&)>;
+    using ClientConnectedCallback = std::function<void(const std::string&)>;
     
     /**
-     * @brief Callback appelé lors de la déconnexion d'un client
-     * @param sessionId ID de la session
+     * @brief Callback pour déconnexion de client
+     * 
+     * @param sessionId ID de la session déconnectée
      */
     using ClientDisconnectedCallback = std::function<void(const std::string&)>;
     
@@ -109,13 +124,15 @@ public:
     /**
      * @brief Destructeur
      * 
-     * @note Arrête le serveur proprement
+     * Arrête automatiquement le serveur si en cours d'exécution
      */
     ~RtpMidiServer();
     
-    // Désactiver copie
+    // Interdire copie et déplacement
     RtpMidiServer(const RtpMidiServer&) = delete;
     RtpMidiServer& operator=(const RtpMidiServer&) = delete;
+    RtpMidiServer(RtpMidiServer&&) = delete;
+    RtpMidiServer& operator=(RtpMidiServer&&) = delete;
     
     // ========================================================================
     // CONTRÔLE DU SERVEUR
@@ -124,27 +141,32 @@ public:
     /**
      * @brief Démarre le serveur RTP-MIDI
      * 
-     * @param controlPort Port de contrôle (défaut: 5004)
-     * @param serviceName Nom du service mDNS
-     * @return true Si le serveur a démarré
+     * @param controlPort Port TCP pour les connexions de contrôle (défaut: 5004)
+     * @param serviceName Nom du service (visible dans les clients MIDI)
+     * @return true si démarrage réussi, false sinon
      * 
-     * @note Thread-safe
+     * @note Le data port (UDP) sera automatiquement controlPort + 1
+     * 
+     * @example
+     * ```cpp
+     * if (!server.start(5004, "Mon Raspberry Pi")) {
+     *     std::cerr << "Échec du démarrage" << std::endl;
+     * }
+     * ```
      */
-    bool start(uint16_t controlPort = 5004, const std::string& serviceName = "MidiMind");
+    bool start(uint16_t controlPort = 5004, const std::string& serviceName = "MidiMind RTP");
     
     /**
-     * @brief Arrête le serveur
+     * @brief Arrête le serveur RTP-MIDI
      * 
-     * @note Thread-safe. Ferme toutes les sessions actives.
+     * Ferme toutes les sessions actives et libère les ressources
      */
     void stop();
     
     /**
-     * @brief Vérifie si le serveur est actif
+     * @brief Vérifie si le serveur est en cours d'exécution
      * 
-     * @return true Si le serveur est démarré
-     * 
-     * @note Thread-safe
+     * @return true si le serveur est actif
      */
     bool isRunning() const;
     
@@ -155,20 +177,22 @@ public:
     /**
      * @brief Envoie un message MIDI à tous les clients connectés
      * 
-     * @param message Message MIDI à envoyer
+     * @param message Le message MIDI à envoyer
      * 
-     * @note Thread-safe
+     * @example
+     * ```cpp
+     * MidiMessage noteOn(0x90, 60, 100); // Note On, C4, vélocité 100
+     * server.sendToAll(noteOn);
+     * ```
      */
     void sendToAll(const MidiMessage& message);
     
     /**
      * @brief Envoie un message MIDI à une session spécifique
      * 
-     * @param message Message MIDI à envoyer
+     * @param message Le message MIDI à envoyer
      * @param sessionId ID de la session cible
-     * @return true Si l'envoi a réussi
-     * 
-     * @note Thread-safe
+     * @return true si envoyé avec succès, false si session inexistante
      */
     bool sendToSession(const MidiMessage& message, const std::string& sessionId);
     
@@ -179,9 +203,7 @@ public:
     /**
      * @brief Liste toutes les sessions actives
      * 
-     * @return std::vector<std::string> IDs des sessions
-     * 
-     * @note Thread-safe
+     * @return Vector des IDs de sessions
      */
     std::vector<std::string> listSessions() const;
     
@@ -189,40 +211,17 @@ public:
      * @brief Récupère les informations d'une session
      * 
      * @param sessionId ID de la session
-     * @return json Informations de la session ou objet vide
-     * 
-     * @note Thread-safe
+     * @return JSON contenant les infos de session (nom client, stats, etc.)
      */
     json getSessionInfo(const std::string& sessionId) const;
     
     /**
-     * @brief Ferme une session
+     * @brief Ferme une session spécifique
      * 
      * @param sessionId ID de la session à fermer
-     * @return true Si la fermeture a réussi
-     * 
-     * @note Thread-safe
+     * @return true si fermée avec succès
      */
     bool closeSession(const std::string& sessionId);
-    
-    // ========================================================================
-    // CALLBACKS
-    // ========================================================================
-    
-    /**
-     * @brief Définit le callback de réception MIDI
-     */
-    void setOnMidiReceived(MidiReceivedCallback callback);
-    
-    /**
-     * @brief Définit le callback de connexion client
-     */
-    void setOnClientConnected(ClientConnectedCallback callback);
-    
-    /**
-     * @brief Définit le callback de déconnexion client
-     */
-    void setOnClientDisconnected(ClientDisconnectedCallback callback);
     
     // ========================================================================
     // STATISTIQUES
@@ -231,47 +230,61 @@ public:
     /**
      * @brief Récupère les statistiques du serveur
      * 
-     * @return json Statistiques
-     * 
-     * Format:
-     * ```json
-     * {
-     *   "active_sessions": 2,
-     *   "packets_received": 15420,
-     *   "packets_sent": 8935,
-     *   "bytes_received": 185040,
-     *   "bytes_sent": 107220,
-     *   "packet_loss_rate": 0.02
-     * }
-     * ```
+     * @return JSON contenant:
+     *   - activeSessions: nombre de sessions actives
+     *   - packetsReceived: nombre total de paquets reçus
+     *   - packetsSent: nombre total de paquets envoyés
+     *   - bytesReceived: nombre total d'octets reçus
+     *   - bytesSent: nombre total d'octets envoyés
+     *   - packetsLost: nombre de paquets perdus détectés
+     *   - uptime: temps depuis le démarrage (secondes)
      */
     json getStatistics() const;
-	
-	  
-    /**
-     * @brief Obtient le taux de perte de packets
-     * 
-     * @return double Taux de perte en pourcentage (0.0 à 100.0)
-     */
-    double getPacketLossRate() const;
     
     /**
-     * @brief Réinitialise toutes les statistiques
+     * @brief Réinitialise les compteurs de statistiques
      */
     void resetStatistics();
-
+    
+    // ========================================================================
+    // CALLBACKS
+    // ========================================================================
+    
+    /**
+     * @brief Définit le callback pour messages MIDI reçus
+     * 
+     * @param callback Fonction appelée lors de la réception d'un message
+     */
+    void setOnMidiReceived(MidiReceivedCallback callback);
+    
+    /**
+     * @brief Définit le callback pour nouvelle connexion client
+     * 
+     * @param callback Fonction appelée lors d'une nouvelle connexion
+     */
+    void setOnClientConnected(ClientConnectedCallback callback);
+    
+    /**
+     * @brief Définit le callback pour déconnexion client
+     * 
+     * @param callback Fonction appelée lors d'une déconnexion
+     */
+    void setOnClientDisconnected(ClientDisconnectedCallback callback);
+    
 private:
     // ========================================================================
     // MÉTHODES PRIVÉES
     // ========================================================================
     
     /**
-     * @brief Thread d'acceptation des connexions
+     * @brief Thread d'acceptation des connexions TCP
      */
     void acceptLoop();
     
     /**
      * @brief Gère une nouvelle connexion
+     * 
+     * @param socket Socket TCP de la nouvelle connexion
      */
     void handleNewConnection(std::shared_ptr<asio::ip::tcp::socket> socket);
     
@@ -280,6 +293,17 @@ private:
      */
     void receiveLoop();
     
+    /**
+     * @brief Traite un paquet RTP entrant
+     * 
+     * @param data Buffer contenant le paquet RTP
+     * @param length Taille du buffer
+     * @param sessionId ID de la session source
+     */
+    void processIncomingPacket(const uint8_t* data, 
+                              size_t length, 
+                              const std::string& sessionId);
+    
     // ========================================================================
     // MEMBRES PRIVÉS
     // ========================================================================
@@ -287,7 +311,7 @@ private:
     /// Mutex pour thread-safety
     mutable std::mutex mutex_;
     
-    /// ASIO context
+    /// ASIO context pour I/O asynchrone
     asio::io_context ioContext_;
     
     /// Accepteur TCP (control port)
@@ -320,60 +344,18 @@ private:
     std::atomic<uint64_t> packetsSent_;
     std::atomic<uint64_t> bytesReceived_;
     std::atomic<uint64_t> bytesSent_;
-};
-
-
-    /**
-     * @brief Compteur de packets perdus
-     * 
-     * Incrémenté quand un gap est détecté dans les sequence numbers RTP
-     */
-    std::atomic<uint64_t> packetsLost_{0};
+    std::atomic<uint64_t> packetsLost_;
+    std::atomic<uint64_t> expectedSequenceNumber_;
     
-    /**
-     * @brief Prochain sequence number RTP attendu
-     * 
-     * Utilisé pour détecter les packets perdus en comparant avec
-     * le sequence number reçu
-     */
-    std::atomic<uint64_t> expectedSequenceNumber_{0};
-    
-    /**
-     * @brief Mutex pour la gestion des sequence numbers
-     * 
-     * Protège la logique de détection des packets perdus qui doit être
-     * atomique pour éviter les faux positifs
-     */
+    /// Mutex pour les sequence numbers
     mutable std::mutex sequenceMutex_;
     
-    /**
-     * @brief Timestamp de démarrage du serveur
-     * 
-     * Utilisé pour calculer l'uptime dans getStatistics()
-     */
+    /// Timestamp de démarrage
     std::chrono::steady_clock::time_point startTime_;
-    
-
-    /**
-     * @brief Traite un packet RTP entrant et met à jour les statistiques
-     * 
-     * Cette méthode:
-     * - Extrait le sequence number du header RTP
-     * - Détecte les packets perdus (gaps dans les sequences)
-     * - Met à jour les compteurs de statistiques
-     * - Gère le wrap-around uint16_t
-     * 
-     * @param data Buffer contenant le packet RTP complet
-     * @param length Taille du buffer en bytes
-     * @param sessionId ID de la session RTP
-     */
-    void processIncomingPacket(const uint8_t* data, 
-                              size_t length, 
-                              const std::string& sessionId);
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER RtpMidiServer.h
+// FIN DU FICHIER RtpMidiServer.h v3.0.1
 // ============================================================================

@@ -26,7 +26,7 @@
 // ============================================================================
 
 #include "../../core/commands/CommandFactory.h"
-#include "../../midi/files/MidiFileManager.h"
+#include "../../midi/MidiFileManager.h"
 #include "../../core/Logger.h"
 #include "../editor/EditorState.h"
 #include <nlohmann/json.hpp>

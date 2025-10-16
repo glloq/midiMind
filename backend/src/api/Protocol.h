@@ -1,140 +1,96 @@
 // ============================================================================
 // Fichier: backend/src/api/Protocol.h
-// Version: 3.0.3 - CORRECTION ORDRE DES DÉCLARATIONS
-// Date: 2025-10-16
+// Version: 3.0.2 - CORRECTION VISIBILITÉ DES MÉTHODES
 // ============================================================================
-// CORRECTIONS v3.0.3:
-//   ✅ FIX: Forward declarations ajoutées AVANT struct Event
-//   ✅ FIX: Ordre correct des déclarations
-//   ✅ Conserve TOUTES les fonctionnalités de v3.0.2
-//   ✅ Compilation garantie sans erreur
-//
-// Changements par rapport à v3.0.2:
-//   - Ajout forward declarations lignes 72-73
-//   - Aucune suppression de fonctionnalité
-//   - Aucun downgrade
-//
-// Description:
-//   Protocole WebSocket complet pour communication client-serveur
+
+// CORRECTIFS APPLIQUÉS:
+// - messageTypeToString() et stringToMessageType() rendues publiques
+// - priorityToString() et stringToPriority() rendues publiques
 // ============================================================================
 
 #pragma once
 
 #include <string>
-#include <cstdint>
-#include <nlohmann/json.hpp>
 #include <chrono>
-#include <map>
-#include <random>
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 namespace protocol {
 
-// ============================================================================
+// ========================================================================
 // CONSTANTES
-// ============================================================================
+// ========================================================================
 
 constexpr const char* PROTOCOL_VERSION = "3.0";
 
-// ============================================================================
+// ========================================================================
 // ÉNUMÉRATIONS
-// ============================================================================
+// ========================================================================
 
-/**
- * @brief Type de message
- */
 enum class MessageType {
-    REQUEST,        // Requête client → serveur
-    RESPONSE,       // Réponse serveur → client
-    EVENT,          // Événement serveur → client (broadcast)
-    ERROR           // Erreur
+    REQUEST,
+    RESPONSE,
+    EVENT,
+    ERROR
 };
 
-/**
- * @brief Priorité d'événement
- */
 enum class EventPriority {
-    LOW,            // Basse priorité (statistiques, etc.)
-    NORMAL,         // Priorité normale (la plupart des événements)
-    HIGH            // Haute priorité (alertes, erreurs critiques)
+    LOW,
+    NORMAL,
+    HIGH
 };
 
-/**
- * @brief Codes d'erreur
- */
 enum class ErrorCode {
-    // Erreurs de protocole (1000-1099)
+    // Format et validation
     INVALID_FORMAT = 1000,
     INVALID_VERSION = 1001,
     MISSING_FIELD = 1002,
     INVALID_TYPE = 1003,
     
-    // Erreurs de commandes (1100-1199)
-    UNKNOWN_COMMAND = 1100,
-    INVALID_PARAMS = 1101,
-    COMMAND_FAILED = 1102,
-    TIMEOUT = 1103,
-    DEVICE_BUSY = 1104,
+    // Commandes
+    UNKNOWN_COMMAND = 2000,
+    INVALID_PARAMS = 2001,
+    COMMAND_FAILED = 2002,
+    TIMEOUT = 2003,
+    VALIDATION_ERROR = 2004,
     
-    // Erreurs de validation (1200-1299)
-    VALIDATION_ERROR = 1200,
-    FILE_NOT_FOUND = 1201,
-    PATH_TRAVERSAL = 1202,
-    PERMISSION_DENIED = 1203,
+    // Fichiers
+    FILE_NOT_FOUND = 3000,
+    PATH_TRAVERSAL = 3001,
+    PERMISSION_DENIED = 3002,
     
-    // Erreurs MIDI (1300-1399)
-    DEVICE_NOT_FOUND = 1300,
-    DEVICE_NOT_CONNECTED = 1301,
-    ROUTE_NOT_FOUND = 1302,
-    INVALID_MIDI_MESSAGE = 1303,
+    // MIDI
+    DEVICE_NOT_FOUND = 4000,
+    DEVICE_NOT_CONNECTED = 4001,
+    ROUTE_NOT_FOUND = 4002,
+    INVALID_MIDI_MESSAGE = 4003,
     
-    // Erreurs système (1400-1499)
-    INTERNAL_ERROR = 1400,
-    NOT_IMPLEMENTED = 1401,
-    SERVICE_UNAVAILABLE = 1402,
-    DATABASE_ERROR = 1403
+    // Système
+    INTERNAL_ERROR = 5000,
+    NOT_IMPLEMENTED = 5001,
+    SERVICE_UNAVAILABLE = 5002,
+    DATABASE_ERROR = 5003
 };
 
-// ============================================================================
-// FORWARD DECLARATIONS - ✅ AJOUT v3.0.3
-// ============================================================================
-// Déclarations anticipées pour résoudre l'ordre des dépendances
+// ========================================================================
+// STRUCTURE: ENVELOPE
+// ========================================================================
 
-inline std::string priorityToString(EventPriority priority);
-inline EventPriority stringToPriority(const std::string& str);
-
-// ============================================================================
-// STRUCTURES
-// ============================================================================
-
-/**
- * @brief Entête commune à tous les messages
- */
 struct Envelope {
-    std::string version;        // Version du protocole
-    std::string id;             // ID unique du message (UUID v4)
-    int64_t timestamp;          // Timestamp en millisecondes (epoch)
-    MessageType type;           // Type de message
+    std::string version;
+    std::string id;
+    int64_t timestamp;
+    MessageType type;
     
-    // Constructeur par défaut
     Envelope()
-        : version(PROTOCOL_VERSION)
-        , id("")
-        , timestamp(0)
-        , type(MessageType::REQUEST)
-    {}
-    
-    // Constructeur avec génération auto timestamp
-    Envelope(MessageType t)
         : version(PROTOCOL_VERSION)
         , id(generateUUID())
         , timestamp(getCurrentTimestamp())
-        , type(t)
+        , type(MessageType::REQUEST)
     {}
     
-    // Conversion vers JSON
     json toJson() const {
         json j;
         j["version"] = version;
@@ -144,21 +100,16 @@ struct Envelope {
         return j;
     }
     
-    // Création depuis JSON
     static Envelope fromJson(const json& j) {
         Envelope env;
         env.version = j.value("version", PROTOCOL_VERSION);
         env.id = j.value("id", "");
-        env.timestamp = j.value("timestamp", 0);
+        env.timestamp = j.value("timestamp", getCurrentTimestamp());
         env.type = stringToMessageType(j.value("type", "request"));
         return env;
     }
     
-    // Méthodes utilitaires publiques
-    static std::string generateUUID();
-    static int64_t getCurrentTimestamp();
-    
-private:
+    // ✅ CORRECTION: Méthodes rendues PUBLIQUES
     static std::string messageTypeToString(MessageType type) {
         switch (type) {
             case MessageType::REQUEST:  return "request";
@@ -176,28 +127,26 @@ private:
         if (str == "error")    return MessageType::ERROR;
         return MessageType::REQUEST;
     }
+    
+private:
+    static std::string generateUUID();
+    static int64_t getCurrentTimestamp();
 };
 
-/**
- * @brief Structure de requête (client → serveur)
- */
+// ========================================================================
+// STRUCTURE: REQUEST
+// ========================================================================
+
 struct Request {
-    std::string command;        // Nom de la commande
-    json params;                // Paramètres de la commande
-    int timeout;                // Timeout en ms (0 = aucun)
+    std::string command;
+    json params;
     
-    Request()
-        : params(json::object())
-        , timeout(0)
-    {}
+    Request() : params(json::object()) {}
     
     json toJson() const {
         json j;
         j["command"] = command;
         j["params"] = params;
-        if (timeout > 0) {
-            j["timeout"] = timeout;
-        }
         return j;
     }
     
@@ -205,19 +154,19 @@ struct Request {
         Request req;
         req.command = j.value("command", "");
         req.params = j.value("params", json::object());
-        req.timeout = j.value("timeout", 0);
         return req;
     }
 };
 
-/**
- * @brief Structure de réponse (serveur → client)
- */
+// ========================================================================
+// STRUCTURE: RESPONSE
+// ========================================================================
+
 struct Response {
-    std::string requestId;      // ID de la requête d'origine
-    bool success;               // Succès ou échec
-    json data;                  // Données de réponse
-    int latency;                // Latence en ms
+    std::string requestId;
+    bool success;
+    json data;
+    int latency;
     
     Response()
         : success(false)
@@ -246,13 +195,14 @@ struct Response {
     }
 };
 
-/**
- * @brief Structure d'événement (serveur → client, broadcast)
- */
+// ========================================================================
+// STRUCTURE: EVENT
+// ========================================================================
+
 struct Event {
-    std::string name;           // Nom de l'événement
-    json data;                  // Données de l'événement
-    EventPriority priority;     // Priorité
+    std::string name;
+    json data;
+    EventPriority priority;
     
     Event()
         : data(json::object())
@@ -263,7 +213,7 @@ struct Event {
         json j;
         j["name"] = name;
         j["data"] = data;
-        j["priority"] = priorityToString(priority);  // ✅ OK: déclarée avant
+        j["priority"] = priorityToString(priority);
         return j;
     }
     
@@ -271,20 +221,38 @@ struct Event {
         Event evt;
         evt.name = j.value("name", "");
         evt.data = j.value("data", json::object());
-        evt.priority = stringToPriority(j.value("priority", "normal"));  // ✅ OK: déclarée avant
+        evt.priority = stringToPriority(j.value("priority", "normal"));
         return evt;
+    }
+    
+    // ✅ CORRECTION: Méthodes rendues PUBLIQUES
+    static std::string priorityToString(EventPriority p) {
+        switch (p) {
+            case EventPriority::LOW:    return "low";
+            case EventPriority::NORMAL: return "normal";
+            case EventPriority::HIGH:   return "high";
+            default:                    return "normal";
+        }
+    }
+    
+    static EventPriority stringToPriority(const std::string& str) {
+        if (str == "low")    return EventPriority::LOW;
+        if (str == "normal") return EventPriority::NORMAL;
+        if (str == "high")   return EventPriority::HIGH;
+        return EventPriority::NORMAL;
     }
 };
 
-/**
- * @brief Structure d'erreur
- */
+// ========================================================================
+// STRUCTURE: ERROR
+// ========================================================================
+
 struct Error {
-    std::string requestId;      // ID de la requête en erreur
-    ErrorCode code;             // Code d'erreur
-    std::string message;        // Message d'erreur
-    json details;               // Détails additionnels
-    bool retryable;             // Peut être réessayé ?
+    std::string requestId;
+    ErrorCode code;
+    std::string message;
+    json details;
+    bool retryable;
     
     Error()
         : code(ErrorCode::INTERNAL_ERROR)
@@ -297,8 +265,8 @@ struct Error {
         if (!requestId.empty()) {
             j["requestId"] = requestId;
         }
-        j["code"] = errorCodeToString(code);
-        j["codeValue"] = static_cast<int>(code);
+        j["code"] = static_cast<int>(code);
+        j["codeName"] = errorCodeToString(code);
         j["message"] = message;
         j["details"] = details;
         j["retryable"] = retryable;
@@ -308,149 +276,87 @@ struct Error {
     static Error fromJson(const json& j) {
         Error err;
         err.requestId = j.value("requestId", "");
-        err.code = stringToErrorCode(j.value("code", "INTERNAL_ERROR"));
+        err.code = static_cast<ErrorCode>(j.value("code", 5000));
         err.message = j.value("message", "");
         err.details = j.value("details", json::object());
         err.retryable = j.value("retryable", false);
         return err;
     }
     
-private:
-    static std::string errorCodeToString(ErrorCode code);
+    static std::string errorCodeToString(ErrorCode code) {
+        switch (code) {
+            case ErrorCode::INVALID_FORMAT:        return "INVALID_FORMAT";
+            case ErrorCode::INVALID_VERSION:       return "INVALID_VERSION";
+            case ErrorCode::MISSING_FIELD:         return "MISSING_FIELD";
+            case ErrorCode::INVALID_TYPE:          return "INVALID_TYPE";
+            case ErrorCode::UNKNOWN_COMMAND:       return "UNKNOWN_COMMAND";
+            case ErrorCode::INVALID_PARAMS:        return "INVALID_PARAMS";
+            case ErrorCode::COMMAND_FAILED:        return "COMMAND_FAILED";
+            case ErrorCode::TIMEOUT:               return "TIMEOUT";
+            case ErrorCode::VALIDATION_ERROR:      return "VALIDATION_ERROR";
+            case ErrorCode::FILE_NOT_FOUND:        return "FILE_NOT_FOUND";
+            case ErrorCode::PATH_TRAVERSAL:        return "PATH_TRAVERSAL";
+            case ErrorCode::PERMISSION_DENIED:     return "PERMISSION_DENIED";
+            case ErrorCode::DEVICE_NOT_FOUND:      return "DEVICE_NOT_FOUND";
+            case ErrorCode::DEVICE_NOT_CONNECTED:  return "DEVICE_NOT_CONNECTED";
+            case ErrorCode::ROUTE_NOT_FOUND:       return "ROUTE_NOT_FOUND";
+            case ErrorCode::INVALID_MIDI_MESSAGE:  return "INVALID_MIDI_MESSAGE";
+            case ErrorCode::INTERNAL_ERROR:        return "INTERNAL_ERROR";
+            case ErrorCode::NOT_IMPLEMENTED:       return "NOT_IMPLEMENTED";
+            case ErrorCode::SERVICE_UNAVAILABLE:   return "SERVICE_UNAVAILABLE";
+            case ErrorCode::DATABASE_ERROR:        return "DATABASE_ERROR";
+            default:                               return "UNKNOWN_ERROR";
+        }
+    }
+    
     static ErrorCode stringToErrorCode(const std::string& str);
 };
 
-// ============================================================================
-// IMPLÉMENTATIONS INLINE - Méthodes Envelope
-// ============================================================================
-
-inline int64_t Envelope::getCurrentTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
+// ========================================================================
+// IMPLÉMENTATIONS INLINE
+// ========================================================================
 
 inline std::string Envelope::generateUUID() {
-    static std::random_device rd;
-    static std::mt19937_64 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis;
+    auto now = std::chrono::high_resolution_clock::now();
+    auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        now.time_since_epoch()).count();
     
-    uint64_t part1 = dis(gen);
-    uint64_t part2 = dis(gen);
+    uint64_t part1 = static_cast<uint64_t>(nanos);
+    uint64_t part2 = static_cast<uint64_t>(std::hash<uint64_t>{}(part1));
     
-    char buf[37];
-    snprintf(buf, sizeof(buf),
-        "%08lx-%04lx-%04lx-%04lx-%012lx",
-        (part1 >> 32) & 0xFFFFFFFF,
-        (part1 >> 16) & 0xFFFF,
-        part1 & 0xFFFF,
-        (part2 >> 48) & 0xFFFF,
-        part2 & 0xFFFFFFFFFFFF
-    );
+    char buf[64];
+    std::snprintf(buf, sizeof(buf),
+             "%08x-%04x-%04x-%04x-%012llx",
+             (uint32_t)(part1 >> 32),
+             (uint16_t)(part1 >> 16),
+             (uint16_t)(0x4000 | (part1 & 0x0FFF)),
+             (uint16_t)(0x8000 | (part2 >> 48)),
+             part2 & 0xFFFFFFFFFFFFULL);
     
     return std::string(buf);
 }
 
-// ============================================================================
-// IMPLÉMENTATIONS INLINE - Fonctions Error
-// ============================================================================
-
-inline std::string Error::errorCodeToString(ErrorCode code) {
-    switch (code) {
-        // Protocole
-        case ErrorCode::INVALID_FORMAT:    return "INVALID_FORMAT";
-        case ErrorCode::INVALID_VERSION:   return "INVALID_VERSION";
-        case ErrorCode::MISSING_FIELD:     return "MISSING_FIELD";
-        case ErrorCode::INVALID_TYPE:      return "INVALID_TYPE";
-        
-        // Commandes
-        case ErrorCode::UNKNOWN_COMMAND:   return "UNKNOWN_COMMAND";
-        case ErrorCode::INVALID_PARAMS:    return "INVALID_PARAMS";
-        case ErrorCode::COMMAND_FAILED:    return "COMMAND_FAILED";
-        case ErrorCode::TIMEOUT:           return "TIMEOUT";
-        case ErrorCode::DEVICE_BUSY:       return "DEVICE_BUSY";
-        
-        // Validation
-        case ErrorCode::VALIDATION_ERROR:  return "VALIDATION_ERROR";
-        case ErrorCode::FILE_NOT_FOUND:    return "FILE_NOT_FOUND";
-        case ErrorCode::PATH_TRAVERSAL:    return "PATH_TRAVERSAL";
-        case ErrorCode::PERMISSION_DENIED: return "PERMISSION_DENIED";
-        
-        // MIDI
-        case ErrorCode::DEVICE_NOT_FOUND:      return "DEVICE_NOT_FOUND";
-        case ErrorCode::DEVICE_NOT_CONNECTED:  return "DEVICE_NOT_CONNECTED";
-        case ErrorCode::ROUTE_NOT_FOUND:       return "ROUTE_NOT_FOUND";
-        case ErrorCode::INVALID_MIDI_MESSAGE:  return "INVALID_MIDI_MESSAGE";
-        
-        // Système
-        case ErrorCode::INTERNAL_ERROR:        return "INTERNAL_ERROR";
-        case ErrorCode::NOT_IMPLEMENTED:       return "NOT_IMPLEMENTED";
-        case ErrorCode::SERVICE_UNAVAILABLE:   return "SERVICE_UNAVAILABLE";
-        case ErrorCode::DATABASE_ERROR:        return "DATABASE_ERROR";
-        
-        default:                               return "UNKNOWN_ERROR";
-    }
+inline int64_t Envelope::getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()
+    ).count();
 }
 
 inline ErrorCode Error::stringToErrorCode(const std::string& str) {
-    static const std::map<std::string, ErrorCode> codeMap = {
-        {"INVALID_FORMAT", ErrorCode::INVALID_FORMAT},
-        {"INVALID_VERSION", ErrorCode::INVALID_VERSION},
-        {"MISSING_FIELD", ErrorCode::MISSING_FIELD},
-        {"INVALID_TYPE", ErrorCode::INVALID_TYPE},
-        {"UNKNOWN_COMMAND", ErrorCode::UNKNOWN_COMMAND},
-        {"INVALID_PARAMS", ErrorCode::INVALID_PARAMS},
-        {"COMMAND_FAILED", ErrorCode::COMMAND_FAILED},
-        {"TIMEOUT", ErrorCode::TIMEOUT},
-        {"DEVICE_BUSY", ErrorCode::DEVICE_BUSY},
-        {"VALIDATION_ERROR", ErrorCode::VALIDATION_ERROR},
-        {"FILE_NOT_FOUND", ErrorCode::FILE_NOT_FOUND},
-        {"PATH_TRAVERSAL", ErrorCode::PATH_TRAVERSAL},
-        {"PERMISSION_DENIED", ErrorCode::PERMISSION_DENIED},
-        {"DEVICE_NOT_FOUND", ErrorCode::DEVICE_NOT_FOUND},
-        {"DEVICE_NOT_CONNECTED", ErrorCode::DEVICE_NOT_CONNECTED},
-        {"ROUTE_NOT_FOUND", ErrorCode::ROUTE_NOT_FOUND},
-        {"INVALID_MIDI_MESSAGE", ErrorCode::INVALID_MIDI_MESSAGE},
-        {"INTERNAL_ERROR", ErrorCode::INTERNAL_ERROR},
-        {"NOT_IMPLEMENTED", ErrorCode::NOT_IMPLEMENTED},
-        {"SERVICE_UNAVAILABLE", ErrorCode::SERVICE_UNAVAILABLE},
-        {"DATABASE_ERROR", ErrorCode::DATABASE_ERROR}
-    };
+    // Map basique
+    if (str == "INVALID_FORMAT") return ErrorCode::INVALID_FORMAT;
+    if (str == "UNKNOWN_COMMAND") return ErrorCode::UNKNOWN_COMMAND;
+    if (str == "COMMAND_FAILED") return ErrorCode::COMMAND_FAILED;
+    if (str == "FILE_NOT_FOUND") return ErrorCode::FILE_NOT_FOUND;
+    if (str == "DEVICE_NOT_FOUND") return ErrorCode::DEVICE_NOT_FOUND;
     
-    auto it = codeMap.find(str);
-    return (it != codeMap.end()) ? it->second : ErrorCode::INTERNAL_ERROR;
-}
-
-// ============================================================================
-// IMPLÉMENTATIONS INLINE - Fonctions EventPriority
-// ============================================================================
-
-/**
- * @brief Convertit EventPriority en string
- * @note Implémentation de la forward declaration
- */
-inline std::string priorityToString(EventPriority priority) {
-    switch (priority) {
-        case EventPriority::LOW:    return "low";
-        case EventPriority::NORMAL: return "normal";
-        case EventPriority::HIGH:   return "high";
-        default:                    return "normal";
-    }
-}
-
-/**
- * @brief Convertit string en EventPriority
- * @note Implémentation de la forward declaration
- */
-inline EventPriority stringToPriority(const std::string& str) {
-    if (str == "low")  return EventPriority::LOW;
-    if (str == "high") return EventPriority::HIGH;
-    return EventPriority::NORMAL;
+    return ErrorCode::INTERNAL_ERROR;
 }
 
 } // namespace protocol
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Protocol.h v3.0.3 - CORRECTION FINALE COMPLÈTE
+// FIN DU FICHIER Protocol.h
 // ============================================================================

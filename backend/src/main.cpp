@@ -34,7 +34,7 @@
 
 #include "core/Application.h"
 #include "core/Logger.h"
-#include "core/exceptions/MidiMindException.h"
+#include "core/Error.h"
 #include <iostream>
 #include <exception>
 #include <cstdlib>

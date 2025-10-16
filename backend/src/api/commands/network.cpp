@@ -92,7 +92,7 @@ void registerNetworkCommands(
                 for (const auto& network : networks) {
                     networksJson.push_back({
                         {"ssid", network.ssid},
-                        {"signal", network.signal},
+                        {"signal", network.signalStrength},
                         {"security", network.security}
                     });
                 }

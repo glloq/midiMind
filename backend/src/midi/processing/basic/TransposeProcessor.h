@@ -1,45 +1,20 @@
 // ============================================================================
-// Fichier: src/midi/processing/basic/TransposeProcessor.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: backend/src/midi/processing/basic/TransposeProcessor.h
+// Version: 3.0.1 - COMPLET ET À JOUR
 // ============================================================================
-// Description:
-//   Processeur de transposition MIDI.
-//   Transpose les notes MIDI par un nombre de demi-tons.
-//
-// Thread-safety: Oui
-//
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+
+// NOTE: Utilise setNote() de MidiMessage.h (corrigé)
 // ============================================================================
 
 #pragma once
 
 #include "../MidiProcessor.h"
-#include <algorithm>
 
 namespace midiMind {
 
 /**
  * @class TransposeProcessor
- * @brief Processeur de transposition
- * 
- * @details
- * Transpose les notes MIDI par un nombre de demi-tons.
- * Limite les notes à la plage MIDI valide (0-127).
- * 
- * Paramètres:
- * - semitones: Nombre de demi-tons (-24 à +24)
- * 
- * Thread-safety: Oui
- * 
- * @example Utilisation
- * ```cpp
- * auto transpose = std::make_shared<TransposeProcessor>();
- * transpose->setSemitones(7); // Transpose de 5 demi-tons (quinte)
- * 
- * auto output = transpose->process(noteOn);
- * ```
+ * @brief Transpose les notes MIDI
  */
 class TransposeProcessor : public MidiProcessor {
 public:
@@ -47,89 +22,112 @@ public:
     // CONSTRUCTION
     // ========================================================================
     
-    /**
-     * @brief Constructeur
-     * 
-     * @param semitones Transposition initiale (défaut: 0)
-     */
-    explicit TransposeProcessor(int semitones = 0)
-        : MidiProcessor("Transpose", ProcessorType::TRANSPOSE)
-        , semitones_(semitones) {
+    TransposeProcessor(const std::string& id = "transpose", 
+                      const std::string& name = "Transpose")
+        : MidiProcessor(id, name)
+    {
+        type_ = "transpose";
         
-        parameters_["semitones"] = semitones;
+        // Paramètres
+        registerParameter("semitones", 0);  // -12 à +12
+        registerParameter("octaves", 0);    // -2 à +2
     }
     
     // ========================================================================
-    // TRAITEMENT
+    // IMPLÉMENTATION MIDIPROCESSOR
     // ========================================================================
     
-    /**
-     * @brief Traite un message MIDI
-     */
-    std::vector<MidiMessage> process(const MidiMessage& input) override {
-        // Bypass
-        if (!isEnabled() || isBypassed() || semitones_ == 0) {
-            return {input};
+    std::vector<MidiMessage> process(const MidiMessage& message) override {
+        if (!enabled_) {
+            incrementBypassed();
+            return {message};
         }
         
-        // Ne traiter que les Note On/Off
-        if (!input.isNoteOn() && !input.isNoteOff()) {
-            return {input};
+        // Ne traiter que les notes
+        if (!message.isNote()) {
+            return {message};
         }
         
-        // Transposer la note
-        int newNote = input.getNote() + semitones_;
+        int semitones = parameters_["semitones"].get<int>();
+        int octaves = parameters_["octaves"].get<int>();
+        int totalTranspose = semitones + (octaves * 12);
         
-        // Limiter à la plage MIDI valide
-        if (newNote < 0 || newNote > 127) {
-            // Note hors plage, filtrer le message
-            return {};
+        if (totalTranspose == 0) {
+            return {message};
         }
         
-        // Créer le message transposé
-        MidiMessage output = input;
+        // Transposer
+        int originalNote = message.getNote();
+        int newNote = originalNote + totalTranspose;
+        
+        // Clamp à 0-127
+        if (newNote < 0) newNote = 0;
+        if (newNote > 127) newNote = 127;
+        
+        // ✅ Utilise setNote() de MidiMessage.h corrigé
+        MidiMessage output = message;
         output.setNote(static_cast<uint8_t>(newNote));
+        
+        incrementProcessed();
         
         return {output};
     }
     
+    void reset() override {
+        // Rien à réinitialiser
+    }
+    
+    std::unique_ptr<MidiProcessor> clone() const override {
+        auto cloned = std::make_unique<TransposeProcessor>(id_, name_);
+        cloned->loadParameters(parameters_);
+        cloned->setEnabled(enabled_);
+        return cloned;
+    }
+    
     // ========================================================================
-    // CONFIGURATION
+    // MÉTHODES SPÉCIFIQUES
     // ========================================================================
     
     /**
-     * @brief Définit la transposition
-     * 
-     * @param semitones Nombre de demi-tons (-24 à +24)
+     * @brief Définit la transposition en demi-tons
+     * @param semitones Nombre de demi-tons (-12 à +12)
      */
     void setSemitones(int semitones) {
-        // Limiter à ±24 demi-tons (2 octaves)
-        semitones_ = std::clamp(semitones, -24, 24);
-        parameters_["semitones"] = semitones_;
+        if (semitones < -12) semitones = -12;
+        if (semitones > 12) semitones = 12;
+        setParameter("semitones", semitones);
     }
     
     /**
-     * @brief Récupère la transposition actuelle
+     * @brief Récupère la transposition en demi-tons
      */
     int getSemitones() const {
-        return semitones_;
+        return parameters_["semitones"].get<int>();
     }
     
     /**
-     * @brief Définit un paramètre
+     * @brief Définit la transposition en octaves
+     * @param octaves Nombre d'octaves (-2 à +2)
      */
-    bool setParameter(const std::string& name, const json& value) override {
-        if (name == "semitones") {
-            setSemitones(value.get<int>());
-            return true;
-        }
-        
-        return MidiProcessor::setParameter(name, value);
+    void setOctaves(int octaves) {
+        if (octaves < -2) octaves = -2;
+        if (octaves > 2) octaves = 2;
+        setParameter("octaves", octaves);
     }
-
-private:
-    /// Transposition en demi-tons
-    int semitones_;
+    
+    /**
+     * @brief Récupère la transposition en octaves
+     */
+    int getOctaves() const {
+        return parameters_["octaves"].get<int>();
+    }
+    
+    /**
+     * @brief Récupère la transposition totale en demi-tons
+     */
+    int getTotalTranspose() const {
+        return getSemitones() + (getOctaves() * 12);
+    }
 };
 
 } // namespace midiMind

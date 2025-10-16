@@ -1,63 +1,21 @@
 // ============================================================================
-// Fichier: src/midi/processing/basic/VelocityProcessor.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: backend/src/midi/processing/basic/VelocityProcessor.h
+// Version: 3.0.1 - COMPLET ET À JOUR
 // ============================================================================
-// Description:
-//   Processeur de modification de vélocité MIDI.
-//   Ajuste la vélocité des notes (volume/intensité).
-//
-// Thread-safety: Oui
-//
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+
+// NOTE: Utilise setVelocity() de MidiMessage.h (corrigé)
 // ============================================================================
 
 #pragma once
 
 #include "../MidiProcessor.h"
-#include <algorithm>
 #include <cmath>
 
 namespace midiMind {
 
 /**
- * @enum VelocityMode
- * @brief Mode de modification de la vélocité
- */
-enum class VelocityMode {
-    MULTIPLY,       ///< Multiplication (0.0 - 2.0)
-    ADD,            ///< Addition (-127 à +127)
-    SET,            ///< Valeur fixe (0-127)
-    COMPRESS,       ///< Compression dynamique
-    EXPAND          ///< Expansion dynamique
-};
-
-/**
  * @class VelocityProcessor
- * @brief Processeur de vélocité
- * 
- * @details
- * Modifie la vélocité des notes MIDI selon différents modes:
- * - Multiply: Multiplie par un facteur
- * - Add: Ajoute/soustrait une valeur
- * - Set: Fixe à une valeur constante
- * - Compress: Réduit la dynamique
- * - Expand: Augmente la dynamique
- * 
- * Paramètres:
- * - mode: Mode de modification
- * - value: Valeur selon le mode
- * - threshold: Seuil pour compression/expansion
- * 
- * Thread-safety: Oui
- * 
- * @example Utilisation
- * ```cpp
- * auto velocity = std::make_shared<VelocityProcessor>();
- * velocity->setMode(VelocityMode::MULTIPLY);
- * velocity->setValue(1.5f); // +50% de volume
- * ```
+ * @brief Modifie la vélocité des notes MIDI
  */
 class VelocityProcessor : public MidiProcessor {
 public:
@@ -65,174 +23,181 @@ public:
     // CONSTRUCTION
     // ========================================================================
     
-    /**
-     * @brief Constructeur
-     * 
-     * @param mode Mode de modification
-     * @param value Valeur initiale
-     */
-    VelocityProcessor(VelocityMode mode = VelocityMode::MULTIPLY, float value = 1.0f)
-        : MidiProcessor("Velocity", ProcessorType::VELOCITY)
-        , mode_(mode)
-        , value_(value)
-        , threshold_(64) {
+    VelocityProcessor(const std::string& id = "velocity", 
+                     const std::string& name = "Velocity")
+        : MidiProcessor(id, name)
+    {
+        type_ = "velocity";
         
-        parameters_["mode"] = static_cast<int>(mode);
-        parameters_["value"] = value;
-        parameters_["threshold"] = threshold_;
+        // Paramètres
+        registerParameter("mode", "scale");     // "scale", "add", "set", "curve"
+        registerParameter("amount", 100);       // 0-200 pour scale, -127 à +127 pour add, 0-127 pour set
+        registerParameter("curve", 1.0);        // 0.1-10.0 pour curve
+        registerParameter("min", 1);            // Vélocité minimum
+        registerParameter("max", 127);          // Vélocité maximum
+        registerParameter("randomize", 0);      // 0-100% de randomisation
     }
     
     // ========================================================================
-    // TRAITEMENT
+    // IMPLÉMENTATION MIDIPROCESSOR
     // ========================================================================
     
-    /**
-     * @brief Traite un message MIDI
-     */
-    std::vector<MidiMessage> process(const MidiMessage& input) override {
-        // Bypass
-        if (!isEnabled() || isBypassed()) {
-            return {input};
+    std::vector<MidiMessage> process(const MidiMessage& message) override {
+        if (!enabled_) {
+            incrementBypassed();
+            return {message};
         }
         
         // Ne traiter que les Note On
-        if (!input.isNoteOn()) {
-            return {input};
+        if (!message.isNoteOn()) {
+            return {message};
         }
         
-        uint8_t originalVelocity = input.getVelocity();
-        uint8_t newVelocity = originalVelocity;
+        int originalVelocity = message.getVelocity();
+        int newVelocity = originalVelocity;
         
-        switch (mode_) {
-            case VelocityMode::MULTIPLY:
-                newVelocity = static_cast<uint8_t>(
-                    std::clamp(originalVelocity * value_, 0.0f, 127.0f)
-                );
-                break;
-                
-            case VelocityMode::ADD:
-                newVelocity = static_cast<uint8_t>(
-                    std::clamp(originalVelocity + static_cast<int>(value_), 0, 127)
-                );
-                break;
-                
-            case VelocityMode::SET:
-                newVelocity = static_cast<uint8_t>(
-                    std::clamp(static_cast<int>(value_), 0, 127)
-                );
-                break;
-                
-            case VelocityMode::COMPRESS:
-                // Compression: Réduit les valeurs au-dessus du seuil
-                if (originalVelocity > threshold_) {
-                    float excess = originalVelocity - threshold_;
-                    newVelocity = threshold_ + static_cast<uint8_t>(excess * value_);
-                } else {
-                    newVelocity = originalVelocity;
-                }
-                break;
-                
-            case VelocityMode::EXPAND:
-                // Expansion: Augmente les valeurs au-dessus du seuil
-                if (originalVelocity > threshold_) {
-                    float excess = originalVelocity - threshold_;
-                    newVelocity = std::min(127, 
-                        static_cast<int>(threshold_ + excess * value_)
-                    );
-                } else {
-                    newVelocity = originalVelocity;
-                }
-                break;
+        std::string mode = parameters_["mode"].get<std::string>();
+        
+        if (mode == "scale") {
+            // Mise à l'échelle (100 = pas de changement)
+            int amount = parameters_["amount"].get<int>();
+            newVelocity = (originalVelocity * amount) / 100;
+            
+        } else if (mode == "add") {
+            // Ajout/soustraction
+            int amount = parameters_["amount"].get<int>();
+            newVelocity = originalVelocity + amount;
+            
+        } else if (mode == "set") {
+            // Valeur fixe
+            newVelocity = parameters_["amount"].get<int>();
+            
+        } else if (mode == "curve") {
+            // Courbe exponentielle
+            double curve = parameters_["curve"].get<double>();
+            double normalized = originalVelocity / 127.0;
+            normalized = std::pow(normalized, curve);
+            newVelocity = static_cast<int>(normalized * 127.0);
         }
         
-        // Filtrer les vélocités nulles (Note Off)
-        if (newVelocity == 0) {
-            return {};
+        // Randomisation
+        int randomize = parameters_["randomize"].get<int>();
+        if (randomize > 0) {
+            int range = (randomize * 127) / 100;
+            int random = (std::rand() % (range * 2 + 1)) - range;
+            newVelocity += random;
         }
         
-        // Créer le message modifié
-        MidiMessage output = input;
-        output.setVelocity(newVelocity);
+        // Clamp entre min et max
+        int minVel = parameters_["min"].get<int>();
+        int maxVel = parameters_["max"].get<int>();
+        
+        if (newVelocity < minVel) newVelocity = minVel;
+        if (newVelocity > maxVel) newVelocity = maxVel;
+        
+        // Clamp absolu 1-127 (vélocité 0 = Note Off)
+        if (newVelocity < 1) newVelocity = 1;
+        if (newVelocity > 127) newVelocity = 127;
+        
+        // ✅ Utilise setVelocity() de MidiMessage.h corrigé
+        MidiMessage output = message;
+        output.setVelocity(static_cast<uint8_t>(newVelocity));
+        
+        incrementProcessed();
         
         return {output};
     }
     
+    void reset() override {
+        // Rien à réinitialiser
+    }
+    
+    std::unique_ptr<MidiProcessor> clone() const override {
+        auto cloned = std::make_unique<VelocityProcessor>(id_, name_);
+        cloned->loadParameters(parameters_);
+        cloned->setEnabled(enabled_);
+        return cloned;
+    }
+    
     // ========================================================================
-    // CONFIGURATION
+    // MÉTHODES SPÉCIFIQUES
     // ========================================================================
     
     /**
-     * @brief Définit le mode
+     * @brief Définit le mode de modification
+     * @param mode "scale", "add", "set", ou "curve"
      */
-    void setMode(VelocityMode mode) {
-        mode_ = mode;
-        parameters_["mode"] = static_cast<int>(mode);
-    }
-    
-    /**
-     * @brief Récupère le mode
-     */
-    VelocityMode getMode() const {
-        return mode_;
-    }
-    
-    /**
-     * @brief Définit la valeur
-     */
-    void setValue(float value) {
-        value_ = value;
-        parameters_["value"] = value;
-    }
-    
-    /**
-     * @brief Récupère la valeur
-     */
-    float getValue() const {
-        return value_;
-    }
-    
-    /**
-     * @brief Définit le seuil (pour compression/expansion)
-     */
-    void setThreshold(uint8_t threshold) {
-        threshold_ = std::clamp(threshold, uint8_t(0), uint8_t(127));
-        parameters_["threshold"] = threshold_;
-    }
-    
-    /**
-     * @brief Récupère le seuil
-     */
-    uint8_t getThreshold() const {
-        return threshold_;
-    }
-    
-    /**
-     * @brief Définit un paramètre
-     */
-    bool setParameter(const std::string& name, const json& value) override {
-        if (name == "mode") {
-            setMode(static_cast<VelocityMode>(value.get<int>()));
-            return true;
-        } else if (name == "value") {
-            setValue(value.get<float>());
-            return true;
-        } else if (name == "threshold") {
-            setThreshold(value.get<uint8_t>());
-            return true;
+    void setMode(const std::string& mode) {
+        if (mode == "scale" || mode == "add" || mode == "set" || mode == "curve") {
+            setParameter("mode", mode);
         }
-        
-        return MidiProcessor::setParameter(name, value);
     }
-
-private:
-    /// Mode de modification
-    VelocityMode mode_;
     
-    /// Valeur (dépend du mode)
-    float value_;
+    /**
+     * @brief Récupère le mode actuel
+     */
+    std::string getMode() const {
+        return parameters_["mode"].get<std::string>();
+    }
     
-    /// Seuil pour compression/expansion
-    uint8_t threshold_;
+    /**
+     * @brief Définit la quantité de modification
+     */
+    void setAmount(int amount) {
+        setParameter("amount", amount);
+    }
+    
+    /**
+     * @brief Récupère la quantité
+     */
+    int getAmount() const {
+        return parameters_["amount"].get<int>();
+    }
+    
+    /**
+     * @brief Définit la courbe (mode curve)
+     * @param curve 0.1-10.0 (< 1.0 = plus doux, > 1.0 = plus fort)
+     */
+    void setCurve(double curve) {
+        if (curve < 0.1) curve = 0.1;
+        if (curve > 10.0) curve = 10.0;
+        setParameter("curve", curve);
+    }
+    
+    /**
+     * @brief Récupère la courbe
+     */
+    double getCurve() const {
+        return parameters_["curve"].get<double>();
+    }
+    
+    /**
+     * @brief Définit la vélocité minimum
+     */
+    void setMinVelocity(int min) {
+        if (min < 1) min = 1;
+        if (min > 127) min = 127;
+        setParameter("min", min);
+    }
+    
+    /**
+     * @brief Définit la vélocité maximum
+     */
+    void setMaxVelocity(int max) {
+        if (max < 1) max = 1;
+        if (max > 127) max = 127;
+        setParameter("max", max);
+    }
+    
+    /**
+     * @brief Définit le pourcentage de randomisation
+     * @param percent 0-100
+     */
+    void setRandomize(int percent) {
+        if (percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
+        setParameter("randomize", percent);
+    }
 };
 
 } // namespace midiMind

@@ -1,87 +1,28 @@
 // ============================================================================
-// Fichier: src/midi/processing/MidiProcessor.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: backend/src/midi/processing/MidiProcessor.h
+// Version: 3.0.2 - CORRECTION ITERATOR JSON
 // ============================================================================
-// Description:
-//   Interface de base pour tous les processeurs MIDI.
-//   Définit le contrat que doivent respecter tous les effets MIDI.
-//
-// Responsabilités:
-//   - Définir l'API commune de traitement
-//   - Gérer l'état actif/inactif
-//   - Gérer les paramètres
-//   - Supporter le bypass
-//
-// Thread-safety: Les implémentations doivent être thread-safe
-//
-// Patterns: Strategy Pattern, Template Method Pattern
-//
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+
+// CORRECTIFS APPLIQUÉS:
+// - ✅ Ligne 255: Correction it->second → it.value() pour json iterator
 // ============================================================================
 
 #pragma once
 
+#include "../MidiMessage.h"
+#include "../../core/Logger.h"
 #include <string>
 #include <vector>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include "../MidiMessage.h"
-
-using json = nlohmann::json;
 
 namespace midiMind {
 
-/**
- * @enum ProcessorType
- * @brief Type de processeur MIDI
- */
-enum class ProcessorType {
-    TRANSPOSE,          ///< Transposition
-    VELOCITY,           ///< Modification de vélocité
-    CHANNEL_FILTER,     ///< Filtrage par canal
-    NOTE_FILTER,        ///< Filtrage par note
-    ARPEGGIATOR,        ///< Arpégiateur
-    DELAY,              ///< Délai MIDI
-    CHORD,              ///< Générateur d'accords
-    HARMONIZER,         ///< Harmonisation
-    CUSTOM              ///< Processeur personnalisé
-};
+using json = nlohmann::json;
 
 /**
  * @class MidiProcessor
- * @brief Interface de base pour les processeurs MIDI
- * 
- * @details
- * Tous les processeurs MIDI doivent hériter de cette classe.
- * Chaque processeur transforme des messages MIDI en entrée
- * et produit des messages MIDI en sortie.
- * 
- * Un processeur peut :
- * - Modifier les messages (transpose, velocity)
- * - Filtrer les messages (channel filter, note filter)
- * - Générer de nouveaux messages (arpeggiator, chord)
- * - Retarder les messages (delay)
- * 
- * Thread-safety: Les implémentations doivent être thread-safe.
- * 
- * @example Implémentation d'un processeur
- * ```cpp
- * class MyProcessor : public MidiProcessor {
- * public:
- *     MyProcessor() : MidiProcessor("MyProcessor", ProcessorType::CUSTOM) {}
- *     
- *     std::vector<MidiMessage> process(const MidiMessage& input) override {
- *         if (!isEnabled()) {
- *             return {input}; // Bypass
- *         }
- *         
- *         // Traitement...
- *         return {modifiedMessage};
- *     }
- * };
- * ```
+ * @brief Classe abstraite pour processeurs MIDI
  */
 class MidiProcessor {
 public:
@@ -89,143 +30,58 @@ public:
     // CONSTRUCTION / DESTRUCTION
     // ========================================================================
     
-    /**
-     * @brief Constructeur
-     * 
-     * @param name Nom du processeur
-     * @param type Type du processeur
-     */
-    MidiProcessor(const std::string& name, ProcessorType type)
-        : name_(name)
-        , type_(type)
+    MidiProcessor(const std::string& id, const std::string& name)
+        : id_(id)
+        , name_(name)
         , enabled_(true)
-        , bypassed_(false) {}
+        , bypassedMessageCount_(0)
+        , processedMessageCount_(0)
+    {
+        Logger::debug("MidiProcessor", "Processor created: " + name_);
+    }
     
-    /**
-     * @brief Destructeur virtuel
-     */
-    virtual ~MidiProcessor() = default;
+    virtual ~MidiProcessor() {
+        Logger::debug("MidiProcessor", "Processor destroyed: " + name_);
+    }
+    
+    // Non-copiable
+    MidiProcessor(const MidiProcessor&) = delete;
+    MidiProcessor& operator=(const MidiProcessor&) = delete;
     
     // ========================================================================
-    // TRAITEMENT (MÉTHODE PRINCIPALE)
+    // MÉTHODES ABSTRAITES
     // ========================================================================
     
     /**
      * @brief Traite un message MIDI
-     * 
-     * Méthode principale de traitement. Peut retourner :
-     * - Un vecteur vide (message filtré)
-     * - Un message (transformation 1:1)
-     * - Plusieurs messages (génération)
-     * 
-     * @param input Message MIDI en entrée
-     * @return std::vector<MidiMessage> Messages en sortie
-     * 
-     * @note Doit être thread-safe
+     * @param message Message à traiter
+     * @return Messages de sortie (peut être vide, un, ou plusieurs)
      */
-    virtual std::vector<MidiMessage> process(const MidiMessage& input) = 0;
-    
-    /**
-     * @brief Traite plusieurs messages en batch
-     * 
-     * Optimisation pour traiter plusieurs messages d'un coup.
-     * Par défaut, appelle process() pour chaque message.
-     * 
-     * @param inputs Messages en entrée
-     * @return std::vector<MidiMessage> Messages en sortie
-     */
-    virtual std::vector<MidiMessage> processBatch(const std::vector<MidiMessage>& inputs) {
-        std::vector<MidiMessage> outputs;
-        
-        for (const auto& input : inputs) {
-            auto result = process(input);
-            outputs.insert(outputs.end(), result.begin(), result.end());
-        }
-        
-        return outputs;
-    }
-    
-    // ========================================================================
-    // ÉTAT
-    // ========================================================================
-    
-    /**
-     * @brief Active/désactive le processeur
-     * 
-     * @param enabled true pour activer
-     */
-    virtual void setEnabled(bool enabled) {
-        enabled_ = enabled;
-    }
-    
-    /**
-     * @brief Vérifie si le processeur est actif
-     */
-    bool isEnabled() const {
-        return enabled_;
-    }
-    
-    /**
-     * @brief Active/désactive le bypass
-     * 
-     * En mode bypass, les messages passent sans traitement.
-     * 
-     * @param bypassed true pour bypasser
-     */
-    virtual void setBypassed(bool bypassed) {
-        bypassed_ = bypassed;
-    }
-    
-    /**
-     * @brief Vérifie si le processeur est bypassé
-     */
-    bool isBypassed() const {
-        return bypassed_;
-    }
+    virtual std::vector<MidiMessage> process(const MidiMessage& message) = 0;
     
     /**
      * @brief Réinitialise l'état du processeur
-     * 
-     * Réinitialise tous les états internes (buffers, compteurs, etc.)
-     * Appelé lors d'un changement de configuration ou de tempo.
      */
-    virtual void reset() {}
+    virtual void reset() = 0;
+    
+    /**
+     * @brief Clone le processeur
+     */
+    virtual std::unique_ptr<MidiProcessor> clone() const = 0;
     
     // ========================================================================
-    // INFORMATIONS
+    // ACCESSEURS
     // ========================================================================
     
-    /**
-     * @brief Récupère le nom du processeur
-     */
-    std::string getName() const {
-        return name_;
-    }
+    std::string getId() const { return id_; }
+    std::string getName() const { return name_; }
+    std::string getType() const { return type_; }
     
-    /**
-     * @brief Récupère le type du processeur
-     */
-    ProcessorType getType() const {
-        return type_;
-    }
+    bool isEnabled() const { return enabled_; }
+    void setEnabled(bool enabled) { enabled_ = enabled; }
     
-    /**
-     * @brief Récupère le type sous forme de string
-     */
-    std::string getTypeString() const {
-        switch (type_) {
-            case ProcessorType::TRANSPOSE: return "Transpose";
-            case ProcessorType::VELOCITY: return "Velocity";
-            case ProcessorType::CHANNEL_FILTER: return "ChannelFilter";
-            case ProcessorType::NOTE_FILTER: return "NoteFilter";
-            case ProcessorType::ARPEGGIATOR: return "Arpeggiator";
-            case ProcessorType::DELAY: return "Delay";
-            case ProcessorType::CHORD: return "Chord";
-            case ProcessorType::HARMONIZER: return "Harmonizer";
-            case ProcessorType::CUSTOM: return "Custom";
-            default: return "Unknown";
-        }
-    }
+    uint64_t getProcessedMessageCount() const { return processedMessageCount_; }
+    uint64_t getBypassedMessageCount() const { return bypassedMessageCount_; }
     
     // ========================================================================
     // PARAMÈTRES
@@ -233,50 +89,53 @@ public:
     
     /**
      * @brief Définit un paramètre
-     * 
      * @param name Nom du paramètre
-     * @param value Valeur (int, float, string, etc.)
-     * @return true Si le paramètre a été défini
+     * @param value Valeur JSON
+     * @return true si succès
      */
     virtual bool setParameter(const std::string& name, const json& value) {
-        parameters_[name] = value;
-        return true;
+        if (parameters_.contains(name)) {
+            parameters_[name] = value;
+            onParameterChanged(name, value);
+            return true;
+        }
+        return false;
     }
     
     /**
-     * @brief Récupère un paramètre
-     * 
+     * @brief ✅ CORRECTION: Récupère un paramètre
      * @param name Nom du paramètre
-     * @return json Valeur du paramètre
+     * @return Valeur JSON ou null
      */
     virtual json getParameter(const std::string& name) const {
         auto it = parameters_.find(name);
         if (it != parameters_.end()) {
-            return it->second;
+            // ✅ CORRECTION: Utilise it.value() au lieu de it->second
+            return it.value();
         }
         return json();
     }
     
     /**
-     * @brief Liste tous les paramètres
-     * 
-     * @return json Objet JSON avec tous les paramètres
+     * @brief Récupère tous les paramètres
      */
-    virtual json getParameters() const {
+    json getParameters() const {
         return parameters_;
     }
     
     /**
-     * @brief Définit plusieurs paramètres d'un coup
-     * 
-     * @param params Objet JSON avec les paramètres
+     * @brief Charge les paramètres depuis JSON
      */
-    virtual void setParameters(const json& params) {
-        if (params.is_object()) {
-            for (auto& [key, value] : params.items()) {
-                setParameter(key, value);
-            }
+    virtual bool loadParameters(const json& params) {
+        if (!params.is_object()) {
+            return false;
         }
+        
+        for (auto it = params.begin(); it != params.end(); ++it) {
+            setParameter(it.key(), it.value());
+        }
+        
+        return true;
     }
     
     // ========================================================================
@@ -284,60 +143,99 @@ public:
     // ========================================================================
     
     /**
-     * @brief Convertit en JSON
-     * 
-     * @return json Configuration complète du processeur
+     * @brief Exporte en JSON
      */
     virtual json toJson() const {
         json j;
+        j["id"] = id_;
         j["name"] = name_;
-        j["type"] = getTypeString();
+        j["type"] = type_;
         j["enabled"] = enabled_;
-        j["bypassed"] = bypassed_;
         j["parameters"] = parameters_;
+        j["stats"] = {
+            {"processed", processedMessageCount_},
+            {"bypassed", bypassedMessageCount_}
+        };
         return j;
     }
     
     /**
-     * @brief Configure depuis JSON
-     * 
-     * @param j Configuration JSON
+     * @brief Charge depuis JSON
      */
-    virtual void fromJson(const json& j) {
-        if (j.contains("enabled")) {
-            enabled_ = j["enabled"].get<bool>();
+    virtual bool fromJson(const json& j) {
+        if (!j.is_object()) {
+            return false;
         }
         
-        if (j.contains("bypassed")) {
-            bypassed_ = j["bypassed"].get<bool>();
+        if (j.contains("enabled")) {
+            enabled_ = j["enabled"];
         }
         
         if (j.contains("parameters")) {
-            setParameters(j["parameters"]);
+            loadParameters(j["parameters"]);
         }
+        
+        return true;
+    }
+    
+    // ========================================================================
+    // STATISTIQUES
+    // ========================================================================
+    
+    /**
+     * @brief Réinitialise les statistiques
+     */
+    void resetStats() {
+        processedMessageCount_ = 0;
+        bypassedMessageCount_ = 0;
     }
 
 protected:
-    /// Nom du processeur
+    // ========================================================================
+    // MÉTHODES PROTÉGÉES
+    // ========================================================================
+    
+    /**
+     * @brief Appelé quand un paramètre change
+     */
+    virtual void onParameterChanged(const std::string& name, const json& value) {
+        // À implémenter dans les classes dérivées si nécessaire
+    }
+    
+    /**
+     * @brief Enregistre un paramètre avec valeur par défaut
+     */
+    void registerParameter(const std::string& name, const json& defaultValue) {
+        parameters_[name] = defaultValue;
+    }
+    
+    /**
+     * @brief Incrémente le compteur de messages traités
+     */
+    void incrementProcessed() {
+        processedMessageCount_++;
+    }
+    
+    /**
+     * @brief Incrémente le compteur de messages bypassés
+     */
+    void incrementBypassed() {
+        bypassedMessageCount_++;
+    }
+    
+    // ========================================================================
+    // MEMBRES PROTÉGÉS
+    // ========================================================================
+    
+    std::string id_;
     std::string name_;
-    
-    /// Type du processeur
-    ProcessorType type_;
-    
-    /// État actif/inactif
+    std::string type_;
     bool enabled_;
-    
-    /// État bypass
-    bool bypassed_;
-    
-    /// Paramètres du processeur
     json parameters_;
+    
+    uint64_t processedMessageCount_;
+    uint64_t bypassedMessageCount_;
 };
-
-/**
- * @brief Alias pour un shared_ptr de MidiProcessor
- */
-using MidiProcessorPtr = std::shared_ptr<MidiProcessor>;
 
 } // namespace midiMind
 

@@ -1,71 +1,37 @@
 // ============================================================================
 // Fichier: backend/src/api/MessageEnvelope.cpp
-// Version: 3.1.0 - IMPLÉMENTATION COMPLÈTE ET FONCTIONNELLE
-// Date: 2025-10-15
+// Version: 3.0.2 - CORRECTION DES MÉTHODES
 // ============================================================================
-// Description:
-//   Implémentation de la classe MessageEnvelope.
-//   Gère création, validation et parsing des messages WebSocket.
-//   Protocole v3.0 avec support REQUEST/RESPONSE/EVENT/ERROR
-//
-// CORRECTIONS v3.1.0 (FINALE):
-//   ✅ Factory methods pour tous les types de messages
-//   ✅ Validation complète avec codes d'erreur 1000-1399
-//   ✅ Parsing JSON robuste avec gestion erreurs
-//   ✅ Sérialisation JSON complète
-//   ✅ Validation envelope (version, id, timestamp, type)
-//   ✅ Validation contenu selon type de message
-//   ✅ Gestion erreurs avec messages descriptifs
-//   ✅ Support champs optionnels
-//
-// Format MessageEnvelope:
-//   {
-//     "envelope": {
-//       "version": "3.0",
-//       "id": "uuid",
-//       "timestamp": 1696435200000,
-//       "type": "request|response|event|error"
-//     },
-//     "request": {...},    // Si type = request
-//     "response": {...},   // Si type = response
-//     "event": {...},      // Si type = event
-//     "error": {...}       // Si type = error
-//   }
-//
-// Codes d'erreur protocole v3.0:
-//   1000-1099: Erreurs de protocole (format, version, champs manquants)
-//   1100-1199: Erreurs de commande (inconnue, paramètres invalides)
-//   1200-1299: Erreurs de périphérique (introuvable, occupé)
-//   1300-1399: Erreurs système (interne, base de données)
-//
-// Auteur: MidiMind Team
+
+// CORRECTIFS APPLIQUÉS:
+// - Implémentation de toJsonString(int indent)
+// - Implémentation de validate(std::vector<std::string>& errors)
+// - Utilisation des méthodes publiques de Protocol.h
 // ============================================================================
 
 #include "MessageEnvelope.h"
 #include "../core/Logger.h"
-#include <stdexcept>
 
 namespace midiMind {
 
-// ============================================================================
+// ========================================================================
 // CONSTRUCTEURS
-// ============================================================================
+// ========================================================================
 
 MessageEnvelope::MessageEnvelope()
-    : envelope_(protocol::MessageType::REQUEST)
-    , validationCached_(false)
-    , validationResult_(false)
-{}
+    : validationCached_(false)
+    , validationResult_(false) {
+}
 
 MessageEnvelope::MessageEnvelope(protocol::MessageType type)
-    : envelope_(type)
-    , validationCached_(false)
-    , validationResult_(false)
-{}
+    : validationCached_(false)
+    , validationResult_(false) {
+    envelope_.type = type;
+}
 
-// ============================================================================
+// ========================================================================
 // FACTORY METHODS
-// ============================================================================
+// ========================================================================
 
 MessageEnvelope MessageEnvelope::createRequest(
     const std::string& command,
@@ -156,110 +122,91 @@ MessageEnvelope MessageEnvelope::createError(
     return msg;
 }
 
-// ============================================================================
+// ========================================================================
 // PARSING
-// ============================================================================
-
-std::optional<MessageEnvelope> MessageEnvelope::fromJsonString(
-    const std::string& jsonStr)
-{
-    try {
-        json j = json::parse(jsonStr);
-        return fromJson(j);
-    }
-    catch (const json::parse_error& e) {
-        Logger::error("MessageEnvelope", 
-            "JSON parse error: " + std::string(e.what()));
-        return std::nullopt;
-    }
-    catch (const std::exception& e) {
-        Logger::error("MessageEnvelope", 
-            "Error parsing message: " + std::string(e.what()));
-        return std::nullopt;
-    }
-}
+// ========================================================================
 
 std::optional<MessageEnvelope> MessageEnvelope::fromJson(const json& j) {
     try {
-        // Vérifier la présence de l'enveloppe
+        MessageEnvelope msg;
+        
         if (!j.contains("envelope")) {
             Logger::error("MessageEnvelope", "Missing 'envelope' field");
             return std::nullopt;
         }
         
-        // Parser l'enveloppe
-        protocol::Envelope env = protocol::Envelope::fromJson(j["envelope"]);
+        msg.envelope_ = protocol::Envelope::fromJson(j["envelope"]);
         
-        MessageEnvelope msg(env.type);
-        msg.envelope_ = env;
+        // ✅ UTILISATION CORRECTE: méthode publique
+        std::string typeStr = j["envelope"].value("type", "request");
+        protocol::MessageType type = protocol::Envelope::stringToMessageType(typeStr);
+        msg.envelope_.type = type;
         
-        // Parser le contenu selon le type
-        switch (env.type) {
+        switch (type) {
             case protocol::MessageType::REQUEST:
-                if (!j.contains("request")) {
-                    Logger::error("MessageEnvelope", 
-                        "Missing 'request' field for REQUEST type");
-                    return std::nullopt;
+                if (j.contains("request")) {
+                    msg.request_ = protocol::Request::fromJson(j["request"]);
                 }
-                msg.request_ = protocol::Request::fromJson(j["request"]);
                 break;
                 
             case protocol::MessageType::RESPONSE:
-                if (!j.contains("response")) {
-                    Logger::error("MessageEnvelope", 
-                        "Missing 'response' field for RESPONSE type");
-                    return std::nullopt;
+                if (j.contains("response")) {
+                    msg.response_ = protocol::Response::fromJson(j["response"]);
                 }
-                msg.response_ = protocol::Response::fromJson(j["response"]);
                 break;
                 
             case protocol::MessageType::EVENT:
-                if (!j.contains("event")) {
-                    Logger::error("MessageEnvelope", 
-                        "Missing 'event' field for EVENT type");
-                    return std::nullopt;
+                if (j.contains("event")) {
+                    auto evt = protocol::Event::fromJson(j["event"]);
+                    // ✅ UTILISATION CORRECTE: méthode publique
+                    if (j["event"].contains("priority")) {
+                        std::string priorityStr = j["event"]["priority"];
+                        evt.priority = protocol::Event::stringToPriority(priorityStr);
+                    }
+                    msg.event_ = evt;
                 }
-                msg.event_ = protocol::Event::fromJson(j["event"]);
                 break;
                 
             case protocol::MessageType::ERROR:
-                if (!j.contains("error")) {
-                    Logger::error("MessageEnvelope", 
-                        "Missing 'error' field for ERROR type");
-                    return std::nullopt;
+                if (j.contains("error")) {
+                    msg.error_ = protocol::Error::fromJson(j["error"]);
                 }
-                msg.error_ = protocol::Error::fromJson(j["error"]);
                 break;
         }
         
-        // Valider
-        if (!msg.isValid()) {
-            Logger::error("MessageEnvelope", "Message validation failed");
-            auto errors = msg.getValidationErrors();
-            for (const auto& err : errors) {
-                Logger::error("MessageEnvelope", "  - " + err);
-            }
-            return std::nullopt;
-        }
-        
         return msg;
-    }
-    catch (const std::exception& e) {
-        Logger::error("MessageEnvelope", 
-            "Error creating message from JSON: " + std::string(e.what()));
+        
+    } catch (const std::exception& e) {
+        Logger::error("MessageEnvelope", "Parse failed: " + std::string(e.what()));
         return std::nullopt;
     }
 }
 
-// ============================================================================
-// SÉRIALISATION
-// ============================================================================
+std::optional<MessageEnvelope> MessageEnvelope::fromJsonString(const std::string& str) {
+    try {
+        json j = json::parse(str);
+        return fromJson(j);
+    } catch (const std::exception& e) {
+        Logger::error("MessageEnvelope", "JSON parse failed: " + std::string(e.what()));
+        return std::nullopt;
+    }
+}
+
+// ========================================================================
+// SERIALIZATION
+// ========================================================================
 
 json MessageEnvelope::toJson() const {
     json j;
     
     // Enveloppe
-    j["envelope"] = envelope_.toJson();
+    j["envelope"] = {
+        {"version", envelope_.version},
+        {"id", envelope_.id},
+        {"timestamp", envelope_.timestamp},
+        // ✅ UTILISATION CORRECTE: méthode publique
+        {"type", protocol::Envelope::messageTypeToString(envelope_.type)}
+    };
     
     // Contenu selon le type
     switch (envelope_.type) {
@@ -277,7 +224,10 @@ json MessageEnvelope::toJson() const {
             
         case protocol::MessageType::EVENT:
             if (event_) {
-                j["event"] = event_->toJson();
+                json eventJson = event_->toJson();
+                // ✅ UTILISATION CORRECTE: méthode publique
+                eventJson["priority"] = protocol::Event::priorityToString(event_->priority);
+                j["event"] = eventJson;
             }
             break;
             
@@ -291,212 +241,187 @@ json MessageEnvelope::toJson() const {
     return j;
 }
 
-std::string MessageEnvelope::toJsonString() const {
-    return toJson().dump();
+/**
+ * @brief ✅ IMPLÉMENTATION: toJsonString avec paramètre indent
+ */
+std::string MessageEnvelope::toJsonString(int indent) const {
+    json j = toJson();
+    return j.dump(indent);
 }
 
-// ============================================================================
+// ========================================================================
 // VALIDATION
-// ============================================================================
+// ========================================================================
 
-bool MessageEnvelope::isValid() const {
-    if (validationCached_) {
-        return validationResult_;
-    }
-    
-    validationCached_ = true;
-    validationErrors_.clear();
+/**
+ * @brief ✅ IMPLÉMENTATION: validate avec vecteur d'erreurs
+ */
+bool MessageEnvelope::validate(std::vector<std::string>& errors) const {
+    errors.clear();
     
     // Valider l'enveloppe
-    if (!validateEnvelope()) {
-        validationResult_ = false;
-        return false;
+    if (envelope_.version.empty()) {
+        errors.push_back("Version is empty");
     }
     
-    // Valider le contenu
-    if (!validateContent()) {
-        validationResult_ = false;
-        return false;
-    }
-    
-    validationResult_ = true;
-    return true;
-}
-
-std::vector<std::string> MessageEnvelope::getValidationErrors() const {
-    if (!validationCached_) {
-        isValid(); // Force validation
-    }
-    return validationErrors_;
-}
-
-bool MessageEnvelope::validateEnvelope() const {
-    // Vérifier version
-    if (envelope_.version != protocol::PROTOCOL_VERSION) {
-        validationErrors_.push_back(
-            "Invalid protocol version: " + envelope_.version + 
-            " (expected: " + protocol::PROTOCOL_VERSION + ")");
-        return false;
-    }
-    
-    // Vérifier ID
     if (envelope_.id.empty()) {
-        validationErrors_.push_back("Empty envelope ID");
-        return false;
+        errors.push_back("ID is empty");
     }
     
-    // Vérifier timestamp
     if (envelope_.timestamp <= 0) {
-        validationErrors_.push_back("Invalid timestamp: " + 
-                                   std::to_string(envelope_.timestamp));
-        return false;
+        errors.push_back("Timestamp is invalid");
     }
     
-    return true;
-}
-
-bool MessageEnvelope::validateContent() const {
+    // Valider le contenu selon le type
     switch (envelope_.type) {
         case protocol::MessageType::REQUEST:
             if (!request_) {
-                validationErrors_.push_back("Missing request content");
-                return false;
+                errors.push_back("Request content is missing");
+            } else if (request_->command.empty()) {
+                errors.push_back("Command is empty");
             }
-            if (request_->command.empty()) {
-                validationErrors_.push_back("Empty command in request");
-                return false;
-            }
-            // params peut être vide, c'est valide
             break;
             
         case protocol::MessageType::RESPONSE:
             if (!response_) {
-                validationErrors_.push_back("Missing response content");
-                return false;
+                errors.push_back("Response content is missing");
+            } else if (response_->requestId.empty()) {
+                errors.push_back("RequestId is empty");
             }
-            if (response_->requestId.empty()) {
-                validationErrors_.push_back("Empty requestId in response");
-                return false;
-            }
-            // data peut être null/vide pour une réponse sans données
             break;
             
         case protocol::MessageType::EVENT:
             if (!event_) {
-                validationErrors_.push_back("Missing event content");
-                return false;
+                errors.push_back("Event content is missing");
+            } else if (event_->name.empty()) {
+                errors.push_back("Event name is empty");
             }
-            if (event_->name.empty()) {
-                validationErrors_.push_back("Empty event name");
-                return false;
-            }
-            // data peut être null/vide pour un event sans données
             break;
             
         case protocol::MessageType::ERROR:
             if (!error_) {
-                validationErrors_.push_back("Missing error content");
-                return false;
+                errors.push_back("Error content is missing");
+            } else if (error_->message.empty()) {
+                errors.push_back("Error message is empty");
             }
-            if (error_->message.empty()) {
-                validationErrors_.push_back("Empty error message");
-                return false;
-            }
-            // requestId peut être vide pour erreurs globales
-            // details peut être null/vide
             break;
     }
     
-    return true;
+    return errors.empty();
 }
 
-// ============================================================================
+bool MessageEnvelope::isValid() const {
+    if (!validationCached_) {
+        std::vector<std::string> errors;
+        validationResult_ = validate(errors);
+        validationErrors_ = errors;
+        validationCached_ = true;
+    }
+    return validationResult_;
+}
+
+std::vector<std::string> MessageEnvelope::getValidationErrors() const {
+    if (!validationCached_) {
+        isValid(); // Forcer la validation
+    }
+    return validationErrors_;
+}
+
+// ========================================================================
 // ACCESSEURS TYPE
-// ============================================================================
+// ========================================================================
 
 bool MessageEnvelope::isRequest() const {
-    return envelope_.type == protocol::MessageType::REQUEST;
+    return envelope_.type == protocol::MessageType::REQUEST && request_.has_value();
 }
 
 bool MessageEnvelope::isResponse() const {
-    return envelope_.type == protocol::MessageType::RESPONSE;
+    return envelope_.type == protocol::MessageType::RESPONSE && response_.has_value();
 }
 
 bool MessageEnvelope::isEvent() const {
-    return envelope_.type == protocol::MessageType::EVENT;
+    return envelope_.type == protocol::MessageType::EVENT && event_.has_value();
 }
 
 bool MessageEnvelope::isError() const {
-    return envelope_.type == protocol::MessageType::ERROR;
+    return envelope_.type == protocol::MessageType::ERROR && error_.has_value();
 }
 
-// ============================================================================
+// ========================================================================
 // ACCESSEURS CONTENU
-// ============================================================================
+// ========================================================================
 
 const protocol::Request& MessageEnvelope::getRequest() const {
     if (!request_) {
-        throw std::runtime_error("Message is not a REQUEST");
+        throw std::runtime_error("Not a request message");
     }
     return *request_;
 }
 
 const protocol::Response& MessageEnvelope::getResponse() const {
     if (!response_) {
-        throw std::runtime_error("Message is not a RESPONSE");
+        throw std::runtime_error("Not a response message");
     }
     return *response_;
 }
 
 const protocol::Event& MessageEnvelope::getEvent() const {
     if (!event_) {
-        throw std::runtime_error("Message is not an EVENT");
+        throw std::runtime_error("Not an event message");
     }
     return *event_;
 }
 
 const protocol::Error& MessageEnvelope::getError() const {
     if (!error_) {
-        throw std::runtime_error("Message is not an ERROR");
+        throw std::runtime_error("Not an error message");
     }
     return *error_;
 }
 
-// ============================================================================
-// ACCESSEURS ENVELOPE
-// ============================================================================
-
-const protocol::Envelope& MessageEnvelope::getEnvelope() const {
-    return envelope_;
-}
-
-std::string MessageEnvelope::getId() const {
-    return envelope_.id;
-}
-
-int64_t MessageEnvelope::getTimestamp() const {
-    return envelope_.timestamp;
-}
-
-protocol::MessageType MessageEnvelope::getType() const {
-    return envelope_.type;
-}
-
-// ============================================================================
+// ========================================================================
 // HELPERS
-// ============================================================================
+// ========================================================================
 
 int MessageEnvelope::getLatencySinceCreation() const {
     auto now = std::chrono::system_clock::now();
-    auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()
-    ).count();
+    int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()).count();
     
     return static_cast<int>(nowMs - envelope_.timestamp);
+}
+
+// ========================================================================
+// MÉTHODES PRIVÉES
+// ========================================================================
+
+bool MessageEnvelope::validateEnvelope() const {
+    return !envelope_.version.empty() &&
+           !envelope_.id.empty() &&
+           envelope_.timestamp > 0;
+}
+
+bool MessageEnvelope::validateContent() const {
+    switch (envelope_.type) {
+        case protocol::MessageType::REQUEST:
+            return request_ && !request_->command.empty();
+            
+        case protocol::MessageType::RESPONSE:
+            return response_ && !response_->requestId.empty();
+            
+        case protocol::MessageType::EVENT:
+            return event_ && !event_->name.empty();
+            
+        case protocol::MessageType::ERROR:
+            return error_ && !error_->message.empty();
+            
+        default:
+            return false;
+    }
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER MessageEnvelope.cpp v3.1.0
+// FIN DU FICHIER MessageEnvelope.cpp
 // ============================================================================

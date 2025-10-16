@@ -21,7 +21,7 @@
 // ============================================================================
 
 #include "../../core/commands/CommandFactory.h"
-#include "../../midi/playback/MidiPlayer.h"
+#include "../../midi/player/MidiPlayer.h"
 #include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
 
