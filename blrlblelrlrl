@@ -1,23 +1,51 @@
-In file included from /home/pi/midiMind/backend/src/core/EventBus.cpp:20:
-/home/pi/midiMind/backend/src/core/EventBus.h:134:45: error: return type ‘class midiMind::Subscription’ is incomplete
-  134 |                           int priority = 0) {
-      |                                             ^
-/home/pi/midiMind/backend/src/core/EventBus.h:181:45: error: return type ‘class midiMind::Subscription’ is incomplete
-  181 |                           int priority = 0) {
-      |                                             ^
-make[2]: *** [CMakeFiles/midimind.dir/build.make:107: CMakeFiles/midimind.dir/src/core/EventBus.cpp.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
 In file included from /home/pi/midiMind/backend/src/core/Application.cpp:50:
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:30:10: fatal error: ../midi/MidiDeviceManager.h: No such file or directory
-   30 | #include "../midi/MidiDeviceManager.h"
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:30:10: fatal error: ../midi/device/MidiDeviceManager.h: No such file or directory
+   30 | #include "../midi/device/MidiDeviceManager.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 compilation terminated.
 make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
-/home/pi/midiMind/backend/src/main.cpp: In function ‘int main(int, char**)’:
-/home/pi/midiMind/backend/src/main.cpp:166:18: error: ‘std::this_thread’ has not been declared
-  166 |             std::this_thread::sleep_for(std::chrono::seconds(1));
-      |                  ^~~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:79: CMakeFiles/midimind.dir/src/main.cpp.o] Error 1
-make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
-make: *** [Makefile:136: all] Error 2
-✓ Compilation terminée
+make[2]: *** Waiting for unfinished jobs....
+/home/pi/midiMind/backend/src/storage/Database.cpp: In member function ‘bool midiMind::Database::connect(const std::string&)’:
+/home/pi/midiMind/backend/src/storage/Database.cpp:69:17: error: ‘warn’ is not a member of ‘midiMind::Logger’
+   69 |         Logger::warn("Database", "Already connected to: " + filepath_);
+      |                 ^~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:105:17: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  105 |         Logger::warn("Database", "Failed to enable foreign keys: " +
+      |                 ^~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:113:17: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  113 |         Logger::warn("Database", "Failed to set WAL mode: " +
+      |                 ^~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp: In member function ‘std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > > midiMind::Database::getMigrationFiles()’:
+/home/pi/midiMind/backend/src/storage/Database.cpp:484:17: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  484 |         Logger::warn("Database", "Migration directory not found: " + migrationDir);
+      |                 ^~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp: In member function ‘void midiMind::Database::truncateTable(const std::string&)’:
+/home/pi/midiMind/backend/src/storage/Database.cpp:555:13: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  555 |     Logger::warn("Database", "Truncating table: " + tableName);
+      |             ^~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp: In member function ‘json midiMind::Database::getStatistics() const’:
+/home/pi/midiMind/backend/src/storage/Database.cpp:637:37: error: passing ‘const midiMind::Database’ as ‘this’ argument discards qualifiers [-fpermissive]
+  637 |         auto pageCount = queryScalar("PRAGMA page_count");
+      |                          ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:288:13: note:   in call to ‘std::string midiMind::Database::queryScalar(const std::string&, const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&)’
+  288 | std::string Database::queryScalar(const std::string& sql,
+      |             ^~~~~~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:638:36: error: passing ‘const midiMind::Database’ as ‘this’ argument discards qualifiers [-fpermissive]
+  638 |         auto pageSize = queryScalar("PRAGMA page_size");
+      |                         ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:288:13: note:   in call to ‘std::string midiMind::Database::queryScalar(const std::string&, const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&)’
+  288 | std::string Database::queryScalar(const std::string& sql,
+      |             ^~~~~~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:644:32: error: passing ‘const midiMind::Database’ as ‘this’ argument discards qualifiers [-fpermissive]
+  644 |         auto tables = getTables();
+      |                       ~~~~~~~~~^~
+/home/pi/midiMind/backend/src/storage/Database.cpp:542:26: note:   in call to ‘std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > > midiMind::Database::getTables()’
+  542 | std::vector<std::string> Database::getTables() {
+      |                          ^~~~~~~~
+/home/pi/midiMind/backend/src/storage/Database.cpp:648:51: error: passing ‘const midiMind::Database’ as ‘this’ argument discards qualifiers [-fpermissive]
+  648 |         stats["schema_version"] = getSchemaVersion();
+      |                                   ~~~~~~~~~~~~~~~~^~
+/home/pi/midiMind/backend/src/storage/Database.cpp:462:5: note:   in call to ‘int midiMind::Database::getSchemaVersion()’
+  462 | int Database::getSchemaVersion() {
+      |     ^~~~~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:135: CMakeFiles/midimind.dir/src/storage/Database.cpp.o] Error 1
