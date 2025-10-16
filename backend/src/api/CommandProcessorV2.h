@@ -1,12 +1,13 @@
 // ============================================================================
 // Fichier: backend/src/api/CommandProcessorV2.h
-// Version: 3.1.1 - CORRECTIONS CRITIQUES PHASE 1
-// Date: 2025-10-15
+// Version: 3.1.2 - CORRECTIONS COMPLÈTES
+// Date: 2025-10-16
 // ============================================================================
-// CORRECTIFS v3.1.1 (PHASE 1 - CRITIQUES):
-//   ✅ 1.4 Ajout membre processorManager_
-//   ✅ Ajout paramètre constructeur pour ProcessorManager
-//   ✅ Documentation mise à jour
+// CORRECTIFS v3.1.2:
+//   ✅ Ajout membre database_
+//   ✅ Ajout paramètre database au constructeur
+//   ✅ Signatures cohérentes avec .cpp v3.1.2
+//   ✅ Documentation complète mise à jour
 //
 // Description:
 //   Header du processeur de commandes API v2
@@ -27,7 +28,8 @@
 //   ├── MidiPlayer            : Lecture fichiers
 //   ├── MidiFileManager       : Bibliothèque fichiers
 //   ├── SysExHandler          : Messages SysEx
-//   └── ProcessorManager      : Processeurs MIDI (NOUVEAU)
+//   ├── ProcessorManager      : Processeurs MIDI
+//   └── Database              : Persistance SQLite
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -39,21 +41,27 @@
 // ============================================================================
 #include <memory>
 #include <string>
-#include <mutex>
+#include <vector>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 
 #include "../core/commands/CommandFactory.h"
 #include "../core/Logger.h"
 #include "../midi/devices/MidiDeviceManager.h"
-#include "../midi/routing/MidiRouter.h"
-#include "../midi/playback/MidiPlayer.h"
+#include "../midi/MidiRouter.h"
+#include "../midi/player/MidiPlayer.h"
 #include "../midi/files/MidiFileManager.h"
 #include "../midi/sysex/SysExHandler.h"
-#include "../midi/processing/ProcessorManager.h"  // ✅ NOUVEAU
+#include "../midi/processing/ProcessorManager.h"
+#include "../storage/Database.h"
 
 using json = nlohmann::json;
 
 namespace midiMind {
+
+// ============================================================================
+// CLASSE: CommandProcessorV2
+// ============================================================================
 
 /**
  * @class CommandProcessorV2
@@ -62,15 +70,15 @@ namespace midiMind {
  * Utilise CommandFactory pour enregistrer toutes les commandes
  * sous forme de lambdas et les exécuter de manière thread-safe.
  * 
- * Catégories de commandes (v3.1.1):
+ * Catégories de commandes (v3.1.2):
  * - devices.*     : Gestion des périphériques MIDI (5 commandes)
  * - routing.*     : Configuration du routage (6 commandes)
- * - playback.*    : Contrôle du lecteur (9 commandes)
- * - files.*       : Gestion des fichiers (7 commandes)
+ * - playback.*    : Contrôle du lecteur (11 commandes)
+ * - files.*       : Gestion des fichiers (12 commandes)
  * - editor.*      : Édition MIDI JsonMidi (7 commandes)
- * - processing.*  : Processeurs MIDI (5+ commandes) ✅ Gestion nullptr
+ * - processing.*  : Processeurs MIDI (5+ commandes)
  * - network.*     : Configuration réseau (6 commandes)
- * - system.*      : Informations système (5 commandes)
+ * - system.*      : Informations système (6 commandes)
  * - logger.*      : Configuration logs (3 commandes)
  * - loops.*       : Enregistrement loops (6 commandes)
  * - instruments.* : Profils instruments (8 commandes)
@@ -81,10 +89,10 @@ namespace midiMind {
  * ```cpp
  * auto processor = std::make_shared<CommandProcessorV2>(
  *     deviceManager, router, player, fileManager, 
- *     sysExHandler, processorManager
+ *     sysExHandler, processorManager, database
  * );
  * 
- * std::string request = R"({"command": "devices.list"})";
+ * std::string request = R"({"command": "devices.list", "params": {}})";
  * auto response = processor->processCommand(request);
  * ```
  */
@@ -100,12 +108,26 @@ public:
      * @param deviceManager Gestionnaire devices MIDI
      * @param router Routeur MIDI
      * @param player Lecteur MIDI
-     * @param fileManager Gestionnaire fichiers
+     * @param fileManager Gestionnaire fichiers MIDI
      * @param sysExHandler Gestionnaire SysEx (optionnel)
-     * @param processorManager Gestionnaire processeurs (optionnel) ✅ NOUVEAU
+     * @param processorManager Gestionnaire processeurs (optionnel)
+     * @param database Base de données SQLite (optionnel)
      * 
      * @note Les paramètres peuvent être nullptr
      * @note Enregistre automatiquement toutes les commandes disponibles
+     * 
+     * @example
+     * ```cpp
+     * auto processor = std::make_shared<CommandProcessorV2>(
+     *     deviceManager,
+     *     router,
+     *     player,
+     *     fileManager,
+     *     sysExHandler,
+     *     processorManager,
+     *     database
+     * );
+     * ```
      */
     CommandProcessorV2(
         std::shared_ptr<MidiDeviceManager> deviceManager,
@@ -113,7 +135,8 @@ public:
         std::shared_ptr<MidiPlayer> player,
         std::shared_ptr<MidiFileManager> fileManager,
         std::shared_ptr<SysExHandler> sysExHandler = nullptr,
-        std::shared_ptr<ProcessorManager> processorManager = nullptr  // ✅ NOUVEAU
+        std::shared_ptr<ProcessorManager> processorManager = nullptr,
+        std::shared_ptr<Database> database = nullptr
     );
     
     /**
@@ -136,6 +159,7 @@ public:
      * @return json Réponse JSON (format: {"success": bool, "data": {...}})
      * 
      * @note Thread-safe
+     * @throws Aucune exception (toutes catchées et retournées comme erreur)
      * 
      * @example Format requête
      * ```json
@@ -236,6 +260,7 @@ private:
     
     /**
      * @brief Enregistre les commandes files.*
+     * @note Nécessite fileManager_ et database_
      */
     void registerFileCommands();
     
@@ -246,7 +271,7 @@ private:
     
     /**
      * @brief Enregistre les commandes processing.*
-     * @note ✅ CORRECTIF 1.4: Check nullptr processorManager_
+     * @note Check nullptr processorManager_
      */
     void registerProcessingCommands();
     
@@ -279,7 +304,7 @@ private:
     // MEMBRES PRIVÉS
     // ========================================================================
     
-    /// Command factory
+    /// Command factory (thread-safe)
     CommandFactory factory_;
     
     /// Device manager
@@ -291,18 +316,21 @@ private:
     /// Lecteur MIDI
     std::shared_ptr<MidiPlayer> player_;
     
-    /// Gestionnaire fichiers
+    /// Gestionnaire fichiers MIDI
     std::shared_ptr<MidiFileManager> fileManager_;
     
     /// Gestionnaire SysEx (optionnel)
     std::shared_ptr<SysExHandler> sysExHandler_;
     
-    /// ✅ Gestionnaire processeurs (optionnel) - NOUVEAU v3.1.1
+    /// Gestionnaire processeurs (optionnel)
     std::shared_ptr<ProcessorManager> processorManager_;
+    
+    /// Base de données SQLite (optionnel)
+    std::shared_ptr<Database> database_;
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER CommandProcessorV2.h v3.1.1 - CORRECTIONS PHASE 1 COMPLÈTES
+// FIN DU FICHIER CommandProcessorV2.h v3.1.2 - COMPLET ET COHÉRENT
 // ============================================================================

@@ -7,7 +7,6 @@
 #pragma once
 
 #include "MidiMessage.h"
-#include "MidiRoute.h"
 #include "devices/MidiDevice.h"
 #include "sysex/SysExHandler.h"
 #include <memory>

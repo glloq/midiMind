@@ -1,13 +1,14 @@
 // ============================================================================
 // Fichier: backend/src/api/CommandProcessorV2.cpp
-// Version: 3.1.1 - CORRECTIONS CRITIQUES PHASE 1
-// Date: 2025-10-15
+// Version: 3.1.2 - CORRECTIONS COMPLÈTES
+// Date: 2025-10-16
 // ============================================================================
-// CORRECTIFS v3.1.1 (PHASE 1 - CRITIQUES):
-//   ✅ 1.4 registerProcessingCommands() - Check nullptr processorManager_
-//   ✅ Ajout paramètre processorManager au constructeur
-//   ✅ Gestion gracieuse si ProcessorManager absent
-//   ✅ Preservation TOTALE des fonctionnalités v3.1.0
+// CORRECTIFS v3.1.2:
+//   ✅ hasCommand() → exists() (ligne ~299)
+//   ✅ CommandException → MidiMindException (ligne ~323)
+//   ✅ Gestion correcte des error_code
+//   ✅ Preservation TOTALE des fonctionnalités v3.1.1
+//   ✅ Check nullptr processorManager_
 //
 // Description:
 //   Processeur de commandes v2 - TOUTES COMMANDES ENREGISTRÉES
@@ -78,7 +79,8 @@ void registerPlaybackCommands(CommandFactory& factory,
                              std::shared_ptr<MidiPlayer> player);
 
 void registerFileCommands(CommandFactory& factory,
-                         std::shared_ptr<MidiFileManager> fileManager);
+                         std::shared_ptr<MidiFileManager> fileManager,
+                         std::shared_ptr<Database> database);
 
 void registerEditorCommands(CommandFactory& factory,
                            std::shared_ptr<MidiFileManager> fileManager);
@@ -87,7 +89,6 @@ void registerSystemCommands(CommandFactory& factory);
 
 void registerNetworkCommands(CommandFactory& factory);
 
-// ✅ CORRECTIF 1.4: Ajout paramètre ProcessorManager
 void registerProcessingCommands(CommandFactory& factory,
                                std::shared_ptr<ProcessorManager> processorManager);
 
@@ -102,7 +103,7 @@ void registerInstrumentCommands(CommandFactory& factory,
                                std::shared_ptr<SysExHandler> sysExHandler);
 
 // ============================================================================
-// CONSTRUCTEUR / DESTRUCTEUR - CORRECTIF 1.4
+// CONSTRUCTEUR / DESTRUCTEUR
 // ============================================================================
 
 CommandProcessorV2::CommandProcessorV2(
@@ -111,14 +112,16 @@ CommandProcessorV2::CommandProcessorV2(
     std::shared_ptr<MidiPlayer> player,
     std::shared_ptr<MidiFileManager> fileManager,
     std::shared_ptr<SysExHandler> sysExHandler,
-    std::shared_ptr<ProcessorManager> processorManager  // ✅ NOUVEAU paramètre
+    std::shared_ptr<ProcessorManager> processorManager,
+    std::shared_ptr<Database> database
 )
     : deviceManager_(deviceManager)
     , router_(router)
     , player_(player)
     , fileManager_(fileManager)
     , sysExHandler_(sysExHandler)
-    , processorManager_(processorManager)  // ✅ NOUVEAU membre
+    , processorManager_(processorManager)
+    , database_(database)
 {
     Logger::info("CommandProcessorV2", "Initializing CommandProcessorV2...");
     
@@ -145,16 +148,16 @@ void CommandProcessorV2::registerAllCommands() {
     registerDeviceCommands();      // devices.* (5+ commandes)
     registerRoutingCommands();     // routing.* (6+ commandes)
     registerPlaybackCommands();    // playback.* (11+ commandes)
-    registerFileCommands();        // files.* (7+ commandes)
+    registerFileCommands();        // files.* (12+ commandes)
     registerEditorCommands();      // editor.* (7+ commandes)
-    registerProcessingCommands();  // processing.* (N commandes) ✅ CORRECTIF 1.4
+    registerProcessingCommands();  // processing.* (N commandes)
     registerNetworkCommands();     // network.* (6+ commandes)
     registerSystemCommands();      // system.* (6+ commandes)
     registerLoggerCommands();      // logger.* (N commandes)
     
     // CATÉGORIES OPTIONNELLES
-    registerLoopCommands();        // ✅ loops.* (6 commandes)
-    registerInstrumentCommands();  // ✅ instruments.* (8 commandes)
+    registerLoopCommands();        // loops.* (6 commandes)
+    registerInstrumentCommands();  // instruments.* (8 commandes)
     
     Logger::info("CommandProcessorV2", 
         "✅ All commands registered (" + std::to_string(factory_.count()) + " total)");
@@ -207,7 +210,8 @@ void CommandProcessorV2::registerFileCommands() {
         return;
     }
     
-    ::midiMind::registerFileCommands(factory_, fileManager_);
+    // ✅ CORRECTION: Passer database_ en paramètre
+    ::midiMind::registerFileCommands(factory_, fileManager_, database_);
     
     Logger::debug("CommandProcessorV2", "✅ File commands registered");
 }
@@ -224,7 +228,6 @@ void CommandProcessorV2::registerEditorCommands() {
     Logger::debug("CommandProcessorV2", "✅ Editor commands registered");
 }
 
-// ✅ CORRECTIF 1.4: Check nullptr processorManager_
 void CommandProcessorV2::registerProcessingCommands() {
     if (!processorManager_) {
         Logger::warn("CommandProcessorV2", 
@@ -274,40 +277,45 @@ void CommandProcessorV2::registerInstrumentCommands() {
 }
 
 // ============================================================================
-// TRAITEMENT DES COMMANDES
+// TRAITEMENT DES COMMANDES - MÉTHODE CORRIGÉE
 // ============================================================================
 
 json CommandProcessorV2::processCommand(const std::string& jsonString) {
     try {
+        Logger::debug("CommandProcessorV2", "Processing command...");
+        
         // Parser le JSON
         json request = json::parse(jsonString);
         
         // Valider format
         if (!request.contains("command")) {
+            Logger::error("CommandProcessorV2", "Missing 'command' field");
             return {
                 {"success", false},
-                {"error", "Missing 'command' field"},
+                {"error", "Missing 'command' field in request"},
                 {"error_code", "INVALID_FORMAT"}
             };
         }
         
         std::string commandName = request["command"];
+        json params = request.value("params", json::object());
         
-        Logger::debug("CommandProcessorV2", "Processing command: " + commandName);
+        Logger::debug("CommandProcessorV2", "Command: " + commandName);
         
-        // Vérifier que la commande existe
-        if (!factory_.hasCommand(commandName)) {
+        // ✅ CORRECTION: hasCommand() → exists()
+        if (!factory_.exists(commandName)) {
+            Logger::error("CommandProcessorV2", 
+                "Unknown command: " + commandName);
             return {
                 {"success", false},
                 {"error", "Unknown command: " + commandName},
-                {"error_code", "UNKNOWN_COMMAND"},
-                {"available_commands", factory_.listCommands()}
+                {"error_code", "UNKNOWN_COMMAND"}
             };
         }
         
+        // Exécuter la commande
         try {
-            // Exécuter la commande
-            auto result = factory_.execute(commandName, request);
+            auto result = factory_.execute(commandName, params);
             
             // Ajouter success si pas présent
             if (!result.contains("success")) {
@@ -315,19 +323,20 @@ json CommandProcessorV2::processCommand(const std::string& jsonString) {
             }
             
             Logger::debug("CommandProcessorV2", 
-                "Command '" + commandName + "' executed (success: " + 
-                (result["success"].get<bool>() ? "true" : "false") + ")");
+                "Command executed: " + commandName + 
+                " (success: " + (result.value("success", false) ? "true" : "false") + ")");
             
             return result;
         }
-        catch (const CommandException& e) {
+        // ✅ CORRECTION: CommandException → MidiMindException
+        catch (const MidiMindException& e) {
             Logger::error("CommandProcessorV2", 
                 "Command execution failed: " + std::string(e.what()));
             
             return {
                 {"success", false},
                 {"error", e.what()},
-                {"error_code", e.getCode()}
+                {"error_code", std::to_string(static_cast<int>(e.getCode()))}
             };
         }
         catch (const std::exception& e) {
@@ -399,5 +408,5 @@ CommandProcessorV2::listCommandsByCategory() const {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER CommandProcessorV2.cpp v3.1.1 - CORRECTIONS PHASE 1 COMPLÈTES
+// FIN DU FICHIER CommandProcessorV2.cpp v3.1.2 - COMPLET ET CORRIGÉ
 // ============================================================================

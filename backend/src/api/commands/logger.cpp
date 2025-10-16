@@ -1,39 +1,32 @@
 // ============================================================================
-// Fichier: backend/src/api/commands/logger.cpp
-// Version: 1.1.0 - AMÉLIORÉ
-// Date: 2025-10-13
+// Fichier: /home/pi/midiMind/backend/src/api/commands/logger.cpp
+// Version: 3.0.7
+// Date: 2025-10-16
 // ============================================================================
 // Description:
-//   Handlers pour les commandes de gestion du logger.
-//   Permet de modifier dynamiquement le niveau de log et la configuration.
+//   Handlers pour les commandes de configuration du logger
 //
-// AMÉLIORATIONS v1.1.0:
-//   ✅ Ajout commande logger.resetStats
-//   ✅ Ajout commande logger.disableFileLogging
-//   ✅ Amélioration logger.getStats avec stats détaillées
-//   ✅ Amélioration logger.enableFileLogging avec maxSizeMB et maxFiles
-//   ✅ Meilleure gestion des erreurs
-//   ✅ Intégration des meilleures parties de LoggerCommands.cpp
+// CORRECTIONS v3.0.7:
+//   ✅ Correction appels registerCommand (2 paramètres)
+//   ✅ Utilisation des bonnes propriétés LoggerConfig
+//   ✅ Suppression des méthodes Logger statiques inexistantes
+//   ✅ Simplification avec Config::instance()
 //
 // Commandes implémentées:
-//   - logger.getConfig           : Récupérer configuration logger
-//   - logger.setLevel            : Modifier niveau de log
-//   - logger.setFile             : Activer/désactiver logging fichier
-//   - logger.enableFileLogging   : Activer logging fichier (détaillé)
-//   - logger.disableFileLogging  : Désactiver logging fichier
-//   - logger.getStats            : Statistiques de logging (détaillées)
-//   - logger.resetStats          : Réinitialiser statistiques
-//   - logger.clearLogs           : Vider les logs fichier
+//   - logger.getConfig    : Récupérer la configuration
+//   - logger.setLevel     : Définir le niveau de log
+//   - logger.setFile      : Configurer le logging fichier
+//   - logger.enableFileLogging  : Activer le fichier
+//   - logger.disableFileLogging : Désactiver le fichier
+//   - logger.getStats     : Statistiques du logger
 //
-// Auteur: MidiMind Team
+// Auteur: midiMind Team
 // ============================================================================
 
 #include "../../core/commands/CommandFactory.h"
 #include "../../core/Logger.h"
 #include "../../core/Config.h"
 #include <nlohmann/json.hpp>
-#include <algorithm>
-#include <cstdio>  // Pour std::remove
 
 using json = nlohmann::json;
 
@@ -41,7 +34,6 @@ namespace midiMind {
 
 // ============================================================================
 // FONCTION: registerLoggerCommands()
-// Enregistre toutes les commandes de gestion du logger
 // ============================================================================
 
 void registerLoggerCommands(CommandFactory& factory) {
@@ -63,18 +55,14 @@ void registerLoggerCommands(CommandFactory& factory) {
                     {"data", {
                         {"level", loggerConfig.level},
                         {"console", {
-                            {"enabled", true},
-                            {"colors", loggerConfig.colorsEnabled},
-                            {"timestamps", loggerConfig.timestampsEnabled},
-                            {"category", loggerConfig.categoryEnabled}
+                            {"enabled", loggerConfig.enableConsole}
                         }},
                         {"fileLogging", {
-                            {"enabled", loggerConfig.fileLoggingEnabled},
-                            {"path", loggerConfig.filePath},
-                            {"maxSizeMB", loggerConfig.maxFileSizeMB},
-                            {"maxFiles", loggerConfig.maxFiles}
-                        }},
-                        {"categoryFilter", loggerConfig.categoryFilter}
+                            {"enabled", loggerConfig.enableFile},
+                            {"path", loggerConfig.outputFile},
+                            {"maxSizeBytes", loggerConfig.maxFileSize},
+                            {"maxBackups", loggerConfig.maxBackups}
+                        }}
                     }}
                 };
                 
@@ -90,14 +78,13 @@ void registerLoggerCommands(CommandFactory& factory) {
     );
     
     // ========================================================================
-    // logger.setLevel - Modifier niveau de log
+    // logger.setLevel - Définir le niveau de log
     // ========================================================================
     factory.registerCommand("logger.setLevel",
         [](const json& params) -> json {
             Logger::debug("LoggerAPI", "Setting logger level...");
             
             try {
-                // Validation
                 if (!params.contains("level")) {
                     return {
                         {"success", false},
@@ -107,36 +94,17 @@ void registerLoggerCommands(CommandFactory& factory) {
                 
                 std::string level = params["level"];
                 
-                // Valider niveau
-                const std::vector<std::string> validLevels = {
-                    "DEBUG", "INFO", "WARNING", "ERROR"
-                };
-                
-                bool validLevel = false;
-                for (const auto& validLvl : validLevels) {
-                    if (level == validLvl) {
-                        validLevel = true;
-                        break;
-                    }
-                }
-                
-                if (!validLevel) {
+                // Valider le niveau
+                if (level != "debug" && level != "info" && level != "warning" && level != "error") {
                     return {
                         {"success", false},
-                        {"error", "Invalid level. Must be: DEBUG, INFO, WARNING, or ERROR"}
-                    };
-                }
-                
-                // Appliquer nouveau niveau
-                if (!Logger::setGlobalLevel(level)) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to set logger level"}
+                        {"error", "Invalid log level. Must be: debug, info, warning, or error"}
                     };
                 }
                 
                 // Mettre à jour Config
                 Config::instance().logger.level = level;
+                Config::instance().save();
                 
                 Logger::info("LoggerAPI", "Log level changed to: " + level);
                 
@@ -160,14 +128,13 @@ void registerLoggerCommands(CommandFactory& factory) {
     );
     
     // ========================================================================
-    // logger.setFile - Activer/désactiver logging fichier (simple)
+    // logger.setFile - Activer/désactiver logging fichier
     // ========================================================================
     factory.registerCommand("logger.setFile",
         [](const json& params) -> json {
             Logger::debug("LoggerAPI", "Configuring file logging...");
             
             try {
-                // Validation
                 if (!params.contains("enabled")) {
                     return {
                         {"success", false},
@@ -176,25 +143,20 @@ void registerLoggerCommands(CommandFactory& factory) {
                 }
                 
                 bool enabled = params["enabled"];
-                std::string path = params.value("path", Config::instance().logger.filePath);
+                std::string path = params.value("path", Config::instance().logger.outputFile);
                 
                 // Mettre à jour config
-                Config::instance().logger.fileLoggingEnabled = enabled;
-                Config::instance().logger.filePath = path;
+                Config::instance().logger.enableFile = enabled;
+                Config::instance().logger.outputFile = path;
+                Config::instance().save();
                 
-                // Appliquer via Logger
-                bool success = enabled 
-                    ? Logger::enableFileLogging(path, 
-                        Config::instance().logger.maxFileSizeMB, 
-                        Config::instance().logger.maxFiles)
-                    : (Logger::disableFileLogging(), true);
-                
-                if (!success && enabled) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to enable file logging. Check path permissions."},
-                        {"details", {{"path", path}}}
-                    };
+                // Activer/désactiver via Logger
+                if (enabled) {
+                    Logger::enableFileLogging(path, 
+                        Config::instance().logger.maxFileSize,
+                        Config::instance().logger.maxBackups);
+                } else {
+                    Logger::disableFileLogging();
                 }
                 
                 Logger::info("LoggerAPI", 
@@ -231,29 +193,19 @@ void registerLoggerCommands(CommandFactory& factory) {
                 // Paramètres avec valeurs par défaut
                 std::string path = params.value("path", "/var/log/midimind/midimind.log");
                 int maxSizeMB = params.value("maxSizeMB", 10);
-                int maxFiles = params.value("maxFiles", 5);
+                int maxBackups = params.value("maxBackups", 5);
+                
+                size_t maxSizeBytes = maxSizeMB * 1024 * 1024;
                 
                 // Activer
-                bool success = Logger::enableFileLogging(path, maxSizeMB, maxFiles);
-                
-                if (!success) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to enable file logging. Check path and permissions."},
-                        {"details", {
-                            {"path", path},
-                            {"maxSizeMB", maxSizeMB},
-                            {"maxFiles", maxFiles}
-                        }}
-                    };
-                }
+                Logger::enableFileLogging(path, maxSizeBytes, maxBackups);
                 
                 // Mettre à jour Config et sauvegarder
                 auto& config = Config::instance().logger;
-                config.fileLoggingEnabled = true;
-                config.filePath = path;
-                config.maxFileSizeMB = maxSizeMB;
-                config.maxFiles = maxFiles;
+                config.enableFile = true;
+                config.outputFile = path;
+                config.maxFileSize = maxSizeBytes;
+                config.maxBackups = maxBackups;
                 Config::instance().save();
                 
                 Logger::info("LoggerAPI", "File logging enabled: " + path);
@@ -264,7 +216,7 @@ void registerLoggerCommands(CommandFactory& factory) {
                         {"enabled", true},
                         {"path", path},
                         {"maxSizeMB", maxSizeMB},
-                        {"maxFiles", maxFiles},
+                        {"maxBackups", maxBackups},
                         {"message", "File logging enabled successfully"}
                     }}
                 };
@@ -291,8 +243,8 @@ void registerLoggerCommands(CommandFactory& factory) {
                 // Désactiver
                 Logger::disableFileLogging();
                 
-                // Mettre à jour Config et sauvegarder
-                Config::instance().logger.fileLoggingEnabled = false;
+                // Mettre à jour Config
+                Config::instance().logger.enableFile = false;
                 Config::instance().save();
                 
                 Logger::info("LoggerAPI", "File logging disabled");
@@ -317,50 +269,23 @@ void registerLoggerCommands(CommandFactory& factory) {
     );
     
     // ========================================================================
-    // logger.getStats - Statistiques de logging (améliorées)
+    // logger.getStats - Statistiques du logger
     // ========================================================================
     factory.registerCommand("logger.getStats",
         [](const json& params) -> json {
             Logger::debug("LoggerAPI", "Getting logger statistics...");
             
             try {
-                // Récupérer informations actuelles
-                std::string currentLevel = Logger::getGlobalLevel();
-                bool fileEnabled = Logger::isFileLoggingEnabled();
-                std::string filePath = Logger::getFilePath();
+                const auto& loggerConfig = Config::instance().logger;
                 
-                // Tenter de récupérer stats détaillées si disponibles
-                json statsData;
-                
-                // Vérifier si Logger::getStats() existe en appelant
-                // Si la méthode n'existe pas, on utilise des valeurs par défaut
-                try {
-                    auto stats = Logger::getStats();
-                    
-                    // Si getStats() retourne une structure, l'utiliser
-                    statsData = {
-                        {"totalMessages", stats.totalMessages},
-                        {"debugMessages", stats.debugMessages},
-                        {"infoMessages", stats.infoMessages},
-                        {"warnMessages", stats.warnMessages},
-                        {"errorMessages", stats.errorMessages},
-                        {"filteredMessages", stats.filteredMessages},
-                        {"fileRotations", stats.fileRotations},
-                        {"currentLevel", currentLevel},
-                        {"fileLoggingEnabled", fileEnabled},
-                        {"filePath", filePath},
-                        {"syslogEnabled", stats.syslogEnabled},
-                        {"categoryFilters", stats.categoryFilters}
-                    };
-                } catch (...) {
-                    // Si getStats() n'existe pas, utiliser format simple
-                    statsData = {
-                        {"currentLevel", currentLevel},
-                        {"fileLoggingEnabled", fileEnabled},
-                        {"filePath", filePath},
-                        {"note", "Detailed stats not available - Logger::getStats() not implemented"}
-                    };
-                }
+                json statsData = {
+                    {"currentLevel", loggerConfig.level},
+                    {"consoleEnabled", loggerConfig.enableConsole},
+                    {"fileLoggingEnabled", loggerConfig.enableFile},
+                    {"filePath", loggerConfig.outputFile},
+                    {"maxFileSize", loggerConfig.maxFileSize},
+                    {"maxBackups", loggerConfig.maxBackups}
+                };
                 
                 return {
                     {"success", true},
@@ -378,104 +303,11 @@ void registerLoggerCommands(CommandFactory& factory) {
         }
     );
     
-    // ========================================================================
-    // logger.resetStats - Réinitialiser statistiques
-    // ========================================================================
-    factory.registerCommand("logger.resetStats",
-        [](const json& params) -> json {
-            Logger::debug("LoggerAPI", "Resetting logger statistics...");
-            
-            try {
-                // Tenter de réinitialiser les stats si la méthode existe
-                try {
-                    Logger::resetStats();
-                    
-                    Logger::info("LoggerAPI", "Logger statistics reset");
-                    
-                    return {
-                        {"success", true},
-                        {"data", {
-                            {"message", "Logger statistics reset successfully"}
-                        }}
-                    };
-                } catch (...) {
-                    // Si resetStats() n'existe pas
-                    return {
-                        {"success", false},
-                        {"error", "Logger::resetStats() not implemented"},
-                        {"note", "This feature requires Logger class update"}
-                    };
-                }
-                
-            } catch (const std::exception& e) {
-                Logger::error("LoggerAPI", "Error resetting logger stats: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", "Failed to reset logger statistics"},
-                    {"details", e.what()}
-                };
-            }
-        }
-    );
-    
-    // ========================================================================
-    // logger.clearLogs - Vider les logs (fichier)
-    // ========================================================================
-    factory.registerCommand("logger.clearLogs",
-        [](const json& params) -> json {
-            Logger::debug("LoggerAPI", "Clearing log files...");
-            
-            try {
-                // Récupérer état actuel
-                std::string currentPath = Logger::getFilePath();
-                bool wasEnabled = Logger::isFileLoggingEnabled();
-                int maxSizeMB = Config::instance().logger.maxFileSizeMB;
-                int maxFiles = Config::instance().logger.maxFiles;
-                
-                // Désactiver temporairement
-                if (wasEnabled) {
-                    Logger::disableFileLogging();
-                }
-                
-                // Supprimer le fichier
-                try {
-                    std::remove(currentPath.c_str());
-                } catch (...) {
-                    // Ignorer erreurs de suppression
-                }
-                
-                // Réactiver si nécessaire
-                if (wasEnabled) {
-                    Logger::enableFileLogging(currentPath, maxSizeMB, maxFiles);
-                }
-                
-                Logger::info("LoggerAPI", "Log files cleared");
-                
-                return {
-                    {"success", true},
-                    {"data", {
-                        {"message", "Log files cleared successfully"},
-                        {"path", currentPath},
-                        {"reEnabled", wasEnabled}
-                    }}
-                };
-                
-            } catch (const std::exception& e) {
-                Logger::error("LoggerAPI", "Error clearing logs: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", "Failed to clear log files"},
-                    {"details", e.what()}
-                };
-            }
-        }
-    );
-    
-    Logger::info("LoggerHandlers", "✅ Logger commands registered successfully (8 commands)");
+    Logger::info("LoggerHandlers", "✓ Logger commands registered");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER logger.cpp v1.1.0 - AMÉLIORÉ
+// FIN DU FICHIER logger.cpp v3.0.7
 // ============================================================================

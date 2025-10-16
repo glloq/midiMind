@@ -1,409 +1,248 @@
 // ============================================================================
-// Fichier: backend/src/api/commands/network.cpp
-// Version: 3.0.1 - NOUVEAU FICHIER
-// Date: 2025-10-12
+// Fichier: /home/pi/midiMind/backend/src/api/commands/network.cpp
+// Version: 3.0.5
+// Date: 2025-10-16
 // ============================================================================
 // Description:
-//   Handlers pour les commandes réseau.
-//   Configuration WiFi, hotspot, et informations réseau.
+//   Handlers pour les commandes de gestion réseau
 //
-// Commandes:
-//   - network.status      : État du réseau
-//   - network.getInterfaces : Liste des interfaces réseau
-//   - network.scanWifi    : Scanner réseaux WiFi disponibles
-//   - network.connectWifi : Se connecter à un réseau WiFi
-//   - network.startHotspot : Démarrer hotspot WiFi
-//   - network.stopHotspot  : Arrêter hotspot
+// CORRECTIONS v3.0.5:
+//   ✅ Correction appels registerCommand (2 paramètres)
 //
-// Note: Fonctionnalités basiques implémentées. Pour production complète,
-//       intégrer avec NetworkManager ou nmcli.
+// Commandes implémentées:
+//   - network.getStatus  : État de la connexion réseau
+//   - network.scan       : Scanner les réseaux Wi-Fi
+//   - network.connect    : Connecter à un réseau
+//   - network.disconnect : Déconnecter
+//   - network.getConfig  : Configuration réseau
 //
-// Auteur: MidiMind Team
+// Auteur: midiMind Team
 // ============================================================================
 
 #include "../../core/commands/CommandFactory.h"
+#include "../../network/NetworkManager.h"
 #include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
-#include <fstream>
-#include <sstream>
-#include <cstdlib>
-#include <array>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
 // ============================================================================
-// UTILITAIRES RÉSEAU
-// ============================================================================
-
-/**
- * @brief Exécute une commande shell et retourne la sortie
- */
-static std::string executeCommand(const std::string& command) {
-    std::array<char, 128> buffer;
-    std::string result;
-    
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        Logger::error("NetworkAPI", "Failed to execute command: " + command);
-        return "";
-    }
-    
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-        result += buffer.data();
-    }
-    
-    pclose(pipe);
-    return result;
-}
-
-/**
- * @brief Récupère les interfaces réseau
- */
-static json getNetworkInterfaces() {
-    json interfaces = json::array();
-    
-    std::string output = executeCommand("ip -j addr show");
-    
-    if (output.empty()) {
-        // Fallback: parsing manuel
-        output = executeCommand("ip addr show");
-        // TODO: Parser la sortie manuellement si nécessaire
-        return interfaces;
-    }
-    
-    try {
-        // Parse la sortie JSON de ip
-        auto ipData = json::parse(output);
-        
-        for (const auto& iface : ipData) {
-            if (iface.contains("ifname")) {
-                std::string name = iface["ifname"];
-                
-                // Extraire adresse IP si disponible
-                std::string ip = "N/A";
-                if (iface.contains("addr_info")) {
-                    for (const auto& addr : iface["addr_info"]) {
-                        if (addr.contains("local") && addr["family"] == "inet") {
-                            ip = addr["local"];
-                            break;
-                        }
-                    }
-                }
-                
-                interfaces.push_back({
-                    {"name", name},
-                    {"ip", ip},
-                    {"state", iface.value("operstate", "unknown")}
-                });
-            }
-        }
-    } catch (const json::exception& e) {
-        Logger::error("NetworkAPI", "Failed to parse network interfaces");
-    }
-    
-    return interfaces;
-}
-
-/**
- * @brief Vérifie si le hotspot est actif
- */
-static bool isHotspotActive() {
-    std::string output = executeCommand("nmcli con show --active | grep hotspot");
-    return !output.empty();
-}
-
-// ============================================================================
 // FONCTION: registerNetworkCommands()
-// Enregistre toutes les commandes réseau (6 commandes)
 // ============================================================================
-void registerNetworkCommands(CommandFactory& factory) {
+
+void registerNetworkCommands(
+    CommandFactory& factory,
+    std::shared_ptr<NetworkManager> networkManager
+) {
+    if (!networkManager) {
+        Logger::error("NetworkCommands", 
+            "Cannot register commands: NetworkManager is null");
+        return;
+    }
     
     Logger::info("NetworkHandlers", "Registering network commands...");
+
+    // ========================================================================
+    // network.getStatus - État de la connexion
+    // ========================================================================
     
-    // ========================================================================
-    // network.status - État général du réseau
-    // ========================================================================
-    factory.registerCommand("network.status",
-        [](const json& params) -> json {
+    factory.registerCommand("network.getStatus",
+        [networkManager](const json& params) -> json {
             Logger::debug("NetworkAPI", "Getting network status...");
             
             try {
-                auto interfaces = getNetworkInterfaces();
-                bool hotspotActive = isHotspotActive();
+                auto info = networkManager->getNetworkInfo();
                 
                 return {
                     {"success", true},
-                    {"data", {
-                        {"interfaces", interfaces},
-                        {"hotspot_active", hotspotActive},
-                        {"internet_connected", !interfaces.empty()} // Simplifié
-                    }}
+                    {"data", info}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("NetworkAPI", 
-                    "Failed to get network status: " + std::string(e.what()));
+                    "Failed to get status: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to get network status: " + std::string(e.what())}
+                    {"error", e.what()},
+                    {"error_code", "STATUS_FAILED"}
                 };
             }
         }
     );
+
+    // ========================================================================
+    // network.scan - Scanner les réseaux Wi-Fi
+    // ========================================================================
     
-    // ========================================================================
-    // network.getInterfaces - Liste les interfaces réseau
-    // ========================================================================
-    factory.registerCommand("network.getInterfaces",
-        [](const json& params) -> json {
-            Logger::debug("NetworkAPI", "Getting network interfaces...");
+    factory.registerCommand("network.scan",
+        [networkManager](const json& params) -> json {
+            Logger::debug("NetworkAPI", "Scanning networks...");
             
             try {
-                auto interfaces = getNetworkInterfaces();
+                networkManager->startWifiScan();
                 
-                return {
-                    {"success", true},
-                    {"data", {
-                        {"interfaces", interfaces},
-                        {"count", interfaces.size()}
-                    }}
-                };
+                // Attendre un peu pour les résultats
+                std::this_thread::sleep_for(std::chrono::seconds(2));
                 
-            } catch (const std::exception& e) {
-                Logger::error("NetworkAPI", 
-                    "Failed to get interfaces: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", "Failed to get interfaces: " + std::string(e.what())}
-                };
-            }
-        }
-    );
-    
-    // ========================================================================
-    // network.scanWifi - Scanner les réseaux WiFi disponibles
-    // ========================================================================
-    factory.registerCommand("network.scanWifi",
-        [](const json& params) -> json {
-            Logger::debug("NetworkAPI", "Scanning WiFi networks...");
-            
-            try {
-                // Utiliser nmcli ou iw pour scanner
-                std::string output = executeCommand(
-                    "nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list");
+                auto networks = networkManager->getWifiNetworks();
+                json networksJson = json::array();
                 
-                json networks = json::array();
-                std::istringstream stream(output);
-                std::string line;
-                
-                while (std::getline(stream, line)) {
-                    if (line.empty()) continue;
-                    
-                    // Parse format: SSID:SIGNAL:SECURITY
-                    size_t pos1 = line.find(':');
-                    size_t pos2 = line.find(':', pos1 + 1);
-                    
-                    if (pos1 != std::string::npos && pos2 != std::string::npos) {
-                        std::string ssid = line.substr(0, pos1);
-                        std::string signal = line.substr(pos1 + 1, pos2 - pos1 - 1);
-                        std::string security = line.substr(pos2 + 1);
-                        
-                        if (!ssid.empty()) {
-                            networks.push_back({
-                                {"ssid", ssid},
-                                {"signal", signal},
-                                {"security", security},
-                                {"encrypted", security != "--"}
-                            });
-                        }
-                    }
+                for (const auto& network : networks) {
+                    networksJson.push_back({
+                        {"ssid", network.ssid},
+                        {"signal", network.signal},
+                        {"security", network.security}
+                    });
                 }
                 
                 Logger::info("NetworkAPI", 
-                    "Found " + std::to_string(networks.size()) + " WiFi networks");
+                    "Found " + std::to_string(networks.size()) + " networks");
                 
                 return {
                     {"success", true},
                     {"data", {
-                        {"networks", networks},
+                        {"networks", networksJson},
                         {"count", networks.size()}
                     }}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("NetworkAPI", 
-                    "Failed to scan WiFi: " + std::string(e.what()));
+                    "Failed to scan: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to scan WiFi: " + std::string(e.what())}
+                    {"error", e.what()},
+                    {"error_code", "SCAN_FAILED"}
                 };
             }
         }
     );
+
+    // ========================================================================
+    // network.connect - Connecter à un réseau
+    // ========================================================================
     
-    // ========================================================================
-    // network.connectWifi - Se connecter à un réseau WiFi
-    // ========================================================================
-    factory.registerCommand("network.connectWifi",
-        [](const json& params) -> json {
-            Logger::debug("NetworkAPI", "Connecting to WiFi...");
+    factory.registerCommand("network.connect",
+        [networkManager](const json& params) -> json {
+            Logger::debug("NetworkAPI", "Connecting to network...");
             
             try {
-                // Validation
-                if (!params.contains("ssid")) {
+                if (!params.contains("ssid") || !params.contains("password")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: ssid"}
+                        {"error", "Missing required parameters: ssid, password"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
                 std::string ssid = params["ssid"];
-                std::string password = params.value("password", "");
+                std::string password = params["password"];
                 
-                // Construire commande nmcli
-                std::string command = "nmcli dev wifi connect \"" + ssid + "\"";
-                if (!password.empty()) {
-                    command += " password \"" + password + "\"";
-                }
+                bool success = networkManager->connectWifi(ssid, password);
                 
-                std::string output = executeCommand(command);
-                
-                // Vérifier succès
-                bool success = (output.find("successfully") != std::string::npos);
-                
-                if (success) {
-                    Logger::info("NetworkAPI", "Connected to WiFi: " + ssid);
-                    return {
-                        {"success", true},
-                        {"message", "Connected to WiFi successfully"},
-                        {"ssid", ssid}
-                    };
-                } else {
-                    Logger::error("NetworkAPI", "Failed to connect to WiFi: " + ssid);
+                if (!success) {
                     return {
                         {"success", false},
-                        {"error", "Failed to connect to WiFi: " + output}
+                        {"error", "Failed to connect to network"},
+                        {"error_code", "CONNECT_FAILED"}
                     };
                 }
+                
+                Logger::info("NetworkAPI", "✓ Connected to: " + ssid);
+                
+                return {
+                    {"success", true},
+                    {"data", {
+                        {"ssid", ssid},
+                        {"connected", true}
+                    }}
+                };
                 
             } catch (const std::exception& e) {
                 Logger::error("NetworkAPI", 
-                    "Failed to connect WiFi: " + std::string(e.what()));
+                    "Failed to connect: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to connect WiFi: " + std::string(e.what())}
+                    {"error", e.what()},
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
     );
+
+    // ========================================================================
+    // network.disconnect - Déconnecter
+    // ========================================================================
     
-    // ========================================================================
-    // network.startHotspot - Démarrer un hotspot WiFi
-    // ========================================================================
-    factory.registerCommand("network.startHotspot",
-        [](const json& params) -> json {
-            Logger::debug("NetworkAPI", "Starting WiFi hotspot...");
+    factory.registerCommand("network.disconnect",
+        [networkManager](const json& params) -> json {
+            Logger::debug("NetworkAPI", "Disconnecting from network...");
             
             try {
-                // Paramètres par défaut
-                std::string ssid = params.value("ssid", "MidiMind");
-                std::string password = params.value("password", "midimind123");
+                bool success = networkManager->disconnectWifi();
                 
-                // Validation password (min 8 caractères pour WPA2)
-                if (password.length() < 8) {
+                if (!success) {
                     return {
                         {"success", false},
-                        {"error", "Password must be at least 8 characters"}
+                        {"error", "Failed to disconnect"},
+                        {"error_code", "DISCONNECT_FAILED"}
                     };
                 }
                 
-                // Créer hotspot avec nmcli
-                std::string command = 
-                    "nmcli con add type wifi ifname wlan0 con-name hotspot "
-                    "autoconnect no ssid \"" + ssid + "\" && "
-                    "nmcli con modify hotspot 802-11-wireless.mode ap "
-                    "802-11-wireless.band bg ipv4.method shared && "
-                    "nmcli con modify hotspot wifi-sec.key-mgmt wpa-psk && "
-                    "nmcli con modify hotspot wifi-sec.psk \"" + password + "\" && "
-                    "nmcli con up hotspot";
+                Logger::info("NetworkAPI", "✓ Disconnected");
                 
-                std::string output = executeCommand(command);
-                
-                bool success = isHotspotActive();
-                
-                if (success) {
-                    Logger::info("NetworkAPI", "Hotspot started: " + ssid);
-                    return {
-                        {"success", true},
-                        {"message", "Hotspot started successfully"},
-                        {"data", {
-                            {"ssid", ssid},
-                            {"ip", "10.42.0.1"} // IP par défaut nmcli
-                        }}
-                    };
-                } else {
-                    Logger::error("NetworkAPI", "Failed to start hotspot");
-                    return {
-                        {"success", false},
-                        {"error", "Failed to start hotspot: " + output}
-                    };
-                }
+                return {
+                    {"success", true},
+                    {"message", "Disconnected successfully"}
+                };
                 
             } catch (const std::exception& e) {
                 Logger::error("NetworkAPI", 
-                    "Failed to start hotspot: " + std::string(e.what()));
+                    "Failed to disconnect: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to start hotspot: " + std::string(e.what())}
+                    {"error", e.what()},
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
     );
+
+    // ========================================================================
+    // network.getConfig - Configuration réseau
+    // ========================================================================
     
-    // ========================================================================
-    // network.stopHotspot - Arrêter le hotspot WiFi
-    // ========================================================================
-    factory.registerCommand("network.stopHotspot",
-        [](const json& params) -> json {
-            Logger::debug("NetworkAPI", "Stopping WiFi hotspot...");
+    factory.registerCommand("network.getConfig",
+        [networkManager](const json& params) -> json {
+            Logger::debug("NetworkAPI", "Getting network configuration...");
             
             try {
-                std::string output = executeCommand("nmcli con down hotspot");
+                auto info = networkManager->getNetworkInfo();
                 
-                bool success = !isHotspotActive();
-                
-                if (success) {
-                    Logger::info("NetworkAPI", "Hotspot stopped");
-                    return {
-                        {"success", true},
-                        {"message", "Hotspot stopped successfully"}
-                    };
-                } else {
-                    Logger::error("NetworkAPI", "Failed to stop hotspot");
-                    return {
-                        {"success", false},
-                        {"error", "Failed to stop hotspot"}
-                    };
-                }
+                return {
+                    {"success", true},
+                    {"data", info}
+                };
                 
             } catch (const std::exception& e) {
                 Logger::error("NetworkAPI", 
-                    "Failed to stop hotspot: " + std::string(e.what()));
+                    "Failed to get config: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to stop hotspot: " + std::string(e.what())}
+                    {"error", e.what()},
+                    {"error_code", "CONFIG_FAILED"}
                 };
             }
         }
     );
     
-    Logger::info("NetworkHandlers", "✓ Registered 6 network commands");
+    Logger::info("NetworkHandlers", "✓ Network commands registered");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER network.cpp
+// FIN DU FICHIER network.cpp v3.0.5
 // ============================================================================

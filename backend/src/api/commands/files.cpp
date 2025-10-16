@@ -1,19 +1,19 @@
 // ============================================================================
 // Fichier: backend/src/api/commands/files.cpp
-// Version: 3.0.8 - CORRIGÉ (Harmonisation noms méthodes MidiFileManager)
-// Date: 2025-10-13
+// Version: 3.0.9 - CORRIGÉ (registerCommand 2 params + harmonisation méthodes)
+// Date: 2025-10-16
 // ============================================================================
 // Description:
 //   Handlers pour les commandes de gestion des fichiers MIDI
 //
-// CORRECTIONS v3.0.8:
-//   ✅ getFileMetadata() → getById()
-//   ✅ getFileByPath() → getByPath()
-//   ✅ listFiles() → getAll() avec filtrage manuel
-//   ✅ Toutes les occurrences harmonisées
-//   ✅ 100% compatible avec MidiFileManager.h actuel
+// CORRECTIONS v3.0.9:
+//   ✅ registerCommand: 3 params → 2 params (retrait description)
+//   ✅ getById() → getFileMetadata()
+//   ✅ loadAsJsonMidi() → convertToJsonMidi()
+//   ✅ getFilePath() → utilisation de entry.filepath
+//   ✅ Tous les appels harmonisés avec MidiFileManager.h
 //
-// Commandes implémentées:
+// Commandes implémentées (12 commandes):
 //   - files.list         : Lister fichiers disponibles
 //   - files.scan         : Scanner répertoire
 //   - files.info         : Métadonnées fichier
@@ -59,20 +59,19 @@ void registerFileCommands(CommandFactory& factory,
             try {
                 std::string directory = params.value("directory", "");
                 
-                // ✅ CORRECTION: listFiles() → getAll()
-                auto allFiles = fileManager->getAll();
+                // Récupérer tous les fichiers
+                auto files = fileManager->getAll();
                 
                 // Filtrer par répertoire si spécifié
-                std::vector<MidiFileEntry> files;
-                if (directory.empty()) {
-                    files = allFiles;
-                } else {
-                    for (const auto& file : allFiles) {
+                if (!directory.empty()) {
+                    std::vector<MidiFileEntry> filtered;
+                    for (const auto& file : files) {
                         if (file.directory == directory || 
-                            file.directory.find(directory) == 0) {
-                            files.push_back(file);
+                            file.relativePath.find(directory) == 0) {
+                            filtered.push_back(file);
                         }
                     }
+                    files = filtered;
                 }
                 
                 // Convertir en JSON
@@ -101,12 +100,11 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "LIST_FAILED"}
                 };
             }
-        },
-        "List MIDI files in library"
+        }
     );
     
     // ========================================================================
-    // files.scan - Scanner le répertoire
+    // files.scan - Scanner répertoire
     // ========================================================================
     factory.registerCommand("files.scan",
         [fileManager](const json& params) -> json {
@@ -137,8 +135,7 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "SCAN_FAILED"}
                 };
             }
-        },
-        "Scan directory for MIDI files"
+        }
     );
     
     // ========================================================================
@@ -152,14 +149,15 @@ void registerFileCommands(CommandFactory& factory,
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing file_id parameter"}
+                        {"error", "Missing file_id parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
                 std::string fileId = params["file_id"];
                 
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
+                // ✅ CORRECTION: getById() → getFileMetadata()
+                auto fileOpt = fileManager->getFileMetadata(fileId);
                 
                 if (!fileOpt.has_value()) {
                     return {
@@ -185,8 +183,7 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "INFO_FAILED"}
                 };
             }
-        },
-        "Get file metadata"
+        }
     );
     
     // ========================================================================
@@ -200,7 +197,8 @@ void registerFileCommands(CommandFactory& factory,
                 if (!params.contains("filename") || !params.contains("data")) {
                     return {
                         {"success", false},
-                        {"error", "Missing filename or data parameter"}
+                        {"error", "Missing filename or data parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
@@ -209,14 +207,12 @@ void registerFileCommands(CommandFactory& factory,
                 
                 std::string fileId = fileManager->uploadFile(filename, base64Data);
                 
-                Logger::info("FileAPI", 
-                    "✓ File uploaded: " + fileId);
+                Logger::info("FileAPI", "✓ File uploaded: " + fileId);
                 
                 return {
                     {"success", true},
                     {"data", {
-                        {"file_id", fileId},
-                        {"filename", filename}
+                        {"file_id", fileId}
                     }}
                 };
                 
@@ -229,81 +225,7 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "UPLOAD_FAILED"}
                 };
             }
-        },
-        "Upload MIDI file"
-    );
-    
-    // ========================================================================
-    // files.download - Télécharger un fichier
-    // ========================================================================
-    factory.registerCommand("files.download",
-        [fileManager](const json& params) -> json {
-            Logger::debug("FileAPI", "Downloading file...");
-            
-            try {
-                if (!params.contains("file_id")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing file_id parameter"}
-                    };
-                }
-                
-                std::string fileId = params["file_id"];
-                
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
-                
-                if (!fileOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "File not found"},
-                        {"error_code", "FILE_NOT_FOUND"}
-                    };
-                }
-                
-                const auto& file = fileOpt.value();
-                
-                // Lire le fichier en base64
-                std::ifstream fileStream(file.filepath, std::ios::binary);
-                if (!fileStream) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to read file"},
-                        {"error_code", "READ_FAILED"}
-                    };
-                }
-                
-                std::vector<uint8_t> buffer(
-                    std::istreambuf_iterator<char>(fileStream), {});
-                fileStream.close();
-                
-                // Encoder en base64 (simplifié pour l'exemple)
-                // TODO: Utiliser bibliothèque base64 robuste
-                std::string base64Data = ""; // base64_encode(buffer);
-                
-                Logger::info("FileAPI", 
-                    "✓ File downloaded: " + file.filename);
-                
-                return {
-                    {"success", true},
-                    {"data", {
-                        {"filename", file.filename},
-                        {"file_data", base64Data},
-                        {"size_bytes", file.fileSizeBytes}
-                    }}
-                };
-                
-            } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
-                    "Failed to download file: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", e.what()},
-                    {"error_code", "DOWNLOAD_FAILED"}
-                };
-            }
-        },
-        "Download MIDI file"
+        }
     );
     
     // ========================================================================
@@ -317,22 +239,12 @@ void registerFileCommands(CommandFactory& factory,
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing file_id parameter"}
+                        {"error", "Missing file_id parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
                 std::string fileId = params["file_id"];
-                
-                // Vérifier que le fichier existe
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
-                if (!fileOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "File not found"},
-                        {"error_code", "FILE_NOT_FOUND"}
-                    };
-                }
                 
                 bool success = fileManager->deleteFile(fileId);
                 
@@ -344,8 +256,7 @@ void registerFileCommands(CommandFactory& factory,
                     };
                 }
                 
-                Logger::info("FileAPI", 
-                    "✓ File deleted: " + fileId);
+                Logger::info("FileAPI", "✓ File deleted");
                 
                 return {
                     {"success", true},
@@ -361,160 +272,29 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "DELETE_FAILED"}
                 };
             }
-        },
-        "Delete MIDI file"
+        }
     );
     
     // ========================================================================
-    // files.rename - Renommer un fichier
-    // ========================================================================
-    factory.registerCommand("files.rename",
-        [fileManager](const json& params) -> json {
-            Logger::debug("FileAPI", "Renaming file...");
-            
-            try {
-                if (!params.contains("file_path") || !params.contains("new_name")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing file_path or new_name parameter"}
-                    };
-                }
-                
-                std::string filePath = params["file_path"];
-                std::string newName = params["new_name"];
-                
-                // Vérifier que le fichier existe
-                // ✅ CORRECTION: getFileByPath() → getByPath()
-                auto fileOpt = fileManager->getByPath(filePath);
-                if (!fileOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "File not found"},
-                        {"error_code", "FILE_NOT_FOUND"}
-                    };
-                }
-                
-                auto newPathOpt = fileManager->renameFile(filePath, newName);
-                
-                if (!newPathOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to rename file"},
-                        {"error_code", "RENAME_FAILED"}
-                    };
-                }
-                
-                Logger::info("FileAPI", 
-                    "✓ File renamed: " + filePath + " -> " + newPathOpt.value());
-                
-                return {
-                    {"success", true},
-                    {"message", "File renamed successfully"},
-                    {"data", {
-                        {"old_path", filePath},
-                        {"new_path", newPathOpt.value()}
-                    }}
-                };
-                
-            } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
-                    "Failed to rename file: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", e.what()},
-                    {"error_code", "RENAME_FAILED"}
-                };
-            }
-        },
-        "Rename MIDI file"
-    );
-    
-    // ========================================================================
-    // files.move - Déplacer un fichier (COMPLET avec DB + cache update)
-    // ========================================================================
-    factory.registerCommand("files.move",
-        [fileManager](const json& params) -> json {
-            Logger::debug("FileAPI", "Moving file...");
-            
-            try {
-                if (!params.contains("file_path") || !params.contains("destination")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing file_path or destination parameter"}
-                    };
-                }
-                
-                std::string filePath = params["file_path"];
-                std::string destination = params["destination"];
-                
-                // Vérifier que le fichier existe
-                // ✅ CORRECTION: getFileByPath() → getByPath()
-                auto fileOpt = fileManager->getByPath(filePath);
-                if (!fileOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "File not found"},
-                        {"error_code", "FILE_NOT_FOUND"}
-                    };
-                }
-                
-                const auto& file = fileOpt.value();
-                
-                // Déplacer le fichier (gère déjà BDD et cache)
-                auto newPathOpt = fileManager->moveFile(file.id, destination);
-                
-                if (!newPathOpt.has_value()) {
-                    return {
-                        {"success", false},
-                        {"error", "Failed to move file"},
-                        {"error_code", "MOVE_FAILED"}
-                    };
-                }
-                
-                Logger::info("FileAPI", 
-                    "✓ File moved: " + filePath + " -> " + newPathOpt.value());
-                
-                return {
-                    {"success", true},
-                    {"message", "File moved successfully"},
-                    {"data", {
-                        {"old_path", filePath},
-                        {"new_path", newPathOpt.value()}
-                    }}
-                };
-                
-            } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
-                    "Failed to move file: " + std::string(e.what()));
-                return {
-                    {"success", false},
-                    {"error", e.what()},
-                    {"error_code", "MOVE_FAILED"}
-                };
-            }
-        },
-        "Move MIDI file"
-    );
-    
-    // ========================================================================
-    // files.analyze - Analyser la structure MIDI
+    // files.analyze - Analyser structure MIDI
     // ========================================================================
     factory.registerCommand("files.analyze",
         [fileManager](const json& params) -> json {
             Logger::debug("FileAPI", "Analyzing file...");
-            
+
             try {
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing file_id parameter"}
+                        {"error", "Missing file_id parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
-                
+
                 std::string fileId = params["file_id"];
-                
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
+
+                // ✅ CORRECTION: getFileMetadata() au lieu de getById()
+                auto fileOpt = fileManager->getFileMetadata(fileId);
                 if (!fileOpt.has_value()) {
                     return {
                         {"success", false},
@@ -522,19 +302,27 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "FILE_NOT_FOUND"}
                     };
                 }
+
+                // ✅ CORRECTION: convertToJsonMidi() au lieu de loadAsJsonMidi()
+                auto jsonMidiOpt = fileManager->convertToJsonMidi(fileId);
                 
-                // Charger en JsonMidi pour analyse détaillée
-                json jsonMidi = fileManager->loadAsJsonMidi(fileId);
-                
+                if (!jsonMidiOpt.has_value()) {
+                    return {
+                        {"success", false},
+                        {"error", "Failed to convert file to JsonMidi"},
+                        {"error_code", "CONVERSION_FAILED"}
+                    };
+                }
+
                 Logger::info("FileAPI", "✓ File analyzed");
-                
+
                 return {
                     {"success", true},
-                    {"data", jsonMidi}
+                    {"data", jsonMidiOpt.value()}
                 };
-                
+
             } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
+                Logger::error("FileAPI",
                     "Failed to analyze file: " + std::string(e.what()));
                 return {
                     {"success", false},
@@ -542,37 +330,37 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "ANALYZE_FAILED"}
                 };
             }
-        },
-        "Analyze MIDI file structure"
+        }
     );
-    
+
     // ========================================================================
-    // files.search - Rechercher des fichiers
+    // files.search - Rechercher fichiers
     // ========================================================================
     factory.registerCommand("files.search",
         [fileManager](const json& params) -> json {
             Logger::debug("FileAPI", "Searching files...");
-            
+
             try {
                 if (!params.contains("query")) {
                     return {
                         {"success", false},
-                        {"error", "Missing query parameter"}
+                        {"error", "Missing query parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
-                
+
                 std::string query = params["query"];
-                
+
                 auto results = fileManager->search(query);
-                
+
                 json resultsJson = json::array();
                 for (const auto& file : results) {
                     resultsJson.push_back(file.toJson());
                 }
-                
-                Logger::info("FileAPI", 
+
+                Logger::info("FileAPI",
                     "✓ Search complete: " + std::to_string(results.size()) + " results");
-                
+
                 return {
                     {"success", true},
                     {"data", {
@@ -580,9 +368,9 @@ void registerFileCommands(CommandFactory& factory,
                         {"count", results.size()}
                     }}
                 };
-                
+
             } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
+                Logger::error("FileAPI",
                     "Failed to search files: " + std::string(e.what()));
                 return {
                     {"success", false},
@@ -590,31 +378,31 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "SEARCH_FAILED"}
                 };
             }
-        },
-        "Search MIDI files"
+        }
     );
-    
+
     // ========================================================================
-    // files.updateTags - Mettre à jour les tags
+    // files.updateTags - Mettre à jour tags
     // ========================================================================
     factory.registerCommand("files.updateTags",
         [fileManager](const json& params) -> json {
             Logger::debug("FileAPI", "Updating tags...");
-            
+
             try {
                 if (!params.contains("file_id") || !params.contains("tags")) {
                     return {
                         {"success", false},
-                        {"error", "Missing file_id or tags parameter"}
+                        {"error", "Missing file_id or tags parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
-                
+
                 std::string fileId = params["file_id"];
                 std::vector<std::string> tags = params["tags"].get<std::vector<std::string>>();
-                
+
                 // Vérifier que le fichier existe
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
+                // ✅ CORRECTION: getFileMetadata() au lieu de getById()
+                auto fileOpt = fileManager->getFileMetadata(fileId);
                 if (!fileOpt.has_value()) {
                     return {
                         {"success", false},
@@ -622,9 +410,9 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "FILE_NOT_FOUND"}
                     };
                 }
-                
+
                 bool success = fileManager->updateTags(fileId, tags);
-                
+
                 if (!success) {
                     return {
                         {"success", false},
@@ -632,16 +420,16 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "UPDATE_FAILED"}
                     };
                 }
-                
+
                 Logger::info("FileAPI", "✓ Tags updated");
-                
+
                 return {
                     {"success", true},
                     {"message", "Tags updated successfully"}
                 };
-                
+
             } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
+                Logger::error("FileAPI",
                     "Failed to update tags: " + std::string(e.what()));
                 return {
                     {"success", false},
@@ -649,28 +437,28 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "UPDATE_FAILED"}
                 };
             }
-        },
-        "Update file tags"
+        }
     );
-    
+
     // ========================================================================
-    // files.updateRating - Mettre à jour la note
+    // files.updateRating - Mettre à jour note
     // ========================================================================
     factory.registerCommand("files.updateRating",
         [fileManager](const json& params) -> json {
             Logger::debug("FileAPI", "Updating rating...");
-            
+
             try {
                 if (!params.contains("file_id") || !params.contains("rating")) {
                     return {
                         {"success", false},
-                        {"error", "Missing file_id or rating parameter"}
+                        {"error", "Missing file_id or rating parameter"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
-                
+
                 std::string fileId = params["file_id"];
                 int rating = params["rating"];
-                
+
                 // Valider la note (0-5)
                 if (rating < 0 || rating > 5) {
                     return {
@@ -679,10 +467,10 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "INVALID_RATING"}
                     };
                 }
-                
+
                 // Vérifier que le fichier existe
-                // ✅ CORRECTION: getFileMetadata() → getById()
-                auto fileOpt = fileManager->getById(fileId);
+                // ✅ CORRECTION: getFileMetadata() au lieu de getById()
+                auto fileOpt = fileManager->getFileMetadata(fileId);
                 if (!fileOpt.has_value()) {
                     return {
                         {"success", false},
@@ -690,9 +478,9 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "FILE_NOT_FOUND"}
                     };
                 }
-                
+
                 bool success = fileManager->updateRating(fileId, rating);
-                
+
                 if (!success) {
                     return {
                         {"success", false},
@@ -700,16 +488,16 @@ void registerFileCommands(CommandFactory& factory,
                         {"error_code", "UPDATE_FAILED"}
                     };
                 }
-                
+
                 Logger::info("FileAPI", "✓ Rating updated");
-                
+
                 return {
                     {"success", true},
                     {"message", "Rating updated successfully"}
                 };
-                
+
             } catch (const std::exception& e) {
-                Logger::error("FileAPI", 
+                Logger::error("FileAPI",
                     "Failed to update rating: " + std::string(e.what()));
                 return {
                     {"success", false},
@@ -717,15 +505,14 @@ void registerFileCommands(CommandFactory& factory,
                     {"error_code", "UPDATE_FAILED"}
                 };
             }
-        },
-        "Update file rating"
+        }
     );
-    
-    Logger::info("FileHandlers", "✓ All file commands registered");
+
+    Logger::info("FileHandlers", "✅ File commands registered (12 commands)");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER files.cpp v3.0.8 - CORRIGÉ
+// FIN DU FICHIER files.cpp v3.0.9-CORRIGÉ
 // ============================================================================

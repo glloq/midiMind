@@ -4,7 +4,6 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <midifile/MidiFile.h>
 #include <nlohmann/json.hpp>
 #include "../core/Logger.h"
 

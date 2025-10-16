@@ -30,9 +30,9 @@
 #include <chrono>              // Pour timing
 #include <nlohmann/json.hpp>   // Pour getStatus()
 
-#include "MidiMessage.h"
-#include "MidiRouter.h"
-#include "../core/Logger.h"
+#include "../MidiMessage.h"
+#include "../MidiRouter.h"
+#include "../../core/Logger.h"
 
 using json = nlohmann::json;
 

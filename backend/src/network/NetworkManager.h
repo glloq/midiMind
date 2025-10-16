@@ -30,7 +30,7 @@
 #include <mutex>
 #include <functional>
 #include <optional>
-#include "../external/json.hpp"
+#include <nlohmann/json.hpp>
 
 // Composants réseau
 #include "WifiManager.h"

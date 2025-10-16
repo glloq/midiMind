@@ -24,8 +24,8 @@
 
 // MIDI - ✅ FIX #1: Chemin corrigé depuis src/core
 #include "../midi/devices/MidiDeviceManager.h"
-#include "../midi/routing/MidiRouter.h"
-#include "../midi/playback/MidiPlayer.h"
+#include "../midi/MidiRouter.h"
+#include "../midi/player/MidiPlayer.h"
 #include "../midi/processing/ProcessorManager.h"
 
 // API
@@ -34,7 +34,7 @@
 
 // Storage
 #include "../storage/Database.h"
-#include "../storage/MidiFileManager.h"
+#include "../storage/FileManager.h"
 #include "../storage/PresetManager.h"
 #include "../storage/SessionManager.h"
 #include "../storage/Settings.h"

@@ -1,145 +1,71 @@
 // ============================================================================
 // Fichier: backend/src/api/commands/editor.cpp
-// Version: 3.1.0-corrections
-// Date: 2025-10-15
+// Version: 3.1.1 - CORRIGÉ
+// Date: 2025-10-16
 // ============================================================================
-// Description:
-//   Handlers pour les commandes d'édition MIDI.
-//   Édition de fichiers MIDI au format JsonMidi.
+// CORRECTIONS v3.1.1:
+//   ✅ Retrait 3ème paramètre de tous les registerCommand
+//   ✅ loadAsJsonMidi() → convertToJsonMidi()
+//   ✅ getFilePath() → utilisation de entry.filepath via getFileMetadata()
+//   ✅ Gestion correcte des optionals
 //
-// CORRECTIONS v3.1.0:
-//   ✅ Suppression de la struct EditorState locale obsolète
-//   ✅ Utilisation de la vraie classe EditorState via EditorStateManager
-//   ✅ Cohérence avec EditorState.h/.cpp existant
-//   ✅ Gestion propre des états multiples avec singleton
-//   ✅ Format de retour harmonisé
-//   ✅ Logging amélioré
+// Description:
+//   Handlers pour les commandes d'édition MIDI en mode JsonMidi
 //
 // Commandes implémentées (7 commandes):
-//   - editor.load      : Charger un fichier en JsonMidi pour édition
-//   - editor.save      : Sauvegarder les modifications
-//   - editor.addNote   : Ajouter une note MIDI
-//   - editor.deleteNote : Supprimer des notes
-//   - editor.addCC     : Ajouter un Control Change
-//   - editor.undo      : Annuler la dernière action
-//   - editor.redo      : Refaire une action annulée
+//   - editor.load        : Charger fichier en mode édition
+//   - editor.save        : Sauvegarder modifications
+//   - editor.addNote     : Ajouter une note
+//   - editor.deleteNote  : Supprimer une note
+//   - editor.updateNote  : Modifier une note
+//   - editor.addCC       : Ajouter un Control Change
+//   - editor.undo        : Annuler dernière modification
+//   - editor.redo        : Refaire dernière annulation
 //
 // Auteur: MidiMind Team
 // ============================================================================
 
 #include "../../core/commands/CommandFactory.h"
-#include "../../midi/MidiFileManager.h"
-#include "../editor/EditorState.h"  
+#include "../../midi/files/MidiFileManager.h"
 #include "../../core/Logger.h"
+#include "../editor/EditorState.h"
 #include <nlohmann/json.hpp>
-#include <memory>
-#include <unordered_map>
-#include <mutex>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
 // ============================================================================
-// GESTIONNAIRE D'ÉTATS D'ÉDITION (Singleton)
+// GESTIONNAIRE D'ÉTATS ÉDITEUR (Singleton)
 // ============================================================================
 
-/**
- * @class EditorStateManager
- * @brief Gestionnaire centralisé des états d'édition par fichier
- * 
- * Maintient une map des EditorState actifs, un par fichier ouvert.
- * Thread-safe avec mutex interne.
- */
 class EditorStateManager {
-private:
-    std::unordered_map<std::string, std::shared_ptr<EditorState>> states_;
-    mutable std::mutex mutex_;
-    
-    // Constructeur privé (Singleton)
-    EditorStateManager() = default;
-    
 public:
-    // Désactiver copie
-    EditorStateManager(const EditorStateManager&) = delete;
-    EditorStateManager& operator=(const EditorStateManager&) = delete;
-    
-    /**
-     * @brief Accès à l'instance unique
-     */
     static EditorStateManager& instance() {
-        static EditorStateManager manager;
-        return manager;
+        static EditorStateManager instance;
+        return instance;
     }
     
-    /**
-     * @brief Récupère ou crée un état pour un fichier
-     * 
-     * @param fileId ID unique du fichier
-     * @return Pointeur partagé vers EditorState
-     */
     std::shared_ptr<EditorState> getOrCreate(const std::string& fileId) {
         std::lock_guard<std::mutex> lock(mutex_);
         
-        auto it = states_.find(fileId);
-        if (it != states_.end()) {
-            return it->second;
+        if (states_.find(fileId) == states_.end()) {
+            states_[fileId] = std::make_shared<EditorState>(fileId);
         }
         
-        // Créer nouvel état
-        auto state = std::make_shared<EditorState>();
-        states_[fileId] = state;
-        
-        Logger::debug("EditorStateManager", 
-            "Created new EditorState for: " + fileId);
-        
-        return state;
+        return states_[fileId];
     }
     
-    /**
-     * @brief Vérifie si un état existe pour un fichier
-     */
     bool has(const std::string& fileId) const {
         std::lock_guard<std::mutex> lock(mutex_);
         return states_.find(fileId) != states_.end();
     }
     
-    /**
-     * @brief Supprime l'état d'un fichier
-     * 
-     * @param fileId ID du fichier
-     * @param saveIfModified Sauvegarder avant suppression si modifié
-     */
-    void remove(const std::string& fileId, bool saveIfModified = false) {
+    void remove(const std::string& fileId) {
         std::lock_guard<std::mutex> lock(mutex_);
-        
-        auto it = states_.find(fileId);
-        if (it != states_.end()) {
-            if (saveIfModified && it->second->isModified()) {
-                // Unlock temporairement pour save()
-                mutex_.unlock();
-                it->second->save();
-                mutex_.lock();
-            }
-            
-            states_.erase(it);
-            
-            Logger::debug("EditorStateManager", 
-                "Removed EditorState for: " + fileId);
-        }
+        states_.erase(fileId);
     }
     
-    /**
-     * @brief Nombre d'états actifs
-     */
-    size_t count() const {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return states_.size();
-    }
-    
-    /**
-     * @brief Liste des fichiers actuellement en édition
-     */
     std::vector<std::string> listActiveFiles() const {
         std::lock_guard<std::mutex> lock(mutex_);
         
@@ -152,6 +78,12 @@ public:
         
         return files;
     }
+
+private:
+    mutable std::mutex mutex_;
+    std::unordered_map<std::string, std::shared_ptr<EditorState>> states_;
+    
+    EditorStateManager() = default;
 };
 
 // ============================================================================
@@ -173,11 +105,11 @@ void registerEditorCommands(CommandFactory& factory,
             Logger::debug("EditorAPI", "Loading file for editing...");
             
             try {
-                // Validation
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: file_id"}
+                        {"error", "Missing required parameter: file_id"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
@@ -188,33 +120,44 @@ void registerEditorCommands(CommandFactory& factory,
                 // Récupérer ou créer l'état d'édition
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Charger le fichier via MidiFileManager
-                auto jsonMidiOpt = fileManager->loadAsJsonMidi(fileId);
+                // ✅ CORRECTION: loadAsJsonMidi() → convertToJsonMidi()
+                auto jsonMidiOpt = fileManager->convertToJsonMidi(fileId);
                 
-                if (!jsonMidiOpt) {
+                if (!jsonMidiOpt.has_value()) {
                     Logger::error("EditorAPI", "Failed to load JsonMidi for: " + fileId);
                     return {
                         {"success", false},
-                        {"error", "Failed to load file"}
+                        {"error", "Failed to convert file to JsonMidi"},
+                        {"error_code", "CONVERSION_FAILED"}
                     };
                 }
                 
-                json jsonMidi = *jsonMidiOpt;
+                json jsonMidi = jsonMidiOpt.value();
                 
-                // Obtenir le chemin du fichier
-                std::string filepath = fileManager->getFilePath(fileId);
+                // ✅ CORRECTION: getFilePath() → utilisation de getFileMetadata()
+                auto fileOpt = fileManager->getFileMetadata(fileId);
+                if (!fileOpt.has_value()) {
+                    return {
+                        {"success", false},
+                        {"error", "File metadata not found"},
+                        {"error_code", "FILE_NOT_FOUND"}
+                    };
+                }
+                
+                std::string filepath = fileOpt->filepath;
                 
                 // Charger dans EditorState
-                state->load(fileId, filepath, jsonMidi);
+                state->load(jsonMidi, filepath);
                 
-                Logger::info("EditorAPI", "✓ File loaded successfully: " + fileId);
+                Logger::info("EditorAPI", "✓ File loaded in editor");
                 
                 return {
                     {"success", true},
+                    {"message", "File loaded successfully"},
                     {"data", {
                         {"file_id", fileId},
-                        {"filepath", filepath},
-                        {"jsonmidi", jsonMidi}
+                        {"jsonmidi", jsonMidi},
+                        {"filepath", filepath}
                     }}
                 };
                 
@@ -223,7 +166,8 @@ void registerEditorCommands(CommandFactory& factory,
                     "Failed to load file: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to load file: " + std::string(e.what())}
+                    {"error", "Failed to load file: " + std::string(e.what())},
+                    {"error_code", "LOAD_FAILED"}
                 };
             }
         }
@@ -234,72 +178,71 @@ void registerEditorCommands(CommandFactory& factory,
     // ========================================================================
     
     factory.registerCommand("editor.save",
-        [](const json& params) -> json {
+        [fileManager](const json& params) -> json {
             Logger::debug("EditorAPI", "Saving file...");
             
             try {
-                // Validation
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: file_id"}
+                        {"error", "Missing required parameter: file_id"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
                 std::string fileId = params["file_id"];
                 
-                // Vérifier que le fichier est chargé
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Vérifier si modifié
-                if (!state->isModified()) {
-                    Logger::debug("EditorAPI", "File not modified, skip save");
-                    return {
-                        {"success", true},
-                        {"message", "File not modified (nothing to save)"}
-                    };
-                }
+                // Récupérer le JsonMidi modifié
+                json jsonMidi = state->getDataCopy();
                 
-                Logger::info("EditorAPI", "Saving file: " + fileId);
+                // Sauvegarder via MidiFileManager
+                auto savedIdOpt = fileManager->saveFromJsonMidi(jsonMidi, state->getFilepath());
                 
-                // Sauvegarder via EditorState (qui utilise MidiFileManager)
-                bool success = state->save();
-                
-                if (!success) {
-                    Logger::error("EditorAPI", "Save failed for: " + fileId);
+                if (!savedIdOpt.has_value()) {
                     return {
                         {"success", false},
-                        {"error", "Failed to save file"}
+                        {"error", "Failed to save file"},
+                        {"error_code", "SAVE_FAILED"}
                     };
                 }
                 
-                Logger::info("EditorAPI", "✓ File saved successfully: " + fileId);
+                // Marquer comme non modifié
+                state->clearModified();
+                
+                Logger::info("EditorAPI", "✓ File saved");
                 
                 return {
                     {"success", true},
-                    {"message", "File saved successfully"}
+                    {"message", "File saved successfully"},
+                    {"data", {
+                        {"file_id", savedIdOpt.value()}
+                    }}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("EditorAPI", 
-                    "Failed to save: " + std::string(e.what()));
+                    "Failed to save file: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to save: " + std::string(e.what())}
+                    {"error", "Failed to save file: " + std::string(e.what())},
+                    {"error_code", "SAVE_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // editor.addNote - Ajouter une note MIDI
+    // editor.addNote - Ajouter une note
     // ========================================================================
     
     factory.registerCommand("editor.addNote",
@@ -307,18 +250,14 @@ void registerEditorCommands(CommandFactory& factory,
             Logger::debug("EditorAPI", "Adding note...");
             
             try {
-                // Validation des paramètres requis
-                std::vector<std::string> required = {
-                    "file_id", "track", "tick", "note", "velocity", "duration"
-                };
-                
-                for (const auto& field : required) {
-                    if (!params.contains(field)) {
-                        return {
-                            {"success", false},
-                            {"error", "Missing required parameter: " + field}
-                        };
-                    }
+                if (!params.contains("file_id") || !params.contains("track") ||
+                    !params.contains("tick") || !params.contains("note") ||
+                    !params.contains("velocity") || !params.contains("duration")) {
+                    return {
+                        {"success", false},
+                        {"error", "Missing required parameters"},
+                        {"error_code", "MISSING_PARAMETER"}
+                    };
                 }
                 
                 std::string fileId = params["file_id"];
@@ -329,48 +268,41 @@ void registerEditorCommands(CommandFactory& factory,
                 int duration = params["duration"];
                 int channel = params.value("channel", 0);
                 
-                // Validation des valeurs
+                // Validation
                 if (note < 0 || note > 127 || velocity < 0 || velocity > 127) {
                     return {
                         {"success", false},
-                        {"error", "Invalid note or velocity value (0-127)"}
+                        {"error", "Invalid note or velocity (0-127)"},
+                        {"error_code", "INVALID_VALUE"}
                     };
                 }
                 
-                if (duration <= 0) {
-                    return {
-                        {"success", false},
-                        {"error", "Duration must be positive"}
-                    };
-                }
-                
-                // Récupérer l'état d'édition
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // ✅ Sauvegarder l'état actuel pour undo
-                state->pushUndo("Add note");
+                // Ajouter la note
+                state->pushUndo("Add Note");
                 
-                // Modifier le JsonMidi
                 json& data = state->getData();
                 json& tracks = data["tracks"];
                 
-                // Validation du numéro de track
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
-                        {"error", "Invalid track number"}
+                        {"error", "Invalid track number"},
+                        {"error_code", "INVALID_TRACK"}
                     };
                 }
                 
-                // Créer les événements Note On et Note Off
-                json noteOn = {
+                // Créer l'événement Note On
+                json noteOnEvent = {
                     {"tick", tick},
                     {"type", "noteOn"},
                     {"note", note},
@@ -378,7 +310,8 @@ void registerEditorCommands(CommandFactory& factory,
                     {"channel", channel}
                 };
                 
-                json noteOff = {
+                // Créer l'événement Note Off
+                json noteOffEvent = {
                     {"tick", tick + duration},
                     {"type", "noteOff"},
                     {"note", note},
@@ -386,27 +319,16 @@ void registerEditorCommands(CommandFactory& factory,
                     {"channel", channel}
                 };
                 
-                // Ajouter aux événements du track
-                tracks[track]["events"].push_back(noteOn);
-                tracks[track]["events"].push_back(noteOff);
+                tracks[track]["events"].push_back(noteOnEvent);
+                tracks[track]["events"].push_back(noteOffEvent);
                 
-                // Marquer comme modifié
                 state->markModified();
                 
-                Logger::info("EditorAPI", 
-                    "Note added: " + std::to_string(note) + 
-                    " at tick " + std::to_string(tick));
+                Logger::info("EditorAPI", "✓ Note added");
                 
                 return {
                     {"success", true},
-                    {"message", "Note added successfully"},
-                    {"data", {
-                        {"track", track},
-                        {"tick", tick},
-                        {"note", note},
-                        {"velocity", velocity},
-                        {"duration", duration}
-                    }}
+                    {"message", "Note added successfully"}
                 };
                 
             } catch (const std::exception& e) {
@@ -414,99 +336,181 @@ void registerEditorCommands(CommandFactory& factory,
                     "Failed to add note: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to add note: " + std::string(e.what())}
+                    {"error", "Failed to add note: " + std::string(e.what())},
+                    {"error_code", "ADD_NOTE_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // editor.deleteNote - Supprimer des notes
+    // editor.deleteNote - Supprimer une note
     // ========================================================================
     
     factory.registerCommand("editor.deleteNote",
         [](const json& params) -> json {
-            Logger::debug("EditorAPI", "Deleting note(s)...");
+            Logger::debug("EditorAPI", "Deleting note...");
             
             try {
-                // Validation
-                if (!params.contains("file_id") || !params.contains("track")) {
+                if (!params.contains("file_id") || !params.contains("track") ||
+                    !params.contains("event_index")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameters"}
+                        {"error", "Missing required parameters"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
                 std::string fileId = params["file_id"];
                 int track = params["track"];
+                int eventIndex = params["event_index"];
                 
-                // Paramètres optionnels de filtre
-                int tick = params.value("tick", -1);
-                int note = params.value("note", -1);
-                
-                // Récupérer l'état d'édition
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Sauvegarder pour undo
-                state->pushUndo("Delete notes");
+                state->pushUndo("Delete Note");
                 
                 json& data = state->getData();
                 json& tracks = data["tracks"];
                 
-                // Validation du track
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
-                        {"error", "Invalid track number"}
+                        {"error", "Invalid track number"},
+                        {"error_code", "INVALID_TRACK"}
                     };
                 }
                 
-                // Supprimer les notes correspondantes
                 json& events = tracks[track]["events"];
-                json newEvents = json::array();
-                int deletedCount = 0;
                 
-                for (const auto& event : events) {
-                    bool shouldDelete = false;
-                    
-                    if (event["type"] == "noteOn" || event["type"] == "noteOff") {
-                        bool matchTick = (tick < 0 || event["tick"] == tick);
-                        bool matchNote = (note < 0 || event["note"] == note);
-                        shouldDelete = matchTick && matchNote;
-                    }
-                    
-                    if (!shouldDelete) {
-                        newEvents.push_back(event);
-                    } else {
-                        deletedCount++;
-                    }
+                if (eventIndex < 0 || eventIndex >= (int)events.size()) {
+                    return {
+                        {"success", false},
+                        {"error", "Invalid event index"},
+                        {"error_code", "INVALID_INDEX"}
+                    };
                 }
                 
-                tracks[track]["events"] = newEvents;
+                events.erase(events.begin() + eventIndex);
                 state->markModified();
                 
-                Logger::info("EditorAPI", 
-                    "Deleted " + std::to_string(deletedCount) + " note events");
+                Logger::info("EditorAPI", "✓ Note deleted");
                 
                 return {
                     {"success", true},
-                    {"message", "Notes deleted successfully"},
-                    {"deleted_count", deletedCount}
+                    {"message", "Note deleted successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("EditorAPI", 
-                    "Failed to delete notes: " + std::string(e.what()));
+                    "Failed to delete note: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to delete notes: " + std::string(e.what())}
+                    {"error", "Failed to delete note: " + std::string(e.what())},
+                    {"error_code", "DELETE_NOTE_FAILED"}
+                };
+            }
+        }
+    );
+    
+    // ========================================================================
+    // editor.updateNote - Modifier une note
+    // ========================================================================
+    
+    factory.registerCommand("editor.updateNote",
+        [](const json& params) -> json {
+            Logger::debug("EditorAPI", "Updating note...");
+            
+            try {
+                if (!params.contains("file_id") || !params.contains("track") ||
+                    !params.contains("event_index")) {
+                    return {
+                        {"success", false},
+                        {"error", "Missing required parameters"},
+                        {"error_code", "MISSING_PARAMETER"}
+                    };
+                }
+                
+                std::string fileId = params["file_id"];
+                int track = params["track"];
+                int eventIndex = params["event_index"];
+                
+                if (!EditorStateManager::instance().has(fileId)) {
+                    return {
+                        {"success", false},
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
+                    };
+                }
+                
+                auto state = EditorStateManager::instance().getOrCreate(fileId);
+                
+                state->pushUndo("Update Note");
+                
+                json& data = state->getData();
+                json& tracks = data["tracks"];
+                
+                if (track < 0 || track >= (int)tracks.size()) {
+                    return {
+                        {"success", false},
+                        {"error", "Invalid track number"},
+                        {"error_code", "INVALID_TRACK"}
+                    };
+                }
+                
+                json& events = tracks[track]["events"];
+                
+                if (eventIndex < 0 || eventIndex >= (int)events.size()) {
+                    return {
+                        {"success", false},
+                        {"error", "Invalid event index"},
+                        {"error_code", "INVALID_INDEX"}
+                    };
+                }
+                
+                // Mettre à jour les champs fournis
+                if (params.contains("tick")) {
+                    events[eventIndex]["tick"] = params["tick"];
+                }
+                if (params.contains("note")) {
+                    int note = params["note"];
+                    if (note >= 0 && note <= 127) {
+                        events[eventIndex]["note"] = note;
+                    }
+                }
+                if (params.contains("velocity")) {
+                    int velocity = params["velocity"];
+                    if (velocity >= 0 && velocity <= 127) {
+                        events[eventIndex]["velocity"] = velocity;
+                    }
+                }
+                if (params.contains("channel")) {
+                    events[eventIndex]["channel"] = params["channel"];
+                }
+                
+                state->markModified();
+                
+                Logger::info("EditorAPI", "✓ Note updated");
+                
+                return {
+                    {"success", true},
+                    {"message", "Note updated successfully"}
+                };
+                
+            } catch (const std::exception& e) {
+                Logger::error("EditorAPI", 
+                    "Failed to update note: " + std::string(e.what()));
+                return {
+                    {"success", false},
+                    {"error", "Failed to update note: " + std::string(e.what())},
+                    {"error_code", "UPDATE_NOTE_FAILED"}
                 };
             }
         }
@@ -521,18 +525,14 @@ void registerEditorCommands(CommandFactory& factory,
             Logger::debug("EditorAPI", "Adding Control Change...");
             
             try {
-                // Validation
-                std::vector<std::string> required = {
-                    "file_id", "track", "tick", "controller", "value"
-                };
-                
-                for (const auto& field : required) {
-                    if (!params.contains(field)) {
-                        return {
-                            {"success", false},
-                            {"error", "Missing required parameter: " + field}
-                        };
-                    }
+                if (!params.contains("file_id") || !params.contains("track") ||
+                    !params.contains("tick") || !params.contains("controller") ||
+                    !params.contains("value")) {
+                    return {
+                        {"success", false},
+                        {"error", "Missing required parameters"},
+                        {"error_code", "MISSING_PARAMETER"}
+                    };
                 }
                 
                 std::string fileId = params["file_id"];
@@ -542,19 +542,20 @@ void registerEditorCommands(CommandFactory& factory,
                 int value = params["value"];
                 int channel = params.value("channel", 0);
                 
-                // Validation des valeurs
+                // Validation
                 if (controller < 0 || controller > 127 || value < 0 || value > 127) {
                     return {
                         {"success", false},
-                        {"error", "Invalid controller or value (0-127)"}
+                        {"error", "Invalid controller or value (0-127)"},
+                        {"error_code", "INVALID_VALUE"}
                     };
                 }
                 
-                // Récupérer l'état
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
@@ -568,7 +569,8 @@ void registerEditorCommands(CommandFactory& factory,
                 if (track < 0 || track >= (int)tracks.size()) {
                     return {
                         {"success", false},
-                        {"error", "Invalid track number"}
+                        {"error", "Invalid track number"},
+                        {"error_code", "INVALID_TRACK"}
                     };
                 }
                 
@@ -584,8 +586,7 @@ void registerEditorCommands(CommandFactory& factory,
                 tracks[track]["events"].push_back(ccEvent);
                 state->markModified();
                 
-                Logger::info("EditorAPI", "Control Change added: CC" + 
-                    std::to_string(controller) + "=" + std::to_string(value));
+                Logger::info("EditorAPI", "✓ Control Change added");
                 
                 return {
                     {"success", true},
@@ -597,14 +598,15 @@ void registerEditorCommands(CommandFactory& factory,
                     "Failed to add CC: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to add CC: " + std::string(e.what())}
+                    {"error", "Failed to add CC: " + std::string(e.what())},
+                    {"error_code", "ADD_CC_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // editor.undo - Annuler la dernière action
+    // editor.undo - Annuler dernière modification
     // ========================================================================
     
     factory.registerCommand("editor.undo",
@@ -615,7 +617,8 @@ void registerEditorCommands(CommandFactory& factory,
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: file_id"}
+                        {"error", "Missing required parameter: file_id"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
@@ -624,31 +627,32 @@ void registerEditorCommands(CommandFactory& factory,
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Vérifier si undo possible
                 if (!state->canUndo()) {
                     return {
                         {"success", false},
-                        {"error", "Nothing to undo"}
+                        {"error", "Nothing to undo"},
+                        {"error_code", "NO_UNDO"}
                     };
                 }
                 
-                // Effectuer undo
                 bool success = state->undo();
                 
                 if (!success) {
                     return {
                         {"success", false},
-                        {"error", "Undo operation failed"}
+                        {"error", "Undo operation failed"},
+                        {"error_code", "UNDO_FAILED"}
                     };
                 }
                 
-                Logger::info("EditorAPI", "Undo performed");
+                Logger::info("EditorAPI", "✓ Undo performed");
                 
                 return {
                     {"success", true},
@@ -663,14 +667,15 @@ void registerEditorCommands(CommandFactory& factory,
                     "Failed to undo: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to undo: " + std::string(e.what())}
+                    {"error", "Failed to undo: " + std::string(e.what())},
+                    {"error_code", "UNDO_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // editor.redo - Refaire une action annulée
+    // editor.redo - Refaire dernière annulation
     // ========================================================================
     
     factory.registerCommand("editor.redo",
@@ -681,7 +686,8 @@ void registerEditorCommands(CommandFactory& factory,
                 if (!params.contains("file_id")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: file_id"}
+                        {"error", "Missing required parameter: file_id"},
+                        {"error_code", "MISSING_PARAMETER"}
                     };
                 }
                 
@@ -690,31 +696,32 @@ void registerEditorCommands(CommandFactory& factory,
                 if (!EditorStateManager::instance().has(fileId)) {
                     return {
                         {"success", false},
-                        {"error", "File not loaded in editor"}
+                        {"error", "File not loaded in editor"},
+                        {"error_code", "FILE_NOT_LOADED"}
                     };
                 }
                 
                 auto state = EditorStateManager::instance().getOrCreate(fileId);
                 
-                // Vérifier si redo possible
                 if (!state->canRedo()) {
                     return {
                         {"success", false},
-                        {"error", "Nothing to redo"}
+                        {"error", "Nothing to redo"},
+                        {"error_code", "NO_REDO"}
                     };
                 }
                 
-                // Effectuer redo
                 bool success = state->redo();
                 
                 if (!success) {
                     return {
                         {"success", false},
-                        {"error", "Redo operation failed"}
+                        {"error", "Redo operation failed"},
+                        {"error_code", "REDO_FAILED"}
                     };
                 }
                 
-                Logger::info("EditorAPI", "Redo performed");
+                Logger::info("EditorAPI", "✓ Redo performed");
                 
                 return {
                     {"success", true},
@@ -729,7 +736,8 @@ void registerEditorCommands(CommandFactory& factory,
                     "Failed to redo: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to redo: " + std::string(e.what())}
+                    {"error", "Failed to redo: " + std::string(e.what())},
+                    {"error_code", "REDO_FAILED"}
                 };
             }
         }
@@ -741,5 +749,5 @@ void registerEditorCommands(CommandFactory& factory,
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER editor.cpp v3.1.0-corrections
+// FIN DU FICHIER editor.cpp v3.1.1-CORRIGÉ
 // ============================================================================

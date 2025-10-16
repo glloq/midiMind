@@ -1,18 +1,18 @@
 // ============================================================================
-// Fichier: backend/src/api/commands/processing.cpp
-// Version: 3.0.1-corrections
-// Date: 2025-10-15
+// Fichier: /home/pi/midiMind/backend/src/api/commands/processing.cpp
+// Version: 3.0.9
+// Date: 2025-10-16
 // ============================================================================
 // Description:
 //   Handlers pour les commandes de traitement MIDI
 //
-// CORRECTIONS v3.0.1:
-//   ✅ Vérification complète conversion string → ProcessorType
-//   ✅ Gestion "type inconnu"
-//   ✅ Error codes ajoutés partout
-//   ✅ Logging amélioré
+// CORRECTIONS v3.0.9:
+//   ✅ Correction appels registerCommand (2 paramètres au lieu de 3)
+//   ✅ Remplacement addProcessor/removeProcessor → addProcessorToChain/removeProcessorFromChain
+//   ✅ Ajout méthodes enable()/disable() manquantes via setEnabled()
+//   ✅ Correction tous les enum ProcessorType
 //
-// Commandes implémentées (6+ commandes):
+// Commandes implémentées:
 //   - processing.add         : Ajouter un processeur à une chaîne
 //   - processing.remove      : Supprimer un processeur
 //   - processing.list        : Lister tous les processeurs actifs
@@ -25,7 +25,7 @@
 
 #include "../../core/commands/CommandFactory.h"
 #include "../../midi/processing/ProcessorManager.h"
-#include "../../midi/processing/ProcessorType.h"
+#include "../../midi/processing/MidiProcessor.h"
 #include "../../core/Logger.h"
 #include <nlohmann/json.hpp>
 
@@ -37,24 +37,18 @@ namespace midiMind {
 // HELPER: Conversion string → ProcessorType
 // ============================================================================
 
-/**
- * @brief Convertit un nom de type string vers ProcessorType enum
- * @param typeStr Nom du type en string
- * @param outType ProcessorType de sortie
- * @return true si conversion réussie
- */
 static bool stringToProcessorType(const std::string& typeStr, ProcessorType& outType) {
     if (typeStr == "transpose") {
         outType = ProcessorType::TRANSPOSE;
         return true;
-    } else if (typeStr == "filter") {
-        outType = ProcessorType::FILTER;
-        return true;
     } else if (typeStr == "velocity") {
-        outType = ProcessorType::VELOCITY_MAP;
+        outType = ProcessorType::VELOCITY;
         return true;
-    } else if (typeStr == "quantize") {
-        outType = ProcessorType::QUANTIZE;
+    } else if (typeStr == "channel_filter") {
+        outType = ProcessorType::CHANNEL_FILTER;
+        return true;
+    } else if (typeStr == "note_filter") {
+        outType = ProcessorType::NOTE_FILTER;
         return true;
     } else if (typeStr == "arpeggiator") {
         outType = ProcessorType::ARPEGGIATOR;
@@ -62,37 +56,31 @@ static bool stringToProcessorType(const std::string& typeStr, ProcessorType& out
     } else if (typeStr == "delay") {
         outType = ProcessorType::DELAY;
         return true;
+    } else if (typeStr == "chord") {
+        outType = ProcessorType::CHORD;
+        return true;
     } else if (typeStr == "harmonizer") {
         outType = ProcessorType::HARMONIZER;
         return true;
-    } else if (typeStr == "channelmap") {
-        outType = ProcessorType::CHANNEL_MAP;
-        return true;
     }
-    
-    // Type inconnu
     return false;
 }
 
-/**
- * @brief Liste des types de processeurs supportés
- */
 static std::vector<std::string> getSupportedProcessorTypes() {
     return {
         "transpose",
-        "filter",
         "velocity",
-        "quantize",
+        "channel_filter",
+        "note_filter",
         "arpeggiator",
         "delay",
-        "harmonizer",
-        "channelmap"
+        "chord",
+        "harmonizer"
     };
 }
 
 // ============================================================================
 // FONCTION: registerProcessingCommands()
-// Enregistre toutes les commandes processing.*
 // ============================================================================
 
 void registerProcessingCommands(
@@ -116,7 +104,6 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Adding processor...");
             
             try {
-                // Validation des paramètres obligatoires
                 if (!params.contains("chain_id")) {
                     return {
                         {"success", false},
@@ -135,11 +122,8 @@ void registerProcessingCommands(
                 
                 std::string chainId = params["chain_id"];
                 std::string processorTypeStr = params["type"];
-                
-                // Configuration optionnelle
                 json config = params.value("config", json::object());
                 
-                // Convertir le type de string vers ProcessorType enum
                 ProcessorType type;
                 if (!stringToProcessorType(processorTypeStr, type)) {
                     auto supportedTypes = getSupportedProcessorTypes();
@@ -148,45 +132,41 @@ void registerProcessingCommands(
                         typesList += supportedTypes[i];
                         if (i < supportedTypes.size() - 1) typesList += ", ";
                     }
-                    
-                    Logger::error("ProcessingAPI", 
-                        "Unknown processor type: " + processorTypeStr);
-                    
                     return {
                         {"success", false},
                         {"error", "Unknown processor type: " + processorTypeStr},
                         {"error_code", "INVALID_TYPE"},
-                        {"data", {
-                            {"requested_type", processorTypeStr},
-                            {"supported_types", supportedTypes}
-                        }}
+                        {"supported_types", typesList}
                     };
                 }
                 
-                // Ajouter le processeur
-                bool added = processorManager->addProcessor(chainId, type, config);
-                
-                if (!added) {
-                    Logger::error("ProcessingAPI", 
-                        "Failed to add processor to chain: " + chainId);
+                // Créer le processeur
+                auto processor = processorManager->createProcessor(type, config);
+                if (!processor) {
                     return {
                         {"success", false},
-                        {"error", "Failed to add processor"},
-                        {"error_code", "ADD_FAILED"},
-                        {"data", {
-                            {"chain_id", chainId},
-                            {"type", processorTypeStr}
-                        }}
+                        {"error", "Failed to create processor"},
+                        {"error_code", "CREATE_FAILED"}
                     };
                 }
                 
-                Logger::info("ProcessingAPI", 
-                    "✓ Processor added: " + processorTypeStr + " to chain " + chainId);
+                // Ajouter à la chaîne
+                bool added = processorManager->addProcessorToChain(chainId, processor);
+                
+                if (!added) {
+                    return {
+                        {"success", false},
+                        {"error", "Failed to add processor to chain"},
+                        {"error_code", "ADD_FAILED"}
+                    };
+                }
+                
+                Logger::info("ProcessingAPI", "✓ Processor added: " + processor->getName());
                 
                 return {
                     {"success", true},
-                    {"message", "Processor added successfully"},
                     {"data", {
+                        {"processor_id", processor->getName()},
                         {"chain_id", chainId},
                         {"type", processorTypeStr}
                     }}
@@ -194,11 +174,11 @@ void registerProcessingCommands(
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.add: " + std::string(e.what()));
+                    "Failed to add processor: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "INTERNAL_ERROR"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
@@ -213,19 +193,10 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Removing processor...");
             
             try {
-                // Validation des paramètres
-                if (!params.contains("chain_id")) {
+                if (!params.contains("chain_id") || !params.contains("processor_index")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: chain_id"},
-                        {"error_code", "MISSING_PARAMETER"}
-                    };
-                }
-                
-                if (!params.contains("processor_index")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameter: processor_index"},
+                        {"error", "Missing required parameters"},
                         {"error_code", "MISSING_PARAMETER"}
                     };
                 }
@@ -233,50 +204,37 @@ void registerProcessingCommands(
                 std::string chainId = params["chain_id"];
                 size_t processorIndex = params["processor_index"];
                 
-                // Supprimer le processeur
-                bool removed = processorManager->removeProcessor(chainId, processorIndex);
+                bool removed = processorManager->removeProcessorFromChain(chainId, processorIndex);
                 
                 if (!removed) {
-                    Logger::error("ProcessingAPI", 
-                        "Failed to remove processor at index " + std::to_string(processorIndex));
                     return {
                         {"success", false},
                         {"error", "Failed to remove processor"},
-                        {"error_code", "REMOVE_FAILED"},
-                        {"data", {
-                            {"chain_id", chainId},
-                            {"processor_index", processorIndex}
-                        }}
+                        {"error_code", "REMOVE_FAILED"}
                     };
                 }
                 
-                Logger::info("ProcessingAPI", 
-                    "✓ Processor removed at index " + std::to_string(processorIndex) + 
-                    " from chain " + chainId);
+                Logger::info("ProcessingAPI", "✓ Processor removed");
                 
                 return {
                     {"success", true},
-                    {"message", "Processor removed successfully"},
-                    {"data", {
-                        {"chain_id", chainId},
-                        {"processor_index", processorIndex}
-                    }}
+                    {"message", "Processor removed successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.remove: " + std::string(e.what()));
+                    "Failed to remove processor: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "INTERNAL_ERROR"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
     );
 
     // ========================================================================
-    // processing.list - Lister tous les processeurs
+    // processing.list - Lister les processeurs
     // ========================================================================
     
     factory.registerCommand("processing.list",
@@ -284,60 +242,47 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Listing processors...");
             
             try {
-                // Récupérer toutes les chaînes
-                auto chainIds = processorManager->listChains();
+                auto chains = processorManager->listChains();
+                json chainsJson = json::array();
                 
-                json chains = json::array();
-                
-                for (const auto& chainId : chainIds) {
+                for (const auto& chainId : chains) {
                     auto chain = processorManager->getChain(chainId);
+                    if (!chain) continue;
                     
-                    if (chain) {
-                        json chainData;
-                        chainData["id"] = chainId;
-                        chainData["name"] = chain->getName();
-                        chainData["enabled"] = chain->isEnabled();
-                        
-                        // Lister les processeurs de cette chaîne
-                        auto processors = chain->getProcessors();
-                        json processorsArray = json::array();
-                        
-                        size_t index = 0;
-                        for (const auto& processor : processors) {
-                            json processorData;
-                            processorData["index"] = index++;
-                            processorData["name"] = processor->getName();
-                            processorData["type"] = processor->getType();
-                            processorData["enabled"] = processor->isEnabled();
-                            
-                            processorsArray.push_back(processorData);
-                        }
-                        
-                        chainData["processors"] = processorsArray;
-                        chainData["processor_count"] = processors.size();
-                        
-                        chains.push_back(chainData);
+                    auto processors = chain->getProcessors();
+                    json processorsJson = json::array();
+                    
+                    for (const auto& processor : processors) {
+                        processorsJson.push_back({
+                            {"name", processor->getName()},
+                            {"enabled", processor->isEnabled()},
+                            {"config", processor->toJson()}
+                        });
                     }
+                    
+                    chainsJson.push_back({
+                        {"chain_id", chainId},
+                        {"name", chain->getName()},
+                        {"enabled", chain->isEnabled()},
+                        {"processors", processorsJson}
+                    });
                 }
-                
-                Logger::debug("ProcessingAPI", 
-                    "Listed " + std::to_string(chains.size()) + " processing chains");
                 
                 return {
                     {"success", true},
                     {"data", {
-                        {"chains", chains},
-                        {"chain_count", chains.size()}
+                        {"chains", chainsJson},
+                        {"count", chains.size()}
                     }}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.list: " + std::string(e.what()));
+                    "Failed to list processors: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "LIST_FAILED"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
@@ -352,19 +297,10 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Enabling processor...");
             
             try {
-                // Validation des paramètres
-                if (!params.contains("chain_id")) {
+                if (!params.contains("chain_id") || !params.contains("processor_index")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: chain_id"},
-                        {"error_code", "MISSING_PARAMETER"}
-                    };
-                }
-                
-                if (!params.contains("processor_index")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameter: processor_index"},
+                        {"error", "Missing required parameters"},
                         {"error_code", "MISSING_PARAMETER"}
                     };
                 }
@@ -372,56 +308,40 @@ void registerProcessingCommands(
                 std::string chainId = params["chain_id"];
                 size_t processorIndex = params["processor_index"];
                 
-                // Récupérer la chaîne
                 auto chain = processorManager->getChain(chainId);
-                
                 if (!chain) {
                     return {
                         {"success", false},
-                        {"error", "Chain not found: " + chainId},
+                        {"error", "Chain not found"},
                         {"error_code", "CHAIN_NOT_FOUND"}
                     };
                 }
                 
-                // Récupérer les processeurs
                 auto processors = chain->getProcessors();
-                
                 if (processorIndex >= processors.size()) {
                     return {
                         {"success", false},
                         {"error", "Processor index out of range"},
-                        {"error_code", "INDEX_OUT_OF_RANGE"},
-                        {"data", {
-                            {"processor_index", processorIndex},
-                            {"processor_count", processors.size()}
-                        }}
+                        {"error_code", "INDEX_OUT_OF_RANGE"}
                     };
                 }
                 
-                // Activer le processeur
-                processors[processorIndex]->enable();
+                processors[processorIndex]->setEnabled(true);
                 
-                Logger::info("ProcessingAPI", 
-                    "✓ Enabled processor at index " + std::to_string(processorIndex) + 
-                    " in chain '" + chainId + "'");
+                Logger::info("ProcessingAPI", "✓ Processor enabled");
                 
                 return {
                     {"success", true},
-                    {"message", "Processor enabled"},
-                    {"data", {
-                        {"chain_id", chainId},
-                        {"processor_index", processorIndex},
-                        {"enabled", true}
-                    }}
+                    {"message", "Processor enabled successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.enable: " + std::string(e.what()));
+                    "Failed to enable processor: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "ENABLE_FAILED"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
@@ -436,19 +356,10 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Disabling processor...");
             
             try {
-                // Validation des paramètres
-                if (!params.contains("chain_id")) {
+                if (!params.contains("chain_id") || !params.contains("processor_index")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: chain_id"},
-                        {"error_code", "MISSING_PARAMETER"}
-                    };
-                }
-                
-                if (!params.contains("processor_index")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameter: processor_index"},
+                        {"error", "Missing required parameters"},
                         {"error_code", "MISSING_PARAMETER"}
                     };
                 }
@@ -456,56 +367,40 @@ void registerProcessingCommands(
                 std::string chainId = params["chain_id"];
                 size_t processorIndex = params["processor_index"];
                 
-                // Récupérer la chaîne
                 auto chain = processorManager->getChain(chainId);
-                
                 if (!chain) {
                     return {
                         {"success", false},
-                        {"error", "Chain not found: " + chainId},
+                        {"error", "Chain not found"},
                         {"error_code", "CHAIN_NOT_FOUND"}
                     };
                 }
                 
-                // Récupérer les processeurs
                 auto processors = chain->getProcessors();
-                
                 if (processorIndex >= processors.size()) {
                     return {
                         {"success", false},
                         {"error", "Processor index out of range"},
-                        {"error_code", "INDEX_OUT_OF_RANGE"},
-                        {"data", {
-                            {"processor_index", processorIndex},
-                            {"processor_count", processors.size()}
-                        }}
+                        {"error_code", "INDEX_OUT_OF_RANGE"}
                     };
                 }
                 
-                // Désactiver le processeur
-                processors[processorIndex]->disable();
+                processors[processorIndex]->setEnabled(false);
                 
-                Logger::info("ProcessingAPI", 
-                    "✓ Disabled processor at index " + std::to_string(processorIndex) + 
-                    " in chain '" + chainId + "'");
+                Logger::info("ProcessingAPI", "✓ Processor disabled");
                 
                 return {
                     {"success", true},
-                    {"message", "Processor disabled"},
-                    {"data", {
-                        {"chain_id", chainId},
-                        {"processor_index", processorIndex},
-                        {"enabled", false}
-                    }}
+                    {"message", "Processor disabled successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.disable: " + std::string(e.what()));
+                    "Failed to disable processor: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "DISABLE_FAILED"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
@@ -520,27 +415,12 @@ void registerProcessingCommands(
             Logger::debug("ProcessingAPI", "Configuring processor...");
             
             try {
-                // Validation des paramètres
-                if (!params.contains("chain_id")) {
+                if (!params.contains("chain_id") || 
+                    !params.contains("processor_index") ||
+                    !params.contains("config")) {
                     return {
                         {"success", false},
-                        {"error", "Missing required parameter: chain_id"},
-                        {"error_code", "MISSING_PARAMETER"}
-                    };
-                }
-                
-                if (!params.contains("processor_index")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameter: processor_index"},
-                        {"error_code", "MISSING_PARAMETER"}
-                    };
-                }
-                
-                if (!params.contains("config")) {
-                    return {
-                        {"success", false},
-                        {"error", "Missing required parameter: config"},
+                        {"error", "Missing required parameters"},
                         {"error_code", "MISSING_PARAMETER"}
                     };
                 }
@@ -549,48 +429,51 @@ void registerProcessingCommands(
                 size_t processorIndex = params["processor_index"];
                 json config = params["config"];
                 
-                // Configurer le processeur
-                bool configured = processorManager->configureProcessor(
-                    chainId, processorIndex, config);
-                
-                if (!configured) {
-                    Logger::error("ProcessingAPI", "Failed to configure processor");
+                auto chain = processorManager->getChain(chainId);
+                if (!chain) {
                     return {
                         {"success", false},
-                        {"error", "Failed to configure processor"},
-                        {"error_code", "CONFIGURE_FAILED"}
+                        {"error", "Chain not found"},
+                        {"error_code", "CHAIN_NOT_FOUND"}
                     };
                 }
                 
-                Logger::info("ProcessingAPI", 
-                    "✓ Processor configured at index " + std::to_string(processorIndex));
+                auto processors = chain->getProcessors();
+                if (processorIndex >= processors.size()) {
+                    return {
+                        {"success", false},
+                        {"error", "Processor index out of range"},
+                        {"error_code", "INDEX_OUT_OF_RANGE"}
+                    };
+                }
+                
+                // Configurer le processeur
+                processors[processorIndex]->fromJson(config);
+                
+                Logger::info("ProcessingAPI", "✓ Processor configured");
                 
                 return {
                     {"success", true},
-                    {"message", "Processor configured successfully"},
-                    {"data", {
-                        {"chain_id", chainId},
-                        {"processor_index", processorIndex}
-                    }}
+                    {"message", "Processor configured successfully"}
                 };
                 
             } catch (const std::exception& e) {
                 Logger::error("ProcessingAPI", 
-                    "Error in processing.configure: " + std::string(e.what()));
+                    "Failed to configure processor: " + std::string(e.what()));
                 return {
                     {"success", false},
                     {"error", e.what()},
-                    {"error_code", "CONFIGURE_ERROR"}
+                    {"error_code", "EXCEPTION"}
                 };
             }
         }
     );
     
-    Logger::info("ProcessingHandlers", "✅ Processing commands registered (6 commands)");
+    Logger::info("ProcessingHandlers", "✓ Processing commands registered");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER processing.cpp v3.0.1-corrections
+// FIN DU FICHIER processing.cpp v3.0.9
 // ============================================================================

@@ -33,8 +33,7 @@
 #include <mutex>
 #include <optional>
 #include <chrono>
-#include "../../core/json.hpp"
-
+#include <nlohmann/json.hpp>
 namespace midiMind {
 
 using json = nlohmann::json;

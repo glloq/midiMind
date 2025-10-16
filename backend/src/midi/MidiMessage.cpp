@@ -26,8 +26,7 @@ MidiMessage::MidiMessage(const std::vector<uint8_t>& data)
 }
 
 MidiMessage::MidiMessage(uint8_t status, uint8_t data1, uint8_t data2)
-    : data_{status, data1, data2, timestamp_(0)}
-	captureTimestamp();
+    : data_{status, data1, data2} 
     , timestamp_(TimeUtils::getCurrentTimestampUs()) {
 }
 

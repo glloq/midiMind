@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "MidiFileReader.h"
-#include "MidiFileWriter.h"
+#include "file/MidiFileReader.h"
+#include "file/MidiFileWriter.h"
 #include "MidiMessage.h"
 #include "../core/Logger.h"
 #include <nlohmann/json.hpp>

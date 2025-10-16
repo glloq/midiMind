@@ -32,7 +32,7 @@
 #include <functional>
 #include <optional>
 #include <map>
-#include "../external/json.hpp"
+#include <nlohmann/json.hpp>
 
 // Support BlueZ D-Bus (optionnel)
 #ifdef HAS_BLUEZ

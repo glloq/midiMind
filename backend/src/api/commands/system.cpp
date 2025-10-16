@@ -1,18 +1,25 @@
 // ============================================================================
 // Fichier: backend/src/api/commands/system.cpp
-// Version: 3.0.1 - NOUVEAU FICHIER
-// Date: 2025-10-12
+// Version: 3.0.2 - CORRIGÉ
+// Date: 2025-10-16
 // ============================================================================
-// Description:
-//   Handlers pour les commandes système.
-//   Informations sur l'état du système, contrôle de l'application.
+// CORRECTIONS v3.0.2:
+//   ✅ Ajout #include <sys/vfs.h> pour statfs
+//   ✅ Ajout #include <sys/utsname.h> pour uname
+//   ✅ Retrait 3ème paramètre de tous les registerCommand
+//   ✅ Correction accès systemInfo.sysname, etc.
 //
-// Commandes:
-//   - system.status    : État général du système
-//   - system.info      : Informations détaillées
-//   - system.getCommands : Liste toutes les commandes disponibles
-//   - system.shutdown  : Arrêt propre de l'application
-//   - system.restart   : Redémarrage de l'application
+// Description:
+//   Handlers pour les commandes système
+//   Informations sur l'état du système, contrôle de l'application
+//
+// Commandes implémentées (6 commandes):
+//   - system.status      : État général du système
+//   - system.info        : Informations détaillées
+//   - system.commands    : Liste toutes les commandes disponibles
+//   - system.ping        : Test de connectivité
+//   - system.shutdown    : Arrêt propre de l'application
+//   - system.restart     : Redémarrage de l'application
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -21,10 +28,15 @@
 #include "../../core/Logger.h"
 #include "../../core/Config.h"
 #include <nlohmann/json.hpp>
+
+// ✅ CORRECTION: Ajout includes manquants
 #include <sys/sysinfo.h>
+#include <sys/vfs.h>       // Pour statfs
+#include <sys/utsname.h>   // Pour uname
 #include <fstream>
+#include <sstream>
 #include <ctime>
-#include <chrono>
+#include <thread>
 
 using json = nlohmann::json;
 
@@ -49,7 +61,6 @@ static uint64_t getUptimeSeconds() {
  * @brief Récupère l'utilisation CPU (approximative)
  */
 static double getCpuUsage() {
-    // Lecture simple de /proc/stat
     std::ifstream file("/proc/stat");
     if (!file.is_open()) return 0.0;
     
@@ -62,6 +73,20 @@ static double getCpuUsage() {
     if (total == 0) return 0.0;
     
     return ((double)(total - idle) / total) * 100.0;
+}
+
+/**
+ * @brief Récupère la température CPU (Raspberry Pi)
+ */
+static double getCpuTemperature() {
+    std::ifstream file("/sys/class/thermal/thermal_zone0/temp");
+    if (!file.is_open()) return 0.0;
+    
+    int temp;
+    file >> temp;
+    file.close();
+    
+    return temp / 1000.0;  // Convertir en Celsius
 }
 
 /**
@@ -81,7 +106,8 @@ static json getMemoryUsage() {
     uint64_t totalMB = info.totalram / (1024 * 1024);
     uint64_t freeMB = info.freeram / (1024 * 1024);
     uint64_t usedMB = totalMB - freeMB;
-    double usagePercent = totalMB > 0 ? ((double)usedMB / totalMB) * 100.0 : 0.0;
+    double usagePercent = totalMB > 0 ?
+        ((double)usedMB / totalMB) * 100.0 : 0.0;
     
     return {
         {"total_mb", totalMB},
@@ -92,24 +118,10 @@ static json getMemoryUsage() {
 }
 
 /**
- * @brief Récupère la température CPU (Raspberry Pi)
- */
-static double getCpuTemperature() {
-    std::ifstream file("/sys/class/thermal/thermal_zone0/temp");
-    if (!file.is_open()) return 0.0;
-    
-    int temp;
-    file >> temp;
-    file.close();
-    
-    return temp / 1000.0; // Convertir milli-degrés en degrés
-}
-
-/**
  * @brief Récupère l'espace disque
  */
 static json getDiskSpace() {
-    // Utilisation de statfs pour obtenir l'espace disque
+    // ✅ CORRECTION: statfs maintenant défini avec #include <sys/vfs.h>
     struct statfs diskInfo;
     if (statfs("/home/pi/MidiMind", &diskInfo) != 0) {
         return {
@@ -121,9 +133,10 @@ static json getDiskSpace() {
     }
     
     uint64_t totalMB = (diskInfo.f_blocks * diskInfo.f_bsize) / (1024 * 1024);
-    uint64_t freeMB = (diskInfo.f_bavail * diskInfo.f_bsize) / (1024 * 1024);
+    uint64_t freeMB = (diskInfo.f_bfree * diskInfo.f_bsize) / (1024 * 1024);
     uint64_t usedMB = totalMB - freeMB;
-    double usagePercent = totalMB > 0 ? ((double)usedMB / totalMB) * 100.0 : 0.0;
+    double usagePercent = totalMB > 0 ?
+        ((double)usedMB / totalMB) * 100.0 : 0.0;
     
     return {
         {"total_mb", totalMB},
@@ -146,7 +159,7 @@ static json getNetworkInfo() {
 
 // ============================================================================
 // FONCTION: registerSystemCommands()
-// Enregistre toutes les commandes système (5 commandes)
+// Enregistre toutes les commandes système (6 commandes)
 // ============================================================================
 void registerSystemCommands(CommandFactory& factory) {
     
@@ -178,23 +191,25 @@ void registerSystemCommands(CommandFactory& factory) {
                 
             } catch (const std::exception& e) {
                 Logger::error("SystemAPI", 
-                    "Failed to get status: " + std::string(e.what()));
+                    "Failed to get system status: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to get system status: " + std::string(e.what())}
+                    {"error", "Failed to get system status: " + std::string(e.what())},
+                    {"error_code", "STATUS_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // system.info - Informations détaillées sur le système
+    // system.info - Informations détaillées
     // ========================================================================
     factory.registerCommand("system.info",
         [](const json& params) -> json {
-            Logger::debug("SystemAPI", "Getting system info...");
+            Logger::debug("SystemAPI", "Getting detailed system info...");
             
             try {
+                // ✅ CORRECTION: uname maintenant défini avec #include <sys/utsname.h>
                 struct utsname systemInfo;
                 uname(&systemInfo);
                 
@@ -215,7 +230,7 @@ void registerSystemCommands(CommandFactory& factory) {
                             {"hostname", systemInfo.nodename}
                         }},
                         {"hardware", {
-                            {"model", "Raspberry Pi"}, // TODO: Détecter modèle exact
+                            {"model", "Raspberry Pi"},
                             {"cpu_cores", std::thread::hardware_concurrency()},
                             {"memory_total_mb", getMemoryUsage()["total_mb"]}
                         }},
@@ -225,34 +240,38 @@ void registerSystemCommands(CommandFactory& factory) {
                 
             } catch (const std::exception& e) {
                 Logger::error("SystemAPI", 
-                    "Failed to get info: " + std::string(e.what()));
+                    "Failed to get system info: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to get system info: " + std::string(e.what())}
+                    {"error", "Failed to get system info: " + std::string(e.what())},
+                    {"error_code", "INFO_FAILED"}
                 };
             }
         }
     );
     
     // ========================================================================
-    // system.getCommands - Liste toutes les commandes disponibles
+    // system.commands - Liste toutes les commandes disponibles
     // ========================================================================
-    factory.registerCommand("system.getCommands",
+    factory.registerCommand("system.commands",
         [&factory](const json& params) -> json {
             Logger::debug("SystemAPI", "Listing all commands...");
             
             try {
                 auto commands = factory.listCommands();
                 auto byCategory = factory.listCommandsByCategory();
-                auto counts = factory.countByCategory();
+                
+                json categoriesJson = json::object();
+                for (const auto& [category, cmdList] : byCategory) {
+                    categoriesJson[category] = cmdList;
+                }
                 
                 return {
                     {"success", true},
                     {"data", {
                         {"commands", commands},
-                        {"by_category", byCategory},
-                        {"counts", counts},
-                        {"total", factory.count()}
+                        {"count", commands.size()},
+                        {"by_category", categoriesJson}
                     }}
                 };
                 
@@ -261,9 +280,26 @@ void registerSystemCommands(CommandFactory& factory) {
                     "Failed to list commands: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to list commands: " + std::string(e.what())}
+                    {"error", "Failed to list commands: " + std::string(e.what())},
+                    {"error_code", "LIST_FAILED"}
                 };
             }
+        }
+    );
+    
+    // ========================================================================
+    // system.ping - Test de connectivité
+    // ========================================================================
+    factory.registerCommand("system.ping",
+        [](const json& params) -> json {
+            auto currentTime = std::time(nullptr);
+            
+            return {
+                {"success", true},
+                {"message", "pong"},
+                {"timestamp", currentTime},
+                {"uptime_seconds", getUptimeSeconds()}
+            };
         }
     );
     
@@ -272,27 +308,26 @@ void registerSystemCommands(CommandFactory& factory) {
     // ========================================================================
     factory.registerCommand("system.shutdown",
         [](const json& params) -> json {
-            Logger::info("SystemAPI", "Shutdown requested...");
+            Logger::debug("SystemAPI", "Shutting down...");
             
             try {
-                // Délai optionnel avant shutdown
                 int delaySeconds = params.value("delay_seconds", 0);
                 
                 if (delaySeconds < 0 || delaySeconds > 60) {
                     return {
                         {"success", false},
-                        {"error", "Invalid delay. Must be between 0 and 60 seconds"}
+                        {"error", "Delay must be between 0 and 60 seconds"},
+                        {"error_code", "INVALID_DELAY"}
                     };
                 }
                 
                 Logger::info("SystemAPI", 
-                    "Shutting down in " + std::to_string(delaySeconds) + " seconds...");
+                    "Shutdown initiated (delay: " + std::to_string(delaySeconds) + "s)");
                 
-                // TODO: Implémenter arrêt propre
-                // - Fermer tous les devices MIDI
-                // - Sauvegarder état
-                // - Fermer connexions
-                // - Exit application
+                // TODO: Implémenter shutdown propre
+                // - Fermer toutes les connexions
+                // - Sauvegarder l'état
+                // - exit(0)
                 
                 return {
                     {"success", true},
@@ -305,7 +340,8 @@ void registerSystemCommands(CommandFactory& factory) {
                     "Failed to shutdown: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to shutdown: " + std::string(e.what())}
+                    {"error", "Failed to shutdown: " + std::string(e.what())},
+                    {"error_code", "SHUTDOWN_FAILED"}
                 };
             }
         }
@@ -316,21 +352,21 @@ void registerSystemCommands(CommandFactory& factory) {
     // ========================================================================
     factory.registerCommand("system.restart",
         [](const json& params) -> json {
-            Logger::info("SystemAPI", "Restart requested...");
+            Logger::debug("SystemAPI", "Restarting...");
             
             try {
-                // Délai optionnel
                 int delaySeconds = params.value("delay_seconds", 0);
                 
                 if (delaySeconds < 0 || delaySeconds > 60) {
                     return {
                         {"success", false},
-                        {"error", "Invalid delay. Must be between 0 and 60 seconds"}
+                        {"error", "Delay must be between 0 and 60 seconds"},
+                        {"error_code", "INVALID_DELAY"}
                     };
                 }
                 
                 Logger::info("SystemAPI", 
-                    "Restarting in " + std::to_string(delaySeconds) + " seconds...");
+                    "Restart initiated (delay: " + std::to_string(delaySeconds) + "s)");
                 
                 // TODO: Implémenter restart
                 // - Même que shutdown mais avec exec() pour relancer
@@ -346,17 +382,18 @@ void registerSystemCommands(CommandFactory& factory) {
                     "Failed to restart: " + std::string(e.what()));
                 return {
                     {"success", false},
-                    {"error", "Failed to restart: " + std::string(e.what())}
+                    {"error", "Failed to restart: " + std::string(e.what())},
+                    {"error_code", "RESTART_FAILED"}
                 };
             }
         }
     );
     
-    Logger::info("SystemHandlers", "✓ Registered 5 system commands");
+    Logger::info("SystemHandlers", "✅ System commands registered (6 commands)");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER system.cpp
+// FIN DU FICHIER system.cpp v3.0.2-CORRIGÉ
 // ============================================================================

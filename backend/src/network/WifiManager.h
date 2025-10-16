@@ -32,8 +32,7 @@
 #include <atomic>
 #include <functional>
 #include <optional>
-#include "../external/json.hpp"
-
+#include <nlohmann/json.hpp>
 namespace midiMind {
 
 using json = nlohmann::json;
