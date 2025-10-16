@@ -1,11 +1,16 @@
 // ============================================================================
 // File: backend/src/core/Application.h
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.1.1 - CORRIGÉ COMPLET
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.0:
-//   - Added #include <nlohmann/json.hpp> for json type
+// Changes v4.1.1:
+//   - Fixed member variable names to match .cpp
+//   - Fixed pointer types (unique_ptr instead of shared_ptr)
+//   - Added missing thread variable
+//   - Fixed startTime_ type
+//   - Fixed getUptime() return type
+//   - Moved misplaced method declarations inside class
 //
 // ============================================================================
 
@@ -14,7 +19,10 @@
 #include <string>
 #include <memory>
 #include <atomic>
-#include <nlohmann/json.hpp>  // ✅ AJOUTÉ
+#include <thread>
+#include <chrono>
+#include <optional>
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
@@ -77,39 +85,44 @@ public:
     bool start();
     
     /**
+     * @brief Run main loop
+     */
+    void run();
+    
+    /**
      * @brief Stop application
      */
     void stop();
     
     /**
-     * @brief Shutdown application
+     * @brief Shutdown application (alias for stop)
      */
-    void shutdown();
+    void shutdown() { stop(); }
     
     /**
      * @brief Check if initialized
      */
-    bool isInitialized() const { return initialized_.load(); }
+    bool isInitialized() const;
     
     /**
      * @brief Check if running
      */
-    bool isRunning() const { return running_.load(); }
+    bool isRunning() const;
     
     // ========================================================================
     // COMPONENT ACCESS
     // ========================================================================
     
-    std::shared_ptr<Database> getDatabase() const { return database_; }
-    std::shared_ptr<Settings> getSettings() const { return settings_; }
-    std::shared_ptr<FileManager> getFileManager() const { return fileManager_; }
-    std::shared_ptr<InstrumentDatabase> getInstrumentDatabase() const { return instrumentDb_; }
-    std::shared_ptr<LatencyCompensator> getLatencyCompensator() const { return compensator_; }
-    std::shared_ptr<MidiDeviceManager> getDeviceManager() const { return deviceManager_; }
-    std::shared_ptr<MidiRouter> getRouter() const { return router_; }
-    std::shared_ptr<MidiPlayer> getPlayer() const { return player_; }
-    std::shared_ptr<ApiServer> getApiServer() const { return apiServer_; }
-    std::shared_ptr<EventBus> getEventBus() const { return eventBus_; }
+    std::unique_ptr<Database>& getDatabase() { return database_; }
+    std::unique_ptr<Settings>& getSettings() { return settings_; }
+    std::unique_ptr<FileManager>& getFileManager() { return fileManager_; }
+    std::unique_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
+    std::unique_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
+    std::unique_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
+    std::unique_ptr<MidiRouter>& getRouter() { return router_; }
+    std::unique_ptr<MidiPlayer>& getPlayer() { return player_; }
+    std::unique_ptr<ApiServer>& getApiServer() { return apiServer_; }
+    std::unique_ptr<EventBus>& getEventBus() { return eventBus_; }
     
     // ========================================================================
     // STATUS
@@ -119,12 +132,28 @@ public:
      * @brief Get application status
      * @return json Status information
      */
-    json getStatus() const;  // ✅ Type 'json' maintenant déclaré
+    json getStatus() const;
     
     /**
      * @brief Get uptime in seconds
      */
-    uint64_t getUptime() const;
+    int getUptime() const;
+    
+    /**
+     * @brief Get version string
+     */
+    std::string getVersion() const;
+    
+    /**
+     * @brief Get protocol version
+     */
+    std::string getProtocolVersion() const;
+    
+    // ========================================================================
+    // SIGNAL HANDLING (PUBLIC STATIC)
+    // ========================================================================
+    
+    static std::atomic<int> signalCount_;
 
 private:
     // ========================================================================
@@ -138,20 +167,27 @@ private:
     // INITIALIZATION PHASES
     // ========================================================================
     
-    bool initializePhase1_Config(const std::string& configPath);
-    bool initializePhase2_Database();
-    bool initializePhase3_Storage();
-    bool initializePhase4_Timing();
-    bool initializePhase5_MIDI();
-    bool initializePhase6_API();
-    bool initializePhase7_Monitoring();
+    bool initializeConfiguration(const std::string& configPath);
+    bool initializeDatabase();
+    bool initializeStorage();
+    bool initializeTiming();
+    bool initializeMidi();
+    bool initializeApi();
+    bool initializeEventSystem();
+    
+    // ========================================================================
+    // MONITORING
+    // ========================================================================
+    
+    void startMonitoringThreads();
+    void stopMonitoringThreads();
+    void broadcastStatus();
     
     // ========================================================================
     // SIGNAL HANDLING
     // ========================================================================
     
-    static void signalHandler(int signal);
-    static std::atomic<int> signalCount_;
+    void setupSignalHandlers();
     
     // ========================================================================
     // MEMBER VARIABLES
@@ -160,31 +196,35 @@ private:
     // State
     std::atomic<bool> initialized_{false};
     std::atomic<bool> running_{false};
-    uint64_t startTime_{0};
+    std::atomic<bool> statusBroadcastRunning_{false};
+    std::optional<std::chrono::steady_clock::time_point> startTime_;
     
     // Configuration
     std::string configPath_;
     json config_;
     
+    // Threads
+    std::thread statusBroadcastThread_;
+    
     // Core components
-    std::shared_ptr<Database> database_;
-    std::shared_ptr<Settings> settings_;
-    std::shared_ptr<FileManager> fileManager_;
-    std::shared_ptr<PathManager> pathManager_;
-    std::shared_ptr<InstrumentDatabase> instrumentDb_;
-    std::shared_ptr<EventBus> eventBus_;
+    std::unique_ptr<Database> database_;
+    std::unique_ptr<Settings> settings_;
+    std::unique_ptr<FileManager> fileManager_;
+    std::unique_ptr<PathManager> pathManager_;
+    std::unique_ptr<InstrumentDatabase> instrumentDatabase_;
+    std::unique_ptr<EventBus> eventBus_;
     
     // Timing components
-    std::shared_ptr<LatencyCompensator> compensator_;
+    std::unique_ptr<LatencyCompensator> latencyCompensator_;
     
     // MIDI components
-    std::shared_ptr<MidiDeviceManager> deviceManager_;
-    std::shared_ptr<MidiRouter> router_;
-    std::shared_ptr<MidiPlayer> player_;
+    std::unique_ptr<MidiDeviceManager> deviceManager_;
+    std::unique_ptr<MidiRouter> router_;
+    std::unique_ptr<MidiPlayer> player_;
     
     // API components
-    std::shared_ptr<ApiServer> apiServer_;
-    std::shared_ptr<CommandHandler> commandHandler_;
+    std::unique_ptr<ApiServer> apiServer_;
+    std::unique_ptr<CommandHandler> commandHandler_;
 };
 
 } // namespace midiMind

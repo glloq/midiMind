@@ -485,8 +485,7 @@ private:
         
         for (const auto& key : keys) {
             if (!current.is_object() || !current.contains(key)) {
-                throw json::exception::other_error::create(0, 
-                    "Path not found: " + path, nullptr);
+                throw std::runtime_error("Invalid JSON path: " + path);
             }
             current = current[key];
         }

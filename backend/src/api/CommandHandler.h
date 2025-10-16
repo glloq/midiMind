@@ -29,7 +29,7 @@
 
 #include "../midi/devices/MidiDeviceManager.h"
 #include "../midi/MidiRouter.h"
-#include "../midi/MidiPlayer.h"
+#include "../midi/player/MidiPlayer.h"
 #include "../storage/FileManager.h"
 #include <string>
 #include <memory>

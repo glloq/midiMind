@@ -94,7 +94,7 @@ bool FileManager::initializeDirectories() {
     if (allSuccess) {
         Logger::info("FileManager", "✓ Directory structure initialized");
     } else {
-        Logger::warn("FileManager", "⚠ Some directories failed to initialize");
+        Logger::warning("FileManager", "⚠ Some directories failed to initialize");
     }
     
     return allSuccess;
@@ -142,13 +142,13 @@ std::string FileManager::uploadFile(const std::vector<uint8_t>& data,
     
     // 5. Check if file exists
     if (!overwrite && Unsafe::exists(destPath)) {
-        THROW_ERROR(ErrorCode::FILE_ALREADY_EXISTS,
+        THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS,
                    "File already exists: " + safeName);
     }
     
     // 6. Write file
     if (!Unsafe::writeBinaryFile(destPath, data)) {
-        THROW_ERROR(ErrorCode::FILE_WRITE_FAILED,
+        THROW_ERROR(ErrorCode::STORAGE_IO_ERROR,
                    "Failed to write file: " + destPath);
     }
     
@@ -181,7 +181,7 @@ std::vector<uint8_t> FileManager::downloadFile(const std::string& filepath) {
     auto data = Unsafe::readBinaryFile(fullPath);
     
     if (data.empty()) {
-        Logger::warn("FileManager", "File is empty or read failed: " + filepath);
+        Logger::warning("FileManager", "File is empty or read failed: " + filepath);
     }
     
     Logger::info("FileManager", 
@@ -209,7 +209,7 @@ bool FileManager::deleteFile(const std::string& filepath) {
     
     // Check if file exists
     if (!Unsafe::exists(fullPath)) {
-        Logger::warn("FileManager", "File not found: " + filepath);
+        Logger::warning("FileManager", "File not found: " + filepath);
         return false;
     }
     
@@ -296,7 +296,7 @@ std::vector<FileInfo> FileManager::listFiles(DirectoryType dirType) {
     Logger::debug("FileManager", "Listing files in: " + dirPath);
     
     if (!Unsafe::exists(dirPath)) {
-        Logger::warn("FileManager", "Directory not found: " + dirPath);
+        Logger::warning("FileManager", "Directory not found: " + dirPath);
         return files;
     }
     
@@ -328,7 +328,7 @@ std::optional<FileInfo> FileManager::getFileInfo(const std::string& filepath) {
     std::string fullPath = rootPath_ + "/" + filepath;
     
     if (!Unsafe::exists(fullPath)) {
-        Logger::warn("FileManager", "File not found: " + filepath);
+        Logger::warning("FileManager", "File not found: " + filepath);
         return std::nullopt;
     }
     
@@ -426,25 +426,25 @@ bool FileManager::validatePath(const std::string& path) const {
     
     // 1. Check for absolute paths (not allowed)
     if (!path.empty() && (path[0] == '/' || path[0] == '\\')) {
-        Logger::warn("FileManager", "Absolute path not allowed: " + path);
+        Logger::warning("FileManager", "Absolute path not allowed: " + path);
         return false;
     }
     
     // 2. Check for drive letters (Windows)
     if (path.length() >= 2 && path[1] == ':') {
-        Logger::warn("FileManager", "Drive letter not allowed: " + path);
+        Logger::warning("FileManager", "Drive letter not allowed: " + path);
         return false;
     }
     
     // 3. Check for path traversal
     if (path.find("..") != std::string::npos) {
-        Logger::warn("FileManager", "Path traversal detected: " + path);
+        Logger::warning("FileManager", "Path traversal detected: " + path);
         return false;
     }
     
     // 4. Check for null bytes
     if (path.find('\0') != std::string::npos) {
-        Logger::warn("FileManager", "Null byte in path: " + path);
+        Logger::warning("FileManager", "Null byte in path: " + path);
         return false;
     }
     
@@ -455,7 +455,7 @@ bool FileManager::validatePath(const std::string& path) const {
     
     for (const auto& pattern : dangerous) {
         if (path.find(pattern) != std::string::npos) {
-            Logger::warn("FileManager", "Dangerous pattern in path: " + pattern);
+            Logger::warning("FileManager", "Dangerous pattern in path: " + pattern);
             return false;
         }
     }
@@ -471,12 +471,12 @@ bool FileManager::validatePath(const std::string& path) const {
         std::string rootStr = rootCanonical.string();
         
         if (canonicalStr.find(rootStr) != 0) {
-            Logger::warn("FileManager", "Path escapes root: " + path);
+            Logger::warning("FileManager", "Path escapes root: " + path);
             return false;
         }
         
     } catch (const std::exception& e) {
-        Logger::warn("FileManager", "Cannot resolve path: " + std::string(e.what()));
+        Logger::warning("FileManager", "Cannot resolve path: " + std::string(e.what()));
         return false;
     }
     

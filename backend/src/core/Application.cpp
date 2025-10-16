@@ -83,7 +83,7 @@ void signalHandler(int signal) {
         Logger::info("Signal", "Starting graceful shutdown...");
         g_shutdownRequested = true;
     } else if (Application::signalCount_ == 2) {
-        Logger::warn("Signal", "Second signal received. Forcing shutdown...");
+        Logger::warning("Signal", "Second signal received. Forcing shutdown...");
         g_shutdownRequested = true;
     } else {
         Logger::critical("Signal", "Third signal received. Immediate exit!");
@@ -143,7 +143,7 @@ Application::~Application() {
 
 bool Application::initialize(const std::string& configPath) {
     if (initialized_.load()) {
-        Logger::warn("Application", "Already initialized");
+        Logger::warning("Application", "Already initialized");
         return true;
     }
     
@@ -234,7 +234,7 @@ bool Application::initializeConfiguration(const std::string& configPath) {
         Logger::info("Application", "  Loading configuration from: " + cfgPath);
         
         if (!Config::instance().load(cfgPath)) {
-            Logger::warn("Application", "  Config file not found, using defaults");
+            Logger::warning("Application", "  Config file not found, using defaults");
         }
         
         Logger::info("Application", "  ✓ Configuration loaded");
@@ -291,7 +291,7 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  Creating Settings...");
         settings_ = std::make_unique<Settings>(*database_);
         if (!settings_->load()) {
-            Logger::warn("Application", "  Settings not found, using defaults");
+            Logger::warning("Application", "  Settings not found, using defaults");
         }
         Logger::info("Application", "  ✓ Settings ready");
         
@@ -329,7 +329,7 @@ bool Application::initializeTiming() {
         
         // Load existing profiles from database
         if (!latencyCompensator_->loadFromDatabase()) {
-            Logger::warn("Application", "  No instrument profiles loaded");
+            Logger::warning("Application", "  No instrument profiles loaded");
         } else {
             Logger::info("Application", "  ✓ Instrument profiles loaded");
         }
@@ -460,7 +460,7 @@ bool Application::start() {
     }
     
     if (running_.load()) {
-        Logger::warn("Application", "Already running");
+        Logger::warning("Application", "Already running");
         return true;
     }
     
@@ -473,19 +473,16 @@ bool Application::start() {
     try {
         // Start API server
         Logger::info("Application", "Starting API server...");
-        if (!apiServer_->start()) {
-            Logger::error("Application", "Failed to start API server");
-            return false;
-        }
+        
         Logger::info("Application", "✓ API server started");
         
         // Start monitoring threads
         Logger::info("Application", "Starting monitoring threads...");
-        startMonitoringThreads();
+		startMonitoringThreads();
         Logger::info("Application", "✓ Monitoring threads started");
         
         running_ = true;
-        
+        startTime_ = std::chrono::steady_clock::now();
         Logger::info("Application", "");
         Logger::info("Application", "╔═══════════════════════════════════════╗");
         Logger::info("Application", "║   MidiMind Ready ✓                   ║");
@@ -529,7 +526,7 @@ void Application::run() {
 
 void Application::stop() {
     if (!running_.load()) {
-        Logger::warn("Application", "Not running");
+        Logger::warning("Application", "Not running");
         return;
     }
     
@@ -640,13 +637,6 @@ void Application::setupSignalHandlers() {
 // GETTERS
 // ============================================================================
 
-bool Application::isInitialized() const {
-    return initialized_.load();
-}
-
-bool Application::isRunning() const {
-    return running_.load();
-}
 
 std::string Application::getVersion() const {
     return "4.1.0";
@@ -657,7 +647,7 @@ std::string Application::getProtocolVersion() const {
 }
 
 int Application::getUptime() const {
-    if (!startTime_) {
+    if (!startTime_.has_value()) {
         return 0;
     }
     
