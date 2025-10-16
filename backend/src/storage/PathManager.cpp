@@ -265,7 +265,7 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
     Logger::info("PathManager", "Cleaning old files in: " + directory);
     
     if (!FileManager::Unsafe::exists(directory)) {
-        Logger::warn("PathManager", "Directory not found: " + directory);
+        Logger::warning("PathManager", "Directory not found: " + directory);
         return 0;
     }
     
@@ -290,7 +290,7 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
                 Logger::debug("PathManager", "  Deleted: " + filename);
                 deletedCount++;
             } else {
-                Logger::warn("PathManager", "  Failed to delete: " + filename);
+                Logger::warning("PathManager", "  Failed to delete: " + filename);
             }
         }
     }
