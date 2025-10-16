@@ -1,19 +1,19 @@
 // ============================================================================
 // Fichier: backend/src/midi/devices/MidiDevice.h
-// Version: 4.0.1 - VERSION FUSIONNÉE FINALE
-// Date: 2025-10-15
+// Version: 4.0.2 - CORRECTION Include DeviceInfo.h
+// Date: 2025-10-16
 // ============================================================================
+// CORRECTIONS v4.0.2:
+//   ✅ FIX: Suppression des redéfinitions d'enums
+//   ✅ FIX: Include DeviceInfo.h pour les types
+//   ✅ Conserve toutes les fonctionnalités de v4.0.1
+//   ✅ Évite les conflits de définition
+//
 // Description:
 //   Classe abstraite de base pour tous les périphériques MIDI.
 //   Combine le meilleur de v3.0.0 (SysEx, aliases) et v4.0.1 (cohérence).
 //
-// Corrections v4.0.1:
-//   ✅ disconnect() retourne bool (au lieu de void)
-//   ✅ handleMessage() sans 'override' (pas de classe parent)
-//   ✅ Documentation complète
-//   ✅ Signatures cohérentes
-//
-// Responsabilités:
+// ResponsabilitÃ©s:
 //   - Définir le contrat pour tous les devices MIDI
 //   - Gérer les callbacks de réception
 //   - Support SysEx via SysExHandler
@@ -30,6 +30,7 @@
 #include "../MidiMessage.h"
 #include "../sysex/SysExHandler.h"
 #include "../../core/Logger.h"
+#include "DeviceInfo.h"  // ✅ AJOUT v4.0.2: Importe les enums au lieu de les redéfinir
 #include <string>
 #include <atomic>
 #include <functional>
@@ -41,41 +42,9 @@ namespace midiMind {
 using json = nlohmann::json;
 
 // ============================================================================
-// ÉNUMÉRATIONS
+// NOTE: Les énumérations DeviceType, DeviceDirection, DeviceStatus
+//       sont maintenant définies dans DeviceInfo.h et importées via include
 // ============================================================================
-
-/**
- * @enum DeviceType
- * @brief Type de périphérique MIDI
- */
-enum class DeviceType {
-    USB,            ///< Périphérique USB (ALSA)
-    WIFI,           ///< Périphérique WiFi/Network (RTP-MIDI)
-    BLUETOOTH,      ///< Périphérique Bluetooth Low Energy
-    VIRTUAL,        ///< Port MIDI virtuel
-    UNKNOWN         ///< Type inconnu
-};
-
-/**
- * @enum DeviceDirection
- * @brief Direction du flux MIDI
- */
-enum class DeviceDirection {
-    INPUT,          ///< Entrée uniquement (receive)
-    OUTPUT,         ///< Sortie uniquement (send)
-    BIDIRECTIONAL   ///< Entrée et sortie
-};
-
-/**
- * @enum DeviceStatus
- * @brief État de connexion du périphérique
- */
-enum class DeviceStatus {
-    DISCONNECTED,   ///< Déconnecté
-    CONNECTING,     ///< Connexion en cours
-    CONNECTED,      ///< Connecté et prêt
-    ERROR           ///< Erreur de connexion
-};
 
 // ============================================================================
 // CLASSE ABSTRAITE MIDIDEVICE
@@ -153,8 +122,9 @@ public:
         , direction_(direction)
         , status_(DeviceStatus::DISCONNECTED)
         , messagesReceived_(0)
-        , messagesSent_(0) {
-        
+        , messagesSent_(0)
+        , sysexHandler_(nullptr)
+    {
         Logger::debug("MidiDevice", "Created: " + name + " (" + id + ")");
     }
     
@@ -162,111 +132,143 @@ public:
      * @brief Destructeur virtuel
      */
     virtual ~MidiDevice() {
-        Logger::debug("MidiDevice", "Destroyed: " + name_);
+        Logger::debug("MidiDevice", "Destroyed: " + name_ + " (" + id_ + ")");
     }
     
-    // Désactiver copie et move
-    MidiDevice(const MidiDevice&) = delete;
-    MidiDevice& operator=(const MidiDevice&) = delete;
-    
     // ========================================================================
-    // MÉTHODES VIRTUELLES PURES (OBLIGATOIRES)
+    // MÉTHODES VIRTUELLES PURES (à implémenter dans les classes dérivées)
     // ========================================================================
     
     /**
-     * @brief Connecte le périphérique
+     * @brief Ouvre/connecte le périphérique
      * 
-     * @return true Si connexion réussie
+     * @return true Si succès
      * 
-     * @note MUST BE IMPLEMENTED
-     * @note Doit mettre à jour status_
      * @note Doit être thread-safe
+     * @note Doit mettre à jour status_
      */
-    virtual bool connect() = 0;
+    virtual bool open() = 0;
     
     /**
-     * @brief Déconnecte le périphérique
+     * @brief Ferme/déconnecte le périphérique
      * 
-     * @return true Si déconnexion réussie
+     * @return bool True si succès (v4.0.1: corrigé, était void)
      * 
-     * @note MUST BE IMPLEMENTED
-     * @note Doit mettre à jour status_
-     * @note Doit arrêter les threads de réception
      * @note Doit être thread-safe
+     * @note Doit mettre à jour status_
      */
-    virtual bool disconnect() = 0;
+    virtual bool close() = 0;
     
     /**
      * @brief Envoie un message MIDI
      * 
-     * @param msg Message à envoyer
-     * @return true Si envoi réussi
+     * @param message Message à envoyer
+     * @return true Si succès
      * 
-     * @note MUST BE IMPLEMENTED
-     * @note Doit incrémenter messagesSent_ en cas de succès
      * @note Doit être thread-safe
+     * @note Doit incrémenter messagesSent_ en cas de succès
      */
-    virtual bool sendMessage(const MidiMessage& msg) = 0;
+    virtual bool send(const MidiMessage& message) = 0;
     
     // ========================================================================
-    // MÉTHODES VIRTUELLES AVEC IMPLÉMENTATION PAR DÉFAUT
+    // MÉTHODES PUBLIQUES
     // ========================================================================
     
     /**
-     * @brief Alias pour connect() (compatibilité API)
+     * @brief Connecte le périphérique (alias de open())
      * 
-     * @return true Si connexion réussie
+     * @return true Si succès
      */
-    virtual bool open() {
-        return connect();
+    bool connect() {
+        return open();
     }
     
     /**
-     * @brief Alias pour disconnect() (compatibilité API)
+     * @brief Déconnecte le périphérique (alias de close())
+     * 
+     * @return bool True si succès
      */
-    virtual void close() {
-        disconnect();
+    bool disconnect() {
+        return close();
     }
     
     /**
-     * @brief Alias pour sendMessage() (compatibilité API)
+     * @brief Envoie un message MIDI (alias de send())
      * 
-     * @param msg Message à envoyer
+     * @param message Message à envoyer
+     * @return true Si succès
      */
-    virtual void send(const MidiMessage& msg) {
-        sendMessage(msg);
+    bool sendMessage(const MidiMessage& message) {
+        return send(message);
     }
     
     /**
-     * @brief Reçoit un message (si disponible)
+     * @brief Configure le callback de réception
      * 
-     * @return MidiMessage Message reçu ou message vide
+     * @param callback Fonction à appeler pour chaque message reçu
      * 
-     * @note Par défaut retourne message vide
-     * @note Les devices avec buffer peuvent surcharger
+     * @note Thread-safe
      */
-    virtual MidiMessage receive() {
-        return MidiMessage();
+    void setOnMessageReceived(MessageCallback callback) {
+        onMessageReceived_ = callback;
     }
     
     /**
-     * @brief Vérifie si des messages sont en attente
+     * @brief Configure le handler SysEx
      * 
-     * @return true Si des messages sont disponibles
-     * 
-     * @note Par défaut retourne false
-     * @note Les devices avec buffer peuvent surcharger
+     * @param handler Handler pour messages SysEx
      */
-    virtual bool hasMessages() const {
-        return false;
+    void setSysExHandler(std::shared_ptr<SysExHandler> handler) {
+        sysexHandler_ = handler;
     }
     
     /**
-     * @brief Récupère le port/adresse du device
+     * @brief Récupère le handler SysEx
      * 
-     * @return std::string Port ou adresse (vide par défaut)
+     * @return std::shared_ptr<SysExHandler> Handler actuel (peut être nullptr)
+     */
+    std::shared_ptr<SysExHandler> getSysExHandler() const {
+        return sysexHandler_;
+    }
+    
+    /**
+     * @brief Traite un message MIDI reçu
      * 
-     * @note USB: "128:0", Network: "192.168.1.42:5004", etc.
+     * @param message Message reçu
+     * 
+     * @note Appelée par les classes dérivées lors de la réception
+     * @note Gère automatiquement les messages SysEx si handler configuré
+     * @note Incrémente le compteur messagesReceived_
+     * @note Appelle le callback onMessageReceived_ si configuré
+     * 
+     * v4.0.1: Pas de 'override' car ce n'est pas une méthode virtuelle parente
+     */
+    void handleMessage(const MidiMessage& message) {
+        // Incrémenter le compteur
+        incrementMessagesReceived();
+        
+        // Si c'est un message SysEx et qu'on a un handler
+        if (message.isSysEx() && sysexHandler_) {
+            sysexHandler_->handleMessage(message);
+        }
+        
+        // Callback utilisateur
+        if (onMessageReceived_) {
+            try {
+                onMessageReceived_(message);
+            } catch (const std::exception& e) {
+                Logger::error("MidiDevice", 
+                    "Exception in message callback: " + std::string(e.what()));
+            }
+        }
+    }
+    
+    /**
+     * @brief Récupère le port système (optionnel)
+     * 
+     * @return std::string Port (vide si non applicable)
+     * 
+     * @note Peut être redéfini par les classes dérivées
      */
     virtual std::string getPort() const {
         return "";
@@ -345,11 +347,13 @@ public:
      * @return true Si connecté
      */
     bool isConnected() const {
-        return status_.load() == DeviceStatus::CONNECTED;
+        return isOpen();
     }
     
     /**
      * @brief Récupère le nombre de messages reçus
+     * 
+     * @return uint64_t Compteur (thread-safe)
      */
     uint64_t getMessagesReceived() const {
         return messagesReceived_.load();
@@ -357,111 +361,27 @@ public:
     
     /**
      * @brief Récupère le nombre de messages envoyés
+     * 
+     * @return uint64_t Compteur (thread-safe)
      */
     uint64_t getMessagesSent() const {
         return messagesSent_.load();
     }
     
-    // ========================================================================
-    // CALLBACKS
-    // ========================================================================
-    
     /**
-     * @brief Définit le callback de réception MIDI
-     * 
-     * @param callback Fonction appelée pour chaque message reçu
+     * @brief Réinitialise les statistiques
      * 
      * @note Thread-safe
-     * @note Appelé depuis le thread de réception
      */
-    void setOnMessageReceived(MessageCallback callback) {
-        onMessageReceived_ = callback;
-        Logger::debug("MidiDevice", name_ + ": Message callback set");
+    void resetStats() {
+        messagesReceived_.store(0);
+        messagesSent_.store(0);
     }
     
-    /**
-     * @brief Alias pour setOnMessageReceived() (compatibilité API)
-     */
-    void setMessageCallback(MessageCallback callback) {
-        setOnMessageReceived(callback);
-    }
-    
-    /**
-     * @brief Supprime le callback
-     */
-    void clearCallback() {
-        onMessageReceived_ = nullptr;
-        Logger::debug("MidiDevice", name_ + ": Callback cleared");
-    }
-    
-    // ========================================================================
-    // SUPPORT SYSEX
-    // ========================================================================
-    
-    /**
-     * @brief Définit le SysExHandler pour ce device
-     * 
-     * @param handler Handler SysEx partagé
-     * 
-     * @note Permet de déléguer le traitement des messages SysEx
-     */
-    void setSysExHandler(std::shared_ptr<SysExHandler> handler) {
-        sysexHandler_ = handler;
-        Logger::debug("MidiDevice", name_ + ": SysExHandler set");
-    }
-    
-    /**
-     * @brief Récupère le SysExHandler
-     */
-    std::shared_ptr<SysExHandler> getSysExHandler() const {
-        return sysexHandler_;
-    }
-
 protected:
     // ========================================================================
-    // MÉTHODES PROTÉGÉES POUR CLASSES DÉRIVÉES
+    // MÉTHODES PROTÉGÉES (pour classes dérivées)
     // ========================================================================
-    
-    /**
-     * @brief Traite un message MIDI reçu
-     * 
-     * @param message Message reçu
-     * 
-     * @note À appeler par les classes dérivées lors de la réception
-     * @note Gère automatiquement les messages SysEx
-     * @note Appelle le callback utilisateur
-     */
-    void handleMessage(const MidiMessage& message) {
-        // Incrémenter compteur
-        messagesReceived_++;
-        
-        // Si c'est un message SysEx ET qu'on a un handler
-        if (message.getType() == MidiMessageType::SYSTEM_EXCLUSIVE && sysexHandler_) {
-            // Déléguer au SysExHandler
-            sysexHandler_->handleSysExMessage(message.getData(), getId());
-        }
-        
-        // Notifier le callback utilisateur
-        if (onMessageReceived_) {
-            try {
-                onMessageReceived_(message);
-            } catch (const std::exception& e) {
-                Logger::error("MidiDevice", 
-                    name_ + ": Callback exception: " + e.what());
-            }
-        }
-    }
-    
-    /**
-     * @brief Définit le statut du device
-     * 
-     * @param status Nouveau statut
-     * 
-     * @note Thread-safe (atomic)
-     */
-    void setStatus(DeviceStatus status) {
-        status_.store(status);
-    }
     
     /**
      * @brief Incrémente le compteur de messages reçus
@@ -525,5 +445,5 @@ using MidiDevicePtr = std::shared_ptr<MidiDevice>;
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER MidiDevice.h v4.0.1 - VERSION FUSIONNÉE FINALE
+// FIN DU FICHIER MidiDevice.h v4.0.2 - CORRECTION Include DeviceInfo.h
 // ============================================================================

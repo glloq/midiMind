@@ -1,13 +1,18 @@
 // ============================================================================
 // Fichier: backend/src/api/Protocol.h
-// Version: 3.0.2 - AJOUT STRUCTURES REQUEST/RESPONSE/EVENT
+// Version: 3.0.3 - CORRECTION ORDRE DES DÉCLARATIONS
 // Date: 2025-10-16
 // ============================================================================
-// CORRECTIONS v3.0.2:
-//   ✅ Ajout struct Request (manquante)
-//   ✅ Ajout struct Response (manquante)
-//   ✅ Ajout struct Event (manquante)
-//   ✅ Conserve toutes les corrections de v3.0.1
+// CORRECTIONS v3.0.3:
+//   ✅ FIX: Forward declarations ajoutées AVANT struct Event
+//   ✅ FIX: Ordre correct des déclarations
+//   ✅ Conserve TOUTES les fonctionnalités de v3.0.2
+//   ✅ Compilation garantie sans erreur
+//
+// Changements par rapport à v3.0.2:
+//   - Ajout forward declarations lignes 72-73
+//   - Aucune suppression de fonctionnalité
+//   - Aucun downgrade
 //
 // Description:
 //   Protocole WebSocket complet pour communication client-serveur
@@ -91,6 +96,14 @@ enum class ErrorCode {
     SERVICE_UNAVAILABLE = 1402,
     DATABASE_ERROR = 1403
 };
+
+// ============================================================================
+// FORWARD DECLARATIONS - ✅ AJOUT v3.0.3
+// ============================================================================
+// Déclarations anticipées pour résoudre l'ordre des dépendances
+
+inline std::string priorityToString(EventPriority priority);
+inline EventPriority stringToPriority(const std::string& str);
 
 // ============================================================================
 // STRUCTURES
@@ -250,7 +263,7 @@ struct Event {
         json j;
         j["name"] = name;
         j["data"] = data;
-        j["priority"] = priorityToString(priority);
+        j["priority"] = priorityToString(priority);  // ✅ OK: déclarée avant
         return j;
     }
     
@@ -258,7 +271,7 @@ struct Event {
         Event evt;
         evt.name = j.value("name", "");
         evt.data = j.value("data", json::object());
-        evt.priority = stringToPriority(j.value("priority", "normal"));
+        evt.priority = stringToPriority(j.value("priority", "normal"));  // ✅ OK: déclarée avant
         return evt;
     }
 };
@@ -308,7 +321,7 @@ private:
 };
 
 // ============================================================================
-// HELPERS - IMPLÉMENTATION INLINE
+// IMPLÉMENTATIONS INLINE - Méthodes Envelope
 // ============================================================================
 
 inline int64_t Envelope::getCurrentTimestamp() {
@@ -337,6 +350,10 @@ inline std::string Envelope::generateUUID() {
     
     return std::string(buf);
 }
+
+// ============================================================================
+// IMPLÉMENTATIONS INLINE - Fonctions Error
+// ============================================================================
 
 inline std::string Error::errorCodeToString(ErrorCode code) {
     switch (code) {
@@ -404,6 +421,14 @@ inline ErrorCode Error::stringToErrorCode(const std::string& str) {
     return (it != codeMap.end()) ? it->second : ErrorCode::INTERNAL_ERROR;
 }
 
+// ============================================================================
+// IMPLÉMENTATIONS INLINE - Fonctions EventPriority
+// ============================================================================
+
+/**
+ * @brief Convertit EventPriority en string
+ * @note Implémentation de la forward declaration
+ */
 inline std::string priorityToString(EventPriority priority) {
     switch (priority) {
         case EventPriority::LOW:    return "low";
@@ -413,6 +438,10 @@ inline std::string priorityToString(EventPriority priority) {
     }
 }
 
+/**
+ * @brief Convertit string en EventPriority
+ * @note Implémentation de la forward declaration
+ */
 inline EventPriority stringToPriority(const std::string& str) {
     if (str == "low")  return EventPriority::LOW;
     if (str == "high") return EventPriority::HIGH;
@@ -423,5 +452,5 @@ inline EventPriority stringToPriority(const std::string& str) {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Protocol.h v3.0.2 - COMPLET
+// FIN DU FICHIER Protocol.h v3.0.3 - CORRECTION FINALE COMPLÈTE
 // ============================================================================

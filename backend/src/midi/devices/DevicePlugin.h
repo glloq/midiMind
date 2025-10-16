@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include "MidiDevice.h"
+#include "DeviceInfo.h"
 
 namespace midiMind {
 
