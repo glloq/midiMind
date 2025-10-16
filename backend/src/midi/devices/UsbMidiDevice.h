@@ -1,175 +1,132 @@
 // ============================================================================
-// Fichier: backend/src/midi/devices/UsbMidiDevice.h
-// Version: 1.0.0
-// Projet: midiMind - Système d'Orchestration MIDI
-// Description: Implémentation USB MIDI via ALSA sequencer
+// File: backend/src/midi/devices/UsbMidiDevice.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Description:
+//   USB MIDI device implementation using ALSA Sequencer API.
+//   Supports USB MIDI Class compliant devices on Linux.
+//
+// Features:
+//   - ALSA sequencer integration
+//   - Bidirectional communication
+//   - Asynchronous message reception
+//   - Auto-reconnection support
+//   - Message buffering
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Enhanced ALSA error handling
+//   - Better thread management
+//   - Improved auto-reconnect
+//
 // ============================================================================
 
 #pragma once
 
 #include "MidiDevice.h"
-#include "../../core/Logger.h"
-#include <alsa/asoundlib.h>
 #include <thread>
-#include <atomic>
 #include <queue>
-#include <mutex>
 #include <condition_variable>
+#include <atomic>
+
+// ALSA includes (Linux only)
+#ifdef __linux__
+#include <alsa/asoundlib.h>
+#endif
 
 namespace midiMind {
 
 /**
  * @class UsbMidiDevice
- * @brief Périphérique MIDI USB utilisant ALSA sequencer
+ * @brief USB MIDI device using ALSA
  * 
- * @details
- * Implémentation complète d'un device USB MIDI via ALSA (snd_seq).
+ * Implements MIDI communication with USB MIDI Class devices through
+ * ALSA (Advanced Linux Sound Architecture) sequencer API.
  * 
- * Fonctionnalités:
- * - Connexion/déconnexion ALSA
- * - Envoi de messages MIDI
- * - Réception de messages MIDI (thread dédié)
- * - Reconnexion automatique en cas d'erreur
- * - Buffer de messages pour retry
- * - Gestion complète des erreurs ALSA
+ * Thread Safety: YES
+ * Platform: Linux only
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe
- * 
- * @example Utilisation
+ * Example:
  * ```cpp
- * auto device = std::make_shared<UsbMidiDevice>(
- *     "usb_128_0", "Arturia KeyStep", 128, 0
- * );
+ * // Create device (client 128, port 0)
+ * UsbMidiDevice device("usb_128_0", "Yamaha Piano", 128, 0);
  * 
- * if (device->connect()) {
- *     // Envoyer un message
- *     auto msg = MidiMessage::noteOn(0, 60, 100);
- *     device->sendMessage(msg);
- *     
- *     // Recevoir des messages via callback
- *     device->setMessageCallback([](const MidiMessage& msg) {
- *         Logger::info("MIDI", "Received: " + msg.toString());
- *     });
+ * // Set callback
+ * device.setMessageCallback([](const MidiMessage& msg) {
+ *     std::cout << "Received: " << msg.getTypeName() << "\n";
+ * });
+ * 
+ * // Connect
+ * if (device.connect()) {
+ *     // Send note
+ *     device.sendMessage(MidiMessage::noteOn(0, 60, 100));
  * }
  * ```
  */
 class UsbMidiDevice : public MidiDevice {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur
-     * 
-     * @param id ID unique du device (format: "usb_CLIENT_PORT")
-     * @param name Nom du device
-     * @param alsaClient Numéro de client ALSA
-     * @param alsaPort Numéro de port ALSA
+     * @brief Constructor
+     * @param id Device identifier
+     * @param name Device name
+     * @param alsaClient ALSA client number
+     * @param alsaPort ALSA port number
      */
-    UsbMidiDevice(const std::string& id, 
+    UsbMidiDevice(const std::string& id,
                   const std::string& name,
-                  int alsaClient, 
+                  int alsaClient,
                   int alsaPort);
     
     /**
-     * @brief Destructeur
-     * 
-     * Déconnecte proprement et arrête le thread de réception
+     * @brief Destructor
      */
     ~UsbMidiDevice() override;
     
-    // Désactiver copie
-    UsbMidiDevice(const UsbMidiDevice&) = delete;
-    UsbMidiDevice& operator=(const UsbMidiDevice&) = delete;
-    
     // ========================================================================
-    // MÉTHODES VIRTUELLES (MidiDevice)
+    // MIDIDEVICE INTERFACE IMPLEMENTATION
     // ========================================================================
     
-    /**
-     * @brief Connecte le device USB via ALSA
-     * 
-     * Séquence:
-     * 1. Ouvre le sequencer ALSA
-     * 2. Crée un port d'entrée/sortie
-     * 3. Connecte au device cible (alsaClient:alsaPort)
-     * 4. Démarre le thread de réception
-     * 
-     * @return true Si connexion réussie
-     * @return false Si erreur ALSA
-     * 
-     * @note Thread-safe
-     */
     bool connect() override;
+    bool disconnect() override;
+    bool sendMessage(const MidiMessage& message) override;
+    MidiMessage receiveMessage() override;
+    bool isConnected() const override;
+    
+    // ========================================================================
+    // ADDITIONAL METHODS
+    // ========================================================================
     
     /**
-     * @brief Déconnecte le device
-     * 
-     * Séquence:
-     * 1. Arrête le thread de réception
-     * 2. Déconnecte les ports ALSA
-     * 3. Ferme le sequencer
-     * 
-     * @note Thread-safe
-     */
-    void disconnect() override;
-    
-    /**
-     * @brief Envoie un message MIDI
-     * 
-     * @param msg Message MIDI à envoyer
-     * @return true Si envoi réussi
-     * @return false Si erreur ou device déconnecté
-     * 
-     * @note Thread-safe
-     * @note Buffer le message si device déconnecté (retry automatique)
-     */
-    bool sendMessage(const MidiMessage& msg) override;
-    
-    /**
-     * @brief Vérifie si des messages sont disponibles
-     * 
-     * @return true Si queue de réception non vide
-     * 
-     * @note Thread-safe
+     * @brief Check if messages are available
      */
     bool hasMessages() const override;
     
     /**
-     * @brief Récupère le prochain message reçu
-     * 
-     * @return MidiMessage Message reçu, ou message vide si queue vide
-     * 
-     * @note Thread-safe
-     */
-    MidiMessage receive() override;
-    
-    /**
-     * @brief Récupère le port ALSA
-     * 
-     * @return string Format "CLIENT:PORT"
+     * @brief Get port string
      */
     std::string getPort() const override;
     
     /**
-     * @brief Récupère les informations du device
-     * 
-     * @return json Informations complètes (+ statistiques ALSA)
+     * @brief Get device info
      */
     json getInfo() const override;
     
     // ========================================================================
-    // CALLBACKS
+    // CALLBACK
     // ========================================================================
     
     /**
-     * @brief Définit le callback de réception de messages
-     * 
-     * @param callback Fonction appelée pour chaque message reçu
-     * 
-     * @note Thread-safe
-     * @note Appelé depuis le thread de réception
+     * @brief Set message received callback
+     * @param callback Callback function
+     * @note Called from receive thread
      */
     void setMessageCallback(std::function<void(const MidiMessage&)> callback);
     
@@ -178,154 +135,160 @@ public:
     // ========================================================================
     
     /**
-     * @brief Active/désactive la reconnexion automatique
-     * 
-     * @param enabled true pour activer
+     * @brief Enable/disable auto-reconnect
+     * @param enabled State
      */
     void setAutoReconnect(bool enabled);
     
     /**
-     * @brief Définit le nombre maximum de tentatives de reconnexion
-     * 
-     * @param maxRetries Nombre max (défaut: 3)
+     * @brief Set max reconnection attempts
+     * @param maxRetries Maximum retries
      */
     void setMaxRetries(int maxRetries);
     
     /**
-     * @brief Définit le délai entre les tentatives de reconnexion
-     * 
-     * @param delayMs Délai en millisecondes (défaut: 1000)
+     * @brief Set retry delay
+     * @param delayMs Delay in milliseconds
      */
     void setRetryDelay(int delayMs);
-
-private:
+    
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // STATISTICS
     // ========================================================================
     
     /**
-     * @brief Ouvre le sequencer ALSA
-     * 
-     * @return true Si succès
+     * @brief Get ALSA-specific statistics
+     */
+    json getAlsaStatistics() const;
+
+private:
+    // ========================================================================
+    // PRIVATE METHODS - ALSA
+    // ========================================================================
+    
+    /**
+     * @brief Open ALSA sequencer
      */
     bool openSequencer();
     
     /**
-     * @brief Ferme le sequencer ALSA
+     * @brief Close ALSA sequencer
      */
     void closeSequencer();
     
     /**
-     * @brief Crée les ports ALSA d'entrée/sortie
-     * 
-     * @return true Si succès
+     * @brief Create ALSA ports
      */
     bool createPorts();
     
     /**
-     * @brief Connecte aux ports du device cible
-     * 
-     * @return true Si succès
+     * @brief Connect to target device ports
      */
     bool connectToPorts();
     
     /**
-     * @brief Déconnecte des ports
+     * @brief Disconnect from ports
      */
     void disconnectFromPorts();
     
     /**
-     * @brief Thread de réception de messages
-     * 
-     * Boucle principale:
-     * 1. Attend événements ALSA (poll)
-     * 2. Lit les événements
-     * 3. Convertit en MidiMessage
-     * 4. Appelle callback ou met en queue
-     */
-    void receiveThreadFunc();
-    
-    /**
-     * @brief Convertit un événement ALSA en MidiMessage
-     * 
-     * @param ev Événement ALSA
-     * @return MidiMessage Message MIDI correspondant
-     */
-    MidiMessage alsaEventToMidiMessage(const snd_seq_event_t* ev);
-    
-    /**
-     * @brief Convertit un MidiMessage en événement ALSA
-     * 
-     * @param msg Message MIDI
-     * @param ev Événement ALSA (output)
-     */
-    void midiMessageToAlsaEvent(const MidiMessage& msg, snd_seq_event_t* ev);
-    
-    /**
-     * @brief Tente une reconnexion automatique
-     * 
-     * @return true Si reconnexion réussie
-     */
-    bool attemptReconnect();
-    
-    /**
-     * @brief Vide le buffer de messages en attente
-     * 
-     * Appelé après reconnexion réussie
-     */
-    void flushMessageBuffer();
-    
-    /**
-     * @brief Vérifie si la connexion est toujours active
-     * 
-     * @return true Si device répond
+     * @brief Validate connection
      */
     bool validateConnection();
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // PRIVATE METHODS - THREADING
     // ========================================================================
     
-    // ALSA
-    snd_seq_t* alsaSeq_;                  ///< Handle sequencer ALSA
-    int alsaClient_;                      ///< Numéro de client ALSA du device cible
-    int alsaPort_;                        ///< Numéro de port ALSA du device cible
-    int myPort_;                          ///< Notre port ALSA créé
-    snd_seq_addr_t destAddr_;             ///< Adresse destination ALSA
+    /**
+     * @brief Receive thread function
+     */
+    void receiveThreadFunc();
     
-    // Thread de réception
-    std::thread receiveThread_;           ///< Thread de réception
-    std::atomic<bool> shouldStop_;        ///< Flag d'arrêt du thread
+    /**
+     * @brief Process ALSA event
+     */
+    void processAlsaEvent(const snd_seq_event_t* ev);
     
-    // Queue de messages reçus
-    std::queue<MidiMessage> receiveQueue_;  ///< Queue des messages reçus
-    mutable std::mutex receiveMutex_;       ///< Mutex pour receiveQueue_
-    std::condition_variable receiveCv_;     ///< CV pour notification messages
+    // ========================================================================
+    // PRIVATE METHODS - CONVERSION
+    // ========================================================================
     
-    // Buffer d'envoi (pour retry)
-    std::queue<MidiMessage> sendBuffer_;    ///< Buffer messages à renvoyer
-    mutable std::mutex sendMutex_;          ///< Mutex pour sendBuffer_
-    static constexpr size_t MAX_BUFFER_SIZE = 1000;  ///< Taille max buffer
+    /**
+     * @brief Convert MidiMessage to ALSA event
+     */
+    void midiMessageToAlsaEvent(const MidiMessage& msg, snd_seq_event_t* ev);
     
-    // Callback
+    /**
+     * @brief Convert ALSA event to MidiMessage
+     */
+    MidiMessage alsaEventToMidiMessage(const snd_seq_event_t* ev);
+    
+    // ========================================================================
+    // PRIVATE METHODS - RECONNECTION
+    // ========================================================================
+    
+    /**
+     * @brief Attempt reconnection
+     */
+    bool attemptReconnect();
+    
+    /**
+     * @brief Flush message buffer
+     */
+    void flushMessageBuffer();
+    
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
+    
+#ifdef __linux__
+    /// ALSA sequencer handle
+    snd_seq_t* alsaSeq_;
+#else
+    void* alsaSeq_;  // Placeholder for non-Linux
+#endif
+    
+    /// Target ALSA client number
+    int alsaClient_;
+    
+    /// Target ALSA port number
+    int alsaPort_;
+    
+    /// Our ALSA port number
+    int myPort_;
+    
+    /// Receive thread
+    std::thread receiveThread_;
+    
+    /// Stop flag
+    std::atomic<bool> shouldStop_;
+    
+    /// Receive queue
+    std::queue<MidiMessage> receiveQueue_;
+    mutable std::mutex receiveMutex_;
+    std::condition_variable receiveCv_;
+    
+    /// Send buffer (for retry)
+    std::queue<MidiMessage> sendBuffer_;
+    mutable std::mutex sendMutex_;
+    static constexpr size_t MAX_BUFFER_SIZE = 1000;
+    
+    /// Message callback
     std::function<void(const MidiMessage&)> messageCallback_;
-    std::mutex callbackMutex_;              ///< Mutex pour callback
+    std::mutex callbackMutex_;
     
-    // Reconnexion
-    std::atomic<bool> autoReconnect_;       ///< Reconnexion automatique activée
-    std::atomic<int> retryCount_;           ///< Compteur tentatives
-    int maxRetries_;                        ///< Max tentatives
-    int retryDelayMs_;                      ///< Délai entre tentatives
-    std::atomic_flag reconnecting_;         ///< Flag reconnexion en cours
+    /// Auto-reconnect
+    std::atomic<bool> autoReconnect_;
+    std::atomic<int> retryCount_;
+    int maxRetries_;
+    int retryDelayMs_;
+    std::atomic_flag reconnecting_;
     
-    // Statistiques
-    std::atomic<uint64_t> alsaEventsReceived_;  ///< Événements ALSA reçus
-    std::atomic<uint64_t> alsaEventsSent_;      ///< Événements ALSA envoyés
-    std::atomic<uint64_t> alsaErrors_;          ///< Erreurs ALSA
+    /// Statistics
+    std::atomic<uint64_t> alsaEventsReceived_;
+    std::atomic<uint64_t> alsaEventsSent_;
+    std::atomic<uint64_t> alsaErrors_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER UsbMidiDevice.h
-// ============================================================================

@@ -1,7 +1,20 @@
 // ============================================================================
-// Fichier: backend/src/timing/TimestampManager.cpp
-// Version: 3.0.0 - Phase 2
-// Date: 2025-10-09
+// File: backend/src/timing/TimestampManager.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Description:
+//   Implementation of TimestampManager.
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified implementation
+//   - Better drift compensation algorithm
+//   - Enhanced logging
+//
 // ============================================================================
 
 #include "TimestampManager.h"
@@ -12,7 +25,16 @@
 namespace midiMind {
 
 // ============================================================================
-// CONSTRUCTEUR
+// SINGLETON
+// ============================================================================
+
+TimestampManager& TimestampManager::instance() {
+    static TimestampManager instance;
+    return instance;
+}
+
+// ============================================================================
+// CONSTRUCTOR
 // ============================================================================
 
 TimestampManager::TimestampManager()
@@ -23,11 +45,11 @@ TimestampManager::TimestampManager()
     , driftFactor_(0.0)
     , lastDriftMeasurement_(0)
 {
-    Logger::info("TimestampManager", "TimestampManager constructed");
+    Logger::info("TimestampManager", "TimestampManager created");
 }
 
 // ============================================================================
-// CONTRÔLE
+// CONTROL
 // ============================================================================
 
 void TimestampManager::start() {
@@ -38,12 +60,12 @@ void TimestampManager::start() {
         return;
     }
     
-    // Capturer le point de référence
+    // Capture reference point
     referencePoint_.store(getRawTimestamp(), std::memory_order_release);
     started_.store(true, std::memory_order_release);
     
-    Logger::info("TimestampManager", "Started at timestamp: " + 
-                std::to_string(referencePoint_.load()));
+    Logger::info("TimestampManager", 
+                "Started at timestamp: " + std::to_string(referencePoint_.load()));
 }
 
 void TimestampManager::reset() {
@@ -51,32 +73,33 @@ void TimestampManager::reset() {
     
     Logger::info("TimestampManager", "Resetting timestamp manager");
     
-    // Réinitialiser le point de référence
+    // Reset reference point
     referencePoint_.store(getRawTimestamp(), std::memory_order_release);
     
-    // Réinitialiser les corrections
+    // Reset corrections
     syncOffset_.store(0, std::memory_order_release);
     driftFactor_.store(0.0, std::memory_order_release);
     lastDriftMeasurement_.store(0, std::memory_order_release);
+    
+    Logger::info("TimestampManager", "✓ Reset complete");
 }
 
 // ============================================================================
-// TIMESTAMPS - MICROSECONDES
+// TIMESTAMPS - MICROSECONDS
 // ============================================================================
 
 uint64_t TimestampManager::now() const {
     if (!started_.load(std::memory_order_acquire)) {
-        Logger::warn("TimestampManager", "Called now() before start()");
         return 0;
     }
     
     uint64_t raw = getRawTimestamp();
     uint64_t reference = referencePoint_.load(std::memory_order_acquire);
     
-    // Calculer le delta depuis le point de référence
+    // Calculate delta since reference point
     uint64_t delta = (raw >= reference) ? (raw - reference) : 0;
     
-    // Appliquer les corrections
+    // Apply corrections
     return applyCorrections(delta);
 }
 
@@ -85,42 +108,52 @@ uint64_t TimestampManager::systemNow() const {
 }
 
 // ============================================================================
-// TIMESTAMPS - MILLISECONDES
-// ============================================================================
-
-uint64_t TimestampManager::nowMs() const {
-    return usToMs(now());
-}
-
-uint64_t TimestampManager::systemNowMs() const {
-    return usToMs(systemNow());
-}
-
-// ============================================================================
-// SYNCHRONISATION
-// ============================================================================
-
-void TimestampManager::setSyncOffset(int64_t offset) {
-    syncOffset_.store(offset, std::memory_order_release);
-    
-    Logger::debug("TimestampManager", 
-        "Sync offset set to: " + std::to_string(offset) + "µs");
-}
-
-// ============================================================================
-// COMPENSATION DE DÉRIVE
+// DRIFT COMPENSATION
 // ============================================================================
 
 double TimestampManager::calculateDrift() const {
-    // Mesurer la dérive en comparant l'horloge système avec une référence externe
-    // Pour simplifier, on retourne 0 pour l'instant
-    // TODO: Implémenter mesure de dérive réelle
+    if (!started_.load(std::memory_order_acquire)) {
+        return 0.0;
+    }
     
-    return driftFactor_.load(std::memory_order_acquire);
+    uint64_t currentTime = now();
+    uint64_t lastMeasurement = lastDriftMeasurement_.load(std::memory_order_acquire);
+    
+    if (lastMeasurement == 0) {
+        // First measurement
+        lastDriftMeasurement_.store(currentTime, std::memory_order_release);
+        return 0.0;
+    }
+    
+    // Calculate drift since last measurement
+    uint64_t elapsed = currentTime - lastMeasurement;
+    
+    if (elapsed == 0) {
+        return 0.0;
+    }
+    
+    // Get raw timestamp difference
+    uint64_t rawNow = getRawTimestamp();
+    uint64_t rawRef = referencePoint_.load(std::memory_order_acquire);
+    uint64_t rawElapsed = rawNow - rawRef;
+    
+    // Calculate drift in ppm (parts per million)
+    // drift = (rawElapsed - correctedElapsed) / correctedElapsed * 1000000
+    double drift = 0.0;
+    
+    if (currentTime > 0) {
+        drift = static_cast<double>(rawElapsed - currentTime) / 
+                static_cast<double>(currentTime) * 1000000.0;
+    }
+    
+    // Update last measurement
+    lastDriftMeasurement_.store(currentTime, std::memory_order_release);
+    
+    return drift;
 }
 
 // ============================================================================
-// STATISTIQUES
+// STATISTICS
 // ============================================================================
 
 std::string TimestampManager::getStats() const {
@@ -131,6 +164,7 @@ std::string TimestampManager::getStats() const {
     oss << "  Uptime: " << std::fixed << std::setprecision(3) 
         << getUptimeSeconds() << "s\n";
     oss << "  Current timestamp: " << now() << "µs\n";
+    oss << "  System timestamp: " << systemNow() << "µs\n";
     oss << "  Sync offset: " << syncOffset_.load() << "µs\n";
     oss << "  Drift compensation: " 
         << (driftCompensationEnabled_.load() ? "ENABLED" : "DISABLED") << "\n";
@@ -141,11 +175,11 @@ std::string TimestampManager::getStats() const {
 }
 
 // ============================================================================
-// MÉTHODES PRIVÉES
+// PRIVATE METHODS
 // ============================================================================
 
 uint64_t TimestampManager::getRawTimestamp() const {
-    // Utiliser high_resolution_clock pour précision maximale
+    // Use high_resolution_clock for maximum precision
     auto now = std::chrono::high_resolution_clock::now();
     auto duration = now.time_since_epoch();
     
@@ -153,21 +187,21 @@ uint64_t TimestampManager::getRawTimestamp() const {
 }
 
 uint64_t TimestampManager::applyCorrections(uint64_t raw) const {
-    // Appliquer l'offset de synchronisation
+    // Apply synchronization offset
     int64_t offset = syncOffset_.load(std::memory_order_acquire);
     int64_t corrected = static_cast<int64_t>(raw) + offset;
     
-    // S'assurer que le résultat est positif
+    // Ensure result is positive
     if (corrected < 0) {
         corrected = 0;
     }
     
-    // Appliquer la compensation de dérive si activée
+    // Apply drift compensation if enabled
     if (driftCompensationEnabled_.load(std::memory_order_acquire)) {
         double drift = driftFactor_.load(std::memory_order_acquire);
         
-        // drift est en ppm (parties par million)
-        // Appliquer la correction: corrected * (1 + drift/1000000)
+        // drift is in ppm (parts per million)
+        // Apply correction: corrected * (1 + drift/1000000)
         corrected = static_cast<int64_t>(
             corrected * (1.0 + drift / 1000000.0)
         );
@@ -179,5 +213,5 @@ uint64_t TimestampManager::applyCorrections(uint64_t raw) const {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER TimestampManager.cpp
+// END OF FILE TimestampManager.cpp
 // ============================================================================

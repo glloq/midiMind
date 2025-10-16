@@ -1,143 +1,137 @@
 // ============================================================================
-// Fichier: src/core/ErrorManager.h
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/core/ErrorManager.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestionnaire centralisé des erreurs de l'application utilisant le
-//   pattern Observer. Permet aux modules de signaler des erreurs et aux
-//   observateurs (comme l'API Server) d'être notifiés pour broadcast.
+//   Centralized error management system using Observer pattern. Tracks error
+//   history, maintains statistics, and notifies registered observers of errors.
+//   Header-only singleton with thread-safe access.
 //
-// Fonctionnalités:
-//   - Enregistrement d'erreurs avec niveaux de gravité
-//   - Pattern Observer pour notifications
-//   - Thread-safe
-//   - Historique des erreurs
-//   - Statistiques d'erreurs
+// Features:
+//   - Error reporting with severity levels
+//   - Observer pattern for error notifications
+//   - Error history tracking
+//   - Error statistics
+//   - Thread-safe operations
 //
-// Design Pattern:
-//   - Singleton (instance unique)
-//   - Observer Pattern (notifications aux observers)
-//   - Thread-safe via std::mutex
+// Dependencies:
+//   - Logger.h
+//   - Error.h
 //
-// Auteur: midiMind Team
-// Date: 2025-10-02
-// Version: 3.0.0
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified implementation
+//   - Improved error history management
+//   - Enhanced callback system
+//   - Better statistics tracking
+//   - English documentation
+//
 // ============================================================================
 
 #pragma once
 
-// ============================================================================
-// INCLUDES SYSTÈME
-// ============================================================================
-#include <string>        // Pour std::string
-#include <vector>        // Pour std::vector (liste observers)
-#include <functional>    // Pour std::function (callbacks)
-#include <mutex>         // Pour std::mutex (thread-safety)
-#include <deque>         // Pour std::deque (historique)
-#include <chrono>        // Pour timestamps
-#include <algorithm>     // Pour std::remove_if
+#include <string>
+#include <vector>
+#include <deque>
+#include <functional>
+#include <mutex>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+
+#include "Logger.h"
+#include "Error.h"
 
 namespace midiMind {
 
 // ============================================================================
-// CLASSE: ErrorManager
+// ERROR MANAGER CLASS
 // ============================================================================
 
 /**
  * @class ErrorManager
- * @brief Gestionnaire centralisé des erreurs avec pattern Observer
- * 
- * Cette classe permet de centraliser la gestion des erreurs dans l'application.
- * Les modules signalent les erreurs via reportError(), et les observateurs
- * enregistrés (via addObserver()) sont notifiés automatiquement.
+ * @brief Centralized error management with Observer pattern
  * 
  * @details
- * Utilise le pattern Observer pour découpler la génération d'erreurs de
- * leur traitement. Typiquement, l'ApiServer s'enregistre comme observer
- * pour broadcaster les erreurs critiques aux clients WebSocket.
+ * Singleton that manages all application errors. Modules report errors
+ * via reportError(), and registered observers are notified automatically.
+ * Maintains error history and statistics.
  * 
- * Le gestionnaire maintient également un historique des dernières erreurs
- * et des statistiques.
+ * Typical usage:
+ * - ApiServer registers as observer to broadcast errors to WebSocket clients
+ * - Modules report errors instead of just logging them
+ * - Frontend can display error notifications based on severity
  * 
- * @note Thread-safe : peut être utilisé depuis n'importe quel thread
- * @note Singleton : une seule instance pour toute l'application
- * 
- * @example Signaler une erreur:
+ * @example Basic usage
  * @code
- * try {
- *     // Code qui peut échouer
- *     connectToDevice(deviceId);
- * } catch (const std::exception& e) {
- *     ErrorManager::instance().reportError(
- *         "DeviceManager",
- *         "Failed to connect to device",
- *         ErrorManager::Severity::ERROR,
- *         e.what()
- *     );
- * }
- * @endcode
- * 
- * @example S'enregistrer comme observer:
- * @code
- * // Dans Application::setupObservers()
- * ErrorManager::instance().addObserver([this](const ErrorInfo& error) {
- *     // Broadcaster l'erreur via WebSocket
+ * // Register an observer
+ * ErrorManager::instance().addObserver([](const auto& error) {
  *     if (error.severity >= ErrorManager::Severity::ERROR) {
- *         json msg;
- *         msg["event"] = "system.error";
- *         msg["module"] = error.module;
- *         msg["message"] = error.message;
- *         apiServer_->broadcast(msg);
+ *         // Broadcast to WebSocket clients
+ *         apiServer.broadcast("error", error.toJson());
  *     }
  * });
+ * 
+ * // Report an error from any module
+ * ErrorManager::instance().reportError(
+ *     "MidiRouter",
+ *     "Failed to route message",
+ *     ErrorManager::Severity::ERROR,
+ *     "Device disconnected unexpectedly"
+ * );
  * @endcode
  */
 class ErrorManager {
 public:
     // ========================================================================
-    // ÉNUMÉRATION: Niveaux de Gravité
+    // SEVERITY LEVELS
     // ========================================================================
     
     /**
      * @enum Severity
-     * @brief Niveaux de gravité des erreurs
+     * @brief Error severity levels
      */
     enum class Severity {
-        INFO = 0,     ///< Information (pas vraiment une erreur)
-        WARNING = 1,  ///< Avertissement (erreur non critique)
-        ERROR = 2,    ///< Erreur (situation anormale)
-        CRITICAL = 3  ///< Critique (erreur fatale, arrêt nécessaire)
+        INFO = 0,       ///< Informational (not really an error)
+        WARNING = 1,    ///< Warning (potential issue)
+        ERROR = 2,      ///< Error (operation failed)
+        CRITICAL = 3    ///< Critical error (system unstable)
     };
     
     // ========================================================================
-    // STRUCTURE: Informations sur une Erreur
+    // ERROR INFO STRUCTURE
     // ========================================================================
     
     /**
      * @struct ErrorInfo
-     * @brief Informations complètes sur une erreur signalée
+     * @brief Complete error information
      */
     struct ErrorInfo {
-        std::string module;          ///< Module ayant signalé l'erreur
-        std::string message;         ///< Message principal
-        Severity severity;           ///< Niveau de gravité
-        std::string details;         ///< Détails supplémentaires (optionnel)
-        int64_t timestamp;           ///< Timestamp (ms depuis epoch)
+        std::string module;         ///< Module that reported the error
+        std::string message;        ///< Error message
+        Severity severity;          ///< Error severity
+        std::string details;        ///< Additional details (optional)
+        int64_t timestamp;          ///< Timestamp (milliseconds since epoch)
         
         /**
-         * @brief Constructeur avec tous les champs
+         * @brief Constructor
          */
         ErrorInfo(const std::string& mod, const std::string& msg,
                  Severity sev, const std::string& det = "")
             : module(mod), message(msg), severity(sev), details(det) {
-            // Calculer le timestamp
+            // Calculate timestamp
             timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
             ).count();
         }
         
         /**
-         * @brief Convertit la gravité en string
+         * @brief Convert severity to string
+         * @return String representation of severity
          */
         std::string severityToString() const {
             switch (severity) {
@@ -148,68 +142,102 @@ public:
                 default:                 return "UNKNOWN";
             }
         }
+        
+        /**
+         * @brief Format error as string
+         * @return Formatted error string
+         */
+        std::string toString() const {
+            std::ostringstream oss;
+            oss << "[" << severityToString() << "] "
+                << "[" << module << "] "
+                << message;
+            if (!details.empty()) {
+                oss << " - " << details;
+            }
+            return oss.str();
+        }
+        
+        /**
+         * @brief Convert timestamp to readable string
+         * @return Formatted timestamp
+         */
+        std::string getTimestampString() const {
+            auto timeT = std::chrono::system_clock::to_time_t(
+                std::chrono::system_clock::time_point(
+                    std::chrono::milliseconds(timestamp)
+                )
+            );
+            
+            std::tm tm;
+            localtime_r(&timeT, &tm);
+            
+            std::ostringstream oss;
+            oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+            
+            // Add milliseconds
+            int ms = timestamp % 1000;
+            oss << "." << std::setfill('0') << std::setw(3) << ms;
+            
+            return oss.str();
+        }
     };
     
     // ========================================================================
-    // TYPE: Observer Callback
+    // OBSERVER CALLBACK TYPE
     // ========================================================================
     
     /**
      * @typedef ObserverCallback
-     * @brief Type de fonction callback pour les observers
+     * @brief Observer callback function type
      * 
-     * Les observers sont notifiés avec une ErrorInfo complète.
+     * @details
+     * Observers are called with complete ErrorInfo when an error is reported.
      */
     using ObserverCallback = std::function<void(const ErrorInfo&)>;
     
     // ========================================================================
-    // SINGLETON - ACCÈS À L'INSTANCE
+    // SINGLETON
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance unique d'ErrorManager (Singleton)
-     * 
-     * @return ErrorManager& Référence à l'instance unique
-     * 
-     * @note Thread-safe depuis C++11 (Meyer's Singleton)
+     * @brief Get singleton instance (thread-safe)
+     * @return Reference to ErrorManager singleton
      */
     static ErrorManager& instance() {
         static ErrorManager instance;
         return instance;
     }
     
-    // ========================================================================
-    // DÉSACTIVATION COPIE ET ASSIGNATION
-    // ========================================================================
-    
+    // Disable copy and move
     ErrorManager(const ErrorManager&) = delete;
     ErrorManager& operator=(const ErrorManager&) = delete;
+    ErrorManager(ErrorManager&&) = delete;
+    ErrorManager& operator=(ErrorManager&&) = delete;
     
     // ========================================================================
-    // MÉTHODES PUBLIQUES - SIGNALEMENT D'ERREURS
+    // ERROR REPORTING
     // ========================================================================
     
     /**
-     * @brief Signale une erreur
+     * @brief Report an error
      * 
-     * Enregistre l'erreur dans l'historique, met à jour les statistiques,
-     * et notifie tous les observers enregistrés.
-     * 
-     * @param module Nom du module signalant l'erreur
-     * @param message Message d'erreur principal
-     * @param severity Niveau de gravité
-     * @param details Détails supplémentaires (optionnel)
+     * @param module Module name reporting the error
+     * @param message Error message
+     * @param severity Error severity level
+     * @param details Additional details (optional)
      * 
      * @note Thread-safe
-     * @note Les observers sont notifiés de manière synchrone
+     * @note Observers are notified synchronously
+     * @note Error is added to history and logged
      * 
      * @example
      * @code
      * ErrorManager::instance().reportError(
-     *     "MidiRouter",
-     *     "Failed to route message",
+     *     "Database",
+     *     "Failed to execute query",
      *     ErrorManager::Severity::ERROR,
-     *     "Device disconnected unexpectedly"
+     *     "Connection timeout after 30s"
      * );
      * @endcode
      */
@@ -219,45 +247,69 @@ public:
                     const std::string& details = "") {
         std::lock_guard<std::mutex> lock(mutex_);
         
-        // Créer l'ErrorInfo
+        // Create ErrorInfo
         ErrorInfo error(module, message, severity, details);
         
-        // Ajouter à l'historique
+        // Add to history
         history_.push_back(error);
         
-        // Limiter la taille de l'historique
+        // Limit history size
         if (history_.size() > maxHistorySize_) {
             history_.pop_front();
         }
         
-        // Mettre à jour les statistiques
+        // Update statistics
         updateStats(severity);
         
-        // Notifier les observers
+        // Log error
+        logError(error);
+        
+        // Notify observers
         notifyObservers(error);
     }
     
+    /**
+     * @brief Report error from exception
+     * 
+     * @param module Module name
+     * @param exception MidiMindException instance
+     * 
+     * @note Thread-safe
+     * @note Severity is determined based on error code
+     */
+    void reportError(const std::string& module, 
+                    const MidiMindException& exception) {
+        // Determine severity based on error code
+        Severity severity = Severity::ERROR;
+        
+        int code = static_cast<int>(exception.code());
+        if (code >= 1800) {  // System errors
+            severity = Severity::CRITICAL;
+        } else if (code >= 1700) {  // Processing errors
+            severity = Severity::WARNING;
+        }
+        
+        reportError(module, exception.message(), severity, 
+                   "Error code: " + std::to_string(code));
+    }
+    
     // ========================================================================
-    // MÉTHODES PUBLIQUES - GESTION DES OBSERVERS
+    // OBSERVER MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Ajoute un observer
+     * @brief Register an observer
      * 
-     * Enregistre une fonction callback qui sera appelée à chaque erreur.
-     * 
-     * @param observer Fonction callback (lambda, fonction, ou functor)
+     * @param observer Callback function to be called on errors
      * 
      * @note Thread-safe
-     * @note Les observers sont appelés dans l'ordre d'enregistrement
+     * @note Observers are called in registration order
      * 
      * @example
      * @code
-     * // Enregistrer un observer
-     * ErrorManager::instance().addObserver([](const ErrorInfo& error) {
+     * ErrorManager::instance().addObserver([](const auto& error) {
      *     if (error.severity >= ErrorManager::Severity::ERROR) {
-     *         std::cerr << "ERROR in " << error.module << ": " 
-     *                   << error.message << std::endl;
+     *         notifyUser(error.message);
      *     }
      * });
      * @endcode
@@ -268,8 +320,7 @@ public:
     }
     
     /**
-     * @brief Supprime tous les observers
-     * 
+     * @brief Remove all observers
      * @note Thread-safe
      */
     void clearObservers() {
@@ -278,10 +329,8 @@ public:
     }
     
     /**
-     * @brief Récupère le nombre d'observers enregistrés
-     * 
-     * @return size_t Nombre d'observers
-     * 
+     * @brief Get number of registered observers
+     * @return Observer count
      * @note Thread-safe
      */
     size_t getObserverCount() const {
@@ -290,29 +339,17 @@ public:
     }
     
     // ========================================================================
-    // MÉTHODES PUBLIQUES - HISTORIQUE
+    // ERROR HISTORY
     // ========================================================================
     
     /**
-     * @brief Récupère l'historique des erreurs
+     * @brief Get error history
      * 
-     * Retourne une copie de l'historique pour éviter les problèmes
-     * de synchronisation.
-     * 
-     * @param maxCount Nombre maximum d'erreurs à retourner (0 = toutes)
-     * @return std::vector<ErrorInfo> Historique des erreurs (plus récentes en dernier)
+     * @param maxCount Maximum number of errors to return (0 = all)
+     * @return Vector of ErrorInfo (most recent last)
      * 
      * @note Thread-safe
-     * @note Retourne une COPIE de l'historique
-     * 
-     * @example
-     * @code
-     * // Récupérer les 10 dernières erreurs
-     * auto errors = ErrorManager::instance().getHistory(10);
-     * for (const auto& error : errors) {
-     *     std::cout << error.module << ": " << error.message << std::endl;
-     * }
-     * @endcode
+     * @note Returns a COPY of history
      */
     std::vector<ErrorInfo> getHistory(size_t maxCount = 0) const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -320,10 +357,10 @@ public:
         std::vector<ErrorInfo> result;
         
         if (maxCount == 0 || maxCount >= history_.size()) {
-            // Retourner tout l'historique
+            // Return all history
             result.assign(history_.begin(), history_.end());
         } else {
-            // Retourner les N dernières erreurs
+            // Return N most recent errors
             auto start = history_.end() - maxCount;
             result.assign(start, history_.end());
         }
@@ -332,10 +369,9 @@ public:
     }
     
     /**
-     * @brief Efface l'historique des erreurs
-     * 
+     * @brief Clear error history
      * @note Thread-safe
-     * @note Les statistiques ne sont pas réinitialisées
+     * @note Statistics are not reset
      */
     void clearHistory() {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -343,52 +379,51 @@ public:
     }
     
     /**
-     * @brief Définit la taille maximale de l'historique
-     * 
-     * @param size Taille maximale (défaut: 100)
-     * 
+     * @brief Set maximum history size
+     * @param size Maximum size (default: 100)
      * @note Thread-safe
      */
     void setMaxHistorySize(size_t size) {
         std::lock_guard<std::mutex> lock(mutex_);
         maxHistorySize_ = size;
         
-        // Tronquer si nécessaire
+        // Truncate if necessary
         while (history_.size() > maxHistorySize_) {
             history_.pop_front();
         }
     }
     
+    /**
+     * @brief Get maximum history size
+     * @return Maximum history size
+     * @note Thread-safe
+     */
+    size_t getMaxHistorySize() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return maxHistorySize_;
+    }
+    
     // ========================================================================
-    // MÉTHODES PUBLIQUES - STATISTIQUES
+    // STATISTICS
     // ========================================================================
     
     /**
      * @struct Statistics
-     * @brief Statistiques des erreurs
+     * @brief Error statistics
      */
     struct Statistics {
-        size_t totalErrors = 0;      ///< Nombre total d'erreurs
-        size_t infoCount = 0;        ///< Nombre d'infos
-        size_t warningCount = 0;     ///< Nombre d'avertissements
-        size_t errorCount = 0;       ///< Nombre d'erreurs
-        size_t criticalCount = 0;    ///< Nombre d'erreurs critiques
-        int64_t lastErrorTimestamp = 0;  ///< Timestamp de la dernière erreur
+        size_t totalErrors = 0;         ///< Total errors
+        size_t infoCount = 0;           ///< Info count
+        size_t warningCount = 0;        ///< Warning count
+        size_t errorCount = 0;          ///< Error count
+        size_t criticalCount = 0;       ///< Critical count
+        int64_t lastErrorTimestamp = 0; ///< Last error timestamp (ms)
     };
     
     /**
-     * @brief Récupère les statistiques d'erreurs
-     * 
-     * @return Statistics Structure contenant les statistiques
-     * 
+     * @brief Get error statistics
+     * @return Statistics structure
      * @note Thread-safe
-     * 
-     * @example
-     * @code
-     * auto stats = ErrorManager::instance().getStatistics();
-     * std::cout << "Total errors: " << stats.totalErrors << std::endl;
-     * std::cout << "Critical: " << stats.criticalCount << std::endl;
-     * @endcode
      */
     Statistics getStatistics() const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -396,10 +431,9 @@ public:
     }
     
     /**
-     * @brief Réinitialise les statistiques
-     * 
+     * @brief Reset statistics
      * @note Thread-safe
-     * @note L'historique n'est pas effacé
+     * @note History is not cleared
      */
     void resetStatistics() {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -408,54 +442,53 @@ public:
 
 private:
     // ========================================================================
-    // CONSTRUCTEUR PRIVÉ (SINGLETON)
+    // PRIVATE CONSTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur privé (Singleton)
+     * @brief Private constructor (Singleton)
      */
     ErrorManager() : maxHistorySize_(100) {}
     
     /**
-     * @brief Destructeur
+     * @brief Destructor
      */
     ~ErrorManager() = default;
     
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Notifie tous les observers
-     * 
-     * Appelle chaque observer avec l'ErrorInfo.
-     * 
-     * @param error Information sur l'erreur
-     * 
-     * @note Appelée avec le mutex déjà verrouillé
+     * @brief Notify all observers
+     * @param error Error information
+     * @note Must be called with mutex locked
      */
     void notifyObservers(const ErrorInfo& error) {
-        // Note: mutex déjà verrouillé par reportError()
-        for (auto& observer : observers_) {
+        for (const auto& observer : observers_) {
             try {
                 observer(error);
             } catch (const std::exception& e) {
-                // Ne pas propager les exceptions des observers
-                // pour éviter de bloquer les autres observers
+                // Observer threw exception, log but continue
+                Logger::error("ErrorManager", 
+                    "Observer threw exception: " + std::string(e.what()));
+            } catch (...) {
+                Logger::error("ErrorManager", "Observer threw unknown exception");
             }
         }
     }
     
     /**
-     * @brief Met à jour les statistiques
-     * 
-     * @param severity Gravité de l'erreur signalée
-     * 
-     * @note Appelée avec le mutex déjà verrouillé
+     * @brief Update statistics
+     * @param severity Error severity
+     * @note Must be called with mutex locked
      */
     void updateStats(Severity severity) {
-        // Note: mutex déjà verrouillé par reportError()
         stats_.totalErrors++;
+        stats_.lastErrorTimestamp = std::chrono::duration_cast
+            std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
         
         switch (severity) {
             case Severity::INFO:
@@ -471,44 +504,48 @@ private:
                 stats_.criticalCount++;
                 break;
         }
+    }
+    
+    /**
+     * @brief Log error to Logger
+     * @param error Error information
+     * @note Must be called with mutex locked
+     */
+    void logError(const ErrorInfo& error) {
+        std::string logMessage = error.message;
+        if (!error.details.empty()) {
+            logMessage += " - " + error.details;
+        }
         
-        stats_.lastErrorTimestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-        ).count();
+        switch (error.severity) {
+            case Severity::INFO:
+                Logger::info(error.module, logMessage);
+                break;
+            case Severity::WARNING:
+                Logger::warning(error.module, logMessage);
+                break;
+            case Severity::ERROR:
+                Logger::error(error.module, logMessage);
+                break;
+            case Severity::CRITICAL:
+                Logger::critical(error.module, logMessage);
+                break;
+        }
     }
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBERS
     // ========================================================================
     
-    /**
-     * @brief Mutex pour thread-safety
-     */
-    mutable std::mutex mutex_;
-    
-    /**
-     * @brief Liste des observers enregistrés
-     */
-    std::vector<ObserverCallback> observers_;
-    
-    /**
-     * @brief Historique des erreurs (FIFO avec taille limitée)
-     */
-    std::deque<ErrorInfo> history_;
-    
-    /**
-     * @brief Taille maximale de l'historique
-     */
-    size_t maxHistorySize_;
-    
-    /**
-     * @brief Statistiques des erreurs
-     */
-    Statistics stats_;
+    mutable std::mutex mutex_;              ///< Thread-safety
+    std::vector<ObserverCallback> observers_; ///< Registered observers
+    std::deque<ErrorInfo> history_;         ///< Error history
+    size_t maxHistorySize_;                 ///< Max history size
+    Statistics stats_;                      ///< Error statistics
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER ErrorManager.h
+// END OF FILE ErrorManager.h v4.1.0
 // ============================================================================

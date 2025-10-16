@@ -1,401 +1,232 @@
-/**
- * keyboard.css
- * Styles pour le clavier virtuel adaptatif
- */
-
 /* ============================================================================
-   CONTAINER PRINCIPAL
+   Fichier: frontend/styles/keyboard-styles.css (à ajouter à components.css)
+   Version: v3.1.0 - KEYBOARD MONITOR MODE
+   Date: 2025-10-16
+   ============================================================================
+   Styles pour le clavier MIDI (mode monitor)
    ============================================================================ */
 
-.keyboard-container {
+/* ============================================================================
+   KEYBOARD PAGE
+   ============================================================================ */
+
+.keyboard-page {
     display: flex;
     flex-direction: column;
+    gap: var(--spacing-lg);
     height: 100%;
-    background: #0a0a0a;
-    color: #e0e0e0;
+    padding: var(--spacing-lg);
 }
 
 /* ============================================================================
-   HEADER
+   CONTROLS
    ============================================================================ */
-
-.keyboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: #1a1a1a;
-    border-bottom: 1px solid #333;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.layout-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.layout-selector label {
-    font-size: 12px;
-    color: #888;
-}
-
-.layout-selector select {
-    padding: 6px 12px;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 13px;
-    cursor: pointer;
-}
 
 .keyboard-controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.keyboard-controls label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #888;
-}
-
-.keyboard-controls input[type="checkbox"] {
-    cursor: pointer;
-}
-
-.keyboard-controls input[type="range"] {
-    width: 80px;
-}
-
-/* ============================================================================
-   DRUM GRID
-   ============================================================================ */
-
-.keyboard-drum-grid {
-    flex: 1;
     display: grid;
-    gap: 8px;
-    padding: 16px;
-    overflow: auto;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
 }
 
-.drum-pad {
-    position: relative;
-    border-radius: 8px;
-    cursor: pointer;
-    user-select: none;
+.control-group {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    transition: all 0.1s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    min-height: 80px;
+    gap: var(--spacing-xs);
 }
 
-.drum-pad:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+.control-group label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.drum-pad:active,
-.drum-pad.active {
-    transform: scale(0.95);
-    box-shadow: 0 0 20px currentColor;
+.instrument-select,
+.velocity-slider {
+    width: 100%;
 }
 
-.drum-pad .pad-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #fff;
+.note-range-display {
+    background: var(--bg-light);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
     text-align: center;
-    margin-bottom: 4px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.drum-pad .pad-note {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* ============================================================================
-   SCALE LINEAR
-   ============================================================================ */
-
-.keyboard-scale-linear {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.scale-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: #151515;
-    border-bottom: 1px solid #333;
-}
-
-.scale-controls select {
-    padding: 6px 12px;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.scale-controls button {
-    padding: 6px 12px;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.scale-controls button:hover {
-    background: #3a3a3a;
-    border-color: #555;
-}
-
-.scale-pads {
-    flex: 1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 16px;
-    overflow: auto;
-    align-content: flex-start;
-}
-
-.scale-pad {
-    position: relative;
-    width: calc(12.5% - 8px);
-    min-width: 60px;
-    height: 80px;
-    background: #667eea;
-    border-radius: 8px;
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.1s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.scale-pad.tonic {
-    background: #e74c3c;
-    border: 2px solid #fff;
-}
-
-.scale-pad:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.scale-pad:active,
-.scale-pad.active {
-    transform: scale(0.95);
-    box-shadow: 0 0 20px currentColor;
-}
-
-.scale-pad .note-name {
+.note-range-value {
+    color: var(--color-primary);
     font-size: 16px;
     font-weight: 600;
-    color: #fff;
-    margin-bottom: 4px;
 }
 
-.scale-pad .degree {
+/* Velocity Control */
+.velocity-presets {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+}
+
+.btn-preset {
+    flex: 1;
+    padding: var(--spacing-xs);
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-preset:hover {
+    background: var(--color-primary);
+    color: var(--bg-dark);
+}
+
+body.performance-mode .btn-preset:hover {
+    transition: none;
+}
+
+/* Actions */
+.control-group.actions {
+    flex-direction: row;
+    gap: var(--spacing-sm);
 }
 
 /* ============================================================================
-   PIANO ROLL
+   CANVAS KEYBOARD
    ============================================================================ */
 
-.keyboard-piano-roll {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.piano-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 12px 16px;
-    background: #151515;
-    border-bottom: 1px solid #333;
-}
-
-.piano-controls button {
-    padding: 6px 16px;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.piano-controls button:hover {
-    background: #3a3a3a;
-    border-color: #555;
-}
-
-.piano-controls span {
-    font-size: 14px;
-    color: #888;
-}
-
-.piano-keys {
-    flex: 1;
-    display: flex;
-    padding: 16px;
-    gap: 4px;
+.keyboard-canvas-wrapper {
+    background: var(--bg-medium);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
     overflow-x: auto;
     overflow-y: hidden;
-    align-items: flex-end;
 }
 
-.piano-key {
-    position: relative;
+.keyboard-canvas {
+    display: block;
     cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 8px;
-    transition: all 0.1s;
-    border-radius: 4px 4px 0 0;
-}
-
-.piano-key.white {
-    width: 50px;
-    height: 200px;
-    background: linear-gradient(to bottom, #fff, #e0e0e0);
-    border: 1px solid #ccc;
-    border-bottom: 3px solid #aaa;
-    z-index: 1;
-}
-
-.piano-key.black {
-    width: 35px;
-    height: 130px;
-    background: linear-gradient(to bottom, #333, #000);
-    border: 1px solid #000;
-    margin: 0 -18px;
-    z-index: 2;
-}
-
-.piano-key.white:hover {
-    background: linear-gradient(to bottom, #f0f0f0, #d0d0d0);
-}
-
-.piano-key.black:hover {
-    background: linear-gradient(to bottom, #444, #111);
-}
-
-.piano-key.white:active,
-.piano-key.white.active {
-    background: linear-gradient(to bottom, #667eea, #5568d3);
-    transform: translateY(2px);
-}
-
-.piano-key.black:active,
-.piano-key.black.active {
-    background: linear-gradient(to bottom, #667eea, #5568d3);
-    transform: translateY(2px);
-}
-
-.piano-key .key-label {
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.piano-key.white .key-label {
-    color: #333;
-}
-
-.piano-key.black .key-label {
-    color: #fff;
+    min-width: 100%;
 }
 
 /* ============================================================================
-   CUSTOM LAYOUT
+   LEGEND
    ============================================================================ */
 
-.keyboard-custom {
-    flex: 1;
+.keyboard-legend {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-medium);
+    border-radius: var(--border-radius);
 }
 
-.custom-info {
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.legend-item span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+/* ============================================================================
+   KEYBOARD MAPPING INFO
+   ============================================================================ */
+
+.keyboard-mapping-info {
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+}
+
+.keyboard-mapping-info h4 {
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    font-size: 14px;
+}
+
+.keyboard-mapping-info p {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+    font-size: 13px;
+}
+
+.key-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.key-hints kbd {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--color-primary);
+}
+
+/* ============================================================================
+   STATS
+   ============================================================================ */
+
+.keyboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.stat-item {
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
 }
 
-.custom-info h3 {
-    font-size: 20px;
-    margin: 0 0 12px 0;
-    color: #fff;
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: var(--spacing-xs);
 }
 
-.custom-info p {
-    font-size: 14px;
-    color: #888;
-    margin: 0 0 20px 0;
-}
-
-.custom-info button {
-    padding: 10px 24px;
-    background: #667eea;
-    border: none;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.custom-info button:hover {
-    background: #5568d3;
+.stat-value {
+    color: var(--color-primary);
+    font-size: 24px;
+    font-weight: 600;
 }
 
 /* ============================================================================
-   EMPTY STATE
+   WARNING BANNER (enregistrement désactivé)
    ============================================================================ */
 
-.empty-keyboard {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    color: #666;
+.info-banner.warning {
+    background: rgba(255, 217, 61, 0.1);
+    border-left-color: var(--color-accent);
 }
 
 /* ============================================================================
@@ -403,28 +234,33 @@
    ============================================================================ */
 
 @media (max-width: 768px) {
-    .keyboard-header {
+    .keyboard-controls {
+        grid-template-columns: 1fr;
+    }
+    
+    .control-group.actions {
         flex-direction: column;
-        align-items: flex-start;
     }
     
-    .drum-pad {
-        min-height: 60px;
+    .keyboard-stats {
+        grid-template-columns: 1fr;
     }
-    
-    .scale-pad {
-        width: calc(25% - 8px);
-        height: 70px;
-    }
-    
-    .piano-key.white {
-        width: 40px;
-        height: 150px;
-    }
-    
-    .piano-key.black {
-        width: 28px;
-        height: 100px;
-        margin: 0 -14px;
-    }
+}
+
+/* ============================================================================
+   ACCESSIBILITY
+   ============================================================================ */
+
+.keyboard-canvas:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 4px;
+}
+
+/* ============================================================================
+   PERFORMANCE MODE
+   ============================================================================ */
+
+body.performance-mode .keyboard-canvas,
+body.performance-mode .btn-preset {
+    transition: none !important;
 }

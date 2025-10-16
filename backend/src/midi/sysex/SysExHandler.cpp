@@ -1,11 +1,25 @@
 // ============================================================================
-// Fichier: backend/src/midi/sysex/SysExHandler.cpp
-// VERSION CORRIGÉE - Lock Ordering Fixed
-// Date: 06/10/2025
+// File: backend/src/midi/sysex/SysExHandler.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Description:
+//   Implementation of SysExHandler - processes standard and custom SysEx
+//   messages. Focuses on Blocks 1-2 for v4.1.0.
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
 // ============================================================================
 
 #include "SysExHandler.h"
+#include "SysExParser.h"
 #include "../../core/Logger.h"
+
+#include <algorithm>
+#include <sstream>
+#include <iomanip>
 
 namespace midiMind {
 
@@ -16,12 +30,8 @@ namespace midiMind {
 SysExHandler::SysExHandler()
     : autoIdentify_(true)
     , autoIdentifyDelayMs_(500)
-    , messagesReceived_(0)
-    , messagesSent_(0)
-    , identityRepliesReceived_(0)
-    , identityRequestsSent_(0)
 {
-    Logger::info("SysExHandler", "SysExHandler created");
+    Logger::info("SysExHandler", "SysExHandler initialized");
 }
 
 SysExHandler::~SysExHandler() {
@@ -29,354 +39,246 @@ SysExHandler::~SysExHandler() {
 }
 
 // ============================================================================
-// RÉCEPTION DE MESSAGES
+// MESSAGE HANDLING
 // ============================================================================
 
-void SysExHandler::handleSysExMessage(const std::vector<uint8_t>& data, 
+void SysExHandler::handleSysExMessage(const std::vector<uint8_t>& data,
                                       const std::string& deviceId) {
-    SysExMessage msg(data);
-    
-    if (!msg.isValid()) {
-        Logger::warn("SysExHandler", "Invalid SysEx message from " + deviceId);
+    // Validate basic SysEx format
+    if (data.size() < 4) {
+        Logger::warn("SysExHandler", 
+            "Invalid SysEx from " + deviceId + " (too short)");
         return;
     }
     
-    Logger::debug("SysExHandler", 
-        "Received message from " + deviceId + 
-        " (" + std::to_string(msg.getSize()) + " bytes)");
+    if (data[0] != 0xF0 || data[data.size() - 1] != 0xF7) {
+        Logger::warn("SysExHandler",
+            "Invalid SysEx from " + deviceId + " (missing F0/F7)");
+        return;
+    }
     
     messagesReceived_++;
     
-    // Dispatcher selon le type
-    if (SysExParser::isIdentityReply(msg)) {
-        handleIdentityReply(msg, deviceId);
-    } else if (SysExParser::isGeneralMidi(msg)) {
-        handleGeneralMidi(msg, deviceId);
-    } else if (SysExParser::isDeviceControl(msg)) {
-        handleDeviceControl(msg, deviceId);
-    } else if (CustomSysExParser::isCustomSysEx(msg)) {
-        handleCustomSysEx(msg, deviceId);
-    } else {
-        // Message SysEx non géré
-        if (onUnhandledSysEx_) {
-            onUnhandledSysEx_(deviceId, msg);
+    // Log received message
+    std::stringstream ss;
+    ss << "Received SysEx from " << deviceId << " (" << data.size() << " bytes): ";
+    for (size_t i = 0; i < std::min(data.size(), size_t(16)); ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') 
+           << static_cast<int>(data[i]) << " ";
+    }
+    if (data.size() > 16) ss << "...";
+    Logger::debug("SysExHandler", ss.str());
+    
+    // Dispatch based on message type
+    if (SysExParser::isIdentityReply(data)) {
+        handleIdentityReply(data, deviceId);
+    } else if (SysExParser::isCustomSysEx(data)) {
+        auto blockId = SysExParser::getCustomBlockId(data);
+        
+        if (!blockId) {
+            Logger::warn("SysExHandler", 
+                "Invalid Custom SysEx from " + deviceId);
+            return;
         }
-        Logger::debug("SysExHandler", "Unhandled SysEx from " + deviceId);
+        
+        switch (*blockId) {
+            case 1: // Block 1: Identification
+                handleCustomIdentification(data, deviceId);
+                break;
+                
+            case 2: // Block 2: Note Map
+                handleNoteMap(data, deviceId);
+                break;
+                
+            default:
+                Logger::debug("SysExHandler",
+                    "Custom SysEx Block " + std::to_string(*blockId) + 
+                    " not implemented yet");
+                break;
+        }
+    } else {
+        Logger::debug("SysExHandler", 
+            "Unhandled SysEx type from " + deviceId);
     }
 }
 
 // ============================================================================
-// HANDLERS SPÉCIFIQUES
+// INTERNAL HANDLERS
 // ============================================================================
 
-void SysExHandler::handleIdentityReply(const SysExMessage& msg, 
+void SysExHandler::handleIdentityReply(const std::vector<uint8_t>& data,
                                        const std::string& deviceId) {
-    Logger::info("SysExHandler", "Identity Reply from " + deviceId);
+    Logger::info("SysExHandler", "Standard Identity Reply from " + deviceId);
     
-    // ✅ CORRECTION: Parse SANS lock
-    auto identity = SysExParser::parseIdentityReply(msg);
+    // Parse without lock
+    auto identity = SysExParser::parseIdentityReply(data);
     if (!identity) {
         Logger::warn("SysExHandler", "Failed to parse Identity Reply");
         return;
     }
     
-    // ✅ Stocker en cache AVEC lock court
+    // Store in cache with short lock
     {
         std::lock_guard<std::mutex> lock(mutex_);
         identityCache_[deviceId] = *identity;
         identityRepliesReceived_++;
     }
     
-    Logger::info("SysExHandler", "Device identified: " + identity->toString());
+    // Log details
+    std::stringstream ss;
+    ss << "Device identified: "
+       << "Manufacturer=0x" << std::hex << identity->manufacturerId
+       << ", Family=0x" << identity->familyCode
+       << ", Model=0x" << identity->modelNumber
+       << ", Version=" << std::dec 
+       << static_cast<int>(identity->versionMajor) << "."
+       << static_cast<int>(identity->versionMinor) << "."
+       << static_cast<int>(identity->versionPatch);
+    Logger::info("SysExHandler", ss.str());
     
-    // ✅ Callback HORS lock
+    // Callback without lock
     if (onDeviceIdentified_) {
         onDeviceIdentified_(deviceId, *identity);
     }
 }
 
-void SysExHandler::handleGeneralMidi(const SysExMessage& msg, 
-                                    const std::string& deviceId) {
-    Logger::debug("SysExHandler", "General MIDI message from " + deviceId);
-    // TODO: Implémenter si nécessaire
-}
-
-void SysExHandler::handleDeviceControl(const SysExMessage& msg, 
-                                       const std::string& deviceId) {
-    Logger::debug("SysExHandler", "Device Control message from " + deviceId);
-    // TODO: Implémenter si nécessaire
-}
-
-void SysExHandler::handleCustomSysEx(const SysExMessage& msg, 
-                                     const std::string& deviceId) {
-    auto blockId = CustomSysExParser::getBlockId(msg);
-    
-    if (!blockId) {
-        Logger::warn("SysExHandler", "Invalid Custom SysEx from " + deviceId);
-        return;
-    }
-    
-    Logger::info("SysExHandler", 
-        "Custom SysEx Block " + std::to_string(*blockId) + " from " + deviceId);
-    
-    switch (*blockId) {
-        case CustomSysEx::BLOCK_IDENTIFICATION:
-            handleCustomIdentification(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_NOTE_MAP:
-            handleNoteMap(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_CC_SUPPORTED:
-            handleCCSupported(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_AIR_CAPABILITIES:
-            handleAirCapabilities(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_LIGHT_CAPABILITIES:
-            handleLightCapabilities(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_SENSORS_FEEDBACK:
-            handleSensorsFeedback(msg, deviceId);
-            break;
-            
-        case CustomSysEx::BLOCK_SYNC_CLOCK:
-            handleSyncClock(msg, deviceId);
-            break;
-            
-        default:
-            Logger::warn("SysExHandler", 
-                "Unknown Custom Block " + std::to_string(*blockId));
-            
-            auto version = CustomSysExParser::getBlockVersion(msg);
-            if (onUnknownCustomBlock_ && version) {
-                onUnknownCustomBlock_(deviceId, *blockId, *version, msg);
-            }
-            break;
-    }
-}
-
-// ============================================================================
-// HANDLERS CUSTOM SYSEX (BLOCS 1-8)
-// ============================================================================
-
-void SysExHandler::handleCustomIdentification(const SysExMessage& msg, 
+void SysExHandler::handleCustomIdentification(const std::vector<uint8_t>& data,
                                               const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto identity = CustomSysExParser::parseIdentification(msg);
+    Logger::info("SysExHandler", "Custom Identification (Block 1) from " + deviceId);
+    
+    // Parse without lock
+    auto identity = SysExParser::parseCustomIdentification(data);
     if (!identity) {
         Logger::warn("SysExHandler", "Failed to parse Custom Identification");
         return;
     }
     
-    // ✅ Stocker AVEC lock court
+    // Store in cache with short lock
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        customIdentities_[deviceId] = *identity;
+        customIdentityCache_[deviceId] = *identity;
     }
     
-    Logger::info("SysExHandler", 
-        "Custom Device Identified: " + identity->name + 
-        " (ID: 0x" + std::to_string(identity->uniqueId) + ")");
+    // Log details
+    std::stringstream ss;
+    ss << "Custom device identified: "
+       << "Name='" << identity->deviceName << "'"
+       << ", ID=0x" << std::hex << identity->deviceId
+       << ", Version=" << std::dec
+       << static_cast<int>(identity->firmwareVersion[0]) << "."
+       << static_cast<int>(identity->firmwareVersion[1]) << "."
+       << static_cast<int>(identity->firmwareVersion[2])
+       << ", Features=0x" << std::hex << identity->featureFlags;
+    Logger::info("SysExHandler", ss.str());
     
-    // ✅ Callback HORS lock
+    // Callback without lock
     if (onCustomDeviceIdentified_) {
         onCustomDeviceIdentified_(deviceId, *identity);
     }
 }
 
-void SysExHandler::handleNoteMap(const SysExMessage& msg, 
-                                const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto noteMap = CustomSysExParser::parseNoteMap(msg);
+void SysExHandler::handleNoteMap(const std::vector<uint8_t>& data,
+                                 const std::string& deviceId) {
+    Logger::info("SysExHandler", "Note Map (Block 2) from " + deviceId);
+    
+    // Parse without lock
+    auto noteMap = SysExParser::parseNoteMap(data);
     if (!noteMap) {
         Logger::warn("SysExHandler", "Failed to parse Note Map");
         return;
     }
     
-    // Compter les notes jouables
-    int playableCount = 0;
-    for (int i = 0; i < 128; ++i) {
-        if (noteMap->isNotePlayable(i)) {
-            playableCount++;
-        }
-    }
-    
-    // ✅ Stocker AVEC lock court
+    // Store in cache with short lock
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        noteMaps_[deviceId] = *noteMap;
+        noteMapCache_[deviceId] = *noteMap;
     }
     
-    Logger::info("SysExHandler", 
-        "Note Map: " + std::to_string(playableCount) + " playable notes");
+    // Log details
+    std::stringstream ss;
+    ss << "Note map received: "
+       << "Range=" << static_cast<int>(noteMap->minNote) 
+       << "-" << static_cast<int>(noteMap->maxNote)
+       << ", Polyphony=" << static_cast<int>(noteMap->polyphony)
+       << ", Entries=" << noteMap->mappings.size();
+    Logger::info("SysExHandler", ss.str());
     
-    // ✅ Callback HORS lock
+    // Callback without lock
     if (onNoteMapReceived_) {
         onNoteMapReceived_(deviceId, *noteMap);
     }
 }
 
-void SysExHandler::handleCCSupported(const SysExMessage& msg, 
-                                     const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto ccCaps = CustomSysExParser::parseCCSupported(msg);
-    if (!ccCaps) {
-        Logger::warn("SysExHandler", "Failed to parse CC Supported");
-        return;
-    }
-    
-    // ✅ Stocker AVEC lock court
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        ccCapabilities_[deviceId] = *ccCaps;
-    }
-    
-    Logger::info("SysExHandler", 
-        "CC Capabilities: " + std::to_string(ccCaps->supportedCC.size()) + 
-        " controllers");
-    
-    // ✅ Callback HORS lock
-    if (onCCCapabilities_) {
-        onCCCapabilities_(deviceId, *ccCaps);
-    }
-}
-
-void SysExHandler::handleAirCapabilities(const SysExMessage& msg, 
-                                        const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto airCaps = CustomSysExParser::parseAirCapabilities(msg);
-    if (!airCaps) {
-        Logger::warn("SysExHandler", "Failed to parse Air Capabilities");
-        return;
-    }
-    
-    // ✅ Stocker AVEC lock court
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        airCapabilities_[deviceId] = *airCaps;
-    }
-    
-    Logger::info("SysExHandler", "Air Capabilities received");
-    
-    // ✅ Callback HORS lock
-    if (onAirCapabilities_) {
-        onAirCapabilities_(deviceId, *airCaps);
-    }
-}
-
-void SysExHandler::handleLightCapabilities(const SysExMessage& msg, 
-                                          const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto lightCaps = CustomSysExParser::parseLightCapabilities(msg);
-    if (!lightCaps) {
-        Logger::warn("SysExHandler", "Failed to parse Light Capabilities");
-        return;
-    }
-    
-    // ✅ Stocker AVEC lock court
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        lightCapabilities_[deviceId] = *lightCaps;
-    }
-    
-    Logger::info("SysExHandler", 
-        "Light Capabilities: " + std::to_string(lightCaps->ledCount) + " LEDs");
-    
-    // ✅ Callback HORS lock
-    if (onLightCapabilities_) {
-        onLightCapabilities_(deviceId, *lightCaps);
-    }
-}
-
-void SysExHandler::handleSensorsFeedback(const SysExMessage& msg, 
-                                        const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto sensors = CustomSysExParser::parseSensorsFeedback(msg);
-    if (!sensors) {
-        Logger::warn("SysExHandler", "Failed to parse Sensors Feedback");
-        return;
-    }
-    
-    // ✅ Stocker AVEC lock court
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sensorsFeedback_[deviceId] = *sensors;
-    }
-    
-    Logger::info("SysExHandler", 
-        "Sensors Feedback: " + std::to_string(sensors->sensors.size()) + 
-        " sensors");
-    
-    // ✅ Callback HORS lock
-    if (onSensorsFeedback_) {
-        onSensorsFeedback_(deviceId, *sensors);
-    }
-}
-
-void SysExHandler::handleSyncClock(const SysExMessage& msg, 
-                                  const std::string& deviceId) {
-    // ✅ Parse SANS lock
-    auto sync = CustomSysExParser::parseSyncClock(msg);
-    if (!sync) {
-        Logger::warn("SysExHandler", "Failed to parse Sync Clock");
-        return;
-    }
-    
-    // ✅ Stocker AVEC lock court
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        syncClock_[deviceId] = *sync;
-    }
-    
-    Logger::info("SysExHandler", "Sync & Clock capabilities received");
-    
-    // ✅ Callback HORS lock
-    if (onSyncClock_) {
-        onSyncClock_(deviceId, *sync);
-    }
-}
-
 // ============================================================================
-// ENVOI DE MESSAGES
+// REQUESTS
 // ============================================================================
 
-void SysExHandler::requestIdentity(const std::string& deviceId) {
-    Logger::info("SysExHandler", "Requesting identity from " + deviceId);
+bool SysExHandler::requestIdentity(const std::string& deviceId) {
+    // Standard Identity Request: F0 7E 7F 06 01 F7
+    std::vector<uint8_t> request = {
+        0xF0,  // SysEx Start
+        0x7E,  // Universal Non-Real Time
+        0x7F,  // All devices
+        0x06,  // General Information
+        0x01,  // Identity Request
+        0xF7   // SysEx End
+    };
     
-    // Créer le message Identity Request
-    SysExMessage msg = SysExBuilder::createIdentityRequest(0x7F);
-    
-    // Envoyer via callback
-    if (onSendSysEx_) {
-        onSendSysEx_(deviceId, msg);
+    if (sendSysEx(deviceId, request)) {
         identityRequestsSent_++;
-    } else {
-        Logger::warn("SysExHandler", "No send callback configured");
-    }
-}
-
-bool SysExHandler::sendSysEx(const std::string& deviceId, 
-                            const SysExMessage& message) {
-    if (onSendSysEx_) {
-        onSendSysEx_(deviceId, message);
-        messagesSent_++;
+        Logger::info("SysExHandler", 
+            "Identity request sent to " + deviceId);
         return true;
     }
     
-    Logger::warn("SysExHandler", "No send callback configured");
+    return false;
+}
+
+bool SysExHandler::requestCustomIdentification(const std::string& deviceId) {
+    // Custom SysEx Request Block 1: F0 7D 00 01 00 F7
+    std::vector<uint8_t> request = {
+        0xF0,  // SysEx Start
+        0x7D,  // Educational/Development use
+        0x00,  // MidiMind Manufacturer ID
+        0x01,  // Block 1: Identification
+        0x00,  // Request (0x00 = request, 0x01 = reply)
+        0xF7   // SysEx End
+    };
+    
+    if (sendSysEx(deviceId, request)) {
+        Logger::info("SysExHandler",
+            "Custom identification request sent to " + deviceId);
+        return true;
+    }
+    
+    return false;
+}
+
+bool SysExHandler::requestNoteMap(const std::string& deviceId) {
+    // Custom SysEx Request Block 2: F0 7D 00 02 00 F7
+    std::vector<uint8_t> request = {
+        0xF0,  // SysEx Start
+        0x7D,  // Educational/Development use
+        0x00,  // MidiMind Manufacturer ID
+        0x02,  // Block 2: Note Map
+        0x00,  // Request
+        0xF7   // SysEx End
+    };
+    
+    if (sendSysEx(deviceId, request)) {
+        Logger::info("SysExHandler",
+            "Note map request sent to " + deviceId);
+        return true;
+    }
+    
     return false;
 }
 
 // ============================================================================
-// GETTERS - CACHE (THREAD-SAFE)
+// CACHE ACCESS
 // ============================================================================
 
-std::optional<DeviceIdentity> SysExHandler::getDeviceIdentity(
+std::optional<DeviceIdentity> SysExHandler::getIdentity(
     const std::string& deviceId) const {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -392,8 +294,8 @@ std::optional<CustomDeviceIdentity> SysExHandler::getCustomIdentity(
     const std::string& deviceId) const {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    auto it = customIdentities_.find(deviceId);
-    if (it != customIdentities_.end()) {
+    auto it = customIdentityCache_.find(deviceId);
+    if (it != customIdentityCache_.end()) {
         return it->second;
     }
     
@@ -404,214 +306,65 @@ std::optional<NoteMap> SysExHandler::getNoteMap(
     const std::string& deviceId) const {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    auto it = noteMaps_.find(deviceId);
-    if (it != noteMaps_.end()) {
+    auto it = noteMapCache_.find(deviceId);
+    if (it != noteMapCache_.end()) {
         return it->second;
     }
     
     return std::nullopt;
 }
 
-std::optional<CCCapabilities> SysExHandler::getCCCapabilities(
-    const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = ccCapabilities_.find(deviceId);
-    if (it != ccCapabilities_.end()) {
-        return it->second;
-    }
-    
-    return std::nullopt;
-}
-
-std::optional<AirCapabilities> SysExHandler::getAirCapabilities(
-    const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = airCapabilities_.find(deviceId);
-    if (it != airCapabilities_.end()) {
-        return it->second;
-    }
-    
-    return std::nullopt;
-}
-
-std::optional<LightCapabilities> SysExHandler::getLightCapabilities(
-    const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = lightCapabilities_.find(deviceId);
-    if (it != lightCapabilities_.end()) {
-        return it->second;
-    }
-    
-    return std::nullopt;
-}
-
-std::optional<SensorsFeedback> SysExHandler::getSensorsFeedback(
-    const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = sensorsFeedback_.find(deviceId);
-    if (it != sensorsFeedback_.end()) {
-        return it->second;
-    }
-    
-    return std::nullopt;
-}
-
-std::optional<SyncClock> SysExHandler::getSyncClock(
-    const std::string& deviceId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = syncClock_.find(deviceId);
-    if (it != syncClock_.end()) {
-        return it->second;
-    }
-    
-    return std::nullopt;
-}
-
-void SysExHandler::clearCustomIdentity(const std::string& deviceId) {
+void SysExHandler::clearDeviceCache(const std::string& deviceId) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     identityCache_.erase(deviceId);
-    customIdentities_.erase(deviceId);
-    noteMaps_.erase(deviceId);
-    ccCapabilities_.erase(deviceId);
-    airCapabilities_.erase(deviceId);
-    lightCapabilities_.erase(deviceId);
-    sensorsFeedback_.erase(deviceId);
-    syncClock_.erase(deviceId);
+    customIdentityCache_.erase(deviceId);
+    noteMapCache_.erase(deviceId);
     
-    Logger::info("SysExHandler", "Cleared all cached data for " + deviceId);
+    Logger::debug("SysExHandler", "Cache cleared for " + deviceId);
 }
 
-// ============================================================================
-// CONFIGURATION DES CALLBACKS
-// ============================================================================
-
-void SysExHandler::setOnDeviceIdentified(DeviceIdentifiedCallback callback) {
-    onDeviceIdentified_ = callback;
-    Logger::debug("SysExHandler", "Device Identified callback set");
-}
-
-void SysExHandler::setOnSendSysEx(SendSysExCallback callback) {
-    onSendSysEx_ = callback;
-    Logger::debug("SysExHandler", "Send SysEx callback set");
-}
-
-void SysExHandler::setOnUnhandledSysEx(UnhandledSysExCallback callback) {
-    onUnhandledSysEx_ = callback;
-    Logger::debug("SysExHandler", "Unhandled SysEx callback set");
-}
-
-void SysExHandler::setOnCustomDeviceIdentified(
-    CustomDeviceIdentifiedCallback callback) {
-    onCustomDeviceIdentified_ = callback;
-    Logger::debug("SysExHandler", "Custom Device Identified callback set");
-}
-
-void SysExHandler::setOnNoteMapReceived(NoteMapReceivedCallback callback) {
-    onNoteMapReceived_ = callback;
-    Logger::debug("SysExHandler", "Note Map Received callback set");
-}
-
-void SysExHandler::setOnCCCapabilities(CCCapabilitiesCallback callback) {
-    onCCCapabilities_ = callback;
-    Logger::debug("SysExHandler", "CC Capabilities callback set");
-}
-
-void SysExHandler::setOnAirCapabilities(AirCapabilitiesCallback callback) {
-    onAirCapabilities_ = callback;
-    Logger::debug("SysExHandler", "Air Capabilities callback set");
-}
-
-void SysExHandler::setOnLightCapabilities(LightCapabilitiesCallback callback) {
-    onLightCapabilities_ = callback;
-    Logger::debug("SysExHandler", "Light Capabilities callback set");
-}
-
-void SysExHandler::setOnSensorsFeedback(SensorsFeedbackCallback callback) {
-    onSensorsFeedback_ = callback;
-    Logger::debug("SysExHandler", "Sensors Feedback callback set");
-}
-
-void SysExHandler::setOnSyncClock(SyncClockCallback callback) {
-    onSyncClock_ = callback;
-    Logger::debug("SysExHandler", "Sync Clock callback set");
-}
-
-void SysExHandler::setOnUnknownCustomBlock(UnknownCustomBlockCallback callback) {
-    onUnknownCustomBlock_ = callback;
-    Logger::debug("SysExHandler", "Unknown Custom Block callback set");
-}
-
-// ============================================================================
-// CONFIGURATION AUTO-IDENTIFY
-// ============================================================================
-
-void SysExHandler::setAutoIdentify(bool enabled) {
-    autoIdentify_ = enabled;
-    Logger::info("SysExHandler", 
-        "Auto-identify " + std::string(enabled ? "enabled" : "disabled"));
-}
-
-bool SysExHandler::isAutoIdentifyEnabled() const {
-    return autoIdentify_;
-}
-
-void SysExHandler::setAutoIdentifyDelay(uint32_t delayMs) {
-    autoIdentifyDelayMs_ = delayMs;
-    Logger::info("SysExHandler", 
-        "Auto-identify delay set to " + std::to_string(delayMs) + "ms");
-}
-
-uint32_t SysExHandler::getAutoIdentifyDelay() const {
-    return autoIdentifyDelayMs_;
-}
-
-// ============================================================================
-// STATISTIQUES
-// ============================================================================
-
-uint64_t SysExHandler::getMessagesReceived() const {
-    return messagesReceived_.load();
-}
-
-uint64_t SysExHandler::getMessagesSent() const {
-    return messagesSent_.load();
-}
-
-uint64_t SysExHandler::getIdentityRepliesReceived() const {
-    return identityRepliesReceived_.load();
-}
-
-uint64_t SysExHandler::getIdentityRequestsSent() const {
-    return identityRequestsSent_.load();
-}
-
-json SysExHandler::getStats() const {
-    json stats;
-    stats["messages_received"] = messagesReceived_.load();
-    stats["messages_sent"] = messagesSent_.load();
-    stats["identity_replies"] = identityRepliesReceived_.load();
-    stats["identity_requests"] = identityRequestsSent_.load();
+void SysExHandler::clearAllCaches() {
+    std::lock_guard<std::mutex> lock(mutex_);
     
-    // Lock court uniquement pour lire les tailles des caches
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        stats["cached_identities"] = identityCache_.size();
-        stats["cached_custom_identities"] = customIdentities_.size();
-        stats["cached_notemaps"] = noteMaps_.size();
-        stats["cached_cc_capabilities"] = ccCapabilities_.size();
+    identityCache_.clear();
+    customIdentityCache_.clear();
+    noteMapCache_.clear();
+    
+    Logger::info("SysExHandler", "All caches cleared");
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+bool SysExHandler::sendSysEx(const std::string& deviceId,
+                             const std::vector<uint8_t>& data) {
+    if (!onSendMessage_) {
+        Logger::error("SysExHandler", 
+            "Cannot send SysEx: no send callback configured");
+        return false;
     }
     
-    return stats;
+    // Log sent message
+    std::stringstream ss;
+    ss << "Sending SysEx to " << deviceId << " (" << data.size() << " bytes): ";
+    for (size_t i = 0; i < std::min(data.size(), size_t(16)); ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0')
+           << static_cast<int>(data[i]) << " ";
+    }
+    if (data.size() > 16) ss << "...";
+    Logger::debug("SysExHandler", ss.str());
+    
+    try {
+        onSendMessage_(deviceId, data);
+        messagesSent_++;
+        return true;
+    } catch (const std::exception& e) {
+        Logger::error("SysExHandler",
+            "Failed to send SysEx: " + std::string(e.what()));
+        return false;
+    }
 }
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER SysExHandler.cpp - VERSION CORRIGÉE
-// ============================================================================

@@ -1,18 +1,36 @@
 // ============================================================================
-// Fichier: backend/src/core/JsonValidator.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0 - 2025-10-09
+// File: backend/src/core/JsonValidator.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// Description:
-//   Validateur JSON pour sécuriser les entrées API
-//   Vérifie types, plages, formats et sécurité
 //
-// Fonctionnalités:
-//   - Validation types de base (string, int, bool, array, object)
-//   - Validation plages numériques
-//   - Validation formats (email, URL, path, device ID)
-//   - Validation sécurité (injection SQL, XSS, path traversal)
-//   - Validation MIDI (canal, note, velocity, CC)
+// Description:
+//   Complete JSON validator with security checks and MIDI-specific validation.
+//   Provides static methods for validating JSON data with type checking,
+//   range validation, format validation, and security checks.
+//
+// Features:
+//   - Basic type validation (string, int, bool, array, object)
+//   - Range and length constraints
+//   - Format validation (email, URL, IPv4, device ID)
+//   - Security validation (SQL injection, XSS, path traversal)
+//   - MIDI-specific validation (channel, note, velocity, CC)
+//   - Schema-based validation with builder pattern
+//
+// Dependencies:
+//   - nlohmann/json (JSON library)
+//   - Logger (for error reporting)
+//   - Error (for exceptions)
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Unified validation interface
+//   - Enhanced security checks
+//   - MIDI validation methods
+//   - Schema builder pattern
+//
 // ============================================================================
 
 #pragma once
@@ -21,6 +39,7 @@
 #include <vector>
 #include <functional>
 #include <regex>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include "Logger.h"
 #include "Error.h"
@@ -29,47 +48,131 @@ using json = nlohmann::json;
 
 namespace midiMind {
 
+// ============================================================================
+// ENUMS: JSON Types
+// ============================================================================
+
+enum class JsonType {
+    STRING,
+    NUMBER,
+    INTEGER,
+    BOOLEAN,
+    ARRAY,
+    OBJECT,
+    NULL_TYPE,
+    ANY
+};
+
+// ============================================================================
+// STRUCTURE: Field Schema
+// ============================================================================
+
+struct FieldSchema {
+    std::string name;
+    JsonType type;
+    bool required;
+    
+    // Numeric constraints
+    int minValue;
+    int maxValue;
+    
+    // String constraints
+    size_t minLength;
+    size_t maxLength;
+    std::string pattern;
+    
+    // Array constraints
+    size_t minSize;
+    size_t maxSize;
+    
+    // Enum validation
+    std::vector<std::string> enumValues;
+    
+    // Custom validator
+    std::function<bool(const json&, std::string&)> customValidator;
+    
+    // Constructor with defaults
+    FieldSchema(const std::string& fieldName, JsonType fieldType, bool isRequired = false)
+        : name(fieldName)
+        , type(fieldType)
+        , required(isRequired)
+        , minValue(INT_MIN)
+        , maxValue(INT_MAX)
+        , minLength(0)
+        , maxLength(SIZE_MAX)
+        , pattern("")
+        , minSize(0)
+        , maxSize(SIZE_MAX)
+        , enumValues()
+        , customValidator(nullptr)
+    {}
+};
+
+// ============================================================================
+// CLASS: JsonValidator
+// ============================================================================
+
 /**
  * @class JsonValidator
- * @brief Validateur JSON complet et sécurisé
+ * @brief Complete JSON validator with security and MIDI validation
  * 
- * Fournit des méthodes statiques pour valider les données JSON
- * avec vérification de types, plages, formats et sécurité.
+ * Provides both static methods for quick validation and schema-based
+ * validation for complex JSON structures. Thread-safe for static methods.
  */
 class JsonValidator {
 public:
-
     // ========================================================================
-    // VALIDATION DE BASE
+    // CONSTRUCTORS
     // ========================================================================
-
+    
+    JsonValidator() = default;
+    ~JsonValidator() = default;
+    
+    // ========================================================================
+    // BASIC FIELD VALIDATION (STATIC)
+    // ========================================================================
+    
     /**
-     * @brief Vérifie si un champ existe
+     * @brief Check if a field exists and is not null
+     * @param obj JSON object to check
+     * @param field Field name
+     * @return true if field exists and is not null
      */
     static bool hasField(const json& obj, const std::string& field) {
         return obj.contains(field) && !obj[field].is_null();
     }
-
+    
     /**
-     * @brief Vérifie si un champ est requis
+     * @brief Require a field to exist
+     * @param obj JSON object
+     * @param field Field name
+     * @param error Error message output
+     * @return true if field exists, false otherwise
      */
-    static bool requireField(const json& obj, 
-                            const std::string& field, 
-                            std::string& error) {
+    static bool requireField(const json& obj, const std::string& field, std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing required field: " + field;
+            Logger::warning("JsonValidator", error);
             return false;
         }
         return true;
     }
-
+    
+    // ========================================================================
+    // TYPE VALIDATION (STATIC)
+    // ========================================================================
+    
     /**
-     * @brief Valide un champ string
+     * @brief Validate and extract string field
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output string value
+     * @param maxLength Maximum allowed length (0 = no limit)
+     * @param error Error message output
+     * @return true if valid
      */
-    static bool validateString(const json& obj,
-                              const std::string& field,
-                              std::string& result,
-                              size_t maxLength = 0,
+    static bool validateString(const json& obj, const std::string& field,
+                              std::string& result, size_t maxLength = 0,
                               std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing field: " + field;
@@ -90,14 +193,17 @@ public:
         
         return true;
     }
-
+    
     /**
-     * @brief Valide un champ int
+     * @brief Validate and extract integer field
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output integer value
+     * @param error Error message output
+     * @return true if valid
      */
-    static bool validateInt(const json& obj,
-                           const std::string& field,
-                           int& result,
-                           std::string& error) {
+    static bool validateInt(const json& obj, const std::string& field,
+                           int& result, std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing field: " + field;
             return false;
@@ -111,15 +217,19 @@ public:
         result = obj[field].get<int>();
         return true;
     }
-
+    
     /**
-     * @brief Valide un champ int avec plage
+     * @brief Validate integer field with range
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output integer value
+     * @param minValue Minimum allowed value
+     * @param maxValue Maximum allowed value
+     * @param error Error message output
+     * @return true if valid and in range
      */
-    static bool validateRange(const json& obj,
-                             const std::string& field,
-                             int& result,
-                             int minValue,
-                             int maxValue,
+    static bool validateRange(const json& obj, const std::string& field,
+                             int& result, int minValue, int maxValue,
                              std::string& error) {
         if (!validateInt(obj, field, result, error)) {
             return false;
@@ -133,14 +243,17 @@ public:
         
         return true;
     }
-
+    
     /**
-     * @brief Valide un champ bool
+     * @brief Validate and extract boolean field
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output boolean value
+     * @param error Error message output
+     * @return true if valid
      */
-    static bool validateBool(const json& obj,
-                            const std::string& field,
-                            bool& result,
-                            std::string& error) {
+    static bool validateBool(const json& obj, const std::string& field,
+                            bool& result, std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing field: " + field;
             return false;
@@ -154,16 +267,20 @@ public:
         result = obj[field].get<bool>();
         return true;
     }
-
+    
     /**
-     * @brief Valide un champ array
+     * @brief Validate and extract array field
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output array
+     * @param minSize Minimum array size (0 = no limit)
+     * @param maxSize Maximum array size (0 = no limit)
+     * @param error Error message output
+     * @return true if valid
      */
-    static bool validateArray(const json& obj,
-                             const std::string& field,
-                             json& result,
-                             size_t minSize = 0,
-                             size_t maxSize = 0,
-                             std::string& error) {
+    static bool validateArray(const json& obj, const std::string& field,
+                             json& result, size_t minSize = 0,
+                             size_t maxSize = 0, std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing field: " + field;
             return false;
@@ -189,14 +306,17 @@ public:
         
         return true;
     }
-
+    
     /**
-     * @brief Valide un champ object
+     * @brief Validate and extract object field
+     * @param obj JSON object
+     * @param field Field name
+     * @param result Output object
+     * @param error Error message output
+     * @return true if valid
      */
-    static bool validateObject(const json& obj,
-                               const std::string& field,
-                               json& result,
-                               std::string& error) {
+    static bool validateObject(const json& obj, const std::string& field,
+                               json& result, std::string& error) {
         if (!hasField(obj, field)) {
             error = "Missing field: " + field;
             return false;
@@ -210,13 +330,16 @@ public:
         result = obj[field];
         return true;
     }
-
+    
     // ========================================================================
-    // VALIDATION FORMATS
+    // FORMAT VALIDATION (STATIC)
     // ========================================================================
-
+    
     /**
-     * @brief Valide un email
+     * @brief Validate email format
+     * @param email Email string to validate
+     * @param error Error message output
+     * @return true if valid email format
      */
     static bool validateEmail(const std::string& email, std::string& error) {
         static const std::regex emailRegex(
@@ -224,15 +347,18 @@ public:
         );
         
         if (!std::regex_match(email, emailRegex)) {
-            error = "Invalid email format";
+            error = "Invalid email format: " + email;
             return false;
         }
         
         return true;
     }
-
+    
     /**
-     * @brief Valide une URL
+     * @brief Validate URL format
+     * @param url URL string to validate
+     * @param error Error message output
+     * @return true if valid URL format
      */
     static bool validateUrl(const std::string& url, std::string& error) {
         static const std::regex urlRegex(
@@ -240,15 +366,18 @@ public:
         );
         
         if (!std::regex_match(url, urlRegex)) {
-            error = "Invalid URL format";
+            error = "Invalid URL format: " + url;
             return false;
         }
         
         return true;
     }
-
+    
     /**
-     * @brief Valide une IPv4
+     * @brief Validate IPv4 address
+     * @param ip IP address string to validate
+     * @param error Error message output
+     * @return true if valid IPv4 address
      */
     static bool validateIPv4(const std::string& ip, std::string& error) {
         static const std::regex ipRegex(
@@ -257,144 +386,151 @@ public:
         
         std::smatch match;
         if (!std::regex_match(ip, match, ipRegex)) {
-            error = "Invalid IPv4 format";
+            error = "Invalid IPv4 format: " + ip;
             return false;
         }
         
-        // Vérifier chaque octet
+        // Check each octet is 0-255
         for (int i = 1; i <= 4; i++) {
-            int octet = std::stoi(match[i]);
+            int octet = std::stoi(match[i].str());
             if (octet < 0 || octet > 255) {
-                error = "Invalid IPv4 octet: " + std::to_string(octet);
+                error = "Invalid IPv4 octet (must be 0-255): " + ip;
                 return false;
             }
         }
         
         return true;
     }
-
+    
     /**
-     * @brief Valide un UUID
+     * @brief Validate device ID format
+     * @param deviceId Device ID to validate
+     * @param error Error message output
+     * @return true if valid device ID format
      */
-    static bool validateUuid(const std::string& uuid, std::string& error) {
-        static const std::regex uuidRegex(
-            R"(^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$)",
-            std::regex::icase
+    static bool validateDeviceId(const std::string& deviceId, std::string& error) {
+        // Format: device_type_client_port (e.g., "device_usb_128_0")
+        static const std::regex deviceIdRegex(
+            R"(^device_(usb|wifi|bt|virtual)_\d+_\d+$)"
         );
         
-        if (!std::regex_match(uuid, uuidRegex)) {
-            error = "Invalid UUID format";
+        if (!std::regex_match(deviceId, deviceIdRegex)) {
+            error = "Invalid device ID format: " + deviceId;
             return false;
         }
         
         return true;
     }
-
-    // ========================================================================
-    // VALIDATION SÉCURITÉ
-    // ========================================================================
-
+    
     /**
-     * @brief Vérifie les tentatives d'injection SQL
+     * @brief Validate file path (no traversal attacks)
+     * @param path File path to validate
+     * @param error Error message output
+     * @return true if valid and safe path
      */
-    static bool checkSqlInjection(const std::string& input, std::string& error) {
-        // Patterns suspects
-        static const std::vector<std::regex> sqlPatterns = {
-            std::regex(R"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)", 
-                      std::regex::icase),
-            std::regex(R"(--|\#|\/\*|\*\/)"),
-            std::regex(R"(\bOR\b.*=.*\bOR\b)", std::regex::icase),
-            std::regex(R"(;.*\bDROP\b)", std::regex::icase)
+    static bool validatePath(const std::string& path, std::string& error) {
+        // Check for path traversal attempts
+        if (path.find("..") != std::string::npos) {
+            error = "Path traversal not allowed: " + path;
+            return false;
+        }
+        
+        // Check for absolute paths (should be relative)
+        if (!path.empty() && path[0] == '/') {
+            error = "Absolute paths not allowed: " + path;
+            return false;
+        }
+        
+        // Check for dangerous characters
+        static const std::string dangerousChars = "<>:|\"?*";
+        for (char c : dangerousChars) {
+            if (path.find(c) != std::string::npos) {
+                error = "Invalid character in path: " + std::string(1, c);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // ========================================================================
+    // SECURITY VALIDATION (STATIC)
+    // ========================================================================
+    
+    /**
+     * @brief Check for SQL injection patterns
+     * @param input Input string to check
+     * @param error Error message output
+     * @return true if safe, false if suspicious
+     */
+    static bool validateSqlInjection(const std::string& input, std::string& error) {
+        // Common SQL injection patterns
+        static const std::vector<std::string> sqlPatterns = {
+            "' OR '1'='1",
+            "'; DROP TABLE",
+            "'; DELETE FROM",
+            "' UNION SELECT",
+            "' OR 1=1",
+            "--",
+            "/*",
+            "*/"
         };
+        
+        std::string lowerInput = input;
+        std::transform(lowerInput.begin(), lowerInput.end(), lowerInput.begin(), ::tolower);
         
         for (const auto& pattern : sqlPatterns) {
-            if (std::regex_search(input, pattern)) {
-                error = "Potential SQL injection detected";
-                Logger::warn("JsonValidator", "SQL injection attempt: " + input);
+            std::string lowerPattern = pattern;
+            std::transform(lowerPattern.begin(), lowerPattern.end(), lowerPattern.begin(), ::tolower);
+            
+            if (lowerInput.find(lowerPattern) != std::string::npos) {
+                error = "Potential SQL injection detected: " + pattern;
                 return false;
             }
         }
         
         return true;
     }
-
+    
     /**
-     * @brief Vérifie les tentatives XSS
+     * @brief Check for XSS (Cross-Site Scripting) patterns
+     * @param input Input string to check
+     * @param error Error message output
+     * @return true if safe, false if suspicious
      */
-    static bool checkXss(const std::string& input, std::string& error) {
-        static const std::vector<std::regex> xssPatterns = {
-            std::regex(R"(<script)", std::regex::icase),
-            std::regex(R"(javascript:)", std::regex::icase),
-            std::regex(R"(on\w+\s*=)", std::regex::icase),
-            std::regex(R"(<iframe)", std::regex::icase)
+    static bool validateXss(const std::string& input, std::string& error) {
+        // Common XSS patterns
+        static const std::vector<std::string> xssPatterns = {
+            "<script",
+            "</script>",
+            "javascript:",
+            "onerror=",
+            "onload=",
+            "<iframe"
         };
         
+        std::string lowerInput = input;
+        std::transform(lowerInput.begin(), lowerInput.end(), lowerInput.begin(), ::tolower);
+        
         for (const auto& pattern : xssPatterns) {
-            if (std::regex_search(input, pattern)) {
-                error = "Potential XSS attack detected";
-                Logger::warn("JsonValidator", "XSS attempt: " + input);
+            if (lowerInput.find(pattern) != std::string::npos) {
+                error = "Potential XSS detected: " + pattern;
                 return false;
             }
         }
         
         return true;
     }
-
-    /**
-     * @brief Vérifie les path traversal
-     */
-    static bool checkPathTraversal(const std::string& path, std::string& error) {
-        // Interdire ".." dans les chemins
-        if (path.find("..") != std::string::npos) {
-            error = "Path traversal attempt detected";
-            Logger::warn("JsonValidator", "Path traversal: " + path);
-            return false;
-        }
-        
-        // Interdire chemins absolus non autorisés
-        if (path[0] == '/' && path.find("/etc") == 0) {
-            error = "Access to /etc forbidden";
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * @brief Valide un chemin de fichier sécurisé
-     */
-    static bool validateFilePath(const std::string& path,
-                                 const std::string& baseDir,
-                                 std::string& error) {
-        // Vérifier path traversal
-        if (!checkPathTraversal(path, error)) {
-            return false;
-        }
-        
-        // Vérifier que le chemin est dans le répertoire autorisé
-        if (!path.empty() && path[0] == '/') {
-            if (path.find(baseDir) != 0) {
-                error = "Path outside allowed directory";
-                return false;
-            }
-        }
-        
-        // Vérifier caractères dangereux
-        static const std::regex dangerousChars(R"([;&|`$\(\)<>])");
-        if (std::regex_search(path, dangerousChars)) {
-            error = "Dangerous characters in path";
-            return false;
-        }
-        
-        return true;
-    }
-
+    
     // ========================================================================
-    // VALIDATION MIDI
+    // MIDI VALIDATION (STATIC)
     // ========================================================================
-
+    
     /**
-     * @brief Valide un canal MIDI (0-15)
+     * @brief Validate MIDI channel (0-15)
+     * @param channel MIDI channel to validate
+     * @param error Error message output
+     * @return true if valid MIDI channel
      */
     static bool validateMidiChannel(int channel, std::string& error) {
         if (channel < 0 || channel > 15) {
@@ -403,9 +539,12 @@ public:
         }
         return true;
     }
-
+    
     /**
-     * @brief Valide une note MIDI (0-127)
+     * @brief Validate MIDI note (0-127)
+     * @param note MIDI note to validate
+     * @param error Error message output
+     * @return true if valid MIDI note
      */
     static bool validateMidiNote(int note, std::string& error) {
         if (note < 0 || note > 127) {
@@ -414,9 +553,12 @@ public:
         }
         return true;
     }
-
+    
     /**
-     * @brief Valide une vélocité MIDI (0-127)
+     * @brief Validate MIDI velocity (0-127)
+     * @param velocity MIDI velocity to validate
+     * @param error Error message output
+     * @return true if valid MIDI velocity
      */
     static bool validateMidiVelocity(int velocity, std::string& error) {
         if (velocity < 0 || velocity > 127) {
@@ -425,20 +567,26 @@ public:
         }
         return true;
     }
-
+    
     /**
-     * @brief Valide un contrôleur MIDI (0-127)
+     * @brief Validate MIDI CC (Control Change) number (0-127)
+     * @param cc MIDI CC number to validate
+     * @param error Error message output
+     * @return true if valid MIDI CC number
      */
-    static bool validateMidiController(int controller, std::string& error) {
-        if (controller < 0 || controller > 127) {
-            error = "Invalid MIDI controller (must be 0-127): " + std::to_string(controller);
+    static bool validateMidiCC(int cc, std::string& error) {
+        if (cc < 0 || cc > 127) {
+            error = "Invalid MIDI CC (must be 0-127): " + std::to_string(cc);
             return false;
         }
         return true;
     }
-
+    
     /**
-     * @brief Valide un program MIDI (0-127)
+     * @brief Validate MIDI program number (0-127)
+     * @param program MIDI program number to validate
+     * @param error Error message output
+     * @return true if valid MIDI program number
      */
     static bool validateMidiProgram(int program, std::string& error) {
         if (program < 0 || program > 127) {
@@ -447,169 +595,270 @@ public:
         }
         return true;
     }
-
-    /**
-     * @brief Valide un pitch bend MIDI (0-16383)
-     */
-    static bool validateMidiPitchBend(int value, std::string& error) {
-        if (value < 0 || value > 16383) {
-            error = "Invalid MIDI pitch bend (must be 0-16383): " + std::to_string(value);
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * @brief Valide un device ID MIDI
-     */
-    static bool validateDeviceId(const std::string& deviceId, std::string& error) {
-        // Format attendu: "type_identifier"
-        // Exemples: "usb_0", "wifi_192.168.1.100_5004", "bt_00:11:22:33:44:55"
-        
-        // Vérifier longueur
-        if (deviceId.empty() || deviceId.length() > 100) {
-            error = "Invalid device ID length";
-            return false;
-        }
-        
-        // Vérifier injection
-        if (!checkSqlInjection(deviceId, error)) {
-            return false;
-        }
-        
-        if (!checkPathTraversal(deviceId, error)) {
-            return false;
-        }
-        
-        // Vérifier format
-        static const std::regex deviceIdRegex(
-            R"(^(usb|wifi|bt|virtual)_[a-zA-Z0-9\.\:_\-]+$)"
-        );
-        
-        if (!std::regex_match(deviceId, deviceIdRegex)) {
-            error = "Invalid device ID format";
-            return false;
-        }
-        
-        return true;
-    }
-
+    
     // ========================================================================
-    // VALIDATION COMPOSITE
+    // SCHEMA-BASED VALIDATION
     // ========================================================================
-
+    
     /**
-     * @brief Valide un objet MIDI note event
+     * @brief Add a field schema
+     * @param schema Field schema to add
+     * @return Reference to this validator (for chaining)
      */
-    static bool validateMidiNoteEvent(const json& event, std::string& error) {
-        int channel, note, velocity;
-        
-        if (!validateRange(event, "channel", channel, 0, 15, error)) {
-            return false;
-        }
-        
-        if (!validateRange(event, "note", note, 0, 127, error)) {
-            return false;
-        }
-        
-        if (!validateRange(event, "velocity", velocity, 0, 127, error)) {
-            return false;
-        }
-        
-        return true;
+    JsonValidator& addField(const FieldSchema& schema) {
+        fields_.push_back(schema);
+        return *this;
     }
-
+    
     /**
-     * @brief Valide un objet MIDI CC event
+     * @brief Validate JSON data against defined schema
+     * @param data JSON data to validate
+     * @param errorMessage Output error message
+     * @return true if validation passed
      */
-    static bool validateMidiCcEvent(const json& event, std::string& error) {
-        int channel, controller, value;
+    bool validate(const json& data, std::string& errorMessage) const {
+        errorMessage.clear();
         
-        if (!validateRange(event, "channel", channel, 0, 15, error)) {
+        // Check root is object
+        if (!data.is_object()) {
+            errorMessage = "Root element must be an object";
             return false;
         }
         
-        if (!validateRange(event, "controller", controller, 0, 127, error)) {
-            return false;
-        }
-        
-        if (!validateRange(event, "value", value, 0, 127, error)) {
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * @brief Valide une configuration de routage
-     */
-    static bool validateRoutingConfig(const json& config, std::string& error) {
-        // Valider source
-        std::string source;
-        if (!validateString(config, "source", source, 100, error)) {
-            return false;
-        }
-        
-        if (!validateDeviceId(source, error)) {
-            return false;
-        }
-        
-        // Valider destination
-        std::string destination;
-        if (!validateString(config, "destination", destination, 100, error)) {
-            return false;
-        }
-        
-        if (!validateDeviceId(destination, error)) {
-            return false;
-        }
-        
-        // Valider channel (optionnel)
-        if (hasField(config, "channel")) {
-            int channel;
-            if (!validateRange(config, "channel", channel, 0, 15, error)) {
+        // Validate each field in schema
+        for (const auto& field : fields_) {
+            bool fieldExists = data.contains(field.name);
+            
+            // Check required fields
+            if (field.required && !fieldExists) {
+                errorMessage = "Required field '" + field.name + "' is missing";
+                return false;
+            }
+            
+            // Skip optional missing fields
+            if (!fieldExists) {
+                continue;
+            }
+            
+            const json& value = data[field.name];
+            
+            // Validate type
+            if (!validateType(value, field, errorMessage)) {
+                errorMessage = "Field '" + field.name + "': " + errorMessage;
+                return false;
+            }
+            
+            // Validate constraints
+            if (!validateConstraints(value, field, errorMessage)) {
+                errorMessage = "Field '" + field.name + "': " + errorMessage;
                 return false;
             }
         }
         
         return true;
     }
-
-    // ========================================================================
-    // HELPERS
-    // ========================================================================
-
+    
     /**
-     * @brief Sanitize une string pour l'affichage
+     * @brief Validate and throw exception on failure
+     * @param data JSON data to validate
+     * @throws std::runtime_error if validation fails
      */
-    static std::string sanitizeForDisplay(const std::string& input) {
-        std::string result;
+    void validateOrThrow(const json& data) const {
+        std::string errorMessage;
         
-        for (char c : input) {
-            if (c >= 32 && c <= 126) {
-                result += c;
-            } else {
-                result += "?";
+        if (!validate(data, errorMessage)) {
+            THROW_ERROR(ErrorCode::VALIDATION_FAILED, 
+                       "JSON validation failed: " + errorMessage);
+        }
+    }
+    
+private:
+    std::vector<FieldSchema> fields_;
+    
+    // ========================================================================
+    // PRIVATE VALIDATION HELPERS
+    // ========================================================================
+    
+    /**
+     * @brief Validate field type
+     */
+    bool validateType(const json& value, const FieldSchema& field, 
+                     std::string& errorMessage) const {
+        switch (field.type) {
+            case JsonType::STRING:
+                if (!value.is_string()) {
+                    errorMessage = "Expected string";
+                    return false;
+                }
+                break;
+                
+            case JsonType::NUMBER:
+                if (!value.is_number()) {
+                    errorMessage = "Expected number";
+                    return false;
+                }
+                break;
+                
+            case JsonType::INTEGER:
+                if (!value.is_number_integer()) {
+                    errorMessage = "Expected integer";
+                    return false;
+                }
+                break;
+                
+            case JsonType::BOOLEAN:
+                if (!value.is_boolean()) {
+                    errorMessage = "Expected boolean";
+                    return false;
+                }
+                break;
+                
+            case JsonType::ARRAY:
+                if (!value.is_array()) {
+                    errorMessage = "Expected array";
+                    return false;
+                }
+                break;
+                
+            case JsonType::OBJECT:
+                if (!value.is_object()) {
+                    errorMessage = "Expected object";
+                    return false;
+                }
+                break;
+                
+            case JsonType::NULL_TYPE:
+                if (!value.is_null()) {
+                    errorMessage = "Expected null";
+                    return false;
+                }
+                break;
+                
+            case JsonType::ANY:
+                // Any type is valid
+                break;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief Validate field constraints
+     */
+    bool validateConstraints(const json& value, const FieldSchema& field,
+                            std::string& errorMessage) const {
+        // Numeric range validation
+        if (value.is_number_integer()) {
+            int intValue = value.get<int>();
+            if (intValue < field.minValue || intValue > field.maxValue) {
+                errorMessage = "Value out of range [" + 
+                             std::to_string(field.minValue) + ", " + 
+                             std::to_string(field.maxValue) + "]";
+                return false;
             }
         }
         
-        return result;
-    }
-
-    /**
-     * @brief Tronque une string à une longueur maximale
-     */
-    static std::string truncate(const std::string& input, size_t maxLength) {
-        if (input.length() <= maxLength) {
-            return input;
+        // String length and pattern validation
+        if (value.is_string()) {
+            std::string strValue = value.get<std::string>();
+            
+            if (strValue.length() < field.minLength) {
+                errorMessage = "String too short (min " + 
+                             std::to_string(field.minLength) + ")";
+                return false;
+            }
+            
+            if (strValue.length() > field.maxLength) {
+                errorMessage = "String too long (max " + 
+                             std::to_string(field.maxLength) + ")";
+                return false;
+            }
+            
+            if (!field.pattern.empty()) {
+                std::regex pattern(field.pattern);
+                if (!std::regex_match(strValue, pattern)) {
+                    errorMessage = "String does not match pattern";
+                    return false;
+                }
+            }
         }
         
-        return input.substr(0, maxLength - 3) + "...";
+        // Array size validation
+        if (value.is_array()) {
+            size_t size = value.size();
+            
+            if (size < field.minSize) {
+                errorMessage = "Array too small (min " + 
+                             std::to_string(field.minSize) + ")";
+                return false;
+            }
+            
+            if (size > field.maxSize) {
+                errorMessage = "Array too large (max " + 
+                             std::to_string(field.maxSize) + ")";
+                return false;
+            }
+        }
+        
+        // Enum validation
+        if (!field.enumValues.empty() && value.is_string()) {
+            std::string strValue = value.get<std::string>();
+            bool found = false;
+            
+            for (const auto& enumValue : field.enumValues) {
+                if (strValue == enumValue) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                errorMessage = "Value not in enum list";
+                return false;
+            }
+        }
+        
+        // Custom validator
+        if (field.customValidator) {
+            if (!field.customValidator(value, errorMessage)) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 };
 
-} // namespace midiMind
+// ============================================================================
+// PREDEFINED SCHEMAS
+// ============================================================================
 
-// ============================================================================
-// FIN DU FICHIER JsonValidator.h
-// ============================================================================
+/**
+ * @brief Create validator for MIDI message command
+ */
+inline JsonValidator createMidiMessageValidator() {
+    JsonValidator validator;
+    
+    validator.addField(FieldSchema("type", JsonType::STRING, true))
+             .addField(FieldSchema("channel", JsonType::INTEGER, true))
+             .addField(FieldSchema("note", JsonType::INTEGER, false))
+             .addField(FieldSchema("velocity", JsonType::INTEGER, false))
+             .addField(FieldSchema("cc", JsonType::INTEGER, false))
+             .addField(FieldSchema("value", JsonType::INTEGER, false));
+    
+    return validator;
+}
+
+/**
+ * @brief Create validator for device connection command
+ */
+inline JsonValidator createDeviceConnectValidator() {
+    JsonValidator validator;
+    
+    validator.addField(FieldSchema("deviceId", JsonType::STRING, true))
+             .addField(FieldSchema("timeout", JsonType::INTEGER, false));
+    
+    return validator;
+}
+
+} // namespace midiMind

@@ -1,406 +1,445 @@
 // ============================================================================
-// Fichier: backend/src/midi/devices/MidiDeviceManager.h
-// Version: 3.2.0 - CORRECTIONS CRITIQUES APPLIQUÉES
-// Date: 2025-10-13
+// File: backend/src/midi/MidiDeviceManager.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// CORRECTIONS v3.2.0:
-//   ✅ FIX #2: Déclaration reconnectDevice() ajoutée
-//   ✅ Documentation mise à jour
 //
 // Description:
-//   Header du gestionnaire centralisé de périphériques MIDI.
-//   Thread-safe avec Observer Pattern et Factory Pattern.
+//   Central manager for all MIDI devices.
+//   Handles discovery, connection, and lifecycle management.
 //
-// Auteur: MidiMind Team (Corrections par Claude)
+// Features:
+//   - Device discovery (USB, Network, BLE, Virtual)
+//   - Connection management
+//   - Hot-plug detection
+//   - Device registry
+//   - Observer pattern for events
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Enhanced hot-plug support
+//   - Better error handling
+//   - Improved statistics
+//
 // ============================================================================
 
 #pragma once
 
+#include "devices/MidiDevice.h"
+#include "MidiMessage.h"
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include <mutex>
-#include <map>
 #include <functional>
-#include "MidiDevice.h"
-#include "DeviceInfo.h"
-#include "../MidiMessage.h"
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace midiMind {
 
+// ============================================================================
+// STRUCTURE: DeviceInfo
+// ============================================================================
+
+/**
+ * @struct DeviceInfo
+ * @brief Information about a discovered device
+ */
+struct DeviceInfo {
+    /// Unique device identifier
+    std::string id;
+    
+    /// Device name
+    std::string name;
+    
+    /// Device type
+    DeviceType type;
+    
+    /// Communication direction
+    DeviceDirection direction;
+    
+    /// Port/address
+    std::string port;
+    
+    /// Manufacturer
+    std::string manufacturer;
+    
+    /// Connection status
+    bool connected;
+    
+    /// Additional metadata
+    json metadata;
+    
+    /**
+     * @brief Constructor
+     */
+    DeviceInfo()
+        : type(DeviceType::UNKNOWN)
+        , direction(DeviceDirection::BIDIRECTIONAL)
+        , connected(false)
+    {}
+    
+    /**
+     * @brief Convert to JSON
+     */
+    json toJson() const {
+        return {
+            {"id", id},
+            {"name", name},
+            {"type", MidiDevice::deviceTypeToString(type)},
+            {"direction", MidiDevice::deviceDirectionToString(direction)},
+            {"port", port},
+            {"manufacturer", manufacturer},
+            {"connected", connected},
+            {"metadata", metadata}
+        };
+    }
+    
+    /**
+     * @brief Create from JSON
+     */
+    static DeviceInfo fromJson(const json& j) {
+        DeviceInfo info;
+        info.id = j.value("id", "");
+        info.name = j.value("name", "");
+        info.port = j.value("port", "");
+        info.manufacturer = j.value("manufacturer", "");
+        info.connected = j.value("connected", false);
+        
+        if (j.contains("metadata")) {
+            info.metadata = j["metadata"];
+        }
+        
+        return info;
+    }
+};
+
+// ============================================================================
+// CLASS: MidiDeviceManager
+// ============================================================================
+
 /**
  * @class MidiDeviceManager
- * @brief Gestionnaire centralisé des périphériques MIDI
+ * @brief Central manager for MIDI devices
  * 
- * Responsabilités:
- * - Découverte automatique (USB, Network, Bluetooth)
- * - Connexion/Déconnexion thread-safe
- * - Routage des messages MIDI
- * - Notifications via callbacks (Observer Pattern)
- * - Factory Pattern pour création devices
+ * Responsibilities:
+ * - Discover available MIDI devices
+ * - Connect/disconnect devices
+ * - Monitor hot-plug events
+ * - Maintain device registry
+ * - Notify observers of device events
  * 
- * @note Thread-safe : toutes les méthodes sont protégées par mutex
- * @note Singleton Pattern recommandé pour usage
+ * Thread Safety: YES (all methods are thread-safe)
  * 
- * @version 3.2.0 - Corrections critiques appliquées
+ * Example:
+ * ```cpp
+ * MidiDeviceManager manager;
+ * 
+ * // Set callbacks
+ * manager.setOnDeviceDiscovered([](const std::string& deviceId) {
+ *     std::cout << "Device discovered: " << deviceId << "\n";
+ * });
+ * 
+ * // Discover devices
+ * auto devices = manager.discoverDevices();
+ * 
+ * // Connect to device
+ * if (manager.connect(devices[0].id)) {
+ *     auto device = manager.getDevice(devices[0].id);
+ *     device->sendMessage(MidiMessage::noteOn(0, 60, 100));
+ * }
+ * ```
  */
 class MidiDeviceManager {
 public:
     // ========================================================================
-    // TYPES - CALLBACKS
+    // TYPE DEFINITIONS
     // ========================================================================
     
-    /**
-     * @typedef DeviceConnectedCallback
-     * @brief Callback appelé lors de la connexion d'un device
-     */
+    /// Device discovered callback
+    using DeviceDiscoveredCallback = std::function<void(const std::string& deviceId)>;
+    
+    /// Device connected callback
     using DeviceConnectedCallback = std::function<void(const std::string& deviceId)>;
     
-    /**
-     * @typedef DeviceDisconnectedCallback
-     * @brief Callback appelé lors de la déconnexion d'un device
-     */
+    /// Device disconnected callback
     using DeviceDisconnectedCallback = std::function<void(const std::string& deviceId)>;
     
-    /**
-     * @typedef MidiReceivedCallback
-     * @brief Callback appelé lors de la réception d'un message MIDI
-     * 
-     * @param deviceId ID du device source
-     * @param message Message MIDI reçu
-     * 
-     * @note ✅ NOUVEAU v3.2.0: Ce callback est maintenant fonctionnel
-     */
-    using MidiReceivedCallback = std::function<void(
-        const std::string& deviceId, 
-        const MidiMessage& message
-    )>;
+    /// Message received callback
+    using MessageReceivedCallback = std::function<void(const std::string& deviceId, 
+                                                      const MidiMessage& message)>;
     
     // ========================================================================
-    // CONSTRUCTEUR / DESTRUCTEUR
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur
+     * @brief Constructor
      */
     MidiDeviceManager();
     
     /**
-     * @brief Destructeur
-     * 
-     * Déconnecte automatiquement tous les devices
+     * @brief Destructor
      */
     ~MidiDeviceManager();
     
-    // Désactiver copie et assignation
+    // Disable copy
     MidiDeviceManager(const MidiDeviceManager&) = delete;
     MidiDeviceManager& operator=(const MidiDeviceManager&) = delete;
     
     // ========================================================================
-    // DÉCOUVERTE DE PÉRIPHÉRIQUES
+    // DEVICE DISCOVERY
     // ========================================================================
     
     /**
-     * @brief Découvre tous les périphériques MIDI disponibles
-     * 
-     * Scanner tous les types: USB (ALSA), Network (mDNS), Bluetooth (BLE)
-     * 
-     * @param fullScan Si true, efface cache et rescanne complètement
-     *                 Si false, scan incrémental (ajoute nouveaux)
-     * @return std::vector<DeviceInfo> Liste des devices découverts
-     * 
-     * @note ✅ AMÉLIORÉ v3.2.0: Bluetooth scan BLE réel avec BleMidiPlugin
-     * @note Thread-safe (lock sur devicesMutex_)
-     * @note Durée typique: USB ~50ms, Network ~500ms, BT ~2s
+     * @brief Discover available MIDI devices
+     * @param fullScan If true, clear cache and rescan everything
+     * @return std::vector<DeviceInfo> List of discovered devices
+     * @note Thread-safe
      */
-    std::vector<DeviceInfo> discoverDevices(bool fullScan = true);
+    std::vector<DeviceInfo> discoverDevices(bool fullScan = false);
     
     /**
-     * @brief Récupère la liste des devices disponibles (cache)
-     * 
-     * @return std::vector<DeviceInfo> Liste des devices découverts
-     * 
-     * @note Ne rescanne pas, retourne le cache
+     * @brief Scan for devices (alias for discoverDevices)
+     * @param fullScan If true, clear cache and rescan
+     * @note Compatibility method
+     */
+    void scanDevices(bool fullScan = false);
+    
+    /**
+     * @brief Get list of available devices
+     * @return std::vector<DeviceInfo> Available devices
      * @note Thread-safe
      */
     std::vector<DeviceInfo> getAvailableDevices() const;
     
+    /**
+     * @brief Get device info by ID
+     * @param deviceId Device identifier
+     * @return DeviceInfo Device information
+     * @throws std::runtime_error if device not found
+     */
+    DeviceInfo getDeviceInfo(const std::string& deviceId) const;
+    
     // ========================================================================
-    // CONNEXION / DÉCONNEXION
+    // CONNECTION MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Connecte à un périphérique
-     * 
-     * Séquence:
-     *  1. Vérifier si déjà connecté
-     *  2. Trouver DeviceInfo dans availableDevices_
-     *  3. Créer instance via Factory (createDevice)
-     *  4. Ouvrir le device (device->open())
-     *  5. ✅ NOUVEAU v3.2.0: Configurer callback réception MIDI
-     *  6. Ajouter à connectedDevices_
-     *  7. Appeler callback onDeviceConnected_
-     * 
-     * @param deviceId ID du device (DeviceInfo.id)
-     * @return true Si connexion réussie
-     * @return false Si échec (device non trouvé ou erreur ouverture)
-     * 
-     * @note ✅ FIX #1 v3.2.0: Configure maintenant le callback de réception MIDI
-     * @note Thread-safe (exclusive lock)
+     * @brief Connect to a device
+     * @param deviceId Device identifier
+     * @return true if successful
+     * @note Thread-safe
      */
     bool connect(const std::string& deviceId);
     
     /**
-     * @brief Déconnecte un périphérique
-     * 
-     * Séquence:
-     *  1. Trouver device dans connectedDevices_
-     *  2. Fermer le device (device->close())
-     *  3. Retirer de connectedDevices_
-     *  4. Mettre à jour DeviceInfo.connected = false
-     *  5. Appeler callback onDeviceDisconnected_
-     * 
-     * @param deviceId ID du device
-     * 
+     * @brief Disconnect from a device
+     * @param deviceId Device identifier
      * @note Thread-safe
      */
     void disconnect(const std::string& deviceId);
     
     /**
-     * @brief Déconnecte TOUS les périphériques
-     * 
-     * Parcourt tous les devices connectés et appelle close() sur chacun.
-     * Appelé automatiquement par le destructeur.
-     * 
+     * @brief Disconnect all devices
      * @note Thread-safe
      */
     void disconnectAll();
     
     /**
-     * @brief Vérifie si un device est connecté
-     * 
-     * @param deviceId ID du device
-     * @return true Si connecté
-     * 
-     * @note Thread-safe
+     * @brief Check if device is connected
+     * @param deviceId Device identifier
+     * @return true if connected
      */
     bool isConnected(const std::string& deviceId) const;
     
     /**
-     * @brief Reconnecte un périphérique
-     * 
-     * Déconnecte puis reconnecte le device après un délai de 100ms.
-     * Utile après une erreur de communication.
-     * 
-     * @param deviceId ID du device
-     * @return true Si reconnexion réussie
-     * @return false Si échec
-     * 
-     * @note ✅ NOUVEAU v3.2.0: Méthode ajoutée (FIX #2)
-     * @note Bloque pendant ~100ms
+     * @brief Reconnect device
+     * @param deviceId Device identifier
+     * @return true if successful
+     * @note Disconnects then reconnects after 100ms delay
      */
     bool reconnectDevice(const std::string& deviceId);
     
     // ========================================================================
-    // ACCÈS AUX DEVICES
+    // DEVICE ACCESS
     // ========================================================================
     
     /**
-     * @brief Récupère un device par son ID
-     * 
-     * @param deviceId ID du device
-     * @return std::shared_ptr<MidiDevice> Pointeur vers device ou nullptr
-     * 
+     * @brief Get device by ID
+     * @param deviceId Device identifier
+     * @return std::shared_ptr<MidiDevice> Device or nullptr
      * @note Thread-safe
-     * @note Retourne nullptr si device non connecté
      */
     std::shared_ptr<MidiDevice> getDevice(const std::string& deviceId) const;
     
     /**
-     * @brief Récupère tous les devices connectés
-     * 
-     * @return std::vector<std::shared_ptr<MidiDevice>> Liste des devices
-     * 
+     * @brief Get all connected devices
+     * @return std::vector<std::shared_ptr<MidiDevice>> Connected devices
      * @note Thread-safe
      */
     std::vector<std::shared_ptr<MidiDevice>> getConnectedDevices() const;
     
     /**
-     * @brief Récupère les devices d'un type spécifique
-     * 
-     * @param type Type de device (USB, NETWORK, BLUETOOTH, VIRTUAL)
-     * @return std::vector<std::shared_ptr<MidiDevice>> Liste filtrée
-     * 
-     * @note Thread-safe
+     * @brief Get devices by type
+     * @param type Device type
+     * @return std::vector<std::shared_ptr<MidiDevice>> Devices of type
      */
     std::vector<std::shared_ptr<MidiDevice>> getDevicesByType(DeviceType type) const;
     
-    /**
-     * @brief Récupère les devices Network
-     * 
-     * @return std::vector<std::shared_ptr<MidiDevice>> Liste des devices Network
-     * 
-     * @note Raccourci pour getDevicesByType(DeviceType::NETWORK)
-     */
-    std::vector<std::shared_ptr<MidiDevice>> getNetworkDevices() const;
-    
-    /**
-     * @brief Récupère les devices Bluetooth
-     * 
-     * @return std::vector<std::shared_ptr<MidiDevice>> Liste des devices Bluetooth
-     * 
-     * @note Raccourci pour getDevicesByType(DeviceType::BLUETOOTH)
-     */
-    std::vector<std::shared_ptr<MidiDevice>> getBluetoothDevices() const;
-    
     // ========================================================================
-    // ENVOI DE MESSAGES
+    // HOT-PLUG MONITORING
     // ========================================================================
     
     /**
-     * @brief Envoie un message MIDI à un device spécifique
-     * 
-     * @param deviceId ID du device destination
-     * @param message Message MIDI à envoyer
-     * @return true Si envoi réussi
-     * @return false Si échec (device non connecté ou erreur)
-     * 
-     * @note Thread-safe
+     * @brief Start hot-plug monitoring
+     * @note Starts background thread to monitor USB connections
      */
-    bool sendMessage(const std::string& deviceId, const MidiMessage& message);
+    void startHotPlugMonitoring();
     
     /**
-     * @brief Broadcast un message MIDI à TOUS les devices connectés
-     * 
-     * @param message Message MIDI à broadcaster
-     * 
-     * @note Thread-safe
-     * @note Continue même si un device échoue
+     * @brief Stop hot-plug monitoring
      */
-    void broadcastMessage(const MidiMessage& message);
+    void stopHotPlugMonitoring();
+    
+    /**
+     * @brief Check if hot-plug monitoring is active
+     */
+    bool isHotPlugMonitoringActive() const { return hotPlugMonitoring_; }
     
     // ========================================================================
     // CALLBACKS
     // ========================================================================
     
     /**
-     * @brief Configure le callback de connexion
-     * 
-     * @param callback Fonction appelée lors de la connexion d'un device
-     * 
-     * @note Thread-safe
+     * @brief Set device discovered callback
      */
-    void setOnDeviceConnected(DeviceConnectedCallback callback);
+    void setOnDeviceDiscovered(DeviceDiscoveredCallback callback) {
+        onDeviceDiscovered_ = callback;
+    }
     
     /**
-     * @brief Configure le callback de déconnexion
-     * 
-     * @param callback Fonction appelée lors de la déconnexion d'un device
-     * 
-     * @note Thread-safe
+     * @brief Set device connected callback
      */
-    void setOnDeviceDisconnected(DeviceDisconnectedCallback callback);
+    void setOnDeviceConnected(DeviceConnectedCallback callback) {
+        onDeviceConnected_ = callback;
+    }
     
     /**
-     * @brief Configure le callback de réception MIDI
-     * 
-     * @param callback Fonction appelée lors de la réception d'un message MIDI
-     * 
-     * @note ✅ FIX #1 v3.2.0: Ce callback est maintenant fonctionnel !
-     * @note Thread-safe
-     * @note Appelé depuis le thread du device (contexte temps réel)
+     * @brief Set device disconnected callback
      */
-    void setOnMidiReceived(MidiReceivedCallback callback);
+    void setOnDeviceDisconnected(DeviceDisconnectedCallback callback) {
+        onDeviceDisconnected_ = callback;
+    }
+    
+    /**
+     * @brief Set message received callback
+     */
+    void setOnMessageReceived(MessageReceivedCallback callback) {
+        onMessageReceived_ = callback;
+    }
+    
+    // ========================================================================
+    // STATISTICS
+    // ========================================================================
+    
+    /**
+     * @brief Get statistics
+     * @return json Statistics data
+     */
+    json getStatistics() const;
+    
+    /**
+     * @brief Reset statistics
+     */
+    void resetStatistics();
     
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES - SCANNERS
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Scanne les devices USB via ALSA
-     * 
-     * @note Linux only (snd_seq API)
+     * @brief Scan USB devices
      */
     void scanUSBDevices();
     
     /**
-     * @brief Scanne les devices virtuels
-     * 
-     * @note Charge depuis config + crée au moins un par défaut
+     * @brief Scan virtual devices
      */
     void scanVirtualDevices();
     
     /**
-     * @brief Scanne les devices Network via mDNS
-     * 
-     * @note TODO: Implémenter scan mDNS réel pour RTP-MIDI
+     * @brief Scan network devices
      */
     void scanNetworkDevices();
     
     /**
-     * @brief Scanne les devices Bluetooth via BLE
-     * 
-     * @note ✅ AMÉLIORÉ v3.2.0: Utilise BleMidiPlugin pour scan BLE réel
+     * @brief Scan Bluetooth devices
      */
     void scanBluetoothDevices();
     
-    // ========================================================================
-    // MÉTHODES PRIVÉES - FACTORY
-    // ========================================================================
-    
     /**
-     * @brief Crée une instance de device selon son type (Factory Pattern)
-     * 
-     * @param info Informations du device
-     * @return std::shared_ptr<MidiDevice> Instance créée ou nullptr si échec
-     * 
-     * @note Créé le bon type: UsbMidiDevice, NetworkMidiDevice, etc.
+     * @brief Create device instance from info
      */
     std::shared_ptr<MidiDevice> createDevice(const DeviceInfo& info);
     
-    // ========================================================================
-    // MEMBRES PRIVÉS
-    // ========================================================================
+    /**
+     * @brief Hot-plug monitoring thread function
+     */
+    void hotPlugMonitorThread();
     
     /**
-     * @brief Mutex pour thread-safety
+     * @brief Handle device connection
      */
-    mutable std::mutex devicesMutex_;
+    void handleDeviceConnected(const std::string& deviceId);
     
     /**
-     * @brief Liste des devices disponibles (découverts)
+     * @brief Handle device disconnection
      */
+    void handleDeviceDisconnected(const std::string& deviceId);
+    
+    /**
+     * @brief Handle message received
+     */
+    void handleMessageReceived(const std::string& deviceId, const MidiMessage& message);
+    
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
+    
+    /// Available devices (discovered but not necessarily connected)
     std::vector<DeviceInfo> availableDevices_;
     
-    /**
-     * @brief Map des devices connectés
-     * 
-     * Clé: deviceId
-     * Valeur: shared_ptr vers MidiDevice
-     */
-    std::map<std::string, std::shared_ptr<MidiDevice>> connectedDevices_;
+    /// Connected devices (deviceId -> device)
+    std::unordered_map<std::string, std::shared_ptr<MidiDevice>> connectedDevices_;
     
-    /**
-     * @brief Callback appelé lors de la connexion d'un device
-     */
+    /// Mutex for thread-safety
+    mutable std::mutex devicesMutex_;
+    
+    /// Hot-plug monitoring flag
+    std::atomic<bool> hotPlugMonitoring_;
+    
+    /// Hot-plug monitoring thread
+    std::thread hotPlugThread_;
+    
+    /// Callbacks
+    DeviceDiscoveredCallback onDeviceDiscovered_;
     DeviceConnectedCallback onDeviceConnected_;
-    
-    /**
-     * @brief Callback appelé lors de la déconnexion d'un device
-     */
     DeviceDisconnectedCallback onDeviceDisconnected_;
+    MessageReceivedCallback onMessageReceived_;
     
-    /**
-     * @brief Callback appelé lors de la réception d'un message MIDI
-     * 
-     * @note ✅ FIX #1 v3.2.0: Maintenant fonctionnel !
-     */
-    MidiReceivedCallback onMidiReceived_;
+    /// Statistics
+    struct {
+        uint64_t devicesDiscovered;
+        uint64_t connectionsSucceeded;
+        uint64_t connectionsFailed;
+        uint64_t messagesReceived;
+    } stats_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER MidiDeviceManager.h v3.2.0 - CORRIGÉ
-// ============================================================================

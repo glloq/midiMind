@@ -1,19 +1,29 @@
 // ============================================================================
-// Fichier: backend/src/timing/TimestampManager.h
-// Version: 3.0.0 - Phase 2
-// Date: 2025-10-09
+// File: backend/src/timing/TimestampManager.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestionnaire de synchronisation d'horloges haute précision.
-//   Fournit des timestamps cohérents avec compensation de dérive.
+//   High-precision timestamp manager for time synchronization.
+//   Provides consistent timestamps across all system components.
 //
-// Objectifs:
-//   - Précision < 1ms
-//   - Synchronisation entre composants
-//   - Compensation de dérive
-//   - Thread-safe
+// Features:
+//   - Microsecond precision (< 1µs typical)
+//   - Thread-safe operations
+//   - Drift compensation
+//   - Synchronization support
+//   - Singleton pattern
 //
-// Auteur: midiMind Team
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified API
+//   - Enhanced precision
+//   - Better drift compensation
+//   - Removed unused features
+//
 // ============================================================================
 
 #pragma once
@@ -22,329 +32,303 @@
 #include <chrono>
 #include <mutex>
 #include <cstdint>
+#include <string>
 
 namespace midiMind {
 
 /**
  * @class TimestampManager
- * @brief Gestionnaire d'horloges synchronisées haute précision
+ * @brief High-precision timestamp manager with drift compensation
  * 
- * Fournit des timestamps cohérents à tous les composants du système
- * avec compensation automatique de la dérive d'horloge.
- * 
- * @details
- * Utilise std::chrono::high_resolution_clock pour une précision maximale.
- * Maintient une horloge de référence et calcule les offsets pour
- * synchroniser toutes les mesures de temps.
+ * Provides consistent, high-precision timestamps to all system components.
+ * Uses std::chrono::high_resolution_clock for maximum precision.
  * 
  * Architecture:
  * ```
  * high_resolution_clock
  *        ↓
- * TimestampManager (référence)
+ * TimestampManager (reference)
  *        ↓
  *   ┌────┼────┐
  *   ↓    ↓    ↓
- * MIDI Router Player  (tous synchronisés)
+ * MIDI Router Player  (all synchronized)
  * ```
  * 
- * Thread-safety: OUI - Toutes les méthodes sont thread-safe
+ * Thread Safety:
+ * - All public methods are thread-safe
+ * - Uses atomic operations for performance
  * 
- * @example Utilisation
- * @code
- * auto& tsManager = TimestampManager::instance();
+ * Precision:
+ * - Typical: < 1µs on Raspberry Pi 4
+ * - Used for high-precision latency measurements
  * 
- * // Démarrer l'horloge
- * tsManager.start();
+ * Example:
+ * ```cpp
+ * auto& tm = TimestampManager::instance();
+ * tm.start();
  * 
- * // Obtenir timestamp actuel (microsecondes)
- * uint64_t now = tsManager.now();
+ * // Get current timestamp (microseconds)
+ * uint64_t now = tm.now();
  * 
- * // Obtenir timestamp (millisecondes)
- * uint64_t nowMs = tsManager.nowMs();
+ * // Get current timestamp (milliseconds)
+ * uint64_t nowMs = tm.nowMs();
  * 
- * // Calculer différence entre deux timestamps
- * uint64_t delta = tsManager.elapsed(t1, t2);
- * @endcode
+ * // Calculate elapsed time
+ * uint64_t delta = tm.elapsed(t1, t2);
+ * ```
  */
 class TimestampManager {
 public:
     // ========================================================================
-    // SINGLETON
+    // SINGLETON PATTERN
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance unique
-     * @return TimestampManager& Instance
+     * @brief Get singleton instance
+     * @return Reference to TimestampManager instance
      */
-    static TimestampManager& instance() {
-        static TimestampManager instance;
-        return instance;
-    }
+    static TimestampManager& instance();
     
-    // Désactiver copie et assignation
+    // Disable copy and assignment
     TimestampManager(const TimestampManager&) = delete;
     TimestampManager& operator=(const TimestampManager&) = delete;
     
     // ========================================================================
-    // CONTRÔLE
+    // CONTROL
     // ========================================================================
     
     /**
-     * @brief Démarre l'horloge de référence
-     * 
-     * Initialise le point de référence temporel (t=0).
-     * Doit être appelé une fois au démarrage de l'application.
+     * @brief Start the reference clock
+     * @note Sets reference point (t=0)
+     * @note Should be called once at application startup
      */
     void start();
     
     /**
-     * @brief Réinitialise l'horloge
-     * 
-     * Remet le compteur à zéro. Utile pour les tests ou
-     * lors d'un reset complet du système.
+     * @brief Reset the clock
+     * @note Resets counter to zero
      */
     void reset();
     
     /**
-     * @brief Vérifie si l'horloge est démarrée
-     * @return bool true si démarrée
+     * @brief Check if clock is started
+     * @return true if started
      */
     bool isStarted() const {
         return started_.load(std::memory_order_acquire);
     }
     
     // ========================================================================
-    // TIMESTAMPS - MICROSECONDES (µs)
+    // TIMESTAMPS - MICROSECONDS (µs)
     // ========================================================================
     
     /**
-     * @brief Timestamp actuel en microsecondes
-     * @return uint64_t Microsecondes depuis start()
-     * 
-     * @details
-     * Précision typique: < 1µs sur Raspberry Pi 4
-     * Utilisé pour mesures de latence haute précision
+     * @brief Get current timestamp in microseconds
+     * @return uint64_t Microseconds since start()
+     * @note Typical precision: < 1µs on Raspberry Pi 4
      */
     uint64_t now() const;
     
     /**
-     * @brief Timestamp système en microsecondes (epoch Unix)
-     * @return uint64_t Microsecondes depuis 1970-01-01 00:00:00 UTC
+     * @brief Get system timestamp in microseconds (Unix epoch)
+     * @return uint64_t Microseconds since 1970-01-01 00:00:00 UTC
      */
     uint64_t systemNow() const;
     
     // ========================================================================
-    // TIMESTAMPS - MILLISECONDES (ms)
+    // TIMESTAMPS - MILLISECONDS (ms)
     // ========================================================================
     
     /**
-     * @brief Timestamp actuel en millisecondes
-     * @return uint64_t Millisecondes depuis start()
-     * 
-     * @details
-     * Version moins précise mais suffisante pour la plupart des usages.
-     * Utilisé pour positions de lecture, durées, etc.
+     * @brief Get current timestamp in milliseconds
+     * @return uint64_t Milliseconds since start()
      */
-    uint64_t nowMs() const;
+    uint64_t nowMs() const {
+        return now() / 1000;
+    }
     
     /**
-     * @brief Timestamp système en millisecondes (epoch Unix)
-     * @return uint64_t Millisecondes depuis 1970-01-01 00:00:00 UTC
+     * @brief Get system timestamp in milliseconds (Unix epoch)
+     * @return uint64_t Milliseconds since 1970-01-01 00:00:00 UTC
      */
-    uint64_t systemNowMs() const;
+    uint64_t systemNowMs() const {
+        return systemNow() / 1000;
+    }
     
     // ========================================================================
-    // CALCULS TEMPORELS
+    // TIME CALCULATIONS
     // ========================================================================
     
     /**
-     * @brief Calcule le temps écoulé entre deux timestamps (µs)
-     * @param start Timestamp de début (µs)
-     * @param end Timestamp de fin (µs)
-     * @return uint64_t Différence en microsecondes
+     * @brief Calculate elapsed time between two timestamps (µs)
+     * @param start Start timestamp (µs)
+     * @param end End timestamp (µs)
+     * @return uint64_t Difference in microseconds
      */
     uint64_t elapsed(uint64_t start, uint64_t end) const {
         return (end >= start) ? (end - start) : 0;
     }
     
     /**
-     * @brief Calcule le temps écoulé depuis un timestamp (µs)
-     * @param start Timestamp de début (µs)
-     * @return uint64_t Microsecondes écoulées depuis start
+     * @brief Calculate elapsed time between two timestamps (ms)
+     * @param start Start timestamp (ms)
+     * @param end End timestamp (ms)
+     * @return uint64_t Difference in milliseconds
      */
-    uint64_t elapsedSince(uint64_t start) const {
-        return elapsed(start, now());
-    }
-    
-    /**
-     * @brief Convertit microsecondes → millisecondes
-     * @param us Microsecondes
-     * @return uint64_t Millisecondes
-     */
-    static uint64_t usToMs(uint64_t us) {
-        return us / 1000;
-    }
-    
-    /**
-     * @brief Convertit millisecondes → microsecondes
-     * @param ms Millisecondes
-     * @return uint64_t Microsecondes
-     */
-    static uint64_t msToUs(uint64_t ms) {
-        return ms * 1000;
+    uint64_t elapsedMs(uint64_t start, uint64_t end) const {
+        return elapsed(start, end) / 1000;
     }
     
     // ========================================================================
-    // SYNCHRONISATION
+    // SYNCHRONIZATION
     // ========================================================================
     
     /**
-     * @brief Définit un offset de synchronisation (µs)
-     * @param offset Offset en microsecondes
-     * 
-     * @details
-     * Permet de compenser un délai constant (ex: latence réseau).
-     * L'offset est ajouté à tous les timestamps retournés.
+     * @brief Set synchronization offset
+     * @param offset Offset in microseconds
+     * @note Used for multi-device synchronization
      */
-    void setSyncOffset(int64_t offset);
+    void setSyncOffset(int64_t offset) {
+        syncOffset_.store(offset, std::memory_order_release);
+    }
     
     /**
-     * @brief Récupère l'offset de synchronisation actuel
-     * @return int64_t Offset en microsecondes
+     * @brief Get synchronization offset
+     * @return int64_t Current offset in microseconds
      */
     int64_t getSyncOffset() const {
         return syncOffset_.load(std::memory_order_acquire);
     }
     
-    /**
-     * @brief Réinitialise l'offset de synchronisation
-     */
-    void resetSyncOffset() {
-        syncOffset_.store(0, std::memory_order_release);
-    }
-    
     // ========================================================================
-    // COMPENSATION DE DÉRIVE
+    // DRIFT COMPENSATION
     // ========================================================================
     
     /**
-     * @brief Active/désactive la compensation de dérive
-     * @param enabled true pour activer
+     * @brief Enable drift compensation
+     * @param enabled true to enable
      */
     void setDriftCompensation(bool enabled) {
         driftCompensationEnabled_.store(enabled, std::memory_order_release);
     }
     
     /**
-     * @brief Vérifie si la compensation est activée
-     * @return bool true si activée
+     * @brief Check if drift compensation is enabled
+     * @return true if enabled
      */
     bool isDriftCompensationEnabled() const {
         return driftCompensationEnabled_.load(std::memory_order_acquire);
     }
     
     /**
-     * @brief Calcule la dérive actuelle de l'horloge (ppm)
-     * @return double Dérive en parties par million
-     * 
-     * @details
-     * Une dérive de 10 ppm signifie 10µs de décalage par seconde.
-     * Valeur typique sur Raspberry Pi: < 50 ppm
+     * @brief Set drift factor
+     * @param driftPpm Drift in parts per million (ppm)
+     * @note Typical values on Raspberry Pi: < 50 ppm
+     */
+    void setDriftFactor(double driftPpm) {
+        driftFactor_.store(driftPpm, std::memory_order_release);
+    }
+    
+    /**
+     * @brief Get drift factor
+     * @return double Drift in parts per million (ppm)
+     */
+    double getDriftFactor() const {
+        return driftFactor_.load(std::memory_order_acquire);
+    }
+    
+    /**
+     * @brief Calculate current drift
+     * @return double Drift in ppm
      */
     double calculateDrift() const;
     
     // ========================================================================
-    // STATISTIQUES
+    // STATISTICS
     // ========================================================================
     
     /**
-     * @brief Récupère des statistiques sur l'horloge
-     * @return std::string Statistiques formatées
+     * @brief Get clock statistics
+     * @return std::string Formatted statistics
      */
     std::string getStats() const;
     
     /**
-     * @brief Récupère l'uptime depuis start() (secondes)
-     * @return double Secondes écoulées
+     * @brief Get uptime since start() in seconds
+     * @return double Elapsed seconds
      */
     double getUptimeSeconds() const {
         return now() / 1000000.0;
     }
-
+    
 private:
     // ========================================================================
-    // CONSTRUCTEUR / DESTRUCTEUR PRIVÉS (Singleton)
+    // PRIVATE CONSTRUCTOR (SINGLETON)
     // ========================================================================
     
     TimestampManager();
     ~TimestampManager() = default;
     
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Récupère le timestamp brut de l'horloge système (µs)
+     * @brief Get raw system timestamp (µs)
      */
     uint64_t getRawTimestamp() const;
     
     /**
-     * @brief Applique l'offset et la compensation de dérive
+     * @brief Apply offset and drift compensation
      */
     uint64_t applyCorrections(uint64_t raw) const;
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    /// Point de référence temporel (µs depuis epoch)
+    /// Reference point (µs since epoch)
     std::atomic<uint64_t> referencePoint_;
     
-    /// Flag indiquant si l'horloge est démarrée
+    /// Started flag
     std::atomic<bool> started_;
     
-    /// Offset de synchronisation (µs)
+    /// Synchronization offset (µs)
     std::atomic<int64_t> syncOffset_;
     
-    /// Compensation de dérive activée
+    /// Drift compensation enabled
     std::atomic<bool> driftCompensationEnabled_;
     
-    /// Facteur de dérive calculé (ppm)
+    /// Drift factor (ppm)
     std::atomic<double> driftFactor_;
     
-    /// Dernière mesure de dérive (µs)
+    /// Last drift measurement (µs)
     mutable std::atomic<uint64_t> lastDriftMeasurement_;
     
-    /// Mutex pour opérations critiques
+    /// Mutex for critical operations
     mutable std::mutex mutex_;
 };
 
 // ============================================================================
-// FONCTIONS UTILITAIRES INLINE
+// INLINE UTILITY FUNCTIONS
 // ============================================================================
 
 /**
- * @brief Obtient un timestamp rapide (microsecondes)
- * 
- * Version inline optimisée pour performance maximale.
- * Utilisée dans les boucles critiques.
+ * @brief Get fast timestamp (microseconds)
+ * @return uint64_t Current timestamp in µs
+ * @note Optimized inline version for performance-critical code
  */
 inline uint64_t getTimestampUs() {
     return TimestampManager::instance().now();
 }
 
 /**
- * @brief Obtient un timestamp rapide (millisecondes)
- * 
- * Version inline optimisée pour performance maximale.
+ * @brief Get fast timestamp (milliseconds)
+ * @return uint64_t Current timestamp in ms
+ * @note Optimized inline version for performance-critical code
  */
 inline uint64_t getTimestampMs() {
     return TimestampManager::instance().nowMs();
 }
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER TimestampManager.h
-// ============================================================================

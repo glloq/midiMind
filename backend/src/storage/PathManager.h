@@ -1,215 +1,254 @@
 // ============================================================================
-// Fichier: src/storage/PathManager.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/storage/PathManager.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestionnaire centralisé des chemins de l'application.
-//   Définit et gère tous les chemins utilisés par MidiMind.
+//   Centralized path management system for the application.
+//   Defines and manages all paths used by MidiMind.
 //
-// Thread-safety: OUI
+// Directory Structure:
+//   /var/lib/midimind/
+//   ├── config/
+//   │   ├── config.json
+//   │   └── presets/
+//   ├── data/
+//   │   ├── midimind.db
+//   │   └── sessions/
+//   ├── midi/
+//   │   ├── files/
+//   │   └── recordings/
+//   ├── logs/
+//   └── backups/
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Updated to use FileManager::Unsafe namespace
+//   - Enhanced path validation
+//   - Added migration paths
+//   - Thread-safe operations
+//
 // ============================================================================
 
 #pragma once
 
 #include <string>
 #include <mutex>
-
-#include "FileSystem.h"
 #include "../core/Logger.h"
+#include "FileManager.h"
 
 namespace midiMind {
 
 /**
  * @class PathManager
- * @brief Gestionnaire centralisé des chemins
+ * @brief Centralized path management system
  * 
- * @details
- * Définit tous les chemins utilisés par l'application.
+ * Singleton class that manages all filesystem paths used by MidiMind.
+ * Ensures consistent path structure across the application.
  * 
- * Structure:
- * ```
- * /home/pi/MidiMind/
- * ├── config/
- * │   ├── config.json
- * │   └── presets/
- * ├── data/
- * │   ├── midimind.db
- * │   └── sessions/
- * ├── midi/
- * │   ├── files/
- * │   └── recordings/
- * ├── logs/
- * └── backups/
- * ```
+ * Thread Safety:
+ * - All public methods are thread-safe
+ * - Uses internal mutex for synchronization
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe.
- * 
- * @example Utilisation
+ * Example:
  * ```cpp
- * PathManager::instance().setBasePath("/home/pi/MidiMind");
- * PathManager::instance().initialize();
+ * PathManager& pm = PathManager::instance();
+ * pm.initialize();
  * 
- * auto configPath = PathManager::instance().getConfigPath();
- * auto dbPath = PathManager::instance().getDatabasePath();
+ * std::string configPath = pm.getConfigFilePath();
+ * std::string dbPath = pm.getDatabasePath();
+ * std::string logPath = pm.getLogFilePath();
  * ```
  */
 class PathManager {
 public:
     // ========================================================================
-    // SINGLETON
+    // SINGLETON PATTERN
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance singleton
+     * @brief Get singleton instance
+     * @return Reference to PathManager instance
      */
     static PathManager& instance();
     
-    // Désactiver copie et move
+    // Disable copy and assignment
     PathManager(const PathManager&) = delete;
     PathManager& operator=(const PathManager&) = delete;
     
     // ========================================================================
-    // INITIALISATION
+    // INITIALIZATION
     // ========================================================================
     
     /**
-     * @brief Initialise les chemins
-     * 
-     * Crée tous les dossiers nécessaires.
-     * 
+     * @brief Initialize directory structure
+     * @note Creates all required directories
      * @note Thread-safe
      */
     void initialize();
     
     /**
-     * @brief Définit le chemin de base
-     * 
-     * @param basePath Chemin de base (défaut: /home/pi/MidiMind)
-     * 
+     * @brief Set base path
+     * @param basePath Base directory path (default: /var/lib/midimind)
      * @note Thread-safe
      */
     void setBasePath(const std::string& basePath);
     
     /**
-     * @brief Récupère le chemin de base
-     * 
+     * @brief Get base path
+     * @return Base directory path
      * @note Thread-safe
      */
     std::string getBasePath() const;
     
     // ========================================================================
-    // CHEMINS PRINCIPAUX
+    // CONFIGURATION PATHS
     // ========================================================================
     
     /**
-     * @brief Récupère le chemin du dossier config
+     * @brief Get config directory path
+     * @return Path to config/ directory
      */
     std::string getConfigPath() const;
     
     /**
-     * @brief Récupère le chemin du fichier config.json
+     * @brief Get config file path
+     * @return Path to config.json file
      */
     std::string getConfigFilePath() const;
     
     /**
-     * @brief Récupère le chemin du dossier presets
+     * @brief Get presets directory path
+     * @return Path to presets/ directory
      */
     std::string getPresetsPath() const;
     
+    // ========================================================================
+    // DATA PATHS
+    // ========================================================================
+    
     /**
-     * @brief Récupère le chemin du dossier data
+     * @brief Get data directory path
+     * @return Path to data/ directory
      */
     std::string getDataPath() const;
     
     /**
-     * @brief Récupère le chemin de la base de données
+     * @brief Get database file path
+     * @return Path to midimind.db file
      */
     std::string getDatabasePath() const;
     
     /**
-     * @brief Récupère le chemin du dossier sessions
+     * @brief Get database migrations directory
+     * @return Path to migrations/ directory
+     */
+    std::string getMigrationsPath() const;
+    
+    /**
+     * @brief Get sessions directory path
+     * @return Path to sessions/ directory
      */
     std::string getSessionsPath() const;
     
+    // ========================================================================
+    // MIDI PATHS
+    // ========================================================================
+    
     /**
-     * @brief Récupère le chemin du dossier MIDI
+     * @brief Get MIDI root directory path
+     * @return Path to midi/ directory
      */
     std::string getMidiPath() const;
     
     /**
-     * @brief Récupère le chemin des fichiers MIDI
+     * @brief Get MIDI files directory path
+     * @return Path to midi/files/ directory
      */
     std::string getMidiFilesPath() const;
     
     /**
-     * @brief Récupère le chemin des enregistrements MIDI
+     * @brief Get MIDI recordings directory path
+     * @return Path to midi/recordings/ directory
      */
     std::string getMidiRecordingsPath() const;
     
+    // ========================================================================
+    // LOG PATHS
+    // ========================================================================
+    
     /**
-     * @brief Récupère le chemin du dossier logs
+     * @brief Get logs directory path
+     * @return Path to logs/ directory
      */
     std::string getLogsPath() const;
     
     /**
-     * @brief Récupère le chemin du fichier log actuel
+     * @brief Get current log file path
+     * @return Path to current log file (dated)
+     * @note Format: midimind_YYYY-MM-DD.log
      */
     std::string getLogFilePath() const;
     
+    // ========================================================================
+    // BACKUP PATHS
+    // ========================================================================
+    
     /**
-     * @brief Récupère le chemin du dossier backups
+     * @brief Get backups directory path
+     * @return Path to backups/ directory
      */
     std::string getBackupsPath() const;
     
+    /**
+     * @brief Create database backup
+     * @return Path to created backup file
+     * @note Format: midimind_YYYY-MM-DD_HH-MM-SS.db
+     * @note Thread-safe
+     */
+    std::string createDatabaseBackup();
+    
     // ========================================================================
-    // UTILITAIRES
+    // UTILITIES
     // ========================================================================
     
     /**
-     * @brief Nettoie les vieux fichiers
-     * 
-     * @param directory Dossier à nettoyer
-     * @param maxAgeDays Âge maximum en jours
-     * @return int Nombre de fichiers supprimés
-     * 
+     * @brief Clean old files in directory
+     * @param directory Directory to clean
+     * @param maxAgeDays Maximum file age in days
+     * @return Number of files deleted
      * @note Thread-safe
      */
     int cleanOldFiles(const std::string& directory, int maxAgeDays);
     
     /**
-     * @brief Crée un backup de la base de données
-     * 
-     * @return std::string Chemin du backup créé
-     * 
-     * @note Thread-safe
+     * @brief Join path components
+     * @param parts Path components to join
+     * @return Joined path
+     * @note Uses platform-specific separator
      */
-    std::string createDatabaseBackup();
-
+    static std::string joinPath(const std::vector<std::string>& parts);
+    
 private:
     // ========================================================================
-    // CONSTRUCTION PRIVÉE (Singleton)
+    // PRIVATE CONSTRUCTOR (SINGLETON)
     // ========================================================================
     
     PathManager();
     ~PathManager();
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    /// Chemin de base
+    /// Base path for all application data
     std::string basePath_;
     
-    /// Mutex pour thread-safety
+    /// Mutex for thread-safety
     mutable std::mutex mutex_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER PathManager.h
-// ============================================================================

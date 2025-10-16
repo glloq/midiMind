@@ -1,330 +1,414 @@
 // ============================================================================
-// Fichier: backend/src/timing/LatencyCompensator.h
-// Version: 3.0.0 - Phase 2
-// Date: 2025-10-09
+// File: backend/src/timing/LatencyCompensator.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Compensateur de latence MIDI adaptatif.
-//   Ajuste automatiquement les délais pour minimiser la latence perçue.
+//   Latency compensation system for MIDI devices and instruments.
+//   Provides both device-level and instrument-level compensation.
 //
-// Objectifs:
-//   - Compensation automatique < 5ms
-//   - Apprentissage des latences par device
-//   - Prédiction et ajustement
+// Features:
+//   - Device-level latency tracking (transport)
+//   - Instrument-level latency tracking (intrinsic + transport)
+//   - Automatic compensation calculation
+//   - Manual compensation override
+//   - Outlier detection
+//   - Database persistence
 //
-// Auteur: midiMind Team
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Added instrument-level compensation
+//   - Integration with InstrumentDatabase
+//   - Sync score calculation
+//   - Enhanced statistics
+//
 // ============================================================================
 
 #pragma once
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <mutex>
-#include <cstdint>
-#include <deque>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include "InstrumentLatencyProfile.h"
+#include "../storage/InstrumentDatabase.h"
+#include "../core/Logger.h"
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
+// ============================================================================
+// STRUCTURE: DeviceLatencyProfile
+// ============================================================================
+
 /**
  * @struct DeviceLatencyProfile
- * @brief Profil de latence d'un périphérique
+ * @brief Latency profile for a MIDI device (transport layer)
  */
 struct DeviceLatencyProfile {
+    /// Device identifier
     std::string deviceId;
     
-    // Latences mesurées (microsecondes)
-    uint64_t averageLatency;      ///< Latence moyenne
-    uint64_t minLatency;           ///< Latence minimale observée
-    uint64_t maxLatency;           ///< Latence maximale observée
+    /// Average latency (microseconds)
+    uint64_t averageLatency;
     
-    // Statistiques
-    uint64_t measurementCount;     ///< Nombre de mesures
-    double jitter;                 ///< Variance (écart-type)
+    /// Minimum latency
+    uint64_t minLatency;
     
-    // Compensation
-    int64_t compensationOffset;    ///< Offset appliqué (µs)
-    bool autoCompensation;         ///< Compensation auto activée
+    /// Maximum latency
+    uint64_t maxLatency;
     
-    // Historique
-    std::deque<uint64_t> latencyHistory;  ///< Dernières mesures
+    /// Jitter (standard deviation)
+    double jitter;
     
-    DeviceLatencyProfile()
-        : averageLatency(0)
-        , minLatency(UINT64_MAX)
-        , maxLatency(0)
-        , measurementCount(0)
-        , jitter(0.0)
-        , compensationOffset(0)
-        , autoCompensation(true) {}
+    /// Measurement count
+    uint64_t measurementCount;
+    
+    /// Compensation offset (microseconds)
+    int64_t compensationOffset;
+    
+    /// Auto compensation enabled
+    bool autoCompensation;
+    
+    /// Latency history
+    std::deque<uint64_t> latencyHistory;
     
     /**
-     * @brief Met à jour avec une nouvelle mesure
-     * @param latency Latence mesurée (µs)
+     * @brief Constructor
+     */
+    DeviceLatencyProfile()
+        : deviceId("")
+        , averageLatency(0)
+        , minLatency(UINT64_MAX)
+        , maxLatency(0)
+        , jitter(0.0)
+        , measurementCount(0)
+        , compensationOffset(0)
+        , autoCompensation(true)
+    {}
+    
+    /**
+     * @brief Add measurement
      */
     void addMeasurement(uint64_t latency);
     
     /**
-     * @brief Calcule la compensation optimale
-     * @return int64_t Offset de compensation (µs)
+     * @brief Calculate optimal compensation
      */
     int64_t calculateOptimalCompensation() const;
     
     /**
-     * @brief Exporte en JSON
+     * @brief Convert to JSON
      */
     json toJson() const;
 };
 
+// ============================================================================
+// CLASS: LatencyCompensator
+// ============================================================================
+
 /**
  * @class LatencyCompensator
- * @brief Compensateur adaptatif de latence MIDI
+ * @brief Latency compensation manager for devices and instruments
  * 
- * @details
- * Mesure, apprend et compense automatiquement les latences
- * de chaque périphérique MIDI pour minimiser la latence perçue.
+ * Provides two-level latency compensation:
+ * 1. Device level: Transport latency (USB, network, etc.)
+ * 2. Instrument level: Intrinsic latency (VST, plugin, etc.)
  * 
  * Architecture:
  * ```
- * Message MIDI →
- *   ↓
- * [Mesure timestamp T1]
- *   ↓
- * Envoi au device →
- *   ↓
- * [Mesure timestamp T2]
- *   ↓
- * Latency = T2 - T1
- *   ↓
- * Ajustement profil
- *   ↓
- * Calcul compensation
+ * LatencyCompensator
+ * ├── Device Profiles (transport latency)
+ * │   ├── USB Device: 3ms
+ * │   ├── WiFi Device: 15ms
+ * │   └── BT Device: 30ms
+ * │
+ * └── Instrument Profiles (total compensation)
+ *     ├── Piano (USB + 5ms VST) = -8ms
+ *     ├── Strings (USB + 15ms VST) = -18ms
+ *     └── Drums (BT + 3ms HW) = -33ms
  * ```
  * 
- * Algorithmes:
- * - Moving average sur dernières N mesures
- * - Détection anomalies (outliers)
- * - Prédiction basée sur historique
- * - Ajustement progressif
+ * Thread Safety:
+ * - All public methods are thread-safe
+ * - Separate mutexes for devices and instruments
  * 
- * Thread-safety: OUI
+ * Example:
+ * ```cpp
+ * LatencyCompensator comp(instrumentDb);
  * 
- * @example Utilisation
- * @code
- * LatencyCompensator compensator;
+ * // Register device
+ * comp.registerDevice("usb_kbd");
  * 
- * // Enregistrer un device
- * compensator.registerDevice("piano_001");
+ * // Register instrument
+ * InstrumentLatencyProfile piano("piano_001", "usb_kbd", 0);
+ * piano.intrinsicLatency = 5000;  // 5ms VST
+ * comp.registerInstrument(piano);
  * 
- * // Mesurer latence
- * uint64_t t1 = getTimestampUs();
- * sendMidiMessage(device, msg);
- * uint64_t t2 = getTimestampUs();
- * 
- * compensator.recordLatency("piano_001", t2 - t1);
- * 
- * // Obtenir compensation
- * int64_t offset = compensator.getCompensation("piano_001");
- * @endcode
+ * // Get compensation
+ * int64_t offset = comp.getInstrumentCompensation("piano_001");
+ * // Returns: -8ms (3ms device + 5ms VST)
+ * ```
  */
 class LatencyCompensator {
 public:
     // ========================================================================
-    // CONSTRUCTEUR / DESTRUCTEUR
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
-    LatencyCompensator();
+    /**
+     * @brief Constructor
+     * @param instrumentDb Reference to instrument database
+     */
+    explicit LatencyCompensator(InstrumentDatabase& instrumentDb);
+    
+    /**
+     * @brief Destructor
+     */
     ~LatencyCompensator();
     
-    // Désactiver copie et assignation
+    // Disable copy
     LatencyCompensator(const LatencyCompensator&) = delete;
     LatencyCompensator& operator=(const LatencyCompensator&) = delete;
     
     // ========================================================================
-    // GESTION DES DEVICES
+    // DEVICE MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Enregistre un nouveau périphérique
-     * @param deviceId ID du périphérique
-     * @return bool true si enregistré
+     * @brief Register MIDI device
+     * @param deviceId Device identifier
+     * @return true if registered
      */
     bool registerDevice(const std::string& deviceId);
     
     /**
-     * @brief Désenregistre un périphérique
-     * @param deviceId ID du périphérique
+     * @brief Unregister device
+     * @param deviceId Device identifier
      */
     void unregisterDevice(const std::string& deviceId);
     
     /**
-     * @brief Vérifie si un device est enregistré
-     * @param deviceId ID du périphérique
-     * @return bool true si enregistré
+     * @brief Check if device is registered
+     * @param deviceId Device identifier
+     * @return true if registered
      */
     bool isDeviceRegistered(const std::string& deviceId) const;
     
     // ========================================================================
-    // MESURE DE LATENCE
+    // INSTRUMENT MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Enregistre une mesure de latence
-     * @param deviceId ID du périphérique
-     * @param latencyUs Latence en microsecondes
+     * @brief Register instrument
+     * @param profile Instrument latency profile
+     * @return true if registered
      */
-    void recordLatency(const std::string& deviceId, uint64_t latencyUs);
+    bool registerInstrument(const InstrumentLatencyProfile& profile);
     
     /**
-     * @brief Démarre une mesure (retourne timestamp)
-     * @return uint64_t Timestamp de début (µs)
+     * @brief Unregister instrument
+     * @param instrumentId Instrument identifier
      */
-    uint64_t startMeasurement() const;
+    void unregisterInstrument(const std::string& instrumentId);
     
     /**
-     * @brief Termine une mesure et enregistre
-     * @param deviceId ID du périphérique
-     * @param startTime Timestamp de début
+     * @brief Check if instrument is registered
+     * @param instrumentId Instrument identifier
+     * @return true if registered
      */
-    void endMeasurement(const std::string& deviceId, uint64_t startTime);
+    bool isInstrumentRegistered(const std::string& instrumentId) const;
     
     // ========================================================================
-    // COMPENSATION
-    // ========================================================================
-    
-    /**
-     * @brief Récupère l'offset de compensation pour un device
-     * @param deviceId ID du périphérique
-     * @return int64_t Offset en microsecondes (positif = retarder)
-     */
-    int64_t getCompensation(const std::string& deviceId) const;
-    
-    /**
-     * @brief Définit manuellement la compensation
-     * @param deviceId ID du périphérique
-     * @param offsetUs Offset en microsecondes
-     */
-    void setCompensation(const std::string& deviceId, int64_t offsetUs);
-    
-    /**
-     * @brief Active/désactive la compensation auto pour un device
-     * @param deviceId ID du périphérique
-     * @param enabled true pour activer
-     */
-    void setAutoCompensation(const std::string& deviceId, bool enabled);
-    
-    /**
-     * @brief Réinitialise la compensation d'un device
-     * @param deviceId ID du périphérique
-     */
-    void resetCompensation(const std::string& deviceId);
-    
-    // ========================================================================
-    // PROFILS
+    // DEVICE LATENCY MEASUREMENT
     // ========================================================================
     
     /**
-     * @brief Récupère le profil d'un device
-     * @param deviceId ID du périphérique
-     * @return DeviceLatencyProfile Profil de latence
+     * @brief Record device latency measurement
+     * @param deviceId Device identifier
+     * @param latencyUs Latency in microseconds
      */
-    DeviceLatencyProfile getProfile(const std::string& deviceId) const;
+    void recordDeviceLatency(const std::string& deviceId, uint64_t latencyUs);
     
     /**
-     * @brief Liste tous les profils
-     * @return std::vector<DeviceLatencyProfile> Liste des profils
+     * @brief Get device compensation offset
+     * @param deviceId Device identifier
+     * @return int64_t Offset in microseconds
      */
-    std::vector<DeviceLatencyProfile> getAllProfiles() const;
+    int64_t getDeviceCompensation(const std::string& deviceId) const;
     
     /**
-     * @brief Exporte tous les profils en JSON
-     * @return json Profils au format JSON
+     * @brief Set device compensation manually
+     * @param deviceId Device identifier
+     * @param offsetUs Offset in microseconds
      */
-    json exportProfiles() const;
+    void setDeviceCompensation(const std::string& deviceId, int64_t offsetUs);
+    
+    // ========================================================================
+    // INSTRUMENT LATENCY MEASUREMENT
+    // ========================================================================
     
     /**
-     * @brief Importe des profils depuis JSON
-     * @param profiles Profils au format JSON
-     * @return bool true si importé avec succès
+     * @brief Record instrument latency measurement
+     * @param instrumentId Instrument identifier
+     * @param latencyUs Latency in microseconds
      */
-    bool importProfiles(const json& profiles);
+    void recordInstrumentLatency(const std::string& instrumentId, uint64_t latencyUs);
+    
+    /**
+     * @brief Get instrument compensation offset
+     * @param instrumentId Instrument identifier
+     * @return int64_t Total offset in microseconds (device + intrinsic)
+     * @note Falls back to device compensation if instrument not found
+     */
+    int64_t getInstrumentCompensation(const std::string& instrumentId) const;
+    
+    /**
+     * @brief Set instrument compensation manually
+     * @param instrumentId Instrument identifier
+     * @param offsetUs Total offset in microseconds
+     */
+    void setInstrumentCompensation(const std::string& instrumentId, int64_t offsetUs);
+    
+    
+    // ========================================================================
+    // PROFILES
+    // ========================================================================
+    
+    /**
+     * @brief Get device profile
+     * @param deviceId Device identifier
+     * @return DeviceLatencyProfile Device profile
+     */
+    DeviceLatencyProfile getDeviceProfile(const std::string& deviceId) const;
+    
+    /**
+     * @brief Get instrument profile
+     * @param instrumentId Instrument identifier
+     * @return InstrumentLatencyProfile Instrument profile
+     */
+    InstrumentLatencyProfile getInstrumentProfile(const std::string& instrumentId) const;
+    
+    /**
+     * @brief Get all instrument profiles
+     * @return std::vector<InstrumentLatencyProfile> All profiles
+     */
+    std::vector<InstrumentLatencyProfile> getAllInstrumentProfiles() const;
+    
+    // ========================================================================
+    // PERSISTENCE
+    // ========================================================================
+    
+    /**
+     * @brief Save all instrument profiles to database
+     * @return true if saved successfully
+     */
+    bool saveInstrumentProfiles();
+    
+    /**
+     * @brief Load all instrument profiles from database
+     * @return true if loaded successfully
+     */
+    bool loadInstrumentProfiles();
+    
+    // ========================================================================
+    // STATISTICS
+    // ========================================================================
+    
+    /**
+     * @brief Get device statistics
+     * @param deviceId Device identifier
+     * @return json Statistics
+     */
+    json getDeviceStatistics(const std::string& deviceId) const;
+    
+    /**
+     * @brief Get instrument statistics
+     * @param instrumentId Instrument identifier
+     * @return json Statistics
+     */
+    json getInstrumentStatistics(const std::string& instrumentId) const;
+    
+    /**
+     * @brief Get all statistics
+     * @return json Complete statistics
+     */
+    json getAllStatistics() const;
+    
+    /**
+     * @brief Calculate synchronization score
+     * @return double Score from 0 (bad) to 100 (perfect)
+     * @note Based on variance between instrument compensations
+     */
+    double getSyncScore() const;
     
     // ========================================================================
     // CONFIGURATION
     // ========================================================================
     
     /**
-     * @brief Définit la taille de l'historique
-     * @param size Nombre de mesures conservées
+     * @brief Set history size
+     * @param size Number of measurements to keep
      */
     void setHistorySize(size_t size) {
         historySize_ = size;
     }
     
     /**
-     * @brief Récupère la taille de l'historique
-     * @return size_t Nombre de mesures
-     */
-    size_t getHistorySize() const {
-        return historySize_;
-    }
-    
-    /**
-     * @brief Active/désactive la détection d'outliers
-     * @param enabled true pour activer
+     * @brief Enable/disable outlier detection
+     * @param enabled true to enable
      */
     void setOutlierDetection(bool enabled) {
         outlierDetectionEnabled_ = enabled;
     }
     
-    // ========================================================================
-    // STATISTIQUES
-    // ========================================================================
-    
-    /**
-     * @brief Récupère des statistiques globales
-     * @return json Statistiques au format JSON
-     */
-    json getStatistics() const;
-
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Détecte si une mesure est un outlier
-     * @param profile Profil du device
-     * @param latency Latence mesurée
-     * @return bool true si outlier
+     * @brief Check if measurement is an outlier
      */
     bool isOutlier(const DeviceLatencyProfile& profile, uint64_t latency) const;
     
     /**
-     * @brief Recalcule les statistiques d'un profil
-     * @param profile Profil à mettre à jour
+     * @brief Update device statistics
      */
-    void updateStatistics(DeviceLatencyProfile& profile);
+    void updateDeviceStatistics(DeviceLatencyProfile& profile);
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    /// Profils de latence par device
-    std::unordered_map<std::string, DeviceLatencyProfile> profiles_;
+    /// Device latency profiles (transport layer)
+    std::unordered_map<std::string, DeviceLatencyProfile> devices_;
     
-    /// Mutex pour thread-safety
-    mutable std::mutex mutex_;
+    /// Instrument latency profiles (intrinsic + transport)
+    std::unordered_map<std::string, InstrumentLatencyProfile> instruments_;
     
-    /// Taille de l'historique (nombre de mesures conservées)
+    /// Reference to instrument database
+    InstrumentDatabase& instrumentDb_;
+    
+    /// Mutex for device operations
+    mutable std::mutex deviceMutex_;
+    
+    /// Mutex for instrument operations
+    mutable std::mutex instrumentMutex_;
+    
+    /// History size
     size_t historySize_;
     
-    /// Détection d'outliers activée
+    /// Outlier detection enabled
     bool outlierDetectionEnabled_;
     
-    /// Seuil de détection d'outliers (écarts-types)
+    /// Outlier threshold (standard deviations)
     double outlierThreshold_;
 };
 

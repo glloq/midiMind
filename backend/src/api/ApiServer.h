@@ -1,25 +1,33 @@
 // ============================================================================
-// Fichier: backend/src/api/ApiServer.h
-// Version: 3.1.0-corrections
-// Date: 2025-10-15
+// File: backend/src/api/ApiServer.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Header du serveur WebSocket avec protocole unifié - CORRECTIONS
+//   WebSocket API server for frontend communication.
+//   Handles client connections, message routing, and event broadcasting.
 //
-// CORRECTIONS v3.1.0:
-//   ✅ Ajout méthode sendError() pour helper d'envoi d'erreurs
-//   ✅ Ajout méthode onFail() pour gérer les échecs de connexion
-//   ✅ Documentation améliorée
-//   ✅ Stats accessibles publiquement
+// Features:
+//   - Multi-client support
+//   - Request/Response pattern
+//   - Event broadcasting
+//   - Thread-safe operations
+//   - Statistics tracking
 //
-// Modifications par rapport à v3.0.0:
-//   - Nouvelle méthode publique: sendError()
-//   - Nouveau handler privé: onFail()
-//   - Méthode publique: getStats()
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Enhanced error handling
+//   - Better connection management
+//   - Improved statistics
+//
 // ============================================================================
 
 #pragma once
 
+#include "MessageEnvelope.h"
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <set>
@@ -27,82 +35,78 @@
 #include <mutex>
 #include <functional>
 #include <chrono>
-#include <nlohmann/json.hpp>
-
-#include "Protocol.h"
 
 namespace midiMind {
 
-// Forward declarations
-class MessageEnvelope;
-
-using json = nlohmann::json;
-using websocketpp::connection_hdl;
-
 /**
  * @class ApiServer
- * @brief Serveur WebSocket pour l'API MidiMind
+ * @brief WebSocket server for API communication
  * 
- * Gère les connexions WebSocket, parse les messages entrants au format
- * MessageEnvelope, route vers CommandProcessor, et envoie les réponses.
+ * Provides WebSocket server functionality for frontend communication.
+ * Handles multiple concurrent connections and message routing.
  * 
  * Architecture:
- * - Thread principal: Serveur WebSocket (listen + accept)
+ * - Main thread: WebSocket server event loop
  * - Callbacks: onOpen, onClose, onMessage, onFail
- * - CommandCallback: Injection du processeur de commandes
- * - Thread-safe: Mutex pour connections et stats
+ * - Command processing: Delegates to registered callback
+ * - Broadcasting: Sends events to all connected clients
  * 
- * Flux de message:
- * 1. Frontend envoie REQUEST via WebSocket
- * 2. onMessage() parse MessageEnvelope
- * 3. Appel commandCallback_ avec command JSON
- * 4. Création RESPONSE avec même requestId
- * 5. Envoi réponse au client
+ * Thread Safety: YES (mutex protected)
  * 
- * @example Utilisation
+ * Example:
  * ```cpp
  * ApiServer server;
  * 
- * // Enregistrer le callback
- * server.setCommandCallback([processor](const json& cmd) {
- *     return processor->processCommand(cmd);
+ * // Set command handler
+ * server.setCommandCallback([](const json& cmd) {
+ *     std::string command = cmd["command"];
+ *     json params = cmd["params"];
+ *     
+ *     // Process command
+ *     json result = processCommand(command, params);
+ *     
+ *     return result;
  * });
  * 
- * // Démarrer
+ * // Start server
  * server.start(8080);
  * 
  * // Broadcast event
- * auto event = MessageEnvelope::createEvent("midi.message", data, HIGH);
+ * auto event = MessageEnvelope::createEvent(
+ *     "midi:message",
+ *     {{"note", 60}, {"velocity", 100}}
+ * );
  * server.broadcast(event);
  * 
- * // Arrêter
+ * // Stop server
  * server.stop();
  * ```
  */
 class ApiServer {
 public:
     // ========================================================================
-    // TYPES
+    // TYPE DEFINITIONS
     // ========================================================================
     
+    /// WebSocket server type
     using server_t = websocketpp::server<websocketpp::config::asio>;
+    
+    /// Connection handle type
+    using connection_hdl = websocketpp::connection_hdl;
+    
+    /// Message pointer type
     using message_ptr = server_t::message_ptr;
     
     /**
-     * @brief Callback pour traitement de commandes
+     * @brief Command callback function
      * 
-     * Prend un objet JSON {"command": "...", "params": {...}}
-     * Retourne un objet JSON {"success": bool, "data": {...}}
-     * 
-     * Le serveur se charge de l'envelopper dans le nouveau protocole.
-     * 
-     * @param command Commande au format {"command": "...", "params": {...}}
-     * @return Résultat au format {"success": bool, "data": {...}}
+     * Takes command JSON: {"command": "...", "params": {...}}
+     * Returns result JSON: {"success": bool, "data": {...}}
      */
     using CommandCallback = std::function<json(const json&)>;
     
     /**
-     * @brief Statistiques du serveur
+     * @brief Server statistics
      */
     struct Stats {
         std::chrono::steady_clock::time_point startTime;
@@ -114,110 +118,82 @@ public:
     };
     
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur
-     * 
-     * Initialise le serveur WebSocket et configure les handlers.
+     * @brief Constructor
      */
     ApiServer();
     
     /**
-     * @brief Destructeur
-     * 
-     * Arrête le serveur proprement si encore en cours d'exécution.
+     * @brief Destructor
      */
     ~ApiServer();
     
-    // Interdire copie et assignation
+    // Disable copy
     ApiServer(const ApiServer&) = delete;
     ApiServer& operator=(const ApiServer&) = delete;
     
     // ========================================================================
-    // GESTION SERVEUR
+    // SERVER MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Démarre le serveur WebSocket
-     * 
-     * @param port Port d'écoute (défaut: 8080)
-     * 
-     * @throws std::runtime_error Si le serveur ne peut pas démarrer
-     * 
+     * @brief Start WebSocket server
+     * @param port Port number (default: 8080)
+     * @throws std::runtime_error if server fails to start
      * @note Thread-safe
-     * @note Bloquant jusqu'à ce que le serveur soit prêt (100ms max)
      */
     void start(int port = 8080);
     
     /**
-     * @brief Arrête le serveur WebSocket
-     * 
-     * Ferme toutes les connexions proprement et arrête le thread serveur.
-     * 
+     * @brief Stop WebSocket server
+     * @note Closes all connections gracefully
      * @note Thread-safe
-     * @note Peut prendre quelques secondes
      */
     void stop();
     
     /**
-     * @brief Retourne le nombre de clients connectés
-     * 
-     * @return Nombre de connexions actives
-     * 
+     * @brief Check if server is running
+     */
+    bool isRunning() const { return running_; }
+    
+    /**
+     * @brief Get active connection count
+     * @return Number of connected clients
      * @note Thread-safe
      */
     size_t getClientCount() const;
     
     /**
-     * @brief Obtient les statistiques du serveur
-     * 
-     * @return Structure Stats avec métriques
-     * 
+     * @brief Get server statistics
+     * @return Stats Server statistics
      * @note Thread-safe
      */
     Stats getStats() const;
     
     // ========================================================================
-    // ENVOI DE MESSAGES
+    // MESSAGE SENDING
     // ========================================================================
     
     /**
-     * @brief Envoie un message à un client spécifique
-     * 
-     * @param hdl Handle de connexion du client
-     * @param message Message à envoyer (format MessageEnvelope)
-     * 
-     * @return true si envoi réussi
-     * 
+     * @brief Send message to specific client
+     * @param hdl Connection handle
+     * @param message Message envelope
+     * @return true if successful
      * @note Thread-safe
-     * @note Incrémente stats.messagesSent
      */
     bool sendTo(connection_hdl hdl, const MessageEnvelope& message);
     
     /**
-     * @brief ✅ NOUVEAU: Envoie une erreur formatée à un client
-     * 
-     * Helper pour envoyer rapidement une erreur au format MessageEnvelope.
-     * 
-     * @param hdl Handle de connexion du client
-     * @param requestId ID de la requête d'origine (vide si non applicable)
-     * @param code Code d'erreur (ErrorCode enum)
-     * @param message Message d'erreur lisible
-     * @param details Détails supplémentaires (optionnel)
-     * 
-     * @return true si envoi réussi
-     * 
-     * @note Thread-safe
-     * @note Incrémente stats.errorCount
-     * 
-     * @example
-     * ```cpp
-     * sendError(hdl, "req-123", ErrorCode::INVALID_PARAMS, 
-     *          "Missing required field 'name'", 
-     *          json{{"field", "name"}});
-     * ```
+     * @brief Send error to specific client
+     * @param hdl Connection handle
+     * @param requestId Original request ID
+     * @param code Error code
+     * @param message Error message
+     * @param details Additional details
+     * @return true if successful
      */
     bool sendError(connection_hdl hdl,
                    const std::string& requestId,
@@ -226,126 +202,103 @@ public:
                    const json& details = json::object());
     
     /**
-     * @brief Broadcast un message à tous les clients
-     * 
-     * @param message Message à broadcaster (format MessageEnvelope)
-     * 
+     * @brief Broadcast message to all clients
+     * @param message Message envelope
      * @note Thread-safe
-     * @note Incrémente stats.messagesSent pour chaque client
      */
     void broadcast(const MessageEnvelope& message);
     
     /**
-     * @brief Broadcast un message legacy (rétrocompatibilité)
-     * 
-     * @param legacyJson Message au format ancien
-     * 
-     * @deprecated Utiliser broadcast(MessageEnvelope) à la place
+     * @brief Broadcast event to all clients
+     * @param name Event name
+     * @param data Event data
+     * @param priority Event priority
      */
-    void broadcast(const json& legacyJson);
+    void broadcastEvent(const std::string& name,
+                       const json& data,
+                       protocol::EventPriority priority = protocol::EventPriority::NORMAL);
     
     // ========================================================================
-    // CALLBACKS
+    // CALLBACK REGISTRATION
     // ========================================================================
     
     /**
-     * @brief Enregistre le callback de traitement de commandes
-     * 
-     * @param callback Fonction callback à appeler pour chaque commande
-     * 
-     * @note Doit être appelé AVANT start()
-     * @warning Appeler après start() génère un warning
+     * @brief Set command callback
+     * @param callback Function to handle commands
      */
-    void setCommandCallback(CommandCallback callback);
-    
+    void setCommandCallback(CommandCallback callback) {
+        commandCallback_ = callback;
+    }
+
 private:
     // ========================================================================
-    // HANDLERS WEBSOCKET (privés)
+    // WEBSOCKET HANDLERS
     // ========================================================================
     
     /**
-     * @brief Handler: nouvelle connexion
-     * 
-     * - Ajoute la connexion à l'ensemble
-     * - Incrémente stats
-     * - Envoie message de bienvenue
-     * 
-     * @param hdl Handle de la connexion
+     * @brief Handle new connection
      */
     void onOpen(connection_hdl hdl);
     
     /**
-     * @brief Handler: connexion fermée
-     * 
-     * - Retire la connexion de l'ensemble
-     * - Met à jour stats
-     * 
-     * @param hdl Handle de la connexion
+     * @brief Handle connection close
      */
     void onClose(connection_hdl hdl);
     
     /**
-     * @brief ✅ CORRIGÉ: Handler message reçu - IMPLÉMENTATION COMPLÈTE
-     * 
-     * Flux complet:
-     * 1. Parse MessageEnvelope depuis JSON
-     * 2. Valide le message
-     * 3. Vérifie que c'est une REQUEST
-     * 4. Extrait requestId
-     * 5. Appelle commandCallback_
-     * 6. Crée RESPONSE avec même requestId
-     * 7. Envoie réponse au client
-     * 8. Gère toutes les erreurs avec sendError()
-     * 
-     * @param hdl Handle de la connexion
-     * @param msg Message WebSocket reçu
+     * @brief Handle received message
      */
     void onMessage(connection_hdl hdl, message_ptr msg);
     
     /**
-     * @brief ✅ NOUVEAU: Handler échec de connexion
-     * 
-     * @param hdl Handle de la connexion
+     * @brief Handle connection failure
      */
     void onFail(connection_hdl hdl);
     
     // ========================================================================
-    // THREAD SERVEUR
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Thread principal du serveur
-     * 
-     * Lance le serveur WebSocket et traite les événements.
+     * @brief Server thread function
      */
     void serverThread();
     
+    /**
+     * @brief Process request message
+     */
+    void processRequest(connection_hdl hdl, const MessageEnvelope& message);
+    
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    // Serveur WebSocket
+    /// WebSocket server instance
     server_t server_;
+    
+    /// Active connections
     std::set<connection_hdl, std::owner_less<connection_hdl>> connections_;
+    
+    /// Server thread
     std::thread serverThread_;
     
-    // État
-    bool running_;
+    /// Running flag
+    std::atomic<bool> running_;
+    
+    /// Port number
     int port_;
     
-    // Callback
+    /// Command callback
     CommandCallback commandCallback_;
     
-    // Thread-safety
+    /// Mutex for connections
     mutable std::mutex connectionsMutex_;
+    
+    /// Mutex for statistics
     mutable std::mutex statsMutex_;
     
-    // Statistiques
+    /// Server statistics
     Stats stats_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER ApiServer.h v3.1.0-corrections
-// ============================================================================

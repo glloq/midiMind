@@ -1,276 +1,476 @@
 // ============================================================================
-// Fichier: backend/src/core/Application.h
-// Version: 3.0.6 - CORRECTIONS CHEMINS D'INCLUSION
-// Date: 2025-10-15
+// File: backend/src/core/Application.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// CORRECTIONS v3.0.6:
-//   ✅ FIX #1: Correction chemin MidiDeviceManager.h
-//   ✅ FIX #2: Vérification chemins des autres includes
 //
 // Description:
-//   Classe principale de l'application MidiMind
+//   Main application class implementing the singleton pattern.
+//   Manages the complete lifecycle of the MidiMind backend including
+//   initialization, startup, shutdown, and signal handling.
+//
+// Lifecycle:
+//   1. initialize() - 7-phase initialization
+//   2. start()      - Start all services
+//   3. run()        - Main loop / wait for shutdown
+//   4. stop()       - Graceful shutdown
+//
+// Dependencies:
+//   - Logger, Config, Database
+//   - MidiDeviceManager, MidiRouter, MidiPlayer
+//   - ApiServer, CommandProcessorV2
+//   - EventBus
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified initialization (7 phases)
+//   - Removed NetworkManager (WiFi/BT for v4.2.0)
+//   - Added LatencyCompensator integration
+//   - Enhanced signal handling
+//   - Thread-safe Meyers singleton
+//
 // ============================================================================
 
 #pragma once
 
+#include <string>
 #include <memory>
 #include <atomic>
 #include <thread>
-#include <string>
+#include <mutex>
+#include <condition_variable>
 
-// Core
-#include "Logger.h"
-#include "Config.h"
-
-// MIDI - ✅ FIX #1: Chemin corrigé depuis src/core
-#include "../midi/devices/MidiDeviceManager.h"
-#include "../midi/MidiRouter.h"
-#include "../midi/player/MidiPlayer.h"
-#include "../midi/processing/ProcessorManager.h"
-
-// API
-#include "../api/ApiServer.h"
-#include "../api/CommandProcessorV2.h"
-
-// Storage
-#include "../storage/Database.h"
-#include "../storage/FileManager.h"
-#include "../storage/PresetManager.h"
-#include "../storage/SessionManager.h"
-#include "../storage/Settings.h"
-#include "../storage/PathManager.h"
-
-// Network
-#include "../network/NetworkManager.h"
-#include "../network/WiFiHotspot.h"
-
-// Monitoring
-#include "../monitoring/PerformanceMetrics.h"
-#include "../monitoring/SystemMonitor.h"
-#include "../monitoring/LatencyMonitor.h"
-#include "../monitoring/MetricsCollector.h"
+// Forward declarations
+namespace midiMind {
+    class Database;
+    class Settings;
+    class FileManager;
+    class InstrumentDatabase;
+    class MidiDeviceManager;
+    class MidiRouter;
+    class MidiPlayer;
+    class ApiServer;
+    class CommandProcessorV2;
+    class EventBus;
+    class LatencyCompensator;
+    class CalibrationEngine;
+}
 
 namespace midiMind {
 
+// ============================================================================
+// EXIT CODES
+// ============================================================================
+
+enum class ExitCode {
+    SUCCESS = 0,
+    INITIALIZATION_FAILED = 1,
+    START_FAILED = 2,
+    RUNTIME_ERROR = 3,
+    INVALID_ARGUMENTS = 4
+};
+
+// ============================================================================
+// CLASS: Application
+// ============================================================================
+
 /**
  * @class Application
- * @brief Classe principale de l'application MidiMind
+ * @brief Main application class - Singleton pattern
  * 
- * Point d'entrée et orchestrateur central de l'application.
- * Gère l'initialisation, le cycle de vie et l'arrêt de tous les composants.
+ * Manages the complete lifecycle of MidiMind backend:
+ * - Configuration loading
+ * - Database initialization
+ * - MIDI subsystem setup
+ * - API server startup
+ * - Signal handling
+ * - Graceful shutdown
  * 
- * @version 3.0.6
- * @note Thread-safe
+ * Usage:
+ * ```cpp
+ * Application& app = Application::instance();
+ * if (!app.initialize("/path/to/config.json")) {
+ *     return EXIT_FAILURE;
+ * }
+ * if (!app.start()) {
+ *     return EXIT_FAILURE;
+ * }
+ * app.run(); // Blocks until shutdown
+ * app.stop();
+ * ```
+ * 
+ * Thread Safety:
+ * - Meyers singleton (thread-safe since C++11)
+ * - All public methods are thread-safe
+ * - Signal handler interacts safely with atomic flags
  */
 class Application {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // SINGLETON PATTERN
     // ========================================================================
     
     /**
-     * @brief Constructeur
+     * @brief Get the singleton instance (thread-safe)
+     * @return Reference to the unique instance
+     * @note Meyers Singleton - guaranteed thread-safe initialization
      */
-    Application();
+    static Application& instance();
     
-    /**
-     * @brief Destructeur
-     */
-    ~Application();
-    
-    // Désactiver copie et move
+    // Disable copy and assignment
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
     
+    /**
+     * @brief Destructor - Clean shutdown
+     * 
+     * Ensures proper cleanup:
+     * - Stops all threads
+     * - Disconnects devices
+     * - Closes database
+     * - Releases resources
+     */
+    ~Application();
+    
     // ========================================================================
-    // CYCLE DE VIE
+    // LIFECYCLE METHODS
     // ========================================================================
     
     /**
-     * @brief Initialise l'application
+     * @brief Initialize the application (7 phases)
      * 
-     * @param configPath Chemin du fichier de configuration
-     * @return bool True si succès
+     * Initialization phases:
+     * 1. Configuration (Config.h)
+     * 2. Database (SQLite + migrations)
+     * 3. Storage (Settings, FileManager, InstrumentDatabase)
+     * 4. Timing (LatencyCompensator, CalibrationEngine)
+     * 5. MIDI Core (DeviceManager, Router, Player)
+     * 6. API (ApiServer, CommandProcessor)
+     * 7. Event System (EventBus, observers)
+     * 
+     * @param configPath Path to config.json (default: ./config.json)
+     * @return true if initialization successful
+     * 
+     * @note Logs detailed progress for each phase
+     * @note Automatically performs database migrations
      */
     bool initialize(const std::string& configPath = "");
     
     /**
-     * @brief Lance l'application
+     * @brief Start all services
      * 
-     * @note Bloquant - retourne quand l'application s'arrête
+     * Actions:
+     * - Start API Server (WebSocket on configured port)
+     * - Scan and connect MIDI devices
+     * - Start hot-plug monitoring thread
+     * - Start status broadcast thread
+     * - Load saved configuration
+     * 
+     * @return true if startup successful
+     * 
+     * @note Must be called after initialize()
+     * @note Non-blocking - returns after startup
+     */
+    bool start();
+    
+    /**
+     * @brief Run the application (blocking)
+     * 
+     * Blocks until shutdown is requested via:
+     * - SIGINT (Ctrl+C)
+     * - SIGTERM (kill)
+     * - API shutdown command
+     * 
+     * @note This is the main event loop
+     * @note Call stop() to request shutdown
      */
     void run();
     
     /**
-     * @brief Arrête l'application
+     * @brief Stop the application gracefully
      * 
-     * @note Thread-safe - peut être appelé depuis n'importe quel thread
+     * Shutdown sequence:
+     * 1. Set shutdown flag
+     * 2. Stop hot-plug monitoring
+     * 3. Stop status broadcast
+     * 4. Stop MIDI player
+     * 5. Disconnect all devices
+     * 6. Stop API server
+     * 7. Close database
+     * 
+     * @note Thread-safe - can be called from signal handler
+     * @note Can be called multiple times safely
      */
-    void shutdown();
+    void stop();
     
     /**
-     * @brief Vérifie si l'application est en cours d'exécution
-     * 
-     * @return bool True si running
+     * @brief Check if application is running
+     * @return true if running, false otherwise
      */
     bool isRunning() const { return running_.load(); }
     
+    /**
+     * @brief Check if application is initialized
+     * @return true if initialized, false otherwise
+     */
+    bool isInitialized() const { return initialized_.load(); }
+    
     // ========================================================================
-    // ACCÈS AUX COMPOSANTS
+    // SIGNAL HANDLING
     // ========================================================================
     
-    std::shared_ptr<MidiDeviceManager> getDeviceManager() const { 
-        return deviceManager_; 
-    }
+    /**
+     * @brief Setup signal handlers
+     * 
+     * Handles:
+     * - SIGINT (Ctrl+C)
+     * - SIGTERM (kill)
+     * - SIGHUP (reload config - future)
+     * 
+     * @note Automatically called by initialize()
+     */
+    void setupSignalHandlers();
     
-    std::shared_ptr<MidiRouter> getRouter() const { 
-        return router_; 
-    }
+    /**
+     * @brief Signal counter for force quit
+     * 
+     * Tracks number of signals received.
+     * After 3 signals, force immediate exit.
+     */
+    static std::atomic<int> signalCount_;
     
-    std::shared_ptr<MidiPlayer> getPlayer() const { 
-        return player_; 
-    }
+    // ========================================================================
+    // STATUS & MONITORING
+    // ========================================================================
     
-    std::shared_ptr<ProcessorManager> getProcessorManager() const { 
-        return processorManager_; 
-    }
+    /**
+     * @brief Get application status
+     * @return JSON object with status information
+     * 
+     * Status includes:
+     * - Version information
+     * - Uptime
+     * - Connected devices count
+     * - API connection count
+     * - Memory usage
+     * - Database size
+     */
+    json getStatus() const;
     
-    std::shared_ptr<ApiServer> getApiServer() const { 
-        return apiServer_; 
-    }
+    /**
+     * @brief Get application version
+     * @return Version string (e.g., "4.1.0")
+     */
+    static std::string getVersion() { return "4.1.0"; }
     
-    std::shared_ptr<Database> getDatabase() const { 
-        return database_; 
-    }
+    /**
+     * @brief Get protocol version
+     * @return Protocol version string (e.g., "4.0.0")
+     */
+    static std::string getProtocolVersion() { return "4.0.0"; }
     
-    std::shared_ptr<MidiFileManager> getFileManager() const { 
-        return fileManager_; 
-    }
+    // ========================================================================
+    // COMPONENT ACCESS
+    // ========================================================================
     
-    std::shared_ptr<PresetManager> getPresetManager() const { 
-        return presetManager_; 
-    }
+    /**
+     * @brief Get database instance
+     * @return Reference to Database
+     * @throws std::runtime_error if not initialized
+     */
+    Database& getDatabase();
     
-    std::shared_ptr<SessionManager> getSessionManager() const { 
-        return sessionManager_; 
-    }
+    /**
+     * @brief Get MIDI device manager
+     * @return Reference to MidiDeviceManager
+     * @throws std::runtime_error if not initialized
+     */
+    MidiDeviceManager& getDeviceManager();
     
-    std::shared_ptr<Settings> getSettings() const { 
-        return settings_; 
-    }
+    /**
+     * @brief Get MIDI router
+     * @return Reference to MidiRouter
+     * @throws std::runtime_error if not initialized
+     */
+    MidiRouter& getRouter();
     
-    std::shared_ptr<NetworkManager> getNetworkManager() const { 
-        return networkManager_; 
-    }
+    /**
+     * @brief Get MIDI player
+     * @return Reference to MidiPlayer
+     * @throws std::runtime_error if not initialized
+     */
+    MidiPlayer& getPlayer();
     
-    std::shared_ptr<WiFiHotspot> getWiFiHotspot() const { 
-        return wifiHotspot_; 
-    }
+    /**
+     * @brief Get API server
+     * @return Reference to ApiServer
+     * @throws std::runtime_error if not initialized
+     */
+    ApiServer& getApiServer();
     
-    std::shared_ptr<MetricsCollector> getMetricsCollector() const { 
-        return metricsCollector_; 
-    }
+    /**
+     * @brief Get latency compensator
+     * @return Reference to LatencyCompensator
+     * @throws std::runtime_error if not initialized
+     */
+    LatencyCompensator& getLatencyCompensator();
+    
+    /**
+     * @brief Get event bus
+     * @return Reference to EventBus
+     * @throws std::runtime_error if not initialized
+     */
+    EventBus& getEventBus();
     
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES - INITIALISATION
+    // CONSTRUCTOR (PRIVATE - SINGLETON)
+    // ========================================================================
+    
+    Application();
+    
+    // ========================================================================
+    // INITIALIZATION PHASES (PRIVATE)
     // ========================================================================
     
     /**
-     * @brief Initialise le système de chemins
+     * @brief Phase 1: Load configuration
+     * @param configPath Path to config.json
+     * @return true if successful
      */
-    bool initializePaths();
+    bool initializeConfiguration(const std::string& configPath);
     
     /**
-     * @brief Initialise la base de données
+     * @brief Phase 2: Initialize database
+     * @return true if successful
      */
     bool initializeDatabase();
     
     /**
-     * @brief Initialise le système MIDI
+     * @brief Phase 3: Initialize storage subsystems
+     * @return true if successful
+     */
+    bool initializeStorage();
+    
+    /**
+     * @brief Phase 4: Initialize timing subsystems
+     * @return true if successful
+     */
+    bool initializeTiming();
+    
+    /**
+     * @brief Phase 5: Initialize MIDI subsystems
+     * @return true if successful
      */
     bool initializeMidi();
     
     /**
-     * @brief Initialise l'API
+     * @brief Phase 6: Initialize API
+     * @return true if successful
      */
     bool initializeApi();
     
     /**
-     * @brief Initialise le réseau
+     * @brief Phase 7: Setup event system
+     * @return true if successful
      */
-    bool initializeNetwork();
-    
-    /**
-     * @brief Initialise le monitoring
-     */
-    bool initializeMonitoring();
-    
-    /**
-     * @brief Charge la configuration
-     */
-    bool loadConfiguration(const std::string& configPath);
+    bool initializeEventSystem();
     
     // ========================================================================
-    // MEMBRES PRIVÉS - ÉTAT
+    // MONITORING THREADS (PRIVATE)
     // ========================================================================
     
-    std::atomic<bool> running_;
+    /**
+     * @brief Hot-plug monitoring thread function
+     * 
+     * Monitors ALSA for device connections/disconnections.
+     * Automatically connects new devices based on configuration.
+     */
+    void hotPlugMonitorThread();
+    
+    /**
+     * @brief Status broadcast thread function
+     * 
+     * Periodically broadcasts system status to connected clients.
+     * Default: every 5 seconds
+     */
+    void statusBroadcastThread();
+    
+    /**
+     * @brief Stop monitoring threads
+     */
+    void stopMonitoringThreads();
+    
+    // ========================================================================
+    // EVENT HANDLERS (PRIVATE)
+    // ========================================================================
+    
+    /**
+     * @brief Setup event observers
+     * 
+     * Registers callbacks for:
+     * - Device connected/disconnected
+     * - MIDI message received
+     * - Calibration completed
+     * - Error events
+     */
+    void setupEventObservers();
+    
+    /**
+     * @brief Handle device connected event
+     */
+    void onDeviceConnected(const std::string& deviceId);
+    
+    /**
+     * @brief Handle device disconnected event
+     */
+    void onDeviceDisconnected(const std::string& deviceId);
+    
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
+    
+    // Lifecycle flags
     std::atomic<bool> initialized_;
+    std::atomic<bool> running_;
+    std::atomic<bool> shutdownRequested_;
     
-    // ========================================================================
-    // MEMBRES PRIVÉS - COMPOSANTS CORE
-    // ========================================================================
+    // Monitoring threads
+    std::atomic<bool> hotPlugRunning_;
+    std::atomic<bool> statusBroadcastRunning_;
+    std::thread hotPlugThread_;
+    std::thread statusBroadcastThread_;
     
-    // Storage
-    std::shared_ptr<Database> database_;
-    std::shared_ptr<MidiFileManager> fileManager_;
-    std::shared_ptr<PresetManager> presetManager_;
-    std::shared_ptr<SessionManager> sessionManager_;
-    std::shared_ptr<Settings> settings_;
+    // Synchronization
+    mutable std::mutex mutex_;
+    std::condition_variable shutdownCondition_;
     
-    // MIDI
-    std::shared_ptr<MidiDeviceManager> deviceManager_;
-    std::shared_ptr<MidiRouter> router_;
-    std::shared_ptr<MidiPlayer> player_;
-    std::shared_ptr<ProcessorManager> processorManager_;
+    // Core components (unique_ptr for RAII)
+    std::unique_ptr<Database> database_;
+    std::unique_ptr<Settings> settings_;
+    std::unique_ptr<FileManager> fileManager_;
+    std::unique_ptr<InstrumentDatabase> instrumentDatabase_;
     
-    // API
-    std::shared_ptr<ApiServer> apiServer_;
-    std::shared_ptr<CommandProcessorV2> commandProcessor_;
+    // Timing components
+    std::unique_ptr<LatencyCompensator> latencyCompensator_;
+    std::unique_ptr<CalibrationEngine> calibrationEngine_;
     
-    // Network
-    std::shared_ptr<NetworkManager> networkManager_;
-    std::shared_ptr<WiFiHotspot> wifiHotspot_;
+    // MIDI components
+    std::unique_ptr<MidiDeviceManager> deviceManager_;
+    std::unique_ptr<MidiRouter> router_;
+    std::unique_ptr<MidiPlayer> player_;
     
-    // Monitoring
-    std::shared_ptr<SystemMonitor> systemMonitor_;
-    std::shared_ptr<LatencyMonitor> latencyMonitor_;
-    std::shared_ptr<MetricsCollector> metricsCollector_;
+    // API components
+    std::unique_ptr<ApiServer> apiServer_;
+    std::unique_ptr<CommandProcessorV2> commandProcessor_;
     
-    // ========================================================================
-    // MEMBRES PRIVÉS - THREADS
-    // ========================================================================
+    // Event system
+    std::unique_ptr<EventBus> eventBus_;
     
-    std::thread mainLoopThread_;
-    
-    // ========================================================================
-    // MÉTHODES PRIVÉES - BOUCLE PRINCIPALE
-    // ========================================================================
-    
-    /**
-     * @brief Boucle principale de l'application
-     */
-    void mainLoop();
-    
-    /**
-     * @brief Traite les événements
-     */
-    void processEvents();
+    // Runtime info
+    std::chrono::steady_clock::time_point startTime_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER Application.h v3.0.6 - CORRIGÉ
-// ============================================================================

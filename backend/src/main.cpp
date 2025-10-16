@@ -1,26 +1,20 @@
 // ============================================================================
-// Fichier: backend/src/main.cpp
-// Version: 3.0.4 - COMPLET AVEC AMÉLIORATIONS
-// Date: 2025-10-15
+// File: backend/src/main.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Point d'entrée principal de l'application MidiMind
+//   Main entry point for the MidiMind backend application.
+//   Handles command-line arguments, daemon mode, and application lifecycle.
 //
-// CHANGEMENTS v3.0.4:
-//   ✅ Parsing arguments amélioré (--config, --daemon, --pidfile, --log-level)
-//   ✅ Mode daemon complet avec fork()
-//   ✅ Gestion PID file
-//   ✅ Health check au démarrage
-//   ✅ Exit codes précis (0-4)
-//   ✅ Gestion erreurs robuste
-//   ✅ Support verbose mode
-//
-// PRÉSERVÉ DE v3.0.0:
-//   ✅ Structure originale
-//   ✅ Gestion signaux via Application
-//   ✅ Séquence initialize → start → wait → stop
-//   ✅ Try-catch global
-//   ✅ Messages console user-friendly
+// Features:
+//   - Command-line argument parsing
+//   - Daemon mode with PID file
+//   - Signal handling (SIGINT, SIGTERM)
+//   - Graceful shutdown
+//   - Health check
+//   - Verbose mode
 //
 // Exit Codes:
 //   0 - SUCCESS
@@ -29,7 +23,15 @@
 //   3 - RUNTIME_ERROR
 //   4 - INVALID_ARGUMENTS
 //
-// Auteur: MidiMind Team
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Updated for new Application structure
+//   - Removed NetworkManager references
+//   - Enhanced error handling
+//   - Improved logging
+//
 // ============================================================================
 
 #include "core/Application.h"
@@ -49,70 +51,204 @@
 using namespace midiMind;
 
 // ============================================================================
-// EXIT CODES
+// COMMAND LINE ARGUMENTS
 // ============================================================================
 
-enum ExitCode {
-    SUCCESS = 0,
-    INITIALIZATION_FAILED = 1,
-    START_FAILED = 2,
-    RUNTIME_ERROR = 3,
-    INVALID_ARGUMENTS = 4
-};
-
-// ============================================================================
-// STRUCTURES
-// ============================================================================
-
-/**
- * @brief Arguments de ligne de commande
- */
 struct CommandLineArgs {
     std::string configPath;
     std::string pidFile;
-    std::string logLevel = "info";
-    bool showHelp = false;
-    bool showVersion = false;
+    std::string logLevel = "INFO";
     bool daemonMode = false;
     bool verbose = false;
+    bool showHelp = false;
+    bool showVersion = false;
 };
 
 // ============================================================================
-// HELPERS - VERSION & USAGE
+// FUNCTION DECLARATIONS
+// ============================================================================
+
+void printUsage(const char* programName);
+void printVersion();
+CommandLineArgs parseCommandLine(int argc, char* argv[]);
+bool daemonize();
+bool writePidFile(const std::string& pidFile);
+void removePidFile(const std::string& pidFile);
+
+// ============================================================================
+// MAIN
+// ============================================================================
+
+int main(int argc, char* argv[]) {
+    std::string pidFile;
+    
+    try {
+        // ====================================================================
+        // 1. PARSE COMMAND LINE ARGUMENTS
+        // ====================================================================
+        
+        CommandLineArgs args = parseCommandLine(argc, argv);
+        pidFile = args.pidFile;
+        
+        // Show help
+        if (args.showHelp) {
+            printUsage(argv[0]);
+            return args.showHelp && argc > 1 ? 
+                static_cast<int>(ExitCode::INVALID_ARGUMENTS) : 
+                static_cast<int>(ExitCode::SUCCESS);
+        }
+        
+        // Show version
+        if (args.showVersion) {
+            printVersion();
+            return static_cast<int>(ExitCode::SUCCESS);
+        }
+        
+        // ====================================================================
+        // 2. SHOW CONFIGURATION (if verbose)
+        // ====================================================================
+        
+        if (args.verbose) {
+            std::cout << "╔═════════════════════════════════════╗\n";
+            std::cout << "║  Configuration                      ║\n";
+            std::cout << "╚═════════════════════════════════════╝\n";
+            std::cout << "  Config path: " << (args.configPath.empty() ? 
+                "config.json" : args.configPath) << "\n";
+            std::cout << "  Log level:   " << args.logLevel << "\n";
+            std::cout << "  Daemon mode: " << (args.daemonMode ? "yes" : "no") << "\n";
+            if (!args.pidFile.empty()) {
+                std::cout << "  PID file:    " << args.pidFile << "\n";
+            }
+            std::cout << "═════════════════════════════════════\n";
+            std::cout << "\n";
+        }
+        
+        // ====================================================================
+        // 3. DAEMONIZE (if requested)
+        // ====================================================================
+        
+        if (args.daemonMode) {
+            std::cout << "Starting in daemon mode...\n";
+            
+            if (!daemonize()) {
+                std::cerr << "Error: Failed to daemonize\n";
+                return static_cast<int>(ExitCode::INITIALIZATION_FAILED);
+            }
+            
+            // After daemonize, stdout/stderr are redirected to /dev/null
+            // Logger will write to log files
+        }
+        
+        // ====================================================================
+        // 4. WRITE PID FILE
+        // ====================================================================
+        
+        if (!writePidFile(args.pidFile)) {
+            return static_cast<int>(ExitCode::INITIALIZATION_FAILED);
+        }
+        
+        // ====================================================================
+        // 5. CONFIGURE LOGGER
+        // ====================================================================
+        
+        Logger::setLevel(args.logLevel);
+        
+        if (args.daemonMode) {
+            Logger::setOutputToFile(true);
+            Logger::setLogFile("/var/log/midimind/midimind.log");
+        }
+        
+        // ====================================================================
+        // 6. GET APPLICATION INSTANCE
+        // ====================================================================
+        
+        Logger::info("Main", "Starting MidiMind v" + Application::getVersion());
+        
+        Application& app = Application::instance();
+        
+        // ====================================================================
+        // 7. INITIALIZE APPLICATION
+        // ====================================================================
+        
+        if (!app.initialize(args.configPath)) {
+            Logger::critical("Main", "Application initialization failed");
+            removePidFile(pidFile);
+            return static_cast<int>(ExitCode::INITIALIZATION_FAILED);
+        }
+        
+        // ====================================================================
+        // 8. START APPLICATION
+        // ====================================================================
+        
+        if (!app.start()) {
+            Logger::critical("Main", "Application start failed");
+            removePidFile(pidFile);
+            return static_cast<int>(ExitCode::START_FAILED);
+        }
+        
+        // ====================================================================
+        // 9. RUN (blocking until shutdown)
+        // ====================================================================
+        
+        app.run();
+        
+        // ====================================================================
+        // 10. STOP APPLICATION
+        // ====================================================================
+        
+        app.stop();
+        
+        // ====================================================================
+        // 11. CLEANUP
+        // ====================================================================
+        
+        removePidFile(pidFile);
+        
+        Logger::info("Main", "MidiMind stopped successfully");
+        return static_cast<int>(ExitCode::SUCCESS);
+        
+    } catch (const MidiMindError& e) {
+        std::cerr << "MidiMind Error: " << e.what() << std::endl;
+        Logger::critical("Main", "MidiMind error: " + std::string(e.what()));
+        removePidFile(pidFile);
+        return static_cast<int>(ExitCode::RUNTIME_ERROR);
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal Error: " << e.what() << std::endl;
+        Logger::critical("Main", "Fatal error: " + std::string(e.what()));
+        removePidFile(pidFile);
+        return static_cast<int>(ExitCode::RUNTIME_ERROR);
+        
+    } catch (...) {
+        std::cerr << "Unknown fatal error occurred" << std::endl;
+        Logger::critical("Main", "Unknown fatal error");
+        removePidFile(pidFile);
+        return static_cast<int>(ExitCode::RUNTIME_ERROR);
+    }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
 // ============================================================================
 
 /**
- * @brief Affiche la version
- */
-void printVersion() {
-    std::cout << "╔═══════════════════════════════════════════╗\n";
-    std::cout << "║           midiMind v3.0.4                 ║\n";
-    std::cout << "╚═══════════════════════════════════════════╝\n";
-    std::cout << "\n";
-    std::cout << "MIDI Orchestration System for Raspberry Pi\n";
-    std::cout << "Build date: " << __DATE__ << " " << __TIME__ << "\n";
-    std::cout << "Protocol version: 3.0\n";
-    std::cout << "Copyright (c) 2025 MidiMind Team\n";
-    std::cout << "\n";
-}
-
-/**
- * @brief Affiche l'usage
+ * @brief Print usage information
  */
 void printUsage(const char* programName) {
-    std::cout << "Usage: " << programName << " [options]\n\n";
+    std::cout << "Usage: " << programName << " [OPTIONS]\n";
+    std::cout << "\n";
+    std::cout << "MidiMind v" << Application::getVersion() 
+              << " - MIDI Orchestration System for Raspberry Pi\n";
+    std::cout << "\n";
     
     std::cout << "Options:\n";
-    std::cout << "  -c, --config <path>      Path to configuration file\n";
-    std::cout << "                           (default: ./config/config.json)\n";
-    std::cout << "  -d, --daemon             Run as daemon (background)\n";
-    std::cout << "  -p, --pidfile <path>     Write PID to file (daemon mode)\n";
-    std::cout << "                           (default: /var/run/midimind.pid)\n";
-    std::cout << "  -l, --log-level <level>  Log level: debug, info, warn, error\n";
-    std::cout << "                           (default: info)\n";
-    std::cout << "  -v, --verbose            Enable verbose output (debug level)\n";
     std::cout << "  -h, --help               Show this help message\n";
     std::cout << "  -V, --version            Show version information\n";
+    std::cout << "  -c, --config PATH        Configuration file path (default: config.json)\n";
+    std::cout << "  -d, --daemon             Run as daemon in background\n";
+    std::cout << "  -p, --pidfile PATH       PID file path (default: /var/run/midimind.pid)\n";
+    std::cout << "  -l, --log-level LEVEL    Log level: DEBUG, INFO, WARNING, ERROR (default: INFO)\n";
+    std::cout << "  -v, --verbose            Enable verbose output (sets log-level to DEBUG)\n";
     std::cout << "\n";
     
     std::cout << "Examples:\n";
@@ -125,7 +261,7 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " --daemon --pidfile /var/run/midimind.pid\n";
     std::cout << "    Start as daemon with PID file\n\n";
     
-    std::cout << "  " << programName << " --log-level debug --verbose\n";
+    std::cout << "  " << programName << " --log-level DEBUG --verbose\n";
     std::cout << "    Start with debug logging\n";
     std::cout << "\n";
     
@@ -144,12 +280,20 @@ void printUsage(const char* programName) {
     std::cout << "\n";
 }
 
-// ============================================================================
-// HELPERS - ARGUMENT PARSING
-// ============================================================================
+/**
+ * @brief Print version information
+ */
+void printVersion() {
+    std::cout << "MidiMind v" << Application::getVersion() << "\n";
+    std::cout << "Protocol: " << Application::getProtocolVersion() << "\n";
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n";
+    std::cout << "\n";
+    std::cout << "Copyright (c) 2025 MidiMind Team\n";
+    std::cout << "MIDI Orchestration System for Raspberry Pi\n";
+}
 
 /**
- * @brief Parse les arguments de ligne de commande
+ * @brief Parse command line arguments
  */
 CommandLineArgs parseCommandLine(int argc, char* argv[]) {
     CommandLineArgs args;
@@ -191,11 +335,11 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
         else if (arg == "-l" || arg == "--log-level") {
             if (i + 1 < argc) {
                 args.logLevel = argv[++i];
-                // Valider log level
-                if (args.logLevel != "debug" && args.logLevel != "info" &&
-                    args.logLevel != "warn" && args.logLevel != "error") {
+                // Validate log level
+                if (args.logLevel != "DEBUG" && args.logLevel != "INFO" &&
+                    args.logLevel != "WARNING" && args.logLevel != "ERROR") {
                     std::cerr << "Error: Invalid log level '" << args.logLevel << "'\n";
-                    std::cerr << "Valid levels: debug, info, warn, error\n";
+                    std::cerr << "Valid levels: DEBUG, INFO, WARNING, ERROR\n";
                     args.showHelp = true;
                 }
             } else {
@@ -206,7 +350,7 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
         // Verbose
         else if (arg == "-v" || arg == "--verbose") {
             args.verbose = true;
-            args.logLevel = "debug";
+            args.logLevel = "DEBUG";
         }
         // Unknown
         else {
@@ -215,7 +359,7 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
         }
     }
     
-    // PID file par défaut si daemon mode
+    // Default PID file if daemon mode
     if (args.daemonMode && args.pidFile.empty()) {
         args.pidFile = "/var/run/midimind.pid";
     }
@@ -223,62 +367,57 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
     return args;
 }
 
-// ============================================================================
-// HELPERS - DAEMON
-// ============================================================================
-
 /**
- * @brief Daemonize le processus
+ * @brief Daemonize the process
  */
 bool daemonize() {
-    std::cout << "Daemonizing process...\n";
-    
-    // Fork 1: Créer un processus enfant
+    // Fork the parent process
     pid_t pid = fork();
     
     if (pid < 0) {
-        std::cerr << "Error: fork() failed: " << strerror(errno) << "\n";
+        std::cerr << "Error: Fork failed\n";
         return false;
     }
     
-    // Parent: terminer
+    // Exit parent process
     if (pid > 0) {
-        std::exit(EXIT_SUCCESS);
+        exit(EXIT_SUCCESS);
     }
     
-    // Enfant: devenir leader de session
+    // Create new session
     if (setsid() < 0) {
-        std::cerr << "Error: setsid() failed: " << strerror(errno) << "\n";
+        std::cerr << "Error: setsid failed\n";
         return false;
     }
     
-    // Ignorer SIGHUP
-    signal(SIGHUP, SIG_IGN);
-    
-    // Fork 2: Prévenir réacquisition terminal
+    // Fork again to prevent acquiring controlling terminal
     pid = fork();
     
     if (pid < 0) {
-        std::cerr << "Error: second fork() failed: " << strerror(errno) << "\n";
+        std::cerr << "Error: Second fork failed\n";
         return false;
     }
     
+    // Exit first child
     if (pid > 0) {
-        std::exit(EXIT_SUCCESS);
+        exit(EXIT_SUCCESS);
     }
     
-    // Changer répertoire de travail vers root
+    // Set file permissions
+    umask(0);
+    
+    // Change working directory
     if (chdir("/") < 0) {
-        std::cerr << "Error: chdir() failed: " << strerror(errno) << "\n";
+        std::cerr << "Error: chdir failed\n";
         return false;
     }
     
-    // Fermer descripteurs de fichiers standard
+    // Close standard file descriptors
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
     
-    // Rediriger vers /dev/null
+    // Redirect to /dev/null
     int fd = open("/dev/null", O_RDWR);
     if (fd != -1) {
         dup2(fd, STDIN_FILENO);
@@ -293,28 +432,27 @@ bool daemonize() {
 }
 
 /**
- * @brief Écrit le PID dans un fichier
+ * @brief Write PID to file
  */
 bool writePidFile(const std::string& pidFile) {
     if (pidFile.empty()) {
-        return true;
+        return true; // No PID file requested
     }
     
     std::ofstream file(pidFile);
     if (!file.is_open()) {
-        std::cerr << "Error: Cannot write PID file: " << pidFile << "\n";
-        std::cerr << "Reason: " << strerror(errno) << "\n";
+        std::cerr << "Error: Cannot write PID file: " << pidFile << std::endl;
         return false;
     }
     
-    file << getpid() << "\n";
+    file << getpid() << std::endl;
     file.close();
     
     return true;
 }
 
 /**
- * @brief Supprime le PID file
+ * @brief Remove PID file
  */
 void removePidFile(const std::string& pidFile) {
     if (!pidFile.empty()) {
@@ -323,232 +461,5 @@ void removePidFile(const std::string& pidFile) {
 }
 
 // ============================================================================
-// HELPERS - HEALTH CHECK
-// ============================================================================
-
-/**
- * @brief Vérifie la santé de l'application au démarrage
- */
-bool performHealthCheck(Application& app) {
-    std::cout << "\nPerforming health check...\n";
-    
-    // Vérifier initialization
-    if (!app.isInitialized()) {
-        std::cerr << "✗ Health check failed: Not initialized\n";
-        return false;
-    }
-    std::cout << "  ✓ Initialized\n";
-    
-    // Vérifier running
-    if (!app.isRunning()) {
-        std::cerr << "✗ Health check failed: Not running\n";
-        return false;
-    }
-    std::cout << "  ✓ Running\n";
-    
-    // Vérifier modules
-    if (!app.getDeviceManager()) {
-        std::cerr << "✗ Health check failed: DeviceManager missing\n";
-        return false;
-    }
-    std::cout << "  ✓ DeviceManager OK\n";
-    
-    if (!app.getRouter()) {
-        std::cerr << "✗ Health check failed: Router missing\n";
-        return false;
-    }
-    std::cout << "  ✓ Router OK\n";
-    
-    if (!app.getPlayer()) {
-        std::cerr << "✗ Health check failed: Player missing\n";
-        return false;
-    }
-    std::cout << "  ✓ Player OK\n";
-    
-    if (!app.getApiServer()) {
-        std::cerr << "✗ Health check failed: ApiServer missing\n";
-        return false;
-    }
-    std::cout << "  ✓ ApiServer OK\n";
-    
-    std::cout << "✓ Health check passed\n\n";
-    return true;
-}
-
-// ============================================================================
-// MAIN
-// ============================================================================
-
-int main(int argc, char* argv[]) {
-    try {
-        // ====================================================================
-        // 1. PARSING ARGUMENTS
-        // ====================================================================
-        
-        CommandLineArgs args = parseCommandLine(argc, argv);
-        
-        // Afficher aide
-        if (args.showHelp) {
-            printUsage(argv[0]);
-            return args.showHelp && argc > 1 ? INVALID_ARGUMENTS : SUCCESS;
-        }
-        
-        // Afficher version
-        if (args.showVersion) {
-            printVersion();
-            return SUCCESS;
-        }
-        
-        // ====================================================================
-        // 2. AFFICHER CONFIGURATION (si verbose)
-        // ====================================================================
-        
-        if (args.verbose) {
-            std::cout << "═══════════════════════════════════════════\n";
-            std::cout << "  Configuration\n";
-            std::cout << "═══════════════════════════════════════════\n";
-            std::cout << "  Config path: " << (args.configPath.empty() ? 
-                "./config/config.json" : args.configPath) << "\n";
-            std::cout << "  Log level:   " << args.logLevel << "\n";
-            std::cout << "  Daemon mode: " << (args.daemonMode ? "yes" : "no") << "\n";
-            if (!args.pidFile.empty()) {
-                std::cout << "  PID file:    " << args.pidFile << "\n";
-            }
-            std::cout << "═══════════════════════════════════════════\n";
-            std::cout << "\n";
-        }
-        
-        // ====================================================================
-        // 3. DAEMONIZE (si demandé) - AVANT création Application
-        // ====================================================================
-        
-        if (args.daemonMode) {
-            std::cout << "Starting in daemon mode...\n";
-            
-            if (!daemonize()) {
-                std::cerr << "Error: Failed to daemonize\n";
-                return INITIALIZATION_FAILED;
-            }
-            
-            // Après daemonize, stdout/stderr sont redirigés vers /dev/null
-            // Logger va écrire dans les fichiers de log
-        }
-        
-        // ====================================================================
-        // 4. ÉCRIRE PID FILE
-        // ====================================================================
-        
-        if (!writePidFile(args.pidFile)) {
-            return INITIALIZATION_FAILED;
-        }
-        
-        // ====================================================================
-        // 5. CONFIGURER LOGGER
-        // ====================================================================
-        
-        Logger::setLevel(args.logLevel);
-        
-        if (args.daemonMode) {
-            Logger::setLogToFile(true);
-            Logger::setLogFile("./data/logs/midimind.log");
-        }
-        
-        // ====================================================================
-        // 6. RÉCUPÉRER APPLICATION INSTANCE
-        // ====================================================================
-        
-        std::cout << "\n";
-        std::cout << "═══════════════════════════════════════════\n";
-        std::cout << "  midiMind v3.0.4\n";
-        std::cout << "═══════════════════════════════════════════\n";
-        std::cout << "\n";
-        
-        Application& app = Application::instance();
-        
-        // ====================================================================
-        // 7. INITIALIZE (SCÉNARIO 1: STARTUP)
-        // ====================================================================
-        
-        std::cout << "Initializing midiMind...\n";
-        
-        if (!app.initialize(args.configPath)) {
-            std::cerr << "\n✗ ERROR: Failed to initialize application\n";
-            std::cerr << "Check logs for details\n";
-            removePidFile(args.pidFile);
-            return INITIALIZATION_FAILED;
-        }
-        
-        std::cout << "\n✓ Initialization complete\n\n";
-        
-        // ====================================================================
-        // 8. START (SCÉNARIO 1: STARTUP)
-        // ====================================================================
-        
-        std::cout << "Starting midiMind...\n";
-        
-        if (!app.start()) {
-            std::cerr << "\n✗ ERROR: Failed to start application\n";
-            std::cerr << "Check logs for details\n";
-            app.stop();
-            removePidFile(args.pidFile);
-            return START_FAILED;
-        }
-        
-        std::cout << "\n✓ midiMind is running\n";
-        
-        // ====================================================================
-        // 9. HEALTH CHECK
-        // ====================================================================
-        
-        if (!performHealthCheck(app)) {
-            std::cerr << "\n✗ ERROR: Health check failed\n";
-            app.stop();
-            removePidFile(args.pidFile);
-            return START_FAILED;
-        }
-        
-        // ====================================================================
-        // 10. WAIT FOR SHUTDOWN (SCÉNARIO 5: SHUTDOWN)
-        // ====================================================================
-        
-        if (!args.daemonMode) {
-            std::cout << "Press Ctrl+C to stop\n";
-            std::cout << "(Press 3x Ctrl+C for force quit)\n";
-            std::cout << "\n";
-        }
-        
-        // Bloquer jusqu'à signal
-        app.waitForShutdown();
-        
-        // ====================================================================
-        // 11. STOP (SCÉNARIO 5: SHUTDOWN)
-        // ====================================================================
-        
-        std::cout << "\nStopping midiMind...\n";
-        app.stop();
-        
-        // Supprimer PID file
-        removePidFile(args.pidFile);
-        
-        std::cout << "\n✓ midiMind stopped cleanly\n";
-        
-        return SUCCESS;
-        
-    } catch (const MidiMindException& e) {
-        std::cerr << "\n✗ MIDIMIND ERROR: " << e.what() << "\n";
-        std::cerr << "Error code: " << e.getErrorCode() << "\n";
-        return RUNTIME_ERROR;
-        
-    } catch (const std::exception& e) {
-        std::cerr << "\n✗ FATAL ERROR: " << e.what() << "\n";
-        return RUNTIME_ERROR;
-        
-    } catch (...) {
-        std::cerr << "\n✗ FATAL ERROR: Unknown exception\n";
-        return RUNTIME_ERROR;
-    }
-}
-
-// ============================================================================
-// FIN DU FICHIER main.cpp v3.0.4 - COMPLET
+// END OF FILE main.cpp
 // ============================================================================

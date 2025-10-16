@@ -1,357 +1,558 @@
 // ============================================================================
-// Fichier: backend/src/midi/player/MidiPlayer.h
-// Version: 3.0.2 - CORRECTIONS COMPLÈTES
+// File: backend/src/midi/player/MidiPlayer.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-
-// CORRECTIFS APPLIQUÉS:
-// - ✅ Forward declaration struct MidiFile
-// - ✅ Définition de StateCallback
-// - ✅ Suppression des redéfinitions de TempoChange et TrackInfo (déjà dans MidiFileAnalyzer.h)
+//
+// Description:
+//   MIDI file player with precise timing and tempo control
+//
+// Features:
+//   - Load and play MIDI files
+//   - Tempo control (50% - 200%)
+//   - Seek by time or bar/beat
+//   - Track mute/solo
+//   - Loop playback
+//   - Master volume
+//   - Transposition
+//   - Real-time metadata
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Integrated with MidiFileReader v4.1.0
+//   - Enhanced metadata extraction
+//   - Better thread synchronization
+//   - Improved timing precision
+//
 // ============================================================================
 
 #pragma once
 
 #include "../MidiMessage.h"
-#include "../MidiFile.h"  // ✅ Include pour MidiFile
-#include "../../core/Logger.h"
+#include "../MidiRouter.h"
+#include "../file/MidiFileReader.h"
 #include <string>
 #include <vector>
-#include <atomic>
-#include <mutex>
 #include <thread>
+#include <mutex>
+#include <atomic>
 #include <functional>
 #include <chrono>
 #include <nlohmann/json.hpp>
 
-namespace midiMind {
-
 using json = nlohmann::json;
 
-// ========================================================================
-// ÉNUMÉRATIONS
-// ========================================================================
+namespace midiMind {
+
+// ============================================================================
+// ENUMS
+// ============================================================================
 
 /**
- * @enum PlaybackState
- * @brief État de la lecture
+ * @enum PlayerState
+ * @brief Player state
  */
-enum class PlaybackState {
+enum class PlayerState {
     STOPPED,
     PLAYING,
     PAUSED
 };
 
+// ============================================================================
+// STRUCTURES
+// ============================================================================
+
 /**
- * @enum RepeatMode
- * @brief Mode de répétition
+ * @struct TrackInfo
+ * @brief Information about a MIDI track
  */
-enum class RepeatMode {
-    NONE,
-    ONE,
-    ALL
+struct TrackInfo {
+    uint16_t index = 0;
+    std::string name;
+    uint8_t channel = 0;
+    uint8_t programChange = 0;
+    std::string instrumentName;
+    uint16_t noteCount = 0;
+    uint8_t minNote = 127;
+    uint8_t maxNote = 0;
+    uint8_t avgVelocity = 64;
+    bool isMuted = false;
+    bool isSolo = false;
 };
 
-// ========================================================================
-// TYPES
-// ========================================================================
+/**
+ * @struct MusicalPosition
+ * @brief Position in musical notation
+ */
+struct MusicalPosition {
+    uint32_t bar = 1;          ///< Bar number (1-based)
+    uint8_t beat = 1;          ///< Beat in bar (1-based)
+    uint16_t tick = 0;         ///< Tick within beat
+    std::string formatted;     ///< "bar:beat:tick"
+};
 
 /**
- * @brief ✅ AJOUT: Callback de changement d'état
+ * @struct ScheduledEvent
+ * @brief MIDI event with scheduling information
  */
-using StateCallback = std::function<void(PlaybackState oldState, PlaybackState newState)>;
+struct ScheduledEvent {
+    uint64_t tick = 0;
+    uint64_t absoluteTime = 0;
+    MidiMessage message;
+    uint16_t trackNumber = 0;
+    bool processed = false;
+};
 
-/**
- * @brief Callback de position
- */
-using PositionCallback = std::function<void(double positionMs, double durationMs)>;
-
-/**
- * @brief Callback de message
- */
-using MessageCallback = std::function<void(const MidiMessage&)>;
-
-// ========================================================================
-// CLASSE MIDIPLAYER
-// ========================================================================
+// ============================================================================
+// CLASS: MidiPlayer
+// ============================================================================
 
 /**
  * @class MidiPlayer
- * @brief Lecteur de fichiers MIDI avec contrôle de lecture
+ * @brief MIDI file player with precise timing
+ * 
+ * Plays MIDI files with accurate timing, supports tempo changes,
+ * track mute/solo, transposition, and loop playback.
+ * 
+ * Thread Safety: YES (all public methods are thread-safe)
+ * 
+ * Example:
+ * ```cpp
+ * auto router = std::make_shared<MidiRouter>();
+ * auto player = std::make_shared<MidiPlayer>(router);
+ * 
+ * // Load file
+ * if (player->load("/path/to/file.mid")) {
+ *     // Get metadata
+ *     auto metadata = player->getMetadata();
+ *     std::cout << "Duration: " << metadata["duration_ms"] << " ms" << std::endl;
+ *     
+ *     // Play
+ *     player->play();
+ *     
+ *     // Seek to 30 seconds
+ *     player->seek(30000);
+ *     
+ *     // Change tempo
+ *     player->setTempo(140.0);
+ *     
+ *     // Stop
+ *     player->stop();
+ * }
+ * ```
  */
 class MidiPlayer {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // TYPES
     // ========================================================================
     
-    MidiPlayer();
+    /**
+     * @brief Callback for state changes
+     */
+    using StateCallback = std::function<void(const std::string& newState)>;
+    
+    // ========================================================================
+    // CONSTRUCTOR / DESTRUCTOR
+    // ========================================================================
+    
+    /**
+     * @brief Constructor
+     * @param router MIDI router for message output
+     */
+    explicit MidiPlayer(std::shared_ptr<MidiRouter> router);
+    
+    /**
+     * @brief Destructor
+     */
     ~MidiPlayer();
     
-    // Non-copiable
+    // Disable copy
     MidiPlayer(const MidiPlayer&) = delete;
     MidiPlayer& operator=(const MidiPlayer&) = delete;
     
     // ========================================================================
-    // CHARGEMENT
+    // FILE LOADING
     // ========================================================================
     
     /**
-     * @brief Charge un fichier MIDI
-     * @param filepath Chemin du fichier
-     * @return true si succès
+     * @brief Load MIDI file
+     * @param filepath Path to .mid/.midi file
+     * @return true if loaded successfully
+     * @note Thread-safe
      */
     bool load(const std::string& filepath);
     
     /**
-     * @brief Charge depuis un MidiFile
-     * @param midiFile Structure MidiFile
-     * @return true si succès
+     * @brief Get current file path
+     * @return File path or empty string
      */
-    bool loadFromMidiFile(const MidiFile& midiFile);
+    std::string getCurrentFile() const;
     
     /**
-     * @brief Décharge le fichier actuel
+     * @brief Check if file is loaded
+     * @return true if file loaded
      */
-    void unload();
-    
-    /**
-     * @brief Vérifie si un fichier est chargé
-     */
-    bool isLoaded() const;
+    bool hasFile() const;
     
     // ========================================================================
-    // CONTRÔLE DE LECTURE
+    // PLAYBACK CONTROL
     // ========================================================================
     
     /**
-     * @brief Démarre la lecture
-     * @return true si démarré
+     * @brief Start playback
+     * @return true if started
+     * @note Thread-safe
      */
     bool play();
     
     /**
-     * @brief Met en pause
+     * @brief Pause playback
+     * @return true if paused
+     * @note Thread-safe
      */
-    void pause();
+    bool pause();
     
     /**
-     * @brief Arrête la lecture
+     * @brief Stop playback
+     * @note Thread-safe
      */
     void stop();
     
     /**
-     * @brief Récupère l'état
+     * @brief Get current state
+     * @return Player state
      */
-    PlaybackState getState() const;
+    PlayerState getState() const;
     
     /**
-     * @brief Vérifie si en cours de lecture
+     * @brief Check if playing
+     * @return true if playing
      */
-    bool isPlaying() const;
-    
-    /**
-     * @brief Vérifie si en pause
-     */
-    bool isPaused() const;
+    bool isPlaying() const { return getState() == PlayerState::PLAYING; }
     
     // ========================================================================
-    // NAVIGATION
+    // POSITION CONTROL
     // ========================================================================
     
     /**
-     * @brief Se déplace à une position en millisecondes
-     * @param positionMs Position en ms
+     * @brief Seek to time position
+     * @param timeMs Time in milliseconds
+     * @note Thread-safe
      */
-    void seek(double positionMs);
+    void seek(uint64_t timeMs);
     
     /**
-     * @brief Se déplace à une position en ticks
-     * @param tick Position en ticks
+     * @brief Seek to tick position
+     * @param tick Tick number
+     * @note Thread-safe
      */
-    void seekToTick(uint32_t tick);
+    void seekToTick(uint64_t tick);
     
     /**
-     * @brief Récupère la position actuelle en ms
+     * @brief Seek to bar/beat position
+     * @param bar Bar number (1-based)
+     * @param beat Beat in bar (1-based, default 1)
+     * @param tick Tick within beat (default 0)
+     * @return true if seeked successfully
+     * @note Thread-safe
      */
-    double getPosition() const;
+    bool seekToBar(uint32_t bar, uint8_t beat = 1, uint16_t tick = 0);
     
     /**
-     * @brief Récupère la durée totale en ms
+     * @brief Get current position in milliseconds
+     * @return Position in ms
      */
-    double getDuration() const;
+    uint64_t getCurrentPosition() const;
     
     /**
-     * @brief Récupère le pourcentage de progression (0-100)
+     * @brief Get current tick
+     * @return Current tick
      */
-    double getProgressPercent() const;
+    uint64_t getCurrentTick() const;
+    
+    /**
+     * @brief Get musical position
+     * @return Musical position (bar:beat:tick)
+     */
+    MusicalPosition getMusicalPosition() const;
+    
+    /**
+     * @brief Get duration in milliseconds
+     * @return Duration in ms
+     */
+    uint64_t getDuration() const;
     
     // ========================================================================
-    // TEMPO ET TIMING
-    // ========================================================================
-    
-    /**
-     * @brief Définit la vitesse de lecture (1.0 = normal)
-     * @param speed Vitesse (0.25 à 4.0)
-     */
-    void setSpeed(float speed);
-    
-    /**
-     * @brief Récupère la vitesse actuelle
-     */
-    float getSpeed() const;
-    
-    /**
-     * @brief Récupère le tempo actuel en BPM
-     */
-    double getCurrentTempo() const;
-    
-    // ========================================================================
-    // RÉPÉTITION
-    // ========================================================================
-    
-    /**
-     * @brief Définit le mode de répétition
-     */
-    void setRepeatMode(RepeatMode mode);
-    
-    /**
-     * @brief Récupère le mode de répétition
-     */
-    RepeatMode getRepeatMode() const;
-    
-    // ========================================================================
-    // CALLBACKS
+    // PLAYBACK PARAMETERS
     // ========================================================================
     
     /**
-     * @brief Définit le callback de changement d'état
+     * @brief Set tempo
+     * @param bpm Beats per minute (50.0 - 300.0)
+     * @note Thread-safe
+     */
+    void setTempo(double bpm);
+    
+    /**
+     * @brief Get current tempo
+     * @return BPM
+     */
+    double getTempo() const;
+    
+    /**
+     * @brief Set loop mode
+     * @param enabled Enable loop
+     * @note Thread-safe
+     */
+    void setLoop(bool enabled);
+    
+    /**
+     * @brief Get loop state
+     * @return true if looping
+     */
+    bool isLooping() const;
+    
+    /**
+     * @brief Set master volume
+     * @param volume Volume (0.0 - 1.0)
+     * @note Thread-safe
+     */
+    void setVolume(float volume);
+    
+    /**
+     * @brief Get master volume
+     * @return Volume (0.0 - 1.0)
+     */
+    float getVolume() const;
+    
+    /**
+     * @brief Set transposition
+     * @param semitones Semitones to transpose (-12 to +12)
+     * @note Thread-safe
+     */
+    void setTranspose(int semitones);
+    
+    /**
+     * @brief Get transposition
+     * @return Semitones
+     */
+    int getTranspose() const;
+    
+    // ========================================================================
+    // TRACK CONTROL
+    // ========================================================================
+    
+    /**
+     * @brief Set track mute
+     * @param trackIndex Track index (0-based)
+     * @param muted Mute state
+     * @note Thread-safe
+     */
+    void setTrackMute(uint16_t trackIndex, bool muted);
+    
+    /**
+     * @brief Set track solo
+     * @param trackIndex Track index (0-based)
+     * @param solo Solo state
+     * @note Thread-safe
+     */
+    void setTrackSolo(uint16_t trackIndex, bool solo);
+    
+    /**
+     * @brief Get track info
+     * @param trackIndex Track index
+     * @return Track information or nullptr
+     */
+    const TrackInfo* getTrackInfo(uint16_t trackIndex) const;
+    
+    /**
+     * @brief Get all tracks info
+     * @return Vector of track info
+     */
+    std::vector<TrackInfo> getTracksInfo() const;
+    
+    // ========================================================================
+    // METADATA
+    // ========================================================================
+    
+    /**
+     * @brief Get file metadata
+     * @return JSON metadata
+     */
+    json getMetadata() const;
+    
+    /**
+     * @brief Set state callback
+     * @param callback Callback function
      */
     void setStateCallback(StateCallback callback);
-    
-    /**
-     * @brief Définit le callback de position
-     */
-    void setPositionCallback(PositionCallback callback);
-    
-    /**
-     * @brief Définit le callback de message MIDI
-     */
-    void setMessageCallback(MessageCallback callback);
-    
-    // ========================================================================
-    // INFORMATIONS
-    // ========================================================================
-    
-    /**
-     * @brief Récupère les informations du fichier
-     */
-    json getFileInfo() const;
-    
-    /**
-     * @brief Récupère le nombre de pistes
-     */
-    int getTrackCount() const;
-    
-    /**
-     * @brief Récupère le format MIDI (0, 1, ou 2)
-     */
-    int getMidiFormat() const;
-    
-    /**
-     * @brief Récupère la résolution en ticks par quarter note
-     */
-    int getTicksPerQuarterNote() const;
-    
-    // ========================================================================
-    // STATISTIQUES
-    // ========================================================================
-    
-    /**
-     * @brief Récupère les statistiques de lecture
-     */
-    json getStats() const;
-    
-    /**
-     * @brief Réinitialise les statistiques
-     */
-    void resetStats();
 
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE METHODS - LOADING
     // ========================================================================
     
     /**
-     * @brief Thread de lecture
+     * @brief Parse all tracks from MidiFile
      */
-    void playbackThread();
+    void parseAllTracks();
     
     /**
-     * @brief Calcule le timestamp du prochain événement
+     * @brief Extract metadata from file
      */
-    uint64_t calculateNextEventTime(uint32_t deltaTicks);
+    void extractMetadata();
     
     /**
-     * @brief Traite un événement MIDI
+     * @brief Analyze track for metadata
      */
-    void processEvent(const MidiMessage& message);
+    void analyzeTrack(uint16_t trackIndex);
     
     /**
-     * @brief Met à jour le tempo actuel
+     * @brief Calculate total duration
      */
-    void updateTempo(double newTempo);
-    
-    /**
-     * @brief Notifie le changement d'état
-     */
-    void notifyStateChange(PlaybackState newState);
+    void calculateDuration();
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // PRIVATE METHODS - PLAYBACK
     // ========================================================================
     
-    /// Mutex pour thread-safety
+    /**
+     * @brief Main playback loop
+     */
+    void playbackLoop();
+    
+    /**
+     * @brief Check if event should be played
+     */
+    bool shouldPlayEvent(const ScheduledEvent& event) const;
+    
+    /**
+     * @brief Apply modifications to message
+     */
+    MidiMessage applyModifications(const MidiMessage& message, 
+                                   uint16_t trackNumber) const;
+    
+    /**
+     * @brief Apply master volume to message
+     */
+    MidiMessage applyMasterVolume(const MidiMessage& message) const;
+    
+    /**
+     * @brief Send All Notes Off on all channels
+     */
+    void sendAllNotesOff();
+    
+    /**
+     * @brief Stop playback (internal, without lock)
+     */
+    void stopPlayback();
+    
+    /**
+     * @brief Convert milliseconds to ticks
+     */
+    uint64_t msToTicks(uint64_t ms) const;
+    
+    /**
+     * @brief Convert ticks to milliseconds
+     */
+    uint64_t ticksToMs(uint64_t ticks) const;
+    
+    /**
+     * @brief Convert bar/beat to ticks
+     */
+    uint64_t musicalPositionToTicks(uint32_t bar, uint8_t beat, 
+                                    uint16_t tick) const;
+    
+    /**
+     * @brief Convert ticks to bar/beat
+     */
+    MusicalPosition ticksToMusicalPosition(uint64_t ticks) const;
+    
+    // ========================================================================
+    // MEMBER VARIABLES - CORE
+    // ========================================================================
+    
+    /// MIDI router
+    std::shared_ptr<MidiRouter> router_;
+    
+    /// Thread safety
     mutable std::mutex mutex_;
     
-    /// État de lecture
-    std::atomic<PlaybackState> state_;
-    
-    /// Fichier MIDI chargé
-    MidiFile midiFile_;
-    
-    /// Thread de lecture
+    /// Playback thread
     std::thread playbackThread_;
     
-    /// Flag d'arrêt
-    std::atomic<bool> stopFlag_;
+    /// Player state
+    std::atomic<PlayerState> state_;
     
-    /// Position actuelle (ms)
-    std::atomic<double> position_;
+    /// Thread running flag
+    std::atomic<bool> running_;
     
-    /// Durée totale (ms)
-    double duration_;
+    // ========================================================================
+    // MEMBER VARIABLES - FILE DATA
+    // ========================================================================
     
-    /// Vitesse de lecture
-    std::atomic<float> speed_;
+    /// Current file path
+    std::string currentFile_;
     
-    /// Tempo actuel (BPM)
-    std::atomic<double> currentTempo_;
+    /// Parsed MIDI file
+    MidiFile midiFile_;
     
-    /// Mode de répétition
-    std::atomic<RepeatMode> repeatMode_;
+    /// All events sorted by time
+    std::vector<ScheduledEvent> allEvents_;
     
-    /// Callbacks
+    /// Track information
+    std::vector<TrackInfo> tracks_;
+    
+    // ========================================================================
+    // MEMBER VARIABLES - TIMING
+    // ========================================================================
+    
+    /// Current position in ticks
+    std::atomic<uint64_t> currentTick_;
+    
+    /// Total duration in ticks
+    uint64_t totalTicks_;
+    
+    /// Ticks per quarter note
+    uint16_t ticksPerQuarterNote_;
+    
+    /// Current tempo (BPM)
+    std::atomic<double> tempo_;
+    
+    /// Start time for playback
+    std::chrono::high_resolution_clock::time_point startTime_;
+    
+    // ========================================================================
+    // MEMBER VARIABLES - TIME SIGNATURE
+    // ========================================================================
+    
+    /// Time signature numerator
+    uint8_t timeSignatureNum_;
+    
+    /// Time signature denominator
+    uint8_t timeSignatureDen_;
+    
+    /// Ticks per beat
+    uint32_t ticksPerBeat_;
+    
+    // ========================================================================
+    // MEMBER VARIABLES - PLAYBACK SETTINGS
+    // ========================================================================
+    
+    /// Loop enabled
+    std::atomic<bool> loopEnabled_;
+    
+    /// Transposition in semitones
+    std::atomic<int> transpose_;
+    
+    /// Master volume (0.0 - 1.0)
+    std::atomic<float> masterVolume_;
+    
+    /// State change callback
     StateCallback stateCallback_;
-    PositionCallback positionCallback_;
-    MessageCallback messageCallback_;
-    
-    /// Statistiques
-    uint64_t totalMessagesPlayed_;
-    uint64_t totalNotesPlayed_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER MidiPlayer.h
-// ============================================================================

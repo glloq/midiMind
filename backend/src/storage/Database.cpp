@@ -1,168 +1,191 @@
 // ============================================================================
-// Fichier: backend/src/storage/Database.cpp
-// Version: 3.0.2 - CORRECTIONS CRITIQUES PHASE 1
-// Date: 2025-10-15
+// File: backend/src/storage/Database.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// CORRECTIFS v3.0.2 (PHASE 1 - CRITIQUES):
-//   ✅ 1.7 savePreset() - Utilisation transactions pour intégrité
-//   ✅ Ajout helper transaction() pour simplifier
-//   ✅ Rollback automatique si erreur
-//   ✅ Toutes méthodes multi-requêtes protégées
-//   ✅ Préservation TOTALE des fonctionnalités v3.0.1
 //
 // Description:
-//   Gestion de la base de données SQLite avec transactions sûres
+//   Implementation of the Database class - SQLite3 wrapper.
 //
-// Fonctionnalités:
-//   - Connexion/déconnexion
-//   - Requêtes paramétrées
-//   - ✅ Transactions ACID
-//   - Migration automatique de schéma
-//   - Backup
-//   - Thread-safety
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Thread-safety: OUI (mutex)
+// Changes v4.1.0:
+//   - Singleton pattern implementation
+//   - Enhanced migration system with file discovery
+//   - Improved error handling and logging
+//   - Statistics tracking
 //
-// Auteur: MidiMind Team
 // ============================================================================
 
 #include "Database.h"
-#include "../core/Logger.h"
-#include <sqlite3.h>
+#include "../core/TimeUtils.h"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 #include <filesystem>
+#include <sys/stat.h>
+
+namespace fs = std::filesystem;
 
 namespace midiMind {
 
 // ============================================================================
-// CONSTRUCTION / DESTRUCTION
+// SINGLETON
 // ============================================================================
 
-Database::Database(const std::string& filepath)
-    : filepath_(filepath)
-    , db_(nullptr)
-    , isOpen_(false)
+Database& Database::instance() {
+    static Database instance;
+    return instance;
+}
+
+// ============================================================================
+// CONSTRUCTOR / DESTRUCTOR
+// ============================================================================
+
+Database::Database()
+    : db_(nullptr)
+    , filepath_()
+    , isConnected_(false)
     , queryCount_(0)
     , errorCount_(0)
 {
-    Logger::info("Database", "Database instance created for: " + filepath);
+    Logger::debug("Database", "Database instance created");
 }
 
 Database::~Database() {
     close();
-    Logger::info("Database", "Database instance destroyed");
+    Logger::debug("Database", "Database instance destroyed");
 }
 
 // ============================================================================
-// CONNEXION
+// CONNECTION MANAGEMENT
 // ============================================================================
 
-bool Database::open() {
+bool Database::connect(const std::string& filepath) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (isOpen_) {
-        Logger::warn("Database", "Database already open");
+    if (isConnected_) {
+        Logger::warn("Database", "Already connected to: " + filepath_);
         return true;
     }
     
-    Logger::info("Database", "Opening database: " + filepath_);
+    Logger::info("Database", "Connecting to database: " + filepath);
     
-    // Créer le répertoire parent si nécessaire
-    std::filesystem::path path(filepath_);
-    if (path.has_parent_path()) {
-        std::filesystem::create_directories(path.parent_path());
+    filepath_ = filepath;
+    
+    // Create directory if it doesn't exist
+    fs::path dbPath(filepath);
+    fs::path dbDir = dbPath.parent_path();
+    
+    if (!dbDir.empty() && !fs::exists(dbDir)) {
+        try {
+            fs::create_directories(dbDir);
+            Logger::info("Database", "Created directory: " + dbDir.string());
+        } catch (const std::exception& e) {
+            Logger::error("Database", "Failed to create directory: " + std::string(e.what()));
+            return false;
+        }
     }
     
-    // Ouvrir la base de données
-    int rc = sqlite3_open(filepath_.c_str(), &db_);
+    // Open database
+    int rc = sqlite3_open(filepath.c_str(), &db_);
     
     if (rc != SQLITE_OK) {
-        Logger::error("Database", 
-            "Failed to open database: " + std::string(sqlite3_errmsg(db_)));
+        Logger::error("Database", "Failed to open database: " + std::string(sqlite3_errmsg(db_)));
         sqlite3_close(db_);
         db_ = nullptr;
         return false;
     }
     
-    // Configurer SQLite
-    sqlite3_busy_timeout(db_, 5000);  // 5 secondes de timeout
-    
-    // Activer les clés étrangères
+    // Enable foreign keys
     char* errMsg = nullptr;
     rc = sqlite3_exec(db_, "PRAGMA foreign_keys = ON", nullptr, nullptr, &errMsg);
     if (rc != SQLITE_OK) {
         Logger::warn("Database", "Failed to enable foreign keys: " + 
-                    std::string(errMsg ? errMsg : "unknown error"));
+                    std::string(errMsg ? errMsg : "unknown"));
         sqlite3_free(errMsg);
     }
     
-    isOpen_ = true;
+    // Set journal mode to WAL for better concurrency
+    rc = sqlite3_exec(db_, "PRAGMA journal_mode = WAL", nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        Logger::warn("Database", "Failed to set WAL mode: " + 
+                    std::string(errMsg ? errMsg : "unknown"));
+        sqlite3_free(errMsg);
+    }
     
-    Logger::info("Database", "✅ Database opened successfully");
+    isConnected_ = true;
+    
+    Logger::info("Database", "✓ Database connected successfully");
     return true;
 }
 
 void Database::close() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!isOpen_ || !db_) {
+    if (!isConnected_ || !db_) {
         return;
     }
     
-    Logger::info("Database", "Closing database...");
+    Logger::info("Database", "Closing database connection...");
     
     sqlite3_close(db_);
     db_ = nullptr;
-    isOpen_ = false;
+    isConnected_ = false;
     
-    Logger::info("Database", "✅ Database closed");
-}
-
-bool Database::isOpen() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return isOpen_;
+    Logger::info("Database", "✓ Database closed");
 }
 
 // ============================================================================
-// REQUÊTES
+// QUERY EXECUTION
 // ============================================================================
 
-DatabaseResult Database::execute(const std::string& sql, 
+DatabaseResult Database::execute(const std::string& sql,
                                  const std::vector<std::string>& params) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     DatabaseResult result;
     result.success = false;
     
-    if (!isOpen_ || !db_) {
-        result.error = "Database not open";
+    if (!isConnected_ || !db_) {
+        result.error = "Database not connected";
         Logger::error("Database", result.error);
         return result;
     }
     
     queryCount_++;
     
-    // Préparer la requête
-    sqlite3_stmt* stmt = prepareStatement(sql);
-    if (!stmt) {
-        result.error = "Failed to prepare statement";
+    // Prepare statement
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
+    
+    if (rc != SQLITE_OK) {
+        result.error = sqlite3_errmsg(db_);
+        Logger::error("Database", "Failed to prepare statement: " + result.error);
         errorCount_++;
         return result;
     }
     
-    // Lier les paramètres
-    if (!params.empty() && !bindParameters(stmt, params)) {
-        result.error = "Failed to bind parameters";
-        sqlite3_finalize(stmt);
-        errorCount_++;
-        return result;
+    // Bind parameters
+    for (size_t i = 0; i < params.size(); i++) {
+        rc = sqlite3_bind_text(stmt, i + 1, params[i].c_str(), -1, SQLITE_TRANSIENT);
+        if (rc != SQLITE_OK) {
+            result.error = "Failed to bind parameter " + std::to_string(i);
+            Logger::error("Database", result.error);
+            sqlite3_finalize(stmt);
+            errorCount_++;
+            return result;
+        }
     }
     
-    // Exécuter
-    int rc = sqlite3_step(stmt);
+    // Execute
+    rc = sqlite3_step(stmt);
     
     if (rc == SQLITE_DONE || rc == SQLITE_ROW) {
         result.success = true;
         result.affectedRows = sqlite3_changes(db_);
+        result.lastInsertId = sqlite3_last_insert_rowid(db_);
     } else {
         result.success = false;
         result.error = sqlite3_errmsg(db_);
@@ -182,45 +205,54 @@ DatabaseResult Database::query(const std::string& sql,
     DatabaseResult result;
     result.success = false;
     
-    if (!isOpen_ || !db_) {
-        result.error = "Database not open";
+    if (!isConnected_ || !db_) {
+        result.error = "Database not connected";
         Logger::error("Database", result.error);
         return result;
     }
     
     queryCount_++;
     
-    // Préparer la requête
-    sqlite3_stmt* stmt = prepareStatement(sql);
-    if (!stmt) {
-        result.error = "Failed to prepare statement";
+    // Prepare statement
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
+    
+    if (rc != SQLITE_OK) {
+        result.error = sqlite3_errmsg(db_);
+        Logger::error("Database", "Failed to prepare statement: " + result.error);
         errorCount_++;
         return result;
     }
     
-    // Lier les paramètres
-    if (!params.empty() && !bindParameters(stmt, params)) {
-        result.error = "Failed to bind parameters";
-        sqlite3_finalize(stmt);
-        errorCount_++;
-        return result;
+    // Bind parameters
+    for (size_t i = 0; i < params.size(); i++) {
+        rc = sqlite3_bind_text(stmt, i + 1, params[i].c_str(), -1, SQLITE_TRANSIENT);
+        if (rc != SQLITE_OK) {
+            result.error = "Failed to bind parameter " + std::to_string(i);
+            Logger::error("Database", result.error);
+            sqlite3_finalize(stmt);
+            errorCount_++;
+            return result;
+        }
     }
     
-    // Exécuter et récupérer les résultats
+    // Execute and fetch results
     result.success = true;
     
     while (true) {
-        int rc = sqlite3_step(stmt);
+        rc = sqlite3_step(stmt);
         
         if (rc == SQLITE_ROW) {
             int columnCount = sqlite3_column_count(stmt);
             DatabaseRow row;
             
             for (int i = 0; i < columnCount; i++) {
-                const char* text = reinterpret_cast<const char*>(
+                const char* columnName = sqlite3_column_name(stmt, i);
+                const char* columnValue = reinterpret_cast<const char*>(
                     sqlite3_column_text(stmt, i)
                 );
-                row.push_back(text ? text : "");
+                
+                row[columnName] = columnValue ? columnValue : "";
             }
             
             result.rows.push_back(row);
@@ -258,20 +290,21 @@ std::string Database::queryScalar(const std::string& sql,
     auto row = queryOne(sql, params);
     
     if (!row.empty()) {
-        return row[0];
+        return row.begin()->second;
     }
     
     return "";
 }
 
 // ============================================================================
-// TRANSACTIONS - CORRECTIF 1.7
+// TRANSACTIONS
 // ============================================================================
 
 bool Database::beginTransaction() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!isOpen_ || !db_) {
+    if (!isConnected_ || !db_) {
+        Logger::error("Database", "Cannot begin transaction: not connected");
         return false;
     }
     
@@ -292,7 +325,8 @@ bool Database::beginTransaction() {
 bool Database::commit() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!isOpen_ || !db_) {
+    if (!isConnected_ || !db_) {
+        Logger::error("Database", "Cannot commit: not connected");
         return false;
     }
     
@@ -313,7 +347,8 @@ bool Database::commit() {
 bool Database::rollback() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!isOpen_ || !db_) {
+    if (!isConnected_ || !db_) {
+        Logger::error("Database", "Cannot rollback: not connected");
         return false;
     }
     
@@ -331,249 +366,293 @@ bool Database::rollback() {
     return true;
 }
 
-// ✅ CORRECTIF 1.7: Helper transaction sécurisé
 bool Database::transaction(std::function<void()> fn) {
     if (!beginTransaction()) {
-        Logger::error("Database", "Failed to begin transaction");
         return false;
     }
     
     try {
         fn();
-        
-        if (!commit()) {
-            Logger::error("Database", "Failed to commit transaction");
-            rollback();
-            return false;
-        }
-        
-        return true;
-        
+        return commit();
     } catch (const std::exception& e) {
-        Logger::error("Database", "Transaction exception: " + std::string(e.what()));
+        Logger::error("Database", "Transaction failed: " + std::string(e.what()));
         rollback();
         return false;
     }
 }
 
 // ============================================================================
-// SCHÉMA
+// SCHEMA MANAGEMENT
 // ============================================================================
 
-bool Database::initializeSchema() {
-    Logger::info("Database", "Initializing database schema...");
+void Database::initializeSchema() {
+    Logger::info("Database", "Initializing schema...");
     
-    // ✅ CORRECTIF 1.7: Utiliser transaction pour création schéma
-    return transaction([this]() {
-        // Table: midi_files
-        execute(R"(
-            CREATE TABLE IF NOT EXISTS midi_files (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT NOT NULL,
-                filepath TEXT NOT NULL UNIQUE,
-                filesize INTEGER,
-                duration REAL,
-                track_count INTEGER,
-                tempo REAL,
-                time_signature TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_played_at DATETIME
-            )
-        )");
-        
-        // Table: routes
-        execute(R"(
-            CREATE TABLE IF NOT EXISTS routes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                source_device TEXT NOT NULL,
-                source_channel INTEGER,
-                dest_device TEXT NOT NULL,
-                dest_channel INTEGER,
-                enabled INTEGER DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        )");
-        
-        // Table: presets
-        execute(R"(
-            CREATE TABLE IF NOT EXISTS presets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                description TEXT,
-                data TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        )");
-        
-        // Table: sessions
-        execute(R"(
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                state TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                restored_at DATETIME
-            )
-        )");
-        
-        // Table: settings
-        execute(R"(
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        )");
-        
-        Logger::info("Database", "✅ Schema initialized successfully");
-    });
-}
-
-// ============================================================================
-// MÉTHODES PRIVÉES
-// ============================================================================
-
-sqlite3_stmt* Database::prepareStatement(const std::string& sql) {
-    sqlite3_stmt* stmt = nullptr;
+    // Create schema_version table if it doesn't exist
+    std::string sql = R"(
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+            description TEXT NOT NULL,
+            checksum TEXT
+        )
+    )";
     
-    int rc = sqlite3_prepare_v2(
-        db_,
-        sql.c_str(),
-        -1,
-        &stmt,
-        nullptr
-    );
-    
-    if (rc != SQLITE_OK) {
-        std::string error = sqlite3_errmsg(db_);
-        Logger::error("Database", "Failed to prepare statement: " + error);
-        Logger::error("Database", "SQL: " + sql);
-        
-        if (stmt) {
-            sqlite3_finalize(stmt);
-        }
-        
-        return nullptr;
+    auto result = execute(sql);
+    if (!result.success) {
+        THROW_ERROR(ErrorCode::DATABASE_ERROR, 
+                   "Failed to create schema_version table: " + result.error);
     }
     
-    return stmt;
+    Logger::info("Database", "✓ Schema initialized");
 }
 
-bool Database::bindParameters(sqlite3_stmt* stmt, 
-                              const std::vector<std::string>& params) {
-    if (params.empty()) {
+bool Database::migrate() {
+    Logger::info("Database", "Running database migrations...");
+    
+    // Initialize schema first
+    initializeSchema();
+    
+    // Get current version
+    int currentVersion = getSchemaVersion();
+    Logger::info("Database", "Current schema version: " + std::to_string(currentVersion));
+    
+    // Get migration files
+    std::vector<std::string> migrations = getMigrationFiles();
+    
+    if (migrations.empty()) {
+        Logger::info("Database", "No migrations found");
         return true;
     }
     
-    int paramCount = sqlite3_bind_parameter_count(stmt);
+    Logger::info("Database", "Found " + std::to_string(migrations.size()) + " migration(s)");
     
-    if (static_cast<int>(params.size()) != paramCount) {
-        Logger::error("Database", 
-            "Parameter count mismatch: expected " + std::to_string(paramCount) + 
-            ", got " + std::to_string(params.size()));
+    // Apply migrations
+    int appliedCount = 0;
+    for (const auto& migrationFile : migrations) {
+        // Extract version from filename (e.g., "001_initial.sql" -> 1)
+        std::string filename = fs::path(migrationFile).filename().string();
+        int version = std::stoi(filename.substr(0, 3));
+        
+        if (version <= currentVersion) {
+            Logger::debug("Database", "Skipping migration " + filename + " (already applied)");
+            continue;
+        }
+        
+        Logger::info("Database", "Applying migration: " + filename);
+        
+        if (!executeMigrationFile(migrationFile)) {
+            Logger::error("Database", "Migration failed: " + filename);
+            return false;
+        }
+        
+        appliedCount++;
+        Logger::info("Database", "✓ Migration applied: " + filename);
+    }
+    
+    if (appliedCount > 0) {
+        Logger::info("Database", "✓ Applied " + std::to_string(appliedCount) + " migration(s)");
+    } else {
+        Logger::info("Database", "Database schema is up to date");
+    }
+    
+    return true;
+}
+
+int Database::getSchemaVersion() {
+    // Check if schema_version table exists
+    if (!tableExists("schema_version")) {
+        return 0;
+    }
+    
+    std::string version = queryScalar("SELECT MAX(version) FROM schema_version");
+    
+    if (version.empty()) {
+        return 0;
+    }
+    
+    return std::stoi(version);
+}
+
+std::vector<std::string> Database::getMigrationFiles() {
+    std::vector<std::string> files;
+    
+    // Look for migrations in data/migrations/
+    std::string migrationDir = "data/migrations";
+    
+    if (!fs::exists(migrationDir)) {
+        Logger::warn("Database", "Migration directory not found: " + migrationDir);
+        return files;
+    }
+    
+    try {
+        for (const auto& entry : fs::directory_iterator(migrationDir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".sql") {
+                files.push_back(entry.path().string());
+            }
+        }
+        
+        // Sort files by name (e.g., 001_*.sql, 002_*.sql, ...)
+        std::sort(files.begin(), files.end());
+        
+    } catch (const std::exception& e) {
+        Logger::error("Database", "Failed to list migrations: " + std::string(e.what()));
+    }
+    
+    return files;
+}
+
+bool Database::executeMigrationFile(const std::string& filepath) {
+    // Read file content
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        Logger::error("Database", "Failed to open migration file: " + filepath);
         return false;
     }
     
-    for (size_t i = 0; i < params.size(); i++) {
-        int rc = sqlite3_bind_text(
-            stmt,
-            static_cast<int>(i + 1),
-            params[i].c_str(),
-            -1,
-            SQLITE_TRANSIENT
-        );
-        
-        if (rc != SQLITE_OK) {
-            Logger::error("Database", 
-                "Failed to bind parameter " + std::to_string(i) + 
-                ": " + sqlite3_errmsg(db_));
-            return false;
-        }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string sql = buffer.str();
+    file.close();
+    
+    // Execute SQL
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &errMsg);
+    
+    if (rc != SQLITE_OK) {
+        Logger::error("Database", "Migration execution failed: " + 
+                     std::string(errMsg ? errMsg : "unknown error"));
+        sqlite3_free(errMsg);
+        return false;
     }
     
     return true;
 }
 
 // ============================================================================
-// STATISTIQUES
-// ============================================================================
-
-uint64_t Database::getQueryCount() const {
-    return queryCount_;
-}
-
-uint64_t Database::getErrorCount() const {
-    return errorCount_;
-}
-
-std::string Database::getLastError() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (!db_) {
-        return "Database not open";
-    }
-    
-    return sqlite3_errmsg(db_);
-}
-
-// ============================================================================
-// UTILITAIRES
+// UTILITY METHODS
 // ============================================================================
 
 bool Database::tableExists(const std::string& tableName) {
-    std::string sql = 
-        "SELECT name FROM sqlite_master "
-        "WHERE type='table' AND name=?";
-    
-    auto result = query(sql, {tableName});
-    
-    return result.success && !result.rows.empty();
+    std::string sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?";
+    auto result = queryScalar(sql, {tableName});
+    return !result.empty();
 }
 
-int64_t Database::getLastInsertId() {
-    std::lock_guard<std::mutex> lock(mutex_);
+std::vector<std::string> Database::getTables() {
+    std::vector<std::string> tables;
     
-    if (!db_) {
-        return -1;
+    auto result = query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    
+    for (const auto& row : result.rows) {
+        tables.push_back(row.at("name"));
     }
     
-    return sqlite3_last_insert_rowid(db_);
+    return tables;
 }
 
-// ============================================================================
-// EXEMPLE D'UTILISATION CORRECTIF 1.7
-// ============================================================================
+void Database::truncateTable(const std::string& tableName) {
+    Logger::warn("Database", "Truncating table: " + tableName);
+    
+    auto result = execute("DELETE FROM " + tableName);
+    
+    if (result.success) {
+        Logger::info("Database", "✓ Table truncated (" + 
+                    std::to_string(result.affectedRows) + " rows deleted)");
+    }
+}
 
-/*
-bool Database::savePreset(const Preset& preset) {
-    // ✅ CORRECTIF 1.7: Utiliser transaction pour intégrité
-    return transaction([this, &preset]() {
-        // Insérer preset
-        execute(
-            "INSERT INTO presets (name, description, data) VALUES (?, ?, ?)",
-            {preset.name, preset.description, preset.toJson()}
-        );
-        
-        int64_t presetId = getLastInsertId();
-        
-        // Insérer routes associées
-        for (const auto& route : preset.routes) {
-            execute(
-                "INSERT INTO preset_routes (preset_id, route_data) VALUES (?, ?)",
-                {std::to_string(presetId), route.toJson()}
-            );
+void Database::optimize() {
+    Logger::info("Database", "Optimizing database...");
+    
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db_, "VACUUM", nullptr, nullptr, &errMsg);
+    
+    if (rc != SQLITE_OK) {
+        Logger::error("Database", "Optimize failed: " + 
+                     std::string(errMsg ? errMsg : "unknown error"));
+        sqlite3_free(errMsg);
+    } else {
+        Logger::info("Database", "✓ Database optimized");
+    }
+}
+
+bool Database::backup(const std::string& backupPath) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!isConnected_ || !db_) {
+        Logger::error("Database", "Cannot backup: not connected");
+        return false;
+    }
+    
+    Logger::info("Database", "Creating backup: " + backupPath);
+    
+    sqlite3* backupDb = nullptr;
+    int rc = sqlite3_open(backupPath.c_str(), &backupDb);
+    
+    if (rc != SQLITE_OK) {
+        Logger::error("Database", "Failed to open backup file");
+        return false;
+    }
+    
+    sqlite3_backup* backup = sqlite3_backup_init(backupDb, "main", db_, "main");
+    
+    if (!backup) {
+        Logger::error("Database", "Failed to initialize backup");
+        sqlite3_close(backupDb);
+        return false;
+    }
+    
+    rc = sqlite3_backup_step(backup, -1);
+    sqlite3_backup_finish(backup);
+    sqlite3_close(backupDb);
+    
+    if (rc == SQLITE_DONE) {
+        Logger::info("Database", "✓ Backup created successfully");
+        return true;
+    } else {
+        Logger::error("Database", "Backup failed");
+        return false;
+    }
+}
+
+json Database::getStatistics() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    json stats = {
+        {"connected", isConnected_},
+        {"filepath", filepath_},
+        {"query_count", queryCount_},
+        {"error_count", errorCount_}
+    };
+    
+    if (isConnected_ && db_) {
+        // File size
+        struct stat fileStat;
+        if (stat(filepath_.c_str(), &fileStat) == 0) {
+            stats["file_size_bytes"] = fileStat.st_size;
         }
         
-        // Si exception levée ici, rollback automatique
-        // Si tout OK, commit automatique
-    });
+        // Page count and size
+        auto pageCount = queryScalar("PRAGMA page_count");
+        auto pageSize = queryScalar("PRAGMA page_size");
+        
+        if (!pageCount.empty()) stats["page_count"] = std::stoll(pageCount);
+        if (!pageSize.empty()) stats["page_size"] = std::stoll(pageSize);
+        
+        // Table count
+        auto tables = getTables();
+        stats["table_count"] = tables.size();
+        
+        // Schema version
+        stats["schema_version"] = getSchemaVersion();
+    }
+    
+    return stats;
 }
-*/
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Database.cpp v3.0.2 - CORRECTIONS PHASE 1 COMPLÈTES
+// END OF FILE Database.cpp
 // ============================================================================

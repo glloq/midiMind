@@ -1,446 +1,244 @@
 // ============================================================================
 // Fichier: frontend/js/editor/renderers/TimelineRenderer.js
-// Projet: MidiMind v3.2.1 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.2.1 (Complétée selon audit 2025-10-14)
-// Date: 2025-10-14
+// Version: v3.1.0 - PERFORMANCE OPTIMIZED
+// Date: 2025-10-16
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// Description:
-//   Renderer de la timeline horizontale (ruler) avec marqueurs temporels.
-//   Affichage temps en format mm:ss.ms ou mesures/beats selon préférence.
-//
-// Fonctionnalités:
-//   - Timeline horizontale (ruler)
-//   - Marqueurs temporels adaptatifs
-//   - Format temps : mm:ss.ms ou bars:beats
-//   - Playhead avec suivi
-//   - Marqueurs utilisateur (markers)
-//   - Sections/régions colorées
-//   - Zoom adaptatif (spacing)
-//
-// Corrections v3.2.1:
-//   ✅ renderTimeMarkers() - Complet avec marqueurs adaptatifs
-//   ✅ formatTime() - Formatage mm:ss.ms et bars:beats
-//   ✅ renderBorder() - Bordure inférieure
-//   ✅ calculateMarkerSpacing() - Espacement intelligent
-//   ✅ Ajout formatBeats() pour affichage mesures
-//
-// Architecture:
-//   TimelineRenderer (classe)
-//   - Utilise CoordinateSystem
-//   - Formatage temps (Formatter utils)
-//   - Cache de labels texte
-//
-// Auteur: MidiMind Team
+// MODIFICATIONS v3.1.0:
+// ✓ Pas d'animations (marqueurs statiques uniquement)
+// ✓ Rendering simplifié
 // ============================================================================
 
 class TimelineRenderer {
-    constructor(config = {}) {
+    constructor(coordSystem) {
+        this.coordSystem = coordSystem;
+        
+        // Configuration (OPTIMISÉ)
         this.config = {
-            height: config.height || 60,
-            backgroundColor: '#151515',
-            backgroundColorLeft: '#1a1a1a', // Zone avant piano roll
-            markerColor: '#888',
-            markerColorMajor: '#aaa',
-            textColor: '#ccc',
-            textColorMajor: '#fff',
-            borderColor: '#333',
-            playheadColor: '#667eea',
-            
-            // Format d'affichage
-            showMilliseconds: false,
-            showBeats: true,
-            timeFormat: 'time', // 'time' ou 'beats'
-            
-            // Marqueurs
-            majorEvery: 4, // Marqueur majeur tous les N marqueurs
-            minSpacing: 50 // Espacement minimum en pixels
+            height: 30,
+            enableAnimations: PerformanceConfig.rendering.enableAnimations || false  // ✓ DÉSACTIVÉ
         };
         
-        // Cache
-        this.labelCache = new Map();
+        // Couleurs
+        this.colors = {
+            background: '#2c3e50',
+            text: '#ecf0f1',
+            majorTick: '#95A5A6',
+            minorTick: '#7f8c8d',
+            playhead: '#FF6B6B',
+            marker: '#FFD93D'
+        };
+        
+        // État
+        this.playheadPosition = 0;
+        this.markers = [];
     }
-
+    
     // ========================================================================
-    // RENDU PRINCIPAL
+    // RENDERING PRINCIPAL
     // ========================================================================
-
-    /**
-     * Rendu avec offset pour le piano roll
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {Object} viewport - Viewport actuel
-     * @param {Object} coordSystem - Système de coordonnées
-     * @param {Object} metadata - Métadonnées (tempo, timeSignature)
-     * @param {number} offsetX - Offset pour le piano roll
-     */
-    renderWithOffset(ctx, viewport, coordSystem, metadata = {}, offsetX = 0) {
+    
+    render(ctx, viewport, metadata) {
         ctx.save();
         
-        // Fond
-        this.renderBackground(ctx, offsetX);
-        
-        // Marqueurs temporels (avec translation pour offset)
-        ctx.save();
-        ctx.translate(offsetX, 0);
-        this.renderTimeMarkers(ctx, viewport, coordSystem, metadata);
-        ctx.restore();
-        
-        // Bordure inférieure
-        this.renderBorder(ctx);
-        
-        ctx.restore();
-    }
-
-    /**
-     * Rendu du fond
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {number} offsetX - Offset horizontal
-     */
-    renderBackground(ctx, offsetX) {
-        ctx.fillStyle = this.config.backgroundColor;
+        // Background
+        ctx.fillStyle = this.colors.background;
         ctx.fillRect(0, 0, ctx.canvas.width, this.config.height);
         
-        // Zone avant le piano roll (si offsetX > 0)
-        if (offsetX > 0) {
-            ctx.fillStyle = this.config.backgroundColorLeft;
-            ctx.fillRect(0, 0, offsetX, this.config.height);
-        }
-    }
-
-    /**
-     * ✅ COMPLET: Rendu des marqueurs temporels adaptatifs
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {Object} viewport - Viewport actuel
-     * @param {Object} coordSystem - Système de coordonnées
-     * @param {Object} metadata - Métadonnées (tempo, timeSignature)
-     */
-    renderTimeMarkers(ctx, viewport, coordSystem, metadata = {}) {
-        const visibleRect = viewport.getVisibleRect();
-        const timeRange = visibleRect.timeRange;
+        // ✓ RENDERING SIMPLE : pas d'animations
+        this.renderStaticMarkers(ctx, viewport, metadata);
         
-        if (!timeRange) return;
-        
-        // Déterminer l'espacement selon le zoom
-        const spacing = this.calculateMarkerSpacing(coordSystem.zoomX, metadata);
-        
-        // Premier marqueur visible
-        const startTime = Math.floor(timeRange.start / spacing.value) * spacing.value;
-        
-        ctx.save();
-        
-        // Dessiner les marqueurs
-        for (let time = startTime; time <= timeRange.end; time += spacing.value) {
-            const x = coordSystem.timeToX(time);
-            
-            // Déterminer si c'est un marqueur majeur
-            const markerIndex = Math.round(time / spacing.value);
-            const isMajor = (markerIndex % this.config.majorEvery) === 0;
-            
-            this.renderMarker(ctx, x, time, isMajor, metadata);
+        // Playhead (si lecture)
+        if (this.playheadPosition > 0) {
+            this.renderPlayhead(ctx, viewport);
         }
         
         ctx.restore();
     }
-
-    /**
-     * ✅ COMPLET: Rendu d'un marqueur individuel
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {number} x - Position X
-     * @param {number} time - Temps en ms
-     * @param {boolean} isMajor - Marqueur majeur
-     * @param {Object} metadata - Métadonnées
-     */
-    renderMarker(ctx, x, time, isMajor, metadata) {
-        // Hauteur du trait selon importance
-        const height = isMajor ? 40 : 20;
-        const color = isMajor ? this.config.markerColorMajor : this.config.markerColor;
+    
+    // ========================================================================
+    // MARQUEURS DE TEMPS (STATIQUES)
+    // ========================================================================
+    
+    renderStaticMarkers(ctx, viewport, metadata) {
+        const division = metadata?.division || 480;
+        const tempo = metadata?.tempo || 500000;
         
-        // Ligne verticale
-        ctx.strokeStyle = color;
-        ctx.lineWidth = isMajor ? 2 : 1;
-        ctx.beginPath();
-        ctx.moveTo(x, this.config.height - height);
-        ctx.lineTo(x, this.config.height);
-        ctx.stroke();
+        // Calculer intervalle des marqueurs selon zoom
+        const range = viewport.endTime - viewport.startTime;
+        let tickInterval;
         
-        // Label (seulement pour les marqueurs majeurs)
-        if (isMajor) {
-            const label = this.config.timeFormat === 'beats' ?
-                this.formatBeats(time, metadata) :
-                this.formatTime(time);
-            
-            ctx.fillStyle = this.config.textColorMajor;
-            ctx.font = 'bold 11px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(label, x, this.config.height - height - 4);
+        if (range > 50000) {
+            tickInterval = division * 4;  // Mesures
+        } else if (range > 20000) {
+            tickInterval = division;  // Beats
+        } else {
+            tickInterval = division / 4;  // 1/4 beats
         }
-    }
-
-    /**
-     * ✅ COMPLET: Rendu de la bordure inférieure
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     */
-    renderBorder(ctx) {
-        ctx.strokeStyle = this.config.borderColor;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, this.config.height - 0.5);
-        ctx.lineTo(ctx.canvas.width, this.config.height - 0.5);
-        ctx.stroke();
-    }
-
-    // ========================================================================
-    // CALCULS ADAPTATIFS
-    // ========================================================================
-
-    /**
-     * ✅ OPTIMISÉ: Calcule l'espacement des marqueurs selon le zoom
-     * @param {number} zoomX - Zoom horizontal
-     * @param {Object} metadata - Métadonnées (tempo, timeSignature)
-     * @returns {Object} {value: ms, label: string}
-     */
-    calculateMarkerSpacing(zoomX, metadata = {}) {
-        const tempo = metadata.tempo || 120;
-        const beatDuration = 60000 / tempo; // ms par beat
         
-        // Définir les espacements possibles en millisecondes
-        const spacings = [
-            { value: 10, label: '10ms' },
-            { value: 25, label: '25ms' },
-            { value: 50, label: '50ms' },
-            { value: 100, label: '100ms' },
-            { value: 250, label: '250ms' },
-            { value: 500, label: '500ms' },
-            { value: 1000, label: '1s' },
-            { value: 2000, label: '2s' },
-            { value: 5000, label: '5s' },
-            { value: 10000, label: '10s' },
-            { value: beatDuration, label: '1beat' },
-            { value: beatDuration * 2, label: '2beats' },
-            { value: beatDuration * 4, label: '4beats' }
-        ];
-        
-        // Trier par valeur
-        spacings.sort((a, b) => a.value - b.value);
-        
-        // Calcul de pixels par milliseconde
-        const pixelsPerMs = (100 * zoomX) / 1000; // pixelsPerSecond / 1000
-        
-        // Trouver l'espacement optimal (viser ~75-150 pixels)
-        const targetPixels = 100;
-        
-        for (const spacing of spacings) {
-            const pixels = spacing.value * pixelsPerMs;
-            if (pixels >= targetPixels) {
-                return spacing;
+        // Dessiner ticks
+        for (let time = 0; time <= viewport.endTime; time += tickInterval) {
+            if (time < viewport.startTime) continue;
+            
+            const x = this.coordSystem.timeToX(time);
+            const isMajor = time % (division * 4) === 0;
+            
+            // Ligne
+            ctx.strokeStyle = isMajor ? this.colors.majorTick : this.colors.minorTick;
+            ctx.lineWidth = isMajor ? 2 : 1;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, isMajor ? this.config.height : this.config.height / 2);
+            ctx.stroke();
+            
+            // Label (seulement majeurs)
+            if (isMajor) {
+                const measure = Math.floor(time / (division * 4)) + 1;
+                ctx.fillStyle = this.colors.text;
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${measure}`, x, this.config.height - 5);
             }
         }
-        
-        // Fallback: dernier espacement
-        return spacings[spacings.length - 1];
     }
-
-    // ========================================================================
-    // FORMATAGE TEMPS
-    // ========================================================================
-
-    /**
-     * ✅ COMPLET: Formate un temps en mm:ss ou mm:ss.ms
-     * @param {number} timeMs - Temps en millisecondes
-     * @returns {string} Temps formaté
-     */
-    formatTime(timeMs) {
-        if (timeMs < 0) timeMs = 0;
-        
-        const totalSeconds = Math.floor(timeMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const ms = Math.floor((timeMs % 1000) / 10); // Centièmes
-        
-        if (this.config.showMilliseconds) {
-            return `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-        } else {
-            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-    }
-
-    /**
-     * ✅ NOUVEAU: Formate un temps en mesures:temps (bars:beats)
-     * @param {number} timeMs - Temps en millisecondes
-     * @param {Object} metadata - Métadonnées (tempo, timeSignature)
-     * @returns {string} Position formatée (ex: "4:3")
-     */
-    formatBeats(timeMs, metadata = {}) {
-        const tempo = metadata.tempo || 120;
-        const timeSignature = metadata.timeSignature || { numerator: 4, denominator: 4 };
-        
-        const bpm = tempo;
-        const beatDuration = 60000 / bpm; // ms par beat
-        const beatsPerMeasure = timeSignature.numerator || 4;
-        
-        // Calcul du nombre total de beats
-        const totalBeats = timeMs / beatDuration;
-        
-        // Calcul mesure et beat (1-based)
-        const measure = Math.floor(totalBeats / beatsPerMeasure) + 1;
-        const beat = Math.floor(totalBeats % beatsPerMeasure) + 1;
-        
-        return `${measure}:${beat}`;
-    }
-
-    /**
-     * ✅ NOUVEAU: Calcule la position en beats
-     * @param {number} timeMs - Temps en millisecondes
-     * @param {Object} metadata - Métadonnées
-     * @returns {Object} {measure, beat, totalBeats}
-     */
-    calculateBeatPosition(timeMs, metadata = {}) {
-        const tempo = metadata.tempo || 120;
-        const timeSignature = metadata.timeSignature || { numerator: 4, denominator: 4 };
-        
-        const bpm = tempo;
-        const beatDuration = 60000 / bpm;
-        const beatsPerMeasure = timeSignature.numerator || 4;
-        
-        const totalBeats = timeMs / beatDuration;
-        const measure = Math.floor(totalBeats / beatsPerMeasure) + 1;
-        const beat = Math.floor(totalBeats % beatsPerMeasure) + 1;
-        
-        return { measure, beat, totalBeats };
-    }
-
+    
     // ========================================================================
     // PLAYHEAD
     // ========================================================================
-
-    /**
-     * ✅ NOUVEAU: Rendu du playhead (tête de lecture)
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {number} time - Temps actuel en ms
-     * @param {Object} coordSystem - Système de coordonnées
-     * @param {number} canvasHeight - Hauteur totale canvas
-     */
-    renderPlayhead(ctx, time, coordSystem, canvasHeight) {
-        const x = coordSystem.timeToX(time);
-        
-        ctx.save();
+    
+    renderPlayhead(ctx, viewport) {
+        const x = this.coordSystem.timeToX(this.playheadPosition);
         
         // Ligne verticale
-        ctx.strokeStyle = this.config.playheadColor;
+        ctx.strokeStyle = this.colors.playhead;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvasHeight);
+        ctx.lineTo(x, this.config.height);
         ctx.stroke();
         
         // Triangle en haut
-        ctx.fillStyle = this.config.playheadColor;
+        ctx.fillStyle = this.colors.playhead;
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x - 6, 10);
-        ctx.lineTo(x + 6, 10);
+        ctx.lineTo(x - 5, 10);
+        ctx.lineTo(x + 5, 10);
         ctx.closePath();
         ctx.fill();
-        
-        ctx.restore();
     }
-
+    
+    setPlayheadPosition(time) {
+        this.playheadPosition = time;
+    }
+    
     // ========================================================================
-    // RÉGIONS / SECTIONS
+    // MARQUEURS PERSONNALISÉS
     // ========================================================================
-
-    /**
-     * ✅ NOUVEAU: Rendu des régions/sections colorées
-     * @param {CanvasRenderingContext2D} ctx - Contexte Canvas
-     * @param {Array} regions - Liste des régions [{startTime, endTime, color, label}]
-     * @param {Object} coordSystem - Système de coordonnées
-     */
-    renderRegions(ctx, regions, coordSystem) {
-        if (!regions || regions.length === 0) return;
+    
+    addMarker(time, label, color) {
+        this.markers.push({
+            time,
+            label,
+            color: color || this.colors.marker
+        });
+    }
+    
+    removeMarker(time) {
+        this.markers = this.markers.filter(m => m.time !== time);
+    }
+    
+    clearMarkers() {
+        this.markers = [];
+    }
+    
+    renderMarkers(ctx, viewport) {
+        if (this.markers.length === 0) return;
         
         ctx.save();
         
-        regions.forEach(region => {
-            const x1 = coordSystem.timeToX(region.startTime);
-            const x2 = coordSystem.timeToX(region.endTime);
-            const width = x2 - x1;
+        this.markers.forEach(marker => {
+            if (marker.time < viewport.startTime || marker.time > viewport.endTime) {
+                return;
+            }
             
-            // Fond coloré semi-transparent
-            ctx.fillStyle = region.color || 'rgba(102, 126, 234, 0.2)';
-            ctx.fillRect(x1, 0, width, this.config.height);
+            const x = this.coordSystem.timeToX(marker.time);
             
-            // Bordures
-            ctx.strokeStyle = region.color || '#667eea';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x1, 0, width, this.config.height);
+            // Ligne
+            ctx.strokeStyle = marker.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 3]);
+            ctx.beginPath();
+            ctx.moveTo(x, this.config.height);
+            ctx.lineTo(x, ctx.canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
             
-            // Label (si assez large)
-            if (width > 50 && region.label) {
-                ctx.fillStyle = '#fff';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(region.label, x1 + width / 2, this.config.height / 2);
+            // Label
+            if (marker.label) {
+                ctx.fillStyle = marker.color;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(marker.label, x + 3, this.config.height + 15);
             }
         });
         
         ctx.restore();
     }
-
+    
+    // ========================================================================
+    // TEMPS → FORMAT LISIBLE
+    // ========================================================================
+    
+    formatTime(time, division = 480) {
+        const totalBeats = time / division;
+        const measures = Math.floor(totalBeats / 4) + 1;
+        const beats = Math.floor(totalBeats % 4) + 1;
+        const ticks = time % division;
+        
+        return `${measures}:${beats}:${ticks.toString().padStart(3, '0')}`;
+    }
+    
+    formatTimeSMPTE(time, fps = 30) {
+        const totalSeconds = time / 1000;
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        const frames = Math.floor((totalSeconds % 1) * fps);
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+    }
+    
+    // ========================================================================
+    // HIT DETECTION
+    // ========================================================================
+    
+    getTimeAtPosition(x) {
+        return this.coordSystem.xToTime(x);
+    }
+    
+    getMarkerAtPosition(x, viewport, tolerance = 5) {
+        const time = this.getTimeAtPosition(x);
+        
+        return this.markers.find(marker => {
+            const markerX = this.coordSystem.timeToX(marker.time);
+            return Math.abs(markerX - x) <= tolerance;
+        });
+    }
+    
     // ========================================================================
     // CONFIGURATION
     // ========================================================================
-
-    /**
-     * Définit le format de temps
-     * @param {string} format - 'time' ou 'beats'
-     */
-    setTimeFormat(format) {
-        if (['time', 'beats'].includes(format)) {
-            this.config.timeFormat = format;
-            this.clearCache();
-        }
+    
+    setHeight(height) {
+        this.config.height = height;
     }
-
-    /**
-     * Active/désactive l'affichage des millisecondes
-     * @param {boolean} show - Afficher millisecondes
-     */
-    setShowMilliseconds(show) {
-        this.config.showMilliseconds = show;
-        this.clearCache();
+    
+    setColors(colors) {
+        this.colors = { ...this.colors, ...colors };
     }
-
-    /**
-     * Obtient la hauteur de la timeline
-     * @returns {number} Hauteur en pixels
-     */
+    
     getHeight() {
         return this.config.height;
-    }
-
-    /**
-     * Définit la visibilité
-     * @param {boolean} visible - Visibilité
-     */
-    setVisible(visible) {
-        // Timeline est toujours visible si activée
-    }
-
-    /**
-     * Configure les options
-     * @param {Object} options - Options à modifier
-     */
-    setConfig(options) {
-        Object.assign(this.config, options);
-        this.clearCache();
-    }
-
-    /**
-     * Nettoie le cache de labels
-     */
-    clearCache() {
-        this.labelCache.clear();
     }
 }
 
@@ -450,4 +248,8 @@ class TimelineRenderer {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = TimelineRenderer;
+}
+
+if (typeof window !== 'undefined') {
+    window.TimelineRenderer = TimelineRenderer;
 }

@@ -1,70 +1,85 @@
 // ============================================================================
-// Fichier: src/storage/Database.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/storage/Database.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Wrapper SQLite pour la persistence des données.
-//   Gère la base de données locale pour presets, sessions, historique.
+//   High-performance SQLite3 wrapper with modern C++ API.
+//   Handles all database operations with thread-safety and automatic migrations.
 //
-// Responsabilités:
-//   - Connexion à SQLite
-//   - Exécution de requêtes
-//   - Transactions
-//   - Migration de schéma
+// Features:
+//   - Connection management (open/close)
+//   - Parameterized queries (SQL injection protection)
+//   - Transactions (ACID compliant)
+//   - Automatic schema migrations
+//   - Backup and optimization
+//   - Thread-safe operations
 //
-// Thread-safety: OUI (mutex interne)
+// Dependencies:
+//   - SQLite3 (libsqlite3)
+//   - Logger
+//   - Error handling
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Singleton pattern for global access
+//   - Enhanced migration system
+//   - Improved error handling
+//   - Statistics and monitoring
+//
 // ============================================================================
 
 #pragma once
 
 #include <string>
 #include <vector>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <functional>
 #include <sqlite3.h>
-
+#include <nlohmann/json.hpp>
 #include "../core/Logger.h"
 #include "../core/Error.h"
-#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 /**
- * @struct DatabaseRow
- * @brief Une ligne de résultat de requête
+ * @brief Database row as key-value map
  */
 using DatabaseRow = std::map<std::string, std::string>;
 
 /**
- * @struct DatabaseResult
- * @brief Résultat d'une requête SELECT
+ * @brief Query result structure
  */
 struct DatabaseResult {
-    std::vector<DatabaseRow> rows;      ///< Lignes de résultat
-    int affectedRows;                   ///< Lignes affectées (INSERT/UPDATE/DELETE)
-    int64_t lastInsertId;               ///< ID du dernier insert
-    
-    DatabaseResult() : affectedRows(0), lastInsertId(0) {}
+    bool success = true;
+    std::string error;
+    std::vector<DatabaseRow> rows;
+    int affectedRows = 0;
+    int64_t lastInsertId = 0;
     
     /**
-     * @brief Vérifie si le résultat est vide
+     * @brief Check if result is empty
      */
     bool empty() const { return rows.empty(); }
     
     /**
-     * @brief Récupère le nombre de lignes
+     * @brief Get number of rows
      */
     size_t size() const { return rows.size(); }
     
     /**
-     * @brief Convertit en JSON
+     * @brief Convert to JSON array
      */
     json toJson() const {
         json j = json::array();
@@ -79,146 +94,174 @@ struct DatabaseResult {
     }
 };
 
+// ============================================================================
+// CLASS: Database
+// ============================================================================
+
 /**
  * @class Database
- * @brief Wrapper SQLite haute performance
+ * @brief Thread-safe SQLite3 wrapper with automatic migrations
  * 
- * @details
- * Encapsule SQLite3 avec une API C++ moderne et thread-safe.
+ * Provides a modern C++ interface to SQLite3 with:
+ * - Automatic connection management
+ * - Prepared statements for security
+ * - Transaction support
+ * - Schema migration system
+ * - Backup and maintenance
  * 
- * Fonctionnalités:
- * - Connexion/déconnexion
- * - Requêtes paramétrées
- * - Transactions
- * - Migration automatique de schéma
- * - Backup
+ * Thread Safety:
+ * - All public methods are thread-safe
+ * - Uses internal mutex for synchronization
+ * - Can be safely called from multiple threads
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe.
- * 
- * @example Utilisation
+ * Example:
  * ```cpp
- * Database db("midimind.db");
+ * Database& db = Database::instance();
  * 
- * // Ouvrir
- * db.open();
+ * if (!db.connect("/path/to/db.sqlite")) {
+ *     Logger::error("DB", "Connection failed");
+ *     return false;
+ * }
  * 
- * // Créer une table
- * db.execute("CREATE TABLE presets (id INTEGER PRIMARY KEY, name TEXT)");
+ * // Execute query
+ * db.execute("INSERT INTO users (name) VALUES (?)", {"John"});
  * 
- * // Insérer
- * db.execute("INSERT INTO presets (name) VALUES (?)", {"My Preset"});
+ * // Select query
+ * auto result = db.query("SELECT * FROM users WHERE name = ?", {"John"});
+ * for (const auto& row : result.rows) {
+ *     std::cout << row.at("name") << std::endl;
+ * }
  * 
- * // Requête
- * auto result = db.query("SELECT * FROM presets");
+ * // Transaction
+ * db.transaction([&]() {
+ *     db.execute("INSERT INTO table1 ...");
+ *     db.execute("INSERT INTO table2 ...");
+ * });
  * ```
  */
 class Database {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // SINGLETON PATTERN
     // ========================================================================
     
     /**
-     * @brief Constructeur
-     * 
-     * @param filepath Chemin de la base de données
+     * @brief Get singleton instance
+     * @return Reference to Database instance
      */
-    explicit Database(const std::string& filepath);
+    static Database& instance();
     
-    /**
-     * @brief Destructeur
-     */
-    ~Database();
-    
-    // Désactiver copie
+    // Disable copy and assignment
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
     
+    /**
+     * @brief Destructor - closes database connection
+     */
+    ~Database();
+    
     // ========================================================================
-    // CONNEXION
+    // CONNECTION MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Ouvre la base de données
-     * 
-     * @return true Si succès
-     * 
+     * @brief Connect to database file
+     * @param filepath Path to SQLite database file
+     * @return true if connection successful
+     * @note Creates database file if it doesn't exist
      * @note Thread-safe
      */
-    bool open();
+    bool connect(const std::string& filepath);
     
     /**
-     * @brief Ferme la base de données
-     * 
+     * @brief Close database connection
      * @note Thread-safe
+     * @note Automatically called by destructor
      */
     void close();
     
     /**
-     * @brief Vérifie si la base est ouverte
-     * 
+     * @brief Check if database is connected
+     * @return true if connected
      * @note Thread-safe
      */
-    bool isOpen() const;
+    bool isConnected() const { return isConnected_; }
+    
+    /**
+     * @brief Get database file path
+     * @return Database file path
+     */
+    std::string getPath() const { return filepath_; }
     
     // ========================================================================
-    // REQUÊTES
+    // QUERY EXECUTION
     // ========================================================================
     
     /**
-     * @brief Exécute une requête SQL (INSERT/UPDATE/DELETE)
-     * 
-     * @param sql Requête SQL
-     * @param params Paramètres (optionnels)
-     * @return DatabaseResult Résultat
-     * 
-     * @throws MidiMindException Si erreur SQL
-     * 
+     * @brief Execute SQL statement (INSERT, UPDATE, DELETE)
+     * @param sql SQL statement with ? placeholders
+     * @param params Parameter values (optional)
+     * @return DatabaseResult with affected rows and last insert ID
+     * @throws std::runtime_error on SQL error
      * @note Thread-safe
      * 
-     * @example
+     * Example:
      * ```cpp
-     * db.execute("INSERT INTO users (name, email) VALUES (?, ?)", 
+     * db.execute("INSERT INTO users (name, email) VALUES (?, ?)",
      *            {"John", "john@example.com"});
      * ```
      */
-    DatabaseResult execute(const std::string& sql, 
+    DatabaseResult execute(const std::string& sql,
                           const std::vector<std::string>& params = {});
     
     /**
-     * @brief Exécute une requête SELECT
-     * 
-     * @param sql Requête SQL
-     * @param params Paramètres (optionnels)
-     * @return DatabaseResult Résultat avec rows
-     * 
-     * @throws MidiMindException Si erreur SQL
-     * 
+     * @brief Execute SELECT query
+     * @param sql SQL SELECT statement with ? placeholders
+     * @param params Parameter values (optional)
+     * @return DatabaseResult with rows
+     * @throws std::runtime_error on SQL error
      * @note Thread-safe
+     * 
+     * Example:
+     * ```cpp
+     * auto result = db.query("SELECT * FROM users WHERE age > ?", {"18"});
+     * for (const auto& row : result.rows) {
+     *     std::cout << row.at("name") << std::endl;
+     * }
+     * ```
      */
     DatabaseResult query(const std::string& sql,
                         const std::vector<std::string>& params = {});
     
     /**
-     * @brief Exécute une requête et retourne une seule ligne
-     * 
-     * @param sql Requête SQL
-     * @param params Paramètres
-     * @return DatabaseRow Première ligne ou vide
-     * 
+     * @brief Execute query and return first row
+     * @param sql SQL SELECT statement
+     * @param params Parameter values
+     * @return DatabaseRow (empty if no results)
      * @note Thread-safe
+     * 
+     * Example:
+     * ```cpp
+     * auto row = db.queryOne("SELECT * FROM users WHERE id = ?", {"1"});
+     * if (!row.empty()) {
+     *     std::cout << row.at("name") << std::endl;
+     * }
+     * ```
      */
     DatabaseRow queryOne(const std::string& sql,
                         const std::vector<std::string>& params = {});
     
     /**
-     * @brief Exécute une requête et retourne une valeur scalaire
-     * 
-     * @param sql Requête SQL
-     * @param params Paramètres
-     * @return std::string Valeur ou chaîne vide
-     * 
+     * @brief Execute query and return single scalar value
+     * @param sql SQL SELECT statement
+     * @param params Parameter values
+     * @return std::string value (empty if no result)
      * @note Thread-safe
+     * 
+     * Example:
+     * ```cpp
+     * std::string count = db.queryScalar("SELECT COUNT(*) FROM users");
+     * ```
      */
     std::string queryScalar(const std::string& sql,
                            const std::vector<std::string>& params = {});
@@ -228,173 +271,180 @@ public:
     // ========================================================================
     
     /**
-     * @brief Démarre une transaction
-     * 
+     * @brief Begin transaction
+     * @return true if successful
      * @note Thread-safe
      */
-    void beginTransaction();
+    bool beginTransaction();
     
     /**
-     * @brief Commit la transaction
-     * 
+     * @brief Commit transaction
+     * @return true if successful
      * @note Thread-safe
      */
-    void commit();
+    bool commit();
     
     /**
-     * @brief Rollback la transaction
-     * 
+     * @brief Rollback transaction
+     * @return true if successful
      * @note Thread-safe
      */
-    void rollback();
+    bool rollback();
     
     /**
-     * @brief Exécute une fonction dans une transaction
-     * 
-     * @param fn Fonction à exécuter
-     * @return true Si succès (commit), false si erreur (rollback)
-     * 
+     * @brief Execute function within transaction
+     * @param fn Function to execute
+     * @return true if transaction committed, false if rolled back
      * @note Thread-safe
+     * @note Automatically commits on success, rolls back on exception
      * 
-     * @example
+     * Example:
      * ```cpp
-     * db.transaction([&]() {
-     *     db.execute("INSERT INTO table1 ...");
-     *     db.execute("INSERT INTO table2 ...");
+     * bool success = db.transaction([&]() {
+     *     db.execute("INSERT INTO table1 VALUES (...)");
+     *     db.execute("INSERT INTO table2 VALUES (...)");
      * });
      * ```
      */
     bool transaction(std::function<void()> fn);
     
     // ========================================================================
-    // SCHÉMA
+    // SCHEMA MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Initialise le schéma de base
-     * 
-     * Crée les tables nécessaires pour MidiMind.
-     * 
+     * @brief Run all pending migrations
+     * @return true if all migrations successful
      * @note Thread-safe
+     * @note Looks for .sql files in data/migrations/
      */
-    void initializeSchema();
+    bool migrate();
     
     /**
-     * @brief Migre le schéma vers une version
-     * 
-     * @param version Version cible
-     * @return true Si succès
-     * 
-     * @note Thread-safe
-     */
-    bool migrate(int version);
-    
-    /**
-     * @brief Récupère la version actuelle du schéma
-     * 
+     * @brief Get current schema version
+     * @return Current version number
      * @note Thread-safe
      */
     int getSchemaVersion();
     
+    /**
+     * @brief Initialize schema (create version table)
+     * @note Thread-safe
+     * @note Called automatically by migrate()
+     */
+    void initializeSchema();
+    
     // ========================================================================
-    // UTILITAIRES
+    // UTILITY METHODS
     // ========================================================================
     
     /**
-     * @brief Vérifie si une table existe
-     * 
-     * @param tableName Nom de la table
-     * 
+     * @brief Check if table exists
+     * @param tableName Table name
+     * @return true if table exists
      * @note Thread-safe
      */
     bool tableExists(const std::string& tableName);
     
     /**
-     * @brief Récupère la liste des tables
-     * 
+     * @brief Get list of all tables
+     * @return Vector of table names
      * @note Thread-safe
      */
     std::vector<std::string> getTables();
     
     /**
-     * @brief Vide une table
-     * 
-     * @param tableName Nom de la table
-     * 
+     * @brief Truncate table (delete all rows)
+     * @param tableName Table name
      * @note Thread-safe
      */
     void truncateTable(const std::string& tableName);
     
     /**
-     * @brief Optimise la base de données (VACUUM)
-     * 
+     * @brief Optimize database (VACUUM)
      * @note Thread-safe
+     * @note Reclaims unused space and defragments
      */
     void optimize();
     
     /**
-     * @brief Sauvegarde la base de données
-     * 
-     * @param backupPath Chemin de backup
-     * @return true Si succès
-     * 
+     * @brief Create database backup
+     * @param backupPath Path for backup file
+     * @return true if backup successful
      * @note Thread-safe
      */
     bool backup(const std::string& backupPath);
     
     /**
-     * @brief Récupère les statistiques
-     * 
+     * @brief Get database statistics
+     * @return JSON with statistics
      * @note Thread-safe
+     * 
+     * Returns:
+     * - file_size: Database file size in bytes
+     * - page_count: Number of pages
+     * - page_size: Page size in bytes
+     * - table_count: Number of tables
+     * - index_count: Number of indexes
+     * - query_count: Number of queries executed
+     * - error_count: Number of errors
      */
     json getStatistics() const;
-
+    
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE CONSTRUCTOR (SINGLETON)
     // ========================================================================
-    void executeMigrationFile(const std::string& filepath);
+    
+    Database();
+    
+    // ========================================================================
+    // PRIVATE HELPER METHODS
+    // ========================================================================
+    
     /**
-     * @brief Prépare une requête
+     * @brief Prepare SQL statement
+     * @param sql SQL with placeholders
+     * @return sqlite3_stmt pointer
+     * @throws std::runtime_error on error
      */
     sqlite3_stmt* prepareStatement(const std::string& sql);
     
     /**
-     * @brief Bind les paramètres
+     * @brief Bind parameters to prepared statement
+     * @param stmt Statement handle
+     * @param params Parameter values
      */
     void bindParameters(sqlite3_stmt* stmt, const std::vector<std::string>& params);
     
     /**
-     * @brief Récupère le message d'erreur SQLite
+     * @brief Execute migration file
+     * @param filepath Path to .sql file
+     * @return true if successful
      */
-    std::string getErrorMessage() const;
+    bool executeMigrationFile(const std::string& filepath);
+    
+    /**
+     * @brief Get migration files in order
+     * @return Sorted list of migration file paths
+     */
+    std::vector<std::string> getMigrationFiles();
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    /// Chemin de la base de données
-    std::string filepath_;
-    
-    /// Handle SQLite
+    // Database connection
     sqlite3* db_;
+    std::string filepath_;
+    bool isConnected_;
     
-    /// Mutex pour thread-safety
+    // Thread synchronization
     mutable std::mutex mutex_;
     
-    /// Flag d'ouverture
-    std::atomic<bool> isOpen_;
-    
-    /// Compteur de transactions
-    int transactionDepth_;
-    
-    /// Statistiques
+    // Statistics
     mutable uint64_t queryCount_;
     mutable uint64_t errorCount_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER Database.h
-// ============================================================================

@@ -1,82 +1,107 @@
 // ============================================================================
-// Fichier: src/midi/processing/ProcessorManager.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/midi/processing/ProcessorManager.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestionnaire centralisé des processeurs et chaînes MIDI.
-//   Point d'entrée principal pour le traitement MIDI.
+//   Central manager for MIDI processor chains
 //
-// Responsabilités:
-//   - Gérer les chaînes de processors
-//   - Router les messages vers les bonnes chaînes
-//   - Créer des processors (factory)
-//   - Sauvegarder/charger les configurations
-//   - Fournir des presets
+// Features:
+//   - Create and manage processor chains
+//   - Factory for processor creation
+//   - Route messages through chains
+//   - Save/load configurations
+//   - Preset management
+//   - Statistics and monitoring
 //
-// Thread-safety: OUI
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Patterns: Facade Pattern, Factory Pattern
+// Changes v4.1.0:
+//   - Simplified architecture
+//   - Better chain management
+//   - Enhanced error handling
+//   - Improved preset system
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
 // ============================================================================
 
 #pragma once
 
+#include "../MidiMessage.h"
+#include "ProcessorChain.h"
+#include "MidiProcessor.h"
+#include <string>
+#include <vector>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <string>
+#include <atomic>
 #include <functional>
+#include <nlohmann/json.hpp>
 
-#include "ProcessorChain.h"
-#include "MidiProcessor.h"
-#include "../MidiMessage.h"
-#include "../../core/Logger.h"
-
-// Include tous les processors
-#include "basic/TransposeProcessor.h"
-#include "basic/VelocityProcessor.h"
-#include "basic/ChannelFilterProcessor.h"
-#include "basic/NoteFilterProcessor.h"
-#include "creative/ArpeggiatorProcessor.h"
-#include "creative/DelayProcessor.h"
-#include "creative/ChordProcessor.h"
-#include "creative/HarmonizerProcessor.h"
+using json = nlohmann::json;
 
 namespace midiMind {
 
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+/**
+ * @enum ProcessorType
+ * @brief Type of MIDI processor
+ */
+enum class ProcessorType {
+    TRANSPOSE,          ///< Transpose notes
+    VELOCITY,           ///< Modify velocity
+    CHANNEL_FILTER,     ///< Filter by channel
+    NOTE_FILTER,        ///< Filter by note range
+    ARPEGGIATOR,        ///< Arpeggiator
+    DELAY,              ///< MIDI delay
+    CHORD,              ///< Chord generator
+    HARMONIZER,         ///< Harmonizer
+    QUANTIZE,           ///< Timing quantize
+    RANDOMIZE           ///< Randomize parameters
+};
+
+// ============================================================================
+// CLASS: ProcessorManager
+// ============================================================================
+
 /**
  * @class ProcessorManager
- * @brief Gestionnaire centralisé des processeurs MIDI
+ * @brief Central manager for MIDI processor chains
  * 
- * @details
- * Point d'entrée unique pour tout le traitement MIDI.
- * Gère plusieurs chaînes de processors et route les messages.
+ * Manages multiple processor chains and routes MIDI messages.
+ * Acts as a facade for all MIDI processing operations.
  * 
  * Architecture:
  * ```
  * MidiRouter → ProcessorManager → ProcessorChain → Processors → Output
- *                                ↓
- *                         [Chain1, Chain2, ...]
+ *                              ↓
+ *                      [Chain1, Chain2, ...]
  * ```
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe.
+ * Thread Safety: YES (all public methods are thread-safe)
  * 
- * @example Utilisation
+ * Example:
  * ```cpp
  * auto manager = std::make_shared<ProcessorManager>();
  * 
- * // Créer une chaîne
+ * // Create chain
  * auto chainId = manager->createChain("Lead Synth");
  * 
- * // Ajouter des processors
- * manager->addProcessorToChain(chainId, 
- *     manager->createProcessor(ProcessorType::TRANSPOSE));
+ * // Add processors
+ * auto transpose = manager->createProcessor(ProcessorType::TRANSPOSE);
+ * transpose->setParameter("semitones", 12);
+ * manager->addProcessorToChain(chainId, transpose);
  * 
- * // Traiter un message
+ * // Process message
  * auto outputs = manager->processMessage(noteOn, chainId);
+ * 
+ * // Save configuration
+ * manager->saveToFile("config.json");
  * ```
  */
 class ProcessorManager {
@@ -86,214 +111,216 @@ public:
     // ========================================================================
     
     /**
-     * @brief Callback appelé pour les messages traités
+     * @brief Callback for processed messages
      */
-    using MessageOutputCallback = std::function<void(const MidiMessage&, const std::string& chainId)>;
+    using MessageOutputCallback = std::function<void(const MidiMessage&, 
+                                                     const std::string& chainId)>;
     
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur
+     * @brief Constructor
      */
     ProcessorManager();
     
     /**
-     * @brief Destructeur
+     * @brief Destructor
      */
     ~ProcessorManager();
     
-    // Désactiver copie
+    // Disable copy
     ProcessorManager(const ProcessorManager&) = delete;
     ProcessorManager& operator=(const ProcessorManager&) = delete;
     
     // ========================================================================
-    // TRAITEMENT
+    // MESSAGE PROCESSING
     // ========================================================================
     
     /**
-     * @brief Traite un message MIDI à travers une chaîne
-     * 
-     * @param input Message en entrée
-     * @param chainId ID de la chaîne
-     * @return std::vector<MidiMessage> Messages en sortie
-     * 
+     * @brief Process message through a chain
+     * @param input Input message
+     * @param chainId Chain ID
+     * @return Vector of output messages
      * @note Thread-safe
      */
-    std::vector<MidiMessage> processMessage(const MidiMessage& input, 
+    std::vector<MidiMessage> processMessage(const MidiMessage& input,
                                            const std::string& chainId);
     
     /**
-     * @brief Traite un message MIDI à travers toutes les chaînes actives
-     * 
-     * @param input Message en entrée
-     * @return std::map<std::string, std::vector<MidiMessage>> Messages par chaîne
-     * 
+     * @brief Process message through all active chains
+     * @param input Input message
+     * @return Map of chain ID to output messages
      * @note Thread-safe
      */
     std::map<std::string, std::vector<MidiMessage>> processMessageAllChains(
         const MidiMessage& input);
     
     // ========================================================================
-    // GESTION DES CHAÎNES
+    // CHAIN MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Crée une nouvelle chaîne
-     * 
-     * @param name Nom de la chaîne
-     * @return std::string ID de la chaîne créée
-     * 
+     * @brief Create new processor chain
+     * @param name Chain name
+     * @return Chain ID
      * @note Thread-safe
      */
     std::string createChain(const std::string& name);
     
     /**
-     * @brief Supprime une chaîne
-     * 
-     * @param chainId ID de la chaîne
-     * @return true Si supprimée avec succès
-     * 
+     * @brief Delete chain
+     * @param chainId Chain ID
+     * @return true if deleted
      * @note Thread-safe
      */
     bool deleteChain(const std::string& chainId);
     
     /**
-     * @brief Récupère une chaîne
-     * 
-     * @param chainId ID de la chaîne
-     * @return ProcessorChainPtr Chaîne ou nullptr
-     * 
+     * @brief Get chain
+     * @param chainId Chain ID
+     * @return Shared pointer to chain or nullptr
      * @note Thread-safe
      */
-    ProcessorChainPtr getChain(const std::string& chainId) const;
+    std::shared_ptr<ProcessorChain> getChain(const std::string& chainId) const;
     
     /**
-     * @brief Liste toutes les chaînes
-     * 
-     * @return std::vector<std::string> IDs des chaînes
-     * 
+     * @brief List all chains
+     * @return Vector of chain IDs
      * @note Thread-safe
      */
     std::vector<std::string> listChains() const;
     
     /**
-     * @brief Renomme une chaîne
-     * 
-     * @param chainId ID de la chaîne
-     * @param newName Nouveau nom
-     * @return true Si renommée avec succès
-     * 
+     * @brief Rename chain
+     * @param chainId Chain ID
+     * @param newName New name
+     * @return true if renamed
      * @note Thread-safe
      */
     bool renameChain(const std::string& chainId, const std::string& newName);
     
+    /**
+     * @brief Enable/disable chain
+     * @param chainId Chain ID
+     * @param enabled Enable state
+     * @return true if changed
+     * @note Thread-safe
+     */
+    bool setChainEnabled(const std::string& chainId, bool enabled);
+    
     // ========================================================================
-    // GESTION DES PROCESSORS
+    // PROCESSOR MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Crée un processor (factory)
-     * 
-     * @param type Type de processor
-     * @param config Configuration initiale (optionnel)
-     * @return MidiProcessorPtr Processor créé
-     * 
+     * @brief Create processor (factory)
+     * @param type Processor type
+     * @param config Initial configuration (optional)
+     * @return Shared pointer to processor
      * @note Thread-safe
      */
-    MidiProcessorPtr createProcessor(ProcessorType type, 
-                                     const json& config = json());
+    std::shared_ptr<MidiProcessor> createProcessor(ProcessorType type,
+                                                   const json& config = json());
     
     /**
-     * @brief Ajoute un processor à une chaîne
-     * 
-     * @param chainId ID de la chaîne
-     * @param processor Processor à ajouter
-     * @return true Si ajouté avec succès
-     * 
+     * @brief Add processor to chain
+     * @param chainId Chain ID
+     * @param processor Processor to add
+     * @return true if added
      * @note Thread-safe
      */
-    bool addProcessorToChain(const std::string& chainId, 
-                            MidiProcessorPtr processor);
+    bool addProcessorToChain(const std::string& chainId,
+                            std::shared_ptr<MidiProcessor> processor);
     
     /**
-     * @brief Retire un processor d'une chaîne
-     * 
-     * @param chainId ID de la chaîne
-     * @param processorIndex Index du processor
-     * @return true Si retiré avec succès
-     * 
+     * @brief Remove processor from chain
+     * @param chainId Chain ID
+     * @param processorIndex Processor index
+     * @return true if removed
      * @note Thread-safe
      */
-    bool removeProcessorFromChain(const std::string& chainId, 
+    bool removeProcessorFromChain(const std::string& chainId,
                                   size_t processorIndex);
+    
+    /**
+     * @brief Move processor within chain
+     * @param chainId Chain ID
+     * @param fromIndex Source index
+     * @param toIndex Target index
+     * @return true if moved
+     * @note Thread-safe
+     */
+    bool moveProcessor(const std::string& chainId, 
+                      size_t fromIndex, 
+                      size_t toIndex);
     
     // ========================================================================
     // PRESETS
     // ========================================================================
     
     /**
-     * @brief Charge un preset de chaîne
+     * @brief Load preset chain
      * 
-     * Presets disponibles:
-     * - "transpose_up": Transpose +7 demi-tons
+     * Available presets:
+     * - "transpose_up": Transpose +7 semitones
      * - "lead_synth": Transpose + Velocity boost
      * - "piano_chords": Chord processor (Major7)
-     * - "arp_sequence": Arpégiateur + Delay
+     * - "arp_sequence": Arpeggiator + Delay
      * 
-     * @param presetName Nom du preset
-     * @return std::string ID de la chaîne créée
-     * 
+     * @param presetName Preset name
+     * @return Chain ID
      * @note Thread-safe
      */
     std::string loadPreset(const std::string& presetName);
     
     /**
-     * @brief Liste les presets disponibles
-     * 
-     * @return std::vector<std::string> Noms des presets
+     * @brief List available presets
+     * @return Vector of preset names
      */
     std::vector<std::string> listPresets() const;
     
+    /**
+     * @brief Save chain as preset
+     * @param chainId Chain ID
+     * @param presetName Preset name
+     * @return true if saved
+     * @note Thread-safe
+     */
+    bool saveAsPreset(const std::string& chainId, 
+                     const std::string& presetName);
+    
     // ========================================================================
-    // SÉRIALISATION
+    // SERIALIZATION
     // ========================================================================
     
     /**
-     * @brief Sauvegarde toutes les chaînes
-     * 
-     * @param filepath Chemin du fichier
-     * @return true Si sauvegardé avec succès
-     * 
+     * @brief Save all chains to file
+     * @param filepath File path
+     * @return true if saved
      * @note Thread-safe
      */
     bool saveToFile(const std::string& filepath) const;
     
     /**
-     * @brief Charge toutes les chaînes
-     * 
-     * @param filepath Chemin du fichier
-     * @return true Si chargé avec succès
-     * 
+     * @brief Load chains from file
+     * @param filepath File path
+     * @return true if loaded
      * @note Thread-safe
      */
     bool loadFromFile(const std::string& filepath);
     
     /**
-     * @brief Convertit en JSON
-     * 
-     * @return json Configuration complète
-     * 
+     * @brief Export to JSON
+     * @return JSON configuration
      * @note Thread-safe
      */
     json toJson() const;
     
     /**
-     * @brief Configure depuis JSON
-     * 
-     * @param j Configuration JSON
-     * 
+     * @brief Import from JSON
+     * @param j JSON configuration
      * @note Thread-safe
      */
     void fromJson(const json& j);
@@ -303,52 +330,71 @@ public:
     // ========================================================================
     
     /**
-     * @brief Définit le callback de sortie
+     * @brief Set message output callback
+     * @param callback Callback function
+     * @note Thread-safe
      */
     void setMessageOutputCallback(MessageOutputCallback callback);
     
     // ========================================================================
-    // STATISTIQUES
+    // STATISTICS
     // ========================================================================
     
     /**
-     * @brief Récupère les statistiques globales
-     * 
-     * @return json Statistiques
-     * 
+     * @brief Get statistics
+     * @return JSON statistics
      * @note Thread-safe
      */
     json getStatistics() const;
-
-private:
-    /**
-     * @brief Génère un ID unique pour une chaîne
-     */
-    std::string generateChainId() const;
     
     /**
-     * @brief Crée les presets par défaut
+     * @brief Reset statistics
+     * @note Thread-safe
+     */
+    void resetStatistics();
+
+private:
+    // ========================================================================
+    // PRIVATE METHODS
+    // ========================================================================
+    
+    /**
+     * @brief Generate unique chain ID
+     */
+    std::string generateChainId();
+    
+    /**
+     * @brief Initialize built-in presets
      */
     void initializePresets();
     
-    /// Chaînes de processors
-    std::map<std::string, ProcessorChainPtr> chains_;
+    /**
+     * @brief Create processor from type string
+     */
+    std::shared_ptr<MidiProcessor> createProcessorFromType(
+        const std::string& type);
     
-    /// Mutex pour thread-safety
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
+    
+    /// Processor chains (chainId -> chain)
+    std::map<std::string, std::shared_ptr<ProcessorChain>> chains_;
+    
+    /// Preset configurations
+    std::map<std::string, json> presets_;
+    
+    /// Thread safety
     mutable std::mutex mutex_;
     
-    /// Callback de sortie
-    MessageOutputCallback messageOutputCallback_;
-    
-    /// Compteur pour IDs uniques
+    /// Chain ID counter
     std::atomic<uint32_t> chainIdCounter_;
     
-    /// Statistiques
+    /// Statistics
     std::atomic<uint64_t> messagesProcessed_;
+    
+    /// Message output callback
+    MessageOutputCallback messageOutputCallback_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER ProcessorManager.h
-// ============================================================================

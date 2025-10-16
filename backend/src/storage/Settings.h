@@ -1,300 +1,272 @@
 // ============================================================================
-// Fichier: src/storage/Settings.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/storage/Settings.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestion des paramètres persistants de l'application.
-//   Stocke et récupère les settings dans la base de données.
+//   Application settings management with database persistence.
+//   Key-value store with type-safe getters/setters.
 //
-// Responsabilités:
-//   - Sauvegarde/chargement settings
-//   - Validation des valeurs
-//   - Settings par défaut
-//   - Callbacks de changement
+// Features:
+//   - In-memory cache for fast access
+//   - Database persistence (settings table)
+//   - Type-safe get/set methods
+//   - Default values
+//   - Thread-safe operations
 //
-// Thread-safety: OUI
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// Changes v4.1.0:
+//   - Simplified API
+//   - Enhanced type safety
+//   - Better default value handling
+//   - JSON support for complex settings
+//
 // ============================================================================
 
 #pragma once
 
 #include <string>
 #include <map>
-#include <memory>
 #include <mutex>
-#include <functional>
-
-#include "Database.h"
+#include <vector>
+#include <nlohmann/json.hpp>
 #include "../core/Logger.h"
-#include "../core/Error.h"
+#include "Database.h"
+
+using json = nlohmann::json;
 
 namespace midiMind {
 
 /**
  * @class Settings
- * @brief Gestionnaire de paramètres persistants
+ * @brief Application settings manager with database persistence
  * 
- * @details
- * Stocke les paramètres de configuration dans SQLite.
+ * Provides a key-value store for application settings with:
+ * - In-memory cache for performance
+ * - Database persistence
+ * - Type-safe getters and setters
+ * - Thread-safe operations
  * 
- * Types supportés:
- * - String
- * - Integer
- * - Float
- * - Boolean
- * - JSON
+ * Settings are stored in the 'settings' table in the database.
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe.
+ * Thread Safety:
+ * - All public methods are thread-safe
+ * - Uses internal mutex for synchronization
  * 
- * @example Utilisation
+ * Example:
  * ```cpp
  * Settings settings(database);
+ * settings.load();
  * 
- * // Définir une valeur
- * settings.set("midi.default_channel", 1);
- * settings.set("audio.sample_rate", 48000);
+ * // Get with default
+ * int bpm = settings.getInt("midi.clock_bpm", 120);
+ * bool enabled = settings.getBool("auto_save", true);
  * 
- * // Récupérer une valeur
- * int channel = settings.getInt("midi.default_channel", 1);
+ * // Set values
+ * settings.set("midi.clock_bpm", 140);
+ * settings.set("auto_save", false);
  * 
- * // Callback de changement
- * settings.setOnChanged("midi.default_channel", [](const std::string& value) {
- *     Logger::info("Channel changed to: " + value);
- * });
+ * // Save to database
+ * settings.save();
  * ```
  */
 class Settings {
 public:
     // ========================================================================
-    // TYPES
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Callback appelé lors d'un changement de valeur
+     * @brief Constructor
+     * @param database Reference to Database instance
      */
-    using ChangeCallback = std::function<void(const std::string& key, const std::string& value)>;
-    
-    // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
-    // ========================================================================
+    explicit Settings(Database& database);
     
     /**
-     * @brief Constructeur
-     * 
-     * @param database Base de données
-     */
-    explicit Settings(std::shared_ptr<Database> database);
-    
-    /**
-     * @brief Destructeur
+     * @brief Destructor
      */
     ~Settings();
     
-    // Désactiver copie
+    // Disable copy
     Settings(const Settings&) = delete;
     Settings& operator=(const Settings&) = delete;
     
     // ========================================================================
-    // CHARGEMENT / SAUVEGARDE
+    // PERSISTENCE
     // ========================================================================
     
     /**
-     * @brief Charge tous les settings depuis la DB
-     * 
+     * @brief Load all settings from database
+     * @return true if successful
      * @note Thread-safe
      */
-    void load();
+    bool load();
     
     /**
-     * @brief Sauvegarde tous les settings dans la DB
-     * 
+     * @brief Save all settings to database
+     * @return true if successful
      * @note Thread-safe
      */
-    void save();
+    bool save();
     
     /**
-     * @brief Réinitialise aux valeurs par défaut
-     * 
+     * @brief Reset to default values
      * @note Thread-safe
      */
     void reset();
     
     // ========================================================================
-    // GETTERS
+    // GETTERS (TYPE-SAFE)
     // ========================================================================
     
     /**
-     * @brief Récupère une valeur string
-     * 
-     * @param key Clé
-     * @param defaultValue Valeur par défaut
-     * @return std::string Valeur
-     * 
+     * @brief Get string value
+     * @param key Setting key
+     * @param defaultValue Default if key not found
+     * @return String value
      * @note Thread-safe
      */
-    std::string getString(const std::string& key, const std::string& defaultValue = "");
+    std::string getString(const std::string& key, 
+                         const std::string& defaultValue = "");
     
     /**
-     * @brief Récupère une valeur int
-     * 
+     * @brief Get integer value
+     * @param key Setting key
+     * @param defaultValue Default if key not found
+     * @return Integer value
      * @note Thread-safe
      */
     int getInt(const std::string& key, int defaultValue = 0);
     
     /**
-     * @brief Récupère une valeur float
-     * 
-     * @note Thread-safe
-     */
-    float getFloat(const std::string& key, float defaultValue = 0.0f);
-    
-    /**
-     * @brief Récupère une valeur bool
-     * 
+     * @brief Get boolean value
+     * @param key Setting key
+     * @param defaultValue Default if key not found
+     * @return Boolean value
      * @note Thread-safe
      */
     bool getBool(const std::string& key, bool defaultValue = false);
     
     /**
-     * @brief Récupère une valeur JSON
-     * 
+     * @brief Get double value
+     * @param key Setting key
+     * @param defaultValue Default if key not found
+     * @return Double value
+     * @note Thread-safe
+     */
+    double getDouble(const std::string& key, double defaultValue = 0.0);
+    
+    /**
+     * @brief Get JSON value
+     * @param key Setting key
+     * @param defaultValue Default if key not found
+     * @return JSON value
      * @note Thread-safe
      */
     json getJson(const std::string& key, const json& defaultValue = json::object());
     
     // ========================================================================
-    // SETTERS
+    // SETTERS (TYPE-SAFE)
     // ========================================================================
     
     /**
-     * @brief Définit une valeur string
-     * 
+     * @brief Set string value
+     * @param key Setting key
+     * @param value String value
      * @note Thread-safe
      */
     void set(const std::string& key, const std::string& value);
     
     /**
-     * @brief Définit une valeur int
-     * 
+     * @brief Set integer value
+     * @param key Setting key
+     * @param value Integer value
      * @note Thread-safe
      */
     void set(const std::string& key, int value);
     
     /**
-     * @brief Définit une valeur float
-     * 
-     * @note Thread-safe
-     */
-    void set(const std::string& key, float value);
-    
-    /**
-     * @brief Définit une valeur bool
-     * 
+     * @brief Set boolean value
+     * @param key Setting key
+     * @param value Boolean value
      * @note Thread-safe
      */
     void set(const std::string& key, bool value);
     
     /**
-     * @brief Définit une valeur JSON
-     * 
+     * @brief Set double value
+     * @param key Setting key
+     * @param value Double value
+     * @note Thread-safe
+     */
+    void set(const std::string& key, double value);
+    
+    /**
+     * @brief Set JSON value
+     * @param key Setting key
+     * @param value JSON value
      * @note Thread-safe
      */
     void set(const std::string& key, const json& value);
     
     // ========================================================================
-    // VÉRIFICATIONS
+    // UTILITIES
     // ========================================================================
     
     /**
-     * @brief Vérifie si une clé existe
-     * 
+     * @brief Check if key exists
+     * @param key Setting key
+     * @return true if exists
      * @note Thread-safe
      */
     bool has(const std::string& key) const;
     
     /**
-     * @brief Supprime une clé
-     * 
+     * @brief Remove setting
+     * @param key Setting key
      * @note Thread-safe
      */
     void remove(const std::string& key);
     
     /**
-     * @brief Récupère toutes les clés
-     * 
+     * @brief Get all keys
+     * @return Vector of all keys
      * @note Thread-safe
      */
     std::vector<std::string> getKeys() const;
     
     /**
-     * @brief Récupère tous les settings
-     * 
-     * @return json Tous les settings
-     * 
+     * @brief Get all settings as JSON
+     * @return JSON object with all settings
      * @note Thread-safe
      */
     json getAll() const;
     
-    // ========================================================================
-    // CALLBACKS
-    // ========================================================================
-    
-    /**
-     * @brief Définit un callback pour une clé
-     * 
-     * @param key Clé à surveiller
-     * @param callback Callback
-     * 
-     * @note Thread-safe
-     */
-    void setOnChanged(const std::string& key, ChangeCallback callback);
-    
-    /**
-     * @brief Retire un callback
-     * 
-     * @param key Clé
-     * 
-     * @note Thread-safe
-     */
-    void removeOnChanged(const std::string& key);
-
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief Initialise les valeurs par défaut
+     * @brief Initialize default settings
      */
     void initializeDefaults();
     
-    /**
-     * @brief Notifie les callbacks
-     */
-    void notifyChanged(const std::string& key, const std::string& value);
-    
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBER VARIABLES
     // ========================================================================
     
-    /// Base de données
-    std::shared_ptr<Database> database_;
+    /// Reference to database
+    Database& database_;
     
-    /// Cache des settings en mémoire
+    /// In-memory cache (key -> value as string)
     std::map<std::string, std::string> cache_;
     
-    /// Callbacks de changement
-    std::map<std::string, ChangeCallback> callbacks_;
-    
-    /// Mutex pour thread-safety
+    /// Mutex for thread-safety
     mutable std::mutex mutex_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER Settings.h
-// ============================================================================

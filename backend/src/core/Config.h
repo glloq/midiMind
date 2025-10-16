@@ -1,29 +1,37 @@
 // ============================================================================
-// Fichier: backend/src/core/Config.h
-// Version: 3.0.2 - CORRECTIONS CRITIQUES PHASE 1
-// Date: 2025-10-15
+// File: backend/src/core/Config.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// CORRECTIFS v3.0.2 (PHASE 1 - CRITIQUES):
-//   ✅ 1.5 Validation valeurs dans load() - Sample rate, buffer size, ports, etc.
-//   ✅ Valeurs par défaut sûres si invalides
-//   ✅ Logs warnings pour valeurs corrigées
-//   ✅ Préservation TOTALE des fonctionnalités existantes
 //
 // Description:
-//   Configuration globale de l'application
-//   Lecture/écriture fichier JSON avec validation
+//   Global configuration management system. Loads configuration from JSON,
+//   provides typed getters with defaults, validates on load. Header-only
+//   singleton with thread-safe access.
 //
-// Structure:
-//   Config (singleton)
-//   ├── MidiConfig    : Configuration MIDI
-//   ├── ApiConfig     : Configuration API
-//   ├── NetworkConfig : Configuration réseau
-//   ├── LoggerConfig  : Configuration logging
-//   └── ApplicationConfig : Configuration application
+// Features:
+//   - JSON-based configuration file
+//   - Typed getters with default values
+//   - Nested path support with dot notation (e.g., "midi.buffer_size")
+//   - Validation on load
+//   - Runtime updates
+//   - Thread-safe access
 //
-// Thread-safety: Singleton thread-safe (Meyer's Singleton)
+// Dependencies:
+//   - nlohmann/json
+//   - Logger.h
+//   - Error.h
 //
-// Auteur: MidiMind Team
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified structure (removed complex nested structs)
+//   - Added nested path support with dot notation
+//   - Improved validation
+//   - Added merge capability
+//   - Focused on essential configuration only
+//
 // ============================================================================
 
 #pragma once
@@ -31,270 +39,101 @@
 #include <string>
 #include <mutex>
 #include <fstream>
+#include <sstream>
 #include <nlohmann/json.hpp>
-#include "Logger.h"
 
-using json = nlohmann::json;
+#include "Logger.h"
+#include "Error.h"
 
 namespace midiMind {
 
-// ============================================================================
-// STRUCTURES DE CONFIGURATION
-// ============================================================================
-
-/**
- * @struct MidiConfig
- * @brief Configuration MIDI
- */
-struct MidiConfig {
-    std::string defaultInputDevice = "default";
-    std::string defaultOutputDevice = "default";
-    int sampleRate = 44100;           // Hz (validé: 8000-192000)
-    int bufferSize = 256;             // samples (validé: power of 2, 32-8192)
-    int latencyMs = 10;               // ms (validé: 0-1000)
-    bool autoConnect = true;
-    bool hotPlugEnabled = true;
-    
-    /**
-     * @brief Convertit depuis JSON
-     * @param j JSON source
-     * @note Applique valeurs par défaut si champs manquants
-     */
-    void fromJson(const json& j) {
-        if (j.contains("default_input_device")) {
-            defaultInputDevice = j["default_input_device"];
-        }
-        if (j.contains("default_output_device")) {
-            defaultOutputDevice = j["default_output_device"];
-        }
-        if (j.contains("sample_rate")) {
-            sampleRate = j["sample_rate"];
-        }
-        if (j.contains("buffer_size")) {
-            bufferSize = j["buffer_size"];
-        }
-        if (j.contains("latency_ms")) {
-            latencyMs = j["latency_ms"];
-        }
-        if (j.contains("auto_connect")) {
-            autoConnect = j["auto_connect"];
-        }
-        if (j.contains("hot_plug_enabled")) {
-            hotPlugEnabled = j["hot_plug_enabled"];
-        }
-    }
-    
-    /**
-     * @brief Convertit vers JSON
-     * @return json JSON généré
-     */
-    json toJson() const {
-        return {
-            {"default_input_device", defaultInputDevice},
-            {"default_output_device", defaultOutputDevice},
-            {"sample_rate", sampleRate},
-            {"buffer_size", bufferSize},
-            {"latency_ms", latencyMs},
-            {"auto_connect", autoConnect},
-            {"hot_plug_enabled", hotPlugEnabled}
-        };
-    }
-};
-
-/**
- * @struct ApiConfig
- * @brief Configuration API WebSocket et HTTP
- */
-struct ApiConfig {
-    int port = 8080;                  // Port WebSocket (validé: 1024-65535)
-    int httpPort = 8000;              // Port HTTP (validé: 1024-65535)
-    int maxConnections = 100;         // Max clients (validé: 1-1000)
-    int commandTimeout = 5000;        // ms
-    bool enableCors = true;
-    std::string corsOrigin = "*";
-    
-    void fromJson(const json& j) {
-        if (j.contains("port")) {
-            port = j["port"];
-        }
-        if (j.contains("http_port")) {
-            httpPort = j["http_port"];
-        }
-        if (j.contains("max_connections")) {
-            maxConnections = j["max_connections"];
-        }
-        if (j.contains("command_timeout")) {
-            commandTimeout = j["command_timeout"];
-        }
-        if (j.contains("enable_cors")) {
-            enableCors = j["enable_cors"];
-        }
-        if (j.contains("cors_origin")) {
-            corsOrigin = j["cors_origin"];
-        }
-    }
-    
-    json toJson() const {
-        return {
-            {"port", port},
-            {"http_port", httpPort},
-            {"max_connections", maxConnections},
-            {"command_timeout", commandTimeout},
-            {"enable_cors", enableCors},
-            {"cors_origin", corsOrigin}
-        };
-    }
-};
-
-/**
- * @struct NetworkConfig
- * @brief Configuration réseau (WiFi, Bluetooth, etc.)
- */
-struct NetworkConfig {
-    bool enabled = false;
-    bool wifiEnabled = true;
-    bool bluetoothEnabled = false;
-    bool rtpMidiEnabled = false;
-    int rtpMidiPort = 5004;
-    std::string networkInterface = "wlan0";
-    
-    void fromJson(const json& j) {
-        if (j.contains("enabled")) {
-            enabled = j["enabled"];
-        }
-        if (j.contains("wifi_enabled")) {
-            wifiEnabled = j["wifi_enabled"];
-        }
-        if (j.contains("bluetooth_enabled")) {
-            bluetoothEnabled = j["bluetooth_enabled"];
-        }
-        if (j.contains("rtpmidi_enabled")) {
-            rtpMidiEnabled = j["rtpmidi_enabled"];
-        }
-        if (j.contains("rtpmidi_port")) {
-            rtpMidiPort = j["rtpmidi_port"];
-        }
-        if (j.contains("network_interface")) {
-            networkInterface = j["network_interface"];
-        }
-    }
-    
-    json toJson() const {
-        return {
-            {"enabled", enabled},
-            {"wifi_enabled", wifiEnabled},
-            {"bluetooth_enabled", bluetoothEnabled},
-            {"rtpmidi_enabled", rtpMidiEnabled},
-            {"rtpmidi_port", rtpMidiPort},
-            {"network_interface", networkInterface}
-        };
-    }
-};
-
-/**
- * @struct LoggerConfig
- * @brief Configuration du logging
- */
-struct LoggerConfig {
-    std::string level = "info";
-    std::string outputFile = "/var/log/midimind/midimind.log";
-    bool enableConsole = true;
-    bool enableFile = true;
-    int maxFileSize = 10 * 1024 * 1024;  // 10 MB
-    int maxBackups = 5;
-    
-    void fromJson(const json& j) {
-        if (j.contains("level")) {
-            level = j["level"];
-        }
-        if (j.contains("output_file")) {
-            outputFile = j["output_file"];
-        }
-        if (j.contains("enable_console")) {
-            enableConsole = j["enable_console"];
-        }
-        if (j.contains("enable_file")) {
-            enableFile = j["enable_file"];
-        }
-        if (j.contains("max_file_size")) {
-            maxFileSize = j["max_file_size"];
-        }
-        if (j.contains("max_backups")) {
-            maxBackups = j["max_backups"];
-        }
-    }
-    
-    json toJson() const {
-        return {
-            {"level", level},
-            {"output_file", outputFile},
-            {"enable_console", enableConsole},
-            {"enable_file", enableFile},
-            {"max_file_size", maxFileSize},
-            {"max_backups", maxBackups}
-        };
-    }
-};
-
-/**
- * @struct ApplicationConfig
- * @brief Configuration de l'application
- */
-struct ApplicationConfig {
-    std::string version = "3.0.0";
-    std::string dataDirectory = "/var/lib/midimind";
-    bool daemonMode = false;
-    std::string pidFile = "/var/run/midimind.pid";
-    
-    void fromJson(const json& j) {
-        if (j.contains("version")) {
-            version = j["version"];
-        }
-        if (j.contains("data_directory")) {
-            dataDirectory = j["data_directory"];
-        }
-        if (j.contains("daemon_mode")) {
-            daemonMode = j["daemon_mode"];
-        }
-        if (j.contains("pid_file")) {
-            pidFile = j["pid_file"];
-        }
-    }
-    
-    json toJson() const {
-        return {
-            {"version", version},
-            {"data_directory", dataDirectory},
-            {"daemon_mode", daemonMode},
-            {"pid_file", pidFile}
-        };
-    }
-};
+using json = nlohmann::json;
 
 // ============================================================================
-// CLASSE CONFIG (SINGLETON)
+// DEFAULT CONFIGURATION VALUES
+// ============================================================================
+
+/**
+ * @brief Default configuration as JSON string
+ * 
+ * @details
+ * This is the fallback configuration used when:
+ * - No config file is found
+ * - Config file is corrupted
+ * - Specific values are missing
+ */
+const char* DEFAULT_CONFIG_JSON = R"({
+    "application": {
+        "version": "4.1.0",
+        "name": "MidiMind",
+        "data_dir": "/var/lib/midimind",
+        "log_dir": "/var/log/midimind"
+    },
+    "midi": {
+        "buffer_size": 256,
+        "sample_rate": 44100,
+        "max_devices": 32,
+        "alsa_client_name": "MidiMind"
+    },
+    "timing": {
+        "latency_compensation": true,
+        "auto_calibration": true,
+        "calibration_duration_ms": 5000,
+        "calibration_iterations": 100,
+        "max_jitter_ms": 5.0
+    },
+    "api": {
+        "port": 8080,
+        "host": "0.0.0.0",
+        "max_connections": 10,
+        "timeout_ms": 30000
+    },
+    "storage": {
+        "database_path": "/var/lib/midimind/midimind.db",
+        "auto_backup": true,
+        "backup_interval_hours": 24,
+        "max_backups": 7
+    },
+    "logging": {
+        "level": "info",
+        "file_enabled": true,
+        "console_enabled": true,
+        "max_file_size_mb": 10,
+        "max_backups": 5
+    }
+})";
+
+// ============================================================================
+// CONFIG CLASS
 // ============================================================================
 
 /**
  * @class Config
- * @brief Singleton de configuration globale
+ * @brief Global configuration manager (Singleton)
  * 
  * @details
- * Gère la configuration de toute l'application.
+ * Thread-safe singleton that manages application configuration.
+ * Configuration is stored as JSON and can be accessed using:
+ * - Direct JSON access: config.get()
+ * - Typed getters: getString(), getInt(), getBool()
+ * - Nested paths: "midi.buffer_size", "api.port"
  * 
- * Fonctionnalités:
- * - Lecture/écriture fichier JSON
- * - ✅ Validation des valeurs (v3.0.2)
- * - Valeurs par défaut
- * - Thread-safe (Meyer's Singleton)
- * 
- * @example Utilisation
- * ```cpp
+ * @example Basic usage
+ * @code
  * auto& config = Config::instance();
- * config.load("config.json");
+ * config.load("/etc/midimind/config.json");
  * 
- * int sampleRate = config.midi.sampleRate;
- * ```
+ * int bufferSize = config.getInt("midi.buffer_size", 256);
+ * std::string logLevel = config.getString("logging.level", "info");
+ * bool autoCalib = config.getBool("timing.auto_calibration", true);
+ * @endcode
+ * 
+ * @example Nested path access
+ * @code
+ * // Access nested values using dot notation
+ * std::string dbPath = config.getString("storage.database_path");
+ * int apiPort = config.getInt("api.port");
+ * @endcode
  */
 class Config {
 public:
@@ -303,105 +142,91 @@ public:
     // ========================================================================
     
     /**
-     * @brief Récupère l'instance unique (thread-safe C++11)
-     * @return Config& Référence singleton
+     * @brief Get singleton instance (thread-safe)
+     * @return Reference to Config singleton
      */
     static Config& instance() {
         static Config instance;
         return instance;
     }
     
-    // Désactiver copie
+    // Disable copy and move
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
+    Config(Config&&) = delete;
+    Config& operator=(Config&&) = delete;
     
     // ========================================================================
-    // CHARGEMENT / SAUVEGARDE
+    // LOAD / SAVE
     // ========================================================================
     
     /**
-     * @brief Charge la configuration depuis un fichier JSON
+     * @brief Load configuration from JSON file
      * 
-     * @param filepath Chemin du fichier de configuration
-     * @return true Si le chargement a réussi
+     * @param filepath Path to configuration file
+     * @return true if loaded successfully, false otherwise
      * 
+     * @note If file doesn't exist or is invalid, uses default configuration
      * @note Thread-safe
-     * @note Si le fichier n'existe pas, utilise les valeurs par défaut
-     * @note ✅ CORRECTIF 1.5: Validation complète des valeurs
      * 
      * @example
-     * ```cpp
-     * if (!Config::instance().load("config.json")) {
-     *     Logger::warn("Config", "Using default configuration");
+     * @code
+     * if (!Config::instance().load("/etc/midimind/config.json")) {
+     *     Logger::warning("Config", "Using default configuration");
      * }
-     * ```
+     * @endcode
      */
     bool load(const std::string& filepath) {
         std::lock_guard<std::mutex> lock(mutex_);
         
         Logger::info("Config", "Loading configuration from: " + filepath);
         
-        // Ouvrir le fichier
+        // Try to open file
         std::ifstream file(filepath);
         if (!file.is_open()) {
-            Logger::warn("Config", "Cannot open config file: " + filepath);
-            Logger::warn("Config", "Using default configuration");
+            Logger::warning("Config", "Cannot open config file, using defaults");
+            loadDefaults();
             configPath_ = filepath;
             return false;
         }
         
         try {
-            // Parser JSON
-            json j;
-            file >> j;
+            // Parse JSON
+            json fileConfig;
+            file >> fileConfig;
             file.close();
             
-            // Charger les différentes sections
-            if (j.contains("midi")) {
-                midi.fromJson(j["midi"]);
-                Logger::debug("Config", "MIDI config loaded");
-            }
+            // Load defaults first
+            loadDefaults();
             
-            if (j.contains("api")) {
-                api.fromJson(j["api"]);
-                Logger::debug("Config", "API config loaded");
-            }
-            
-            if (j.contains("network")) {
-                network.fromJson(j["network"]);
-                Logger::debug("Config", "Network config loaded");
-            }
-            
-            if (j.contains("logger")) {
-                logger.fromJson(j["logger"]);
-                Logger::debug("Config", "Logger config loaded");
-            }
-            
-            if (j.contains("application")) {
-                application.fromJson(j["application"]);
-                Logger::debug("Config", "Application config loaded");
-            }
+            // Merge file config with defaults (file config takes precedence)
+            mergeJson(config_, fileConfig);
             
             configPath_ = filepath;
             
-            // ✅ CORRECTIF 1.5: VALIDATION DES VALEURS
-            validateAndFix();
+            // Validate configuration
+            if (!validate()) {
+                Logger::warning("Config", "Configuration validation failed, using defaults");
+                loadDefaults();
+                return false;
+            }
             
-            Logger::info("Config", "✅ Configuration loaded successfully");
+            Logger::info("Config", "✓ Configuration loaded successfully");
             return true;
             
         } catch (const json::exception& e) {
             Logger::error("Config", "JSON parse error: " + std::string(e.what()));
-            Logger::warn("Config", "Using default configuration");
+            Logger::warning("Config", "Using default configuration");
+            loadDefaults();
             return false;
         }
     }
     
     /**
-     * @brief Sauvegarde la configuration dans un fichier JSON
+     * @brief Save configuration to JSON file
      * 
-     * @param filepath Chemin du fichier (optionnel, utilise le dernier chargé)
-     * @return true Si la sauvegarde a réussi
+     * @param filepath Path to save config (optional, uses loaded path if empty)
+     * @return true if saved successfully
      * 
      * @note Thread-safe
      */
@@ -411,31 +236,21 @@ public:
         std::string path = filepath.empty() ? configPath_ : filepath;
         
         if (path.empty()) {
-            Logger::error("Config", "No config file path specified");
+            Logger::error("Config", "No config path specified");
             return false;
         }
         
-        Logger::info("Config", "Saving configuration to: " + path);
-        
         try {
-            json j = {
-                {"midi", midi.toJson()},
-                {"api", api.toJson()},
-                {"network", network.toJson()},
-                {"logger", logger.toJson()},
-                {"application", application.toJson()}
-            };
-            
             std::ofstream file(path);
             if (!file.is_open()) {
                 Logger::error("Config", "Cannot open file for writing: " + path);
                 return false;
             }
             
-            file << j.dump(2);  // Pretty print avec indentation
+            file << config_.dump(2);  // Pretty print with 2 spaces
             file.close();
             
-            Logger::info("Config", "✅ Configuration saved successfully");
+            Logger::info("Config", "Configuration saved to: " + path);
             return true;
             
         } catch (const std::exception& e) {
@@ -445,144 +260,373 @@ public:
     }
     
     // ========================================================================
-    // MEMBRES PUBLICS - CONFIGURATION
+    // GETTERS - TYPED
     // ========================================================================
     
-    MidiConfig midi;
-    ApiConfig api;
-    NetworkConfig network;
-    LoggerConfig logger;
-    ApplicationConfig application;
+    /**
+     * @brief Get string value
+     * 
+     * @param path Nested path (e.g., "midi.alsa_client_name")
+     * @param defaultValue Default if path doesn't exist
+     * @return String value or default
+     * 
+     * @note Thread-safe
+     */
+    std::string getString(const std::string& path, 
+                         const std::string& defaultValue = "") const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            auto value = getValueAtPath(path);
+            if (value.is_string()) {
+                return value.get<std::string>();
+            }
+        } catch (...) {
+            // Path not found or wrong type
+        }
+        
+        return defaultValue;
+    }
     
+    /**
+     * @brief Get integer value
+     * 
+     * @param path Nested path (e.g., "midi.buffer_size")
+     * @param defaultValue Default if path doesn't exist
+     * @return Integer value or default
+     * 
+     * @note Thread-safe
+     */
+    int getInt(const std::string& path, int defaultValue = 0) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            auto value = getValueAtPath(path);
+            if (value.is_number_integer()) {
+                return value.get<int>();
+            }
+        } catch (...) {
+            // Path not found or wrong type
+        }
+        
+        return defaultValue;
+    }
+    
+    /**
+     * @brief Get boolean value
+     * 
+     * @param path Nested path (e.g., "timing.latency_compensation")
+     * @param defaultValue Default if path doesn't exist
+     * @return Boolean value or default
+     * 
+     * @note Thread-safe
+     */
+    bool getBool(const std::string& path, bool defaultValue = false) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            auto value = getValueAtPath(path);
+            if (value.is_boolean()) {
+                return value.get<bool>();
+            }
+        } catch (...) {
+            // Path not found or wrong type
+        }
+        
+        return defaultValue;
+    }
+    
+    /**
+     * @brief Get double value
+     * 
+     * @param path Nested path (e.g., "timing.max_jitter_ms")
+     * @param defaultValue Default if path doesn't exist
+     * @return Double value or default
+     * 
+     * @note Thread-safe
+     */
+    double getDouble(const std::string& path, double defaultValue = 0.0) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            auto value = getValueAtPath(path);
+            if (value.is_number()) {
+                return value.get<double>();
+            }
+        } catch (...) {
+            // Path not found or wrong type
+        }
+        
+        return defaultValue;
+    }
+    
+    /**
+     * @brief Get JSON object/array
+     * 
+     * @param path Nested path (e.g., "midi" returns entire midi section)
+     * @return JSON value or null if not found
+     * 
+     * @note Thread-safe
+     */
+    json getJson(const std::string& path) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            return getValueAtPath(path);
+        } catch (...) {
+            return json();  // Return null
+        }
+    }
+    
+    // ========================================================================
+    // SETTERS
+    // ========================================================================
+    
+    /**
+     * @brief Set value at path
+     * 
+     * @param path Nested path (e.g., "midi.buffer_size")
+     * @param value Value to set (any JSON-compatible type)
+     * 
+     * @note Thread-safe
+     * @note Creates intermediate objects if they don't exist
+     * 
+     * @example
+     * @code
+     * config.set("midi.buffer_size", 512);
+     * config.set("logging.level", "debug");
+     * config.set("timing.auto_calibration", false);
+     * @endcode
+     */
+    template<typename T>
+    void set(const std::string& path, const T& value) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        setValueAtPath(path, value);
+    }
+    
+    // ========================================================================
+    // UTILITIES
+    // ========================================================================
+    
+    /**
+     * @brief Get entire configuration as JSON
+     * @return Copy of configuration JSON
+     * @note Thread-safe
+     */
+    json getAll() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return config_;
+    }
+    
+    /**
+     * @brief Check if path exists in configuration
+     * @param path Nested path to check
+     * @return true if path exists
+     * @note Thread-safe
+     */
+    bool has(const std::string& path) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        try {
+            getValueAtPath(path);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    /**
+     * @brief Reset to default configuration
+     * @note Thread-safe
+     */
+    void reset() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        loadDefaults();
+        Logger::info("Config", "Configuration reset to defaults");
+    }
+
 private:
     // ========================================================================
-    // CONSTRUCTEUR PRIVÉ
+    // PRIVATE CONSTRUCTOR
     // ========================================================================
     
-    Config() = default;
+    Config() {
+        loadDefaults();
+    }
+    
+    ~Config() = default;
     
     // ========================================================================
-    // VALIDATION - CORRECTIF 1.5
+    // PRIVATE METHODS
     // ========================================================================
     
     /**
-     * @brief ✅ Valide et corrige les valeurs de configuration
-     * @note Applique valeurs par défaut sûres si invalides
-     * @note Log warnings pour chaque correction
+     * @brief Load default configuration
      */
-    void validateAndFix() {
-        bool hadErrors = false;
-        
-        // ✅ VALIDATION MIDI - Sample Rate
-        if (midi.sampleRate <= 0 || midi.sampleRate > 192000) {
-            Logger::warn("Config", 
-                "Invalid sample rate (" + std::to_string(midi.sampleRate) + 
-                "), using 44100 Hz");
-            midi.sampleRate = 44100;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION MIDI - Buffer Size (doit être puissance de 2)
-        if (midi.bufferSize <= 0 || midi.bufferSize > 8192 || 
-            !isPowerOfTwo(midi.bufferSize)) {
-            Logger::warn("Config", 
-                "Invalid buffer size (" + std::to_string(midi.bufferSize) + 
-                "), using 256 samples");
-            midi.bufferSize = 256;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION MIDI - Latency
-        if (midi.latencyMs < 0 || midi.latencyMs > 1000) {
-            Logger::warn("Config", 
-                "Invalid latency (" + std::to_string(midi.latencyMs) + 
-                "ms), using 10ms");
-            midi.latencyMs = 10;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION API - Port WebSocket
-        if (api.port < 1024 || api.port > 65535) {
-            Logger::warn("Config", 
-                "Invalid API port (" + std::to_string(api.port) + 
-                "), using 8080");
-            api.port = 8080;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION API - Port HTTP
-        if (api.httpPort < 1024 || api.httpPort > 65535) {
-            Logger::warn("Config", 
-                "Invalid HTTP port (" + std::to_string(api.httpPort) + 
-                "), using 8000");
-            api.httpPort = 8000;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION API - Max Connections
-        if (api.maxConnections <= 0 || api.maxConnections > 1000) {
-            Logger::warn("Config", 
-                "Invalid max connections (" + std::to_string(api.maxConnections) + 
-                "), using 100");
-            api.maxConnections = 100;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION API - Command Timeout
-        if (api.commandTimeout <= 0 || api.commandTimeout > 60000) {
-            Logger::warn("Config", 
-                "Invalid command timeout (" + std::to_string(api.commandTimeout) + 
-                "ms), using 5000ms");
-            api.commandTimeout = 5000;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION LOGGER - Max File Size
-        if (logger.maxFileSize <= 0 || logger.maxFileSize > 100 * 1024 * 1024) {
-            Logger::warn("Config", 
-                "Invalid log file size, using 10MB");
-            logger.maxFileSize = 10 * 1024 * 1024;
-            hadErrors = true;
-        }
-        
-        // ✅ VALIDATION LOGGER - Max Backups
-        if (logger.maxBackups < 0 || logger.maxBackups > 100) {
-            Logger::warn("Config", 
-                "Invalid log backups count, using 5");
-            logger.maxBackups = 5;
-            hadErrors = true;
-        }
-        
-        if (hadErrors) {
-            Logger::warn("Config", 
-                "⚠️  Configuration had invalid values, corrected to safe defaults");
-        } else {
-            Logger::info("Config", "✅ Configuration validation passed");
+    void loadDefaults() {
+        try {
+            config_ = json::parse(DEFAULT_CONFIG_JSON);
+        } catch (const json::exception& e) {
+            Logger::error("Config", "Failed to parse default config: " + 
+                         std::string(e.what()));
+            config_ = json::object();  // Empty object as last resort
         }
     }
     
     /**
-     * @brief Vérifie si un nombre est une puissance de 2
-     * @param n Nombre à vérifier
-     * @return true Si puissance de 2
+     * @brief Get value at nested path
+     * @param path Dot-separated path (e.g., "midi.buffer_size")
+     * @return JSON value at path
+     * @throws json::exception if path not found
      */
-    static bool isPowerOfTwo(int n) {
-        return n > 0 && (n & (n - 1)) == 0;
+    json getValueAtPath(const std::string& path) const {
+        auto keys = splitPath(path);
+        json current = config_;
+        
+        for (const auto& key : keys) {
+            if (!current.is_object() || !current.contains(key)) {
+                throw json::exception::other_error::create(0, 
+                    "Path not found: " + path, nullptr);
+            }
+            current = current[key];
+        }
+        
+        return current;
+    }
+    
+    /**
+     * @brief Set value at nested path
+     * @param path Dot-separated path
+     * @param value Value to set
+     */
+    template<typename T>
+    void setValueAtPath(const std::string& path, const T& value) {
+        auto keys = splitPath(path);
+        json* current = &config_;
+        
+        // Navigate/create path
+        for (size_t i = 0; i < keys.size() - 1; ++i) {
+            const auto& key = keys[i];
+            
+            if (!current->is_object()) {
+                *current = json::object();
+            }
+            
+            if (!current->contains(key)) {
+                (*current)[key] = json::object();
+            }
+            
+            current = &(*current)[key];
+        }
+        
+        // Set final value
+        if (!current->is_object()) {
+            *current = json::object();
+        }
+        (*current)[keys.back()] = value;
+    }
+    
+    /**
+     * @brief Split path into keys
+     * @param path Dot-separated path
+     * @return Vector of keys
+     */
+    std::vector<std::string> splitPath(const std::string& path) const {
+        std::vector<std::string> keys;
+        std::stringstream ss(path);
+        std::string key;
+        
+        while (std::getline(ss, key, '.')) {
+            if (!key.empty()) {
+                keys.push_back(key);
+            }
+        }
+        
+        return keys;
+    }
+    
+    /**
+     * @brief Merge two JSON objects recursively
+     * @param base Base object (modified in place)
+     * @param overlay Overlay object (takes precedence)
+     */
+    void mergeJson(json& base, const json& overlay) {
+        if (!overlay.is_object()) {
+            base = overlay;
+            return;
+        }
+        
+        for (auto it = overlay.begin(); it != overlay.end(); ++it) {
+            if (base.contains(it.key()) && base[it.key()].is_object() && 
+                it.value().is_object()) {
+                // Recursive merge for nested objects
+                mergeJson(base[it.key()], it.value());
+            } else {
+                // Direct override
+                base[it.key()] = it.value();
+            }
+        }
+    }
+    
+    /**
+     * @brief Validate configuration values
+     * @return true if valid
+     */
+    bool validate() {
+        bool valid = true;
+        
+        // Validate MIDI buffer size (must be power of 2, 32-8192)
+        int bufferSize = getInt("midi.buffer_size", 256);
+        if (bufferSize < 32 || bufferSize > 8192 || 
+            (bufferSize & (bufferSize - 1)) != 0) {
+            Logger::warning("Config", "Invalid buffer_size: " + 
+                          std::to_string(bufferSize) + ", using 256");
+            set("midi.buffer_size", 256);
+            valid = false;
+        }
+        
+        // Validate sample rate (8000-192000 Hz)
+        int sampleRate = getInt("midi.sample_rate", 44100);
+        if (sampleRate < 8000 || sampleRate > 192000) {
+            Logger::warning("Config", "Invalid sample_rate: " + 
+                          std::to_string(sampleRate) + ", using 44100");
+            set("midi.sample_rate", 44100);
+            valid = false;
+        }
+        
+        // Validate API port (1024-65535)
+        int apiPort = getInt("api.port", 8080);
+        if (apiPort < 1024 || apiPort > 65535) {
+            Logger::warning("Config", "Invalid API port: " + 
+                          std::to_string(apiPort) + ", using 8080");
+            set("api.port", 8080);
+            valid = false;
+        }
+        
+        // Validate log level
+        std::string logLevel = getString("logging.level", "info");
+        if (logLevel != "debug" && logLevel != "info" && 
+            logLevel != "warning" && logLevel != "error") {
+            Logger::warning("Config", "Invalid log level: " + logLevel + 
+                          ", using 'info'");
+            set("logging.level", "info");
+            valid = false;
+        }
+        
+        return valid;
     }
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // MEMBERS
     // ========================================================================
     
-    /// Mutex pour thread-safety
-    mutable std::mutex mutex_;
-    
-    /// Chemin du fichier de configuration
-    std::string configPath_;
+    mutable std::mutex mutex_;     ///< Thread-safety
+    json config_;                   ///< Configuration data
+    std::string configPath_;        ///< Path to config file
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Config.h v3.0.2 - CORRECTIONS PHASE 1 COMPLÈTES
+// END OF FILE Config.h v4.1.0
 // ============================================================================

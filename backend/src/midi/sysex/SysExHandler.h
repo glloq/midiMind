@@ -1,23 +1,26 @@
 // ============================================================================
-// Fichier: src/midi/sysex/SysExHandler.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/midi/sysex/SysExHandler.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Gestionnaire principal des messages System Exclusive (SysEx).
-//   Gère l'identification des devices, le contrôle GM, et Custom SysEx (0x7D).
+//   Main SysEx message handler. Manages System Exclusive messages including
+//   standard Identity Requests and Custom SysEx protocol (0x7D) for DIY
+//   instruments. Focuses on Blocks 1-2 for v4.1.0 (Identification + NoteMap).
 //
-// Responsabilités:
-//   - Réception et dispatch des messages SysEx
-//   - Identification automatique des devices
-//   - Gestion du protocole Custom SysEx (blocs 1-8)
-//   - Cache thread-safe des identités et capacités
-//   - Notifications via callbacks
+// Dependencies:
+//   - SysExParser
+//   - nlohmann/json
 //
-// Thread-safety: Oui (std::mutex)
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-06
-// Version: 3.0.0
+// Changes v4.1.0:
+//   - Simplified to focus on Blocks 1-2 only
+//   - Removed Blocks 3-8 (deferred to later version)
+//   - Thread-safe with proper lock ordering
+//
 // ============================================================================
 
 #pragma once
@@ -28,51 +31,41 @@
 #include <mutex>
 #include <atomic>
 #include <optional>
-#include <nlohmann/json.hpp>
-
-#include "SysExMessage.h"
-#include "SysExParser.h"
-#include "SysExBuilder.h"
-#include "DeviceIdentity.h"
-#include "CustomDeviceIdentity.h"
-#include "NoteMap.h"
-#include "CCCapabilities.h"
-#include "AirCapabilities.h"
-#include "LightCapabilities.h"
-#include "SensorsFeedback.h"
-#include "SyncClock.h"
-#include "CustomSysExParser.h"
-#include "ManufacturerDatabase.h"
-#include "../../core/Logger.h"
-
-using json = nlohmann::json;
+#include <vector>
+#include <string>
 
 namespace midiMind {
 
+// Forward declarations
+struct DeviceIdentity;
+struct CustomDeviceIdentity;
+struct NoteMap;
+
 /**
  * @class SysExHandler
- * @brief Gestionnaire principal des messages SysEx
+ * @brief Main handler for System Exclusive messages
  * 
  * @details
- * Classe centrale pour le traitement des messages System Exclusive.
- * Gère à la fois les messages SysEx standard (Identity, GM, Device Control)
- * et les messages Custom (protocole 0x7D pour instruments DIY).
+ * Processes both standard SysEx (Identity Request/Reply) and Custom SysEx
+ * messages (0x7D protocol for DIY instruments). Version 4.1.0 focuses on
+ * basic identification and note mapping only.
  * 
- * Thread-safety: Oui
+ * Thread-safety: Yes (internal mutex)
  * 
- * @example Utilisation
+ * @example Basic usage
  * ```cpp
  * auto handler = std::make_shared<SysExHandler>();
  * 
- * // Callback pour nouvelles identités
- * handler->setOnDeviceIdentified([](const DeviceIdentity& id) {
- *     Logger::info("Identified: " + id.toString());
+ * // Set callback for device identification
+ * handler->setOnDeviceIdentified([](const std::string& deviceId, 
+ *                                    const DeviceIdentity& id) {
+ *     Logger::info("Identified: " + id.manufacturer);
  * });
  * 
- * // Demander l'identification d'un device
+ * // Request device identity
  * handler->requestIdentity(deviceId);
  * 
- * // Traiter un message SysEx reçu
+ * // Process received SysEx
  * handler->handleSysExMessage(sysexData, deviceId);
  * ```
  */
@@ -83,407 +76,269 @@ public:
     // ========================================================================
     
     /**
-     * @brief Callback appelé quand un device standard est identifié
+     * @brief Callback for standard device identification
+     * @param deviceId Device ID
+     * @param identity Parsed device identity
      */
-    using DeviceIdentifiedCallback = std::function<void(const std::string& deviceId, const DeviceIdentity&)>;
+    using DeviceIdentifiedCallback = std::function<void(
+        const std::string& deviceId, 
+        const DeviceIdentity& identity
+    )>;
     
     /**
-     * @brief Callback appelé pour envoyer un message SysEx
-     * @param deviceId ID du device destinataire
-     * @param message Message à envoyer
+     * @brief Callback for custom device identification (Block 1)
+     * @param deviceId Device ID
+     * @param identity Custom device identity
      */
-    using SendSysExCallback = std::function<void(const std::string& deviceId, const SysExMessage&)>;
+    using CustomDeviceIdentifiedCallback = std::function<void(
+        const std::string& deviceId,
+        const CustomDeviceIdentity& identity
+    )>;
     
     /**
-     * @brief Callback appelé pour les messages SysEx non gérés
+     * @brief Callback for note map received (Block 2)
+     * @param deviceId Device ID
+     * @param noteMap Note mapping information
      */
-    using UnhandledSysExCallback = std::function<void(const std::string& deviceId, const SysExMessage&)>;
+    using NoteMapReceivedCallback = std::function<void(
+        const std::string& deviceId,
+        const NoteMap& noteMap
+    )>;
     
-    // Custom SysEx Callbacks
-    using CustomDeviceIdentifiedCallback = std::function<void(const std::string& deviceId, const CustomDeviceIdentity&)>;
-    using NoteMapReceivedCallback = std::function<void(const std::string& deviceId, const NoteMap&)>;
-    using CCCapabilitiesCallback = std::function<void(const std::string& deviceId, const CCCapabilities&)>;
-    using AirCapabilitiesCallback = std::function<void(const std::string& deviceId, const AirCapabilities&)>;
-    using LightCapabilitiesCallback = std::function<void(const std::string& deviceId, const LightCapabilities&)>;
-    using SensorsFeedbackCallback = std::function<void(const std::string& deviceId, const SensorsFeedback&)>;
-    using SyncClockCallback = std::function<void(const std::string& deviceId, const SyncClock&)>;
-    using UnknownCustomBlockCallback = std::function<void(const std::string& deviceId, uint8_t blockId, uint8_t version, const SysExMessage&)>;
+    /**
+     * @brief Callback to send SysEx message to device
+     * @param deviceId Target device ID
+     * @param data Raw SysEx data
+     */
+    using SendMessageCallback = std::function<void(
+        const std::string& deviceId,
+        const std::vector<uint8_t>& data
+    )>;
     
     // ========================================================================
     // CONSTRUCTION / DESTRUCTION
     // ========================================================================
     
-    /**
-     * @brief Constructeur
-     */
     SysExHandler();
-    
-    /**
-     * @brief Destructeur
-     */
     ~SysExHandler();
     
-    // Désactiver copie
+    // Non-copyable
     SysExHandler(const SysExHandler&) = delete;
     SysExHandler& operator=(const SysExHandler&) = delete;
     
     // ========================================================================
-    // RÉCEPTION DE MESSAGES
+    // CONFIGURATION
     // ========================================================================
     
     /**
-     * @brief Traite un message SysEx reçu
-     * 
-     * Parse le message et déclenche les callbacks appropriés.
-     * 
-     * @param data Données brutes du message SysEx
-     * @param deviceId ID du device source
+     * @brief Set callback for sending messages
+     * @param callback Function to call when sending SysEx
      */
-    void handleSysExMessage(const std::vector<uint8_t>& data, 
+    void setSendMessageCallback(SendMessageCallback callback) {
+        onSendMessage_ = std::move(callback);
+    }
+    
+    /**
+     * @brief Set callback for standard device identified
+     * @param callback Function to call when device identified
+     */
+    void setOnDeviceIdentified(DeviceIdentifiedCallback callback) {
+        onDeviceIdentified_ = std::move(callback);
+    }
+    
+    /**
+     * @brief Set callback for custom device identified (Block 1)
+     * @param callback Function to call when custom device identified
+     */
+    void setOnCustomDeviceIdentified(CustomDeviceIdentifiedCallback callback) {
+        onCustomDeviceIdentified_ = std::move(callback);
+    }
+    
+    /**
+     * @brief Set callback for note map received (Block 2)
+     * @param callback Function to call when note map received
+     */
+    void setOnNoteMapReceived(NoteMapReceivedCallback callback) {
+        onNoteMapReceived_ = std::move(callback);
+    }
+    
+    /**
+     * @brief Enable/disable automatic identity request on device connection
+     * @param enable True to enable auto-identify
+     * @param delayMs Delay in ms before requesting (default: 500ms)
+     */
+    void setAutoIdentify(bool enable, int delayMs = 500) {
+        autoIdentify_ = enable;
+        autoIdentifyDelayMs_ = delayMs;
+    }
+    
+    // ========================================================================
+    // MESSAGE HANDLING
+    // ========================================================================
+    
+    /**
+     * @brief Handle incoming SysEx message
+     * @param data Raw MIDI data (including F0...F7)
+     * @param deviceId Source device ID
+     */
+    void handleSysExMessage(const std::vector<uint8_t>& data,
                            const std::string& deviceId);
     
-    /**
-     * @brief Traite un message SysEx reçu
-     * 
-     * @param message Message SysEx parsé
-     * @param deviceId ID du device source
-     */
-    void handleSysExMessage(const SysExMessage& message, 
-                           const std::string& deviceId);
-    
     // ========================================================================
-    // IDENTIFICATION DE DEVICES
+    // REQUESTS
     // ========================================================================
     
     /**
-     * @brief Demande l'identité d'un device
+     * @brief Request standard device identity
+     * @param deviceId Target device ID
+     * @return True if request sent successfully
      * 
-     * Envoie un Identity Request (F0 7E <device> 06 01 F7)
-     * 
-     * @param deviceId ID du device
-     * @return true si la requête a été envoyée
+     * @details Sends Universal Non-Real Time Identity Request:
+     *          F0 7E 7F 06 01 F7
      */
     bool requestIdentity(const std::string& deviceId);
     
     /**
-     * @brief Broadcast un Identity Request à tous les devices
+     * @brief Request custom device identification (Block 1)
+     * @param deviceId Target device ID
+     * @return True if request sent successfully
      * 
-     * @return true si la requête a été envoyée
+     * @details Sends Custom SysEx Request:
+     *          F0 7D 00 01 00 F7
      */
-    bool requestIdentityAll();
+    bool requestCustomIdentification(const std::string& deviceId);
     
     /**
-     * @brief Récupère l'identité d'un device
+     * @brief Request note map (Block 2)
+     * @param deviceId Target device ID
+     * @return True if request sent successfully
      * 
-     * @param deviceId ID du device
-     * @return std::optional<DeviceIdentity> Identité ou nullopt
+     * @details Sends Custom SysEx Request:
+     *          F0 7D 00 02 00 F7
      */
-    std::optional<DeviceIdentity> getDeviceIdentity(const std::string& deviceId) const;
-    
-    /**
-     * @brief Liste toutes les identités connues
-     * 
-     * @return std::map<std::string, DeviceIdentity> Map deviceId -> identité
-     */
-    std::map<std::string, DeviceIdentity> listKnownIdentities() const;
-    
-    /**
-     * @brief Efface l'identité d'un device
-     * 
-     * @param deviceId ID du device
-     */
-    void clearDeviceIdentity(const std::string& deviceId);
-    
-    /**
-     * @brief Efface toutes les identités
-     */
-    void clearAllIdentities();
+    bool requestNoteMap(const std::string& deviceId);
     
     // ========================================================================
-    // CUSTOM SYSEX (PROTOCOLE 0x7D)
+    // CACHE ACCESS
     // ========================================================================
     
     /**
-     * @brief Récupère l'identité Custom d'un device
-     * 
-     * @param deviceId ID du device
-     * @return std::optional<CustomDeviceIdentity> Identité ou nullopt
+     * @brief Get cached standard identity
+     * @param deviceId Device ID
+     * @return Optional identity if found in cache
      */
-    std::optional<CustomDeviceIdentity> getCustomIdentity(const std::string& deviceId) const;
+    std::optional<DeviceIdentity> getIdentity(const std::string& deviceId) const;
     
     /**
-     * @brief Récupère la Note Map d'un device
-     * 
-     * @param deviceId ID du device
-     * @return std::optional<NoteMap> Note map ou nullopt
+     * @brief Get cached custom identity
+     * @param deviceId Device ID
+     * @return Optional custom identity if found in cache
+     */
+    std::optional<CustomDeviceIdentity> getCustomIdentity(
+        const std::string& deviceId) const;
+    
+    /**
+     * @brief Get cached note map
+     * @param deviceId Device ID
+     * @return Optional note map if found in cache
      */
     std::optional<NoteMap> getNoteMap(const std::string& deviceId) const;
     
     /**
-     * @brief Récupère les CC supportés d'un device
+     * @brief Clear all cached data for a device
+     * @param deviceId Device ID
      */
-    std::optional<CCCapabilities> getCCCapabilities(const std::string& deviceId) const;
+    void clearDeviceCache(const std::string& deviceId);
     
     /**
-     * @brief Récupère les capacités Air d'un device
+     * @brief Clear all caches
      */
-    std::optional<AirCapabilities> getAirCapabilities(const std::string& deviceId) const;
-    
-    /**
-     * @brief Récupère les capacités Lumières d'un device
-     */
-    std::optional<LightCapabilities> getLightCapabilities(const std::string& deviceId) const;
-    
-    /**
-     * @brief Récupère les capteurs d'un device
-     */
-    std::optional<SensorsFeedback> getSensorsFeedback(const std::string& deviceId) const;
-    
-    /**
-     * @brief Récupère les capacités Sync d'un device
-     */
-    std::optional<SyncClock> getSyncClock(const std::string& deviceId) const;
-    
-    /**
-     * @brief Liste tous les Custom Devices connus
-     * 
-     * @return std::map<std::string, CustomDeviceIdentity> Map deviceId -> identité
-     */
-    std::map<std::string, CustomDeviceIdentity> listKnownCustomDevices() const;
-    
-    /**
-     * @brief Efface toutes les données Custom d'un device
-     * 
-     * @param deviceId ID du device
-     */
-    void clearCustomIdentity(const std::string& deviceId);
-    
-    /**
-     * @brief Efface toutes les identités Custom
-     */
-    void clearAllCustomIdentities();
+    void clearAllCaches();
     
     // ========================================================================
-    // AUTO-IDENTIFICATION
+    // STATISTICS
     // ========================================================================
     
     /**
-     * @brief Active/désactive l'auto-identification
-     * 
-     * Quand activé, un Identity Request est automatiquement envoyé
-     * à chaque nouveau device détecté.
-     * 
-     * @param enabled true pour activer
+     * @brief Get number of messages received
+     * @return Message count
      */
-    void setAutoIdentify(bool enabled);
+    uint32_t getMessagesReceived() const {
+        return messagesReceived_.load();
+    }
     
     /**
-     * @brief Vérifie si l'auto-identification est activée
+     * @brief Get number of messages sent
+     * @return Message count
      */
-    bool isAutoIdentifyEnabled() const;
+    uint32_t getMessagesSent() const {
+        return messagesSent_.load();
+    }
     
     /**
-     * @brief Définit le délai avant l'auto-identification
-     * 
-     * @param delayMs Délai en millisecondes
+     * @brief Get number of identity replies received
+     * @return Reply count
      */
-    void setAutoIdentifyDelay(uint32_t delayMs);
-    
-    // ========================================================================
-    // CALLBACKS
-    // ========================================================================
+    uint32_t getIdentityRepliesReceived() const {
+        return identityRepliesReceived_.load();
+    }
     
     /**
-     * @brief Définit le callback pour device identifié
+     * @brief Reset all statistics
      */
-    void setOnDeviceIdentified(DeviceIdentifiedCallback callback);
-    
-    /**
-     * @brief Définit le callback pour envoyer un SysEx
-     */
-    void setOnSendSysEx(SendSysExCallback callback);
-    
-    /**
-     * @brief Définit le callback pour SysEx non géré
-     */
-    void setOnUnhandledSysEx(UnhandledSysExCallback callback);
-    
-    // Custom SysEx Callbacks
-    void setOnCustomDeviceIdentified(CustomDeviceIdentifiedCallback callback);
-    void setOnNoteMapReceived(NoteMapReceivedCallback callback);
-    void setOnCCCapabilities(CCCapabilitiesCallback callback);
-    void setOnAirCapabilities(AirCapabilitiesCallback callback);
-    void setOnLightCapabilities(LightCapabilitiesCallback callback);
-    void setOnSensorsFeedback(SensorsFeedbackCallback callback);
-    void setOnSyncClock(SyncClockCallback callback);
-    void setOnUnknownCustomBlock(UnknownCustomBlockCallback callback);
-    
-    // ========================================================================
-    // CONTRÔLE GÉNÉRAL MIDI
-    // ========================================================================
-    
-    /**
-     * @brief Envoie GM System On
-     * 
-     * @param deviceId ID du device
-     * @return true si envoyé avec succès
-     */
-    bool sendGMSystemOn(const std::string& deviceId);
-    
-    /**
-     * @brief Envoie GM System Off
-     * 
-     * @param deviceId ID du device
-     * @return true si envoyé avec succès
-     */
-    bool sendGMSystemOff(const std::string& deviceId);
-    
-    /**
-     * @brief Envoie Master Volume
-     * 
-     * @param deviceId ID du device
-     * @param volume Volume (0-16383)
-     * @return true si envoyé avec succès
-     */
-    bool sendMasterVolume(const std::string& deviceId, uint16_t volume);
-    
-    /**
-     * @brief Envoie Master Fine Tuning
-     * 
-     * @param deviceId ID du device
-     * @param cents Tuning en cents (-8192 à +8191)
-     * @return true si envoyé avec succès
-     */
-    bool sendMasterFineTuning(const std::string& deviceId, int16_t cents);
-    
-    // ========================================================================
-    // STATISTIQUES
-    // ========================================================================
-    
-    /**
-     * @brief Récupère les statistiques du handler
-     * 
-     * @return json Statistiques au format JSON
-     */
-    json getStatistics() const;
-    
+    void resetStatistics() {
+        messagesReceived_ = 0;
+        messagesSent_ = 0;
+        identityRepliesReceived_ = 0;
+        identityRequestsSent_ = 0;
+    }
+
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // INTERNAL HANDLERS
     // ========================================================================
     
-    /**
-     * @brief Traite un Identity Reply
-     */
-    void handleIdentityReply(const SysExMessage& message, const std::string& deviceId);
+    void handleIdentityReply(const std::vector<uint8_t>& data,
+                            const std::string& deviceId);
     
-    /**
-     * @brief Traite un message General MIDI
-     */
-    void handleGeneralMidi(const SysExMessage& message, const std::string& deviceId);
+    void handleCustomIdentification(const std::vector<uint8_t>& data,
+                                   const std::string& deviceId);
     
-    /**
-     * @brief Traite un message Device Control
-     */
-    void handleDeviceControl(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un message Custom SysEx (0x7D)
-     */
-    void handleCustomSysEx(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 1 - Identification Custom
-     */
-    void handleCustomIdentification(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 2 - Note Map
-     */
-    void handleNoteMap(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 3 - CC Supportés
-     */
-    void handleCCSupported(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 4 - Capacités Air
-     */
-    void handleAirCapabilities(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 5 - Capacités Lumières
-     */
-    void handleLightCapabilities(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 7 - Capteurs/Feedback
-     */
-    void handleSensorsFeedback(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un Bloc 8 - Sync & Clock
-     */
-    void handleSyncClock(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Traite un bloc custom non implémenté
-     */
-    void handleUnknownCustomBlock(const SysExMessage& message, const std::string& deviceId);
-    
-    /**
-     * @brief Envoie un message SysEx
-     */
-    bool sendSysEx(const std::string& deviceId, const SysExMessage& message);
+    void handleNoteMap(const std::vector<uint8_t>& data,
+                      const std::string& deviceId);
     
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // HELPERS
     // ========================================================================
     
-    // Mutex pour thread-safety
-    mutable std::mutex mutex_;
+    bool sendSysEx(const std::string& deviceId,
+                   const std::vector<uint8_t>& data);
     
-    // Cache des identités standard
-    std::map<std::string, DeviceIdentity> identityCache_;
-    
-    // Cache Custom SysEx (Blocs 1-8)
-    std::map<std::string, CustomDeviceIdentity> customIdentities_;
-    std::map<std::string, NoteMap> noteMaps_;
-    std::map<std::string, CCCapabilities> ccCapabilities_;
-    std::map<std::string, AirCapabilities> airCapabilities_;
-    std::map<std::string, LightCapabilities> lightCapabilities_;
-    std::map<std::string, SensorsFeedback> sensorsFeedback_;
-    std::map<std::string, SyncClock> syncClock_;
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
     
     // Callbacks
+    SendMessageCallback onSendMessage_;
     DeviceIdentifiedCallback onDeviceIdentified_;
-    SendSysExCallback onSendSysEx_;
-    UnhandledSysExCallback onUnhandledSysEx_;
-    
-    // Custom SysEx Callbacks
     CustomDeviceIdentifiedCallback onCustomDeviceIdentified_;
     NoteMapReceivedCallback onNoteMapReceived_;
-    CCCapabilitiesCallback onCCCapabilities_;
-    AirCapabilitiesCallback onAirCapabilities_;
-    LightCapabilitiesCallback onLightCapabilities_;
-    SensorsFeedbackCallback onSensorsFeedback_;
-    SyncClockCallback onSyncClock_;
-    UnknownCustomBlockCallback onUnknownCustomBlock_;
     
     // Configuration
     bool autoIdentify_;
-    uint32_t autoIdentifyDelayMs_;
+    int autoIdentifyDelayMs_;
     
-    // Statistiques
-    std::atomic<uint64_t> messagesReceived_;
-    std::atomic<uint64_t> messagesSent_;
-    std::atomic<uint64_t> identityRepliesReceived_;
-    std::atomic<uint64_t> identityRequestsSent_;
+    // Caches (protected by mutex_)
+    mutable std::mutex mutex_;
+    std::map<std::string, DeviceIdentity> identityCache_;
+    std::map<std::string, CustomDeviceIdentity> customIdentityCache_;
+    std::map<std::string, NoteMap> noteMapCache_;
+    
+    // Statistics
+    std::atomic<uint32_t> messagesReceived_{0};
+    std::atomic<uint32_t> messagesSent_{0};
+    std::atomic<uint32_t> identityRepliesReceived_{0};
+    std::atomic<uint32_t> identityRequestsSent_{0};
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER SysExHandler.h
-// ============================================================================

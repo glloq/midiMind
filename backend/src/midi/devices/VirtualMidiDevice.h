@@ -1,143 +1,244 @@
 // ============================================================================
-// Fichier: src/midi/devices/VirtualMidiDevice.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/midi/devices/VirtualMidiDevice.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Device MIDI virtuel pour routage interne.
-//   Permet de créer des ports MIDI virtuels sans matériel physique.
+//   Virtual MIDI device for internal routing and inter-process communication.
+//   Creates ALSA virtual ports visible to other applications.
 //
-// Responsabilités:
-//   - Créer des ports MIDI virtuels
-//   - Communication inter-processus
-//   - Routage interne
+// Features:
+//   - ALSA virtual port creation
+//   - Internal message routing
+//   - Lock-free queues
+//   - Bidirectional communication
 //
-// Thread-safety: OUI
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// Changes v4.1.0:
+//   - Enhanced ALSA integration
+//   - Better queue management
+//   - Improved thread safety
+//
 // ============================================================================
 
 #pragma once
 
 #include "MidiDevice.h"
-#include "../../core/optimization/LockFreeQueue.h"
+#include <queue>
+#include <mutex>
+#include <thread>
+
+// ALSA includes (Linux only)
+#ifdef __linux__
+#include <alsa/asoundlib.h>
+#endif
 
 namespace midiMind {
 
 /**
  * @class VirtualMidiDevice
- * @brief Device MIDI virtuel
+ * @brief Virtual MIDI device for internal routing
  * 
- * @details
- * Crée un port MIDI virtuel pour le routage interne ou la communication
- * avec d'autres applications MIDI sur le système.
+ * Creates an ALSA virtual port that can be used for:
+ * - Internal routing between components
+ * - Communication with other MIDI applications
+ * - Testing and simulation
  * 
- * Utilise ALSA Sequencer pour créer des ports virtuels visibles par
- * d'autres applications MIDI (DAW, synthés logiciels, etc.).
+ * Thread Safety: YES
+ * Platform: Linux (ALSA), with fallback for other platforms
  * 
- * Thread-safety: Toutes les méthodes publiques sont thread-safe.
- * 
- * @example Utilisation
+ * Example:
  * ```cpp
- * auto virtualDevice = std::make_shared<VirtualMidiDevice>("MidiMind Virtual");
+ * // Create virtual device
+ * VirtualMidiDevice device("virtual_0", "MidiMind Virtual");
  * 
- * // Ouvrir le port virtuel
- * virtualDevice->open();
+ * // Set direction
+ * device.setPortDirection(true, true);  // Bidirectional
  * 
- * // Envoyer un message
- * MidiMessage msg = MidiMessage::noteOn(1, 60, 100);
- * virtualDevice->send(msg);
+ * // Connect
+ * if (device.connect()) {
+ *     // Send message
+ *     device.sendMessage(MidiMessage::noteOn(0, 60, 100));
+ *     
+ *     // Receive message
+ *     if (device.hasMessages()) {
+ *         MidiMessage msg = device.receiveMessage();
+ *     }
+ * }
  * ```
  */
 class VirtualMidiDevice : public MidiDevice {
 public:
     // ========================================================================
-    // CONSTRUCTION / DESTRUCTION
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
     /**
-     * @brief Constructeur
-     * 
-     * @param name Nom du port virtuel
+     * @brief Constructor
+     * @param id Device identifier
+     * @param name Port name
      */
-    explicit VirtualMidiDevice(const std::string& name);
+    VirtualMidiDevice(const std::string& id, const std::string& name);
     
     /**
-     * @brief Destructeur
+     * @brief Destructor
      */
     ~VirtualMidiDevice() override;
     
     // ========================================================================
-    // IMPLÉMENTATION MidiDevice
+    // MIDIDEVICE INTERFACE IMPLEMENTATION
     // ========================================================================
     
-    bool open() override;
-    void close() override;
-    bool isOpen() const override;
-    
-    void send(const MidiMessage& message) override;
-    MidiMessage receive() override;
-    bool hasMessages() const override;
-    
-    DeviceType getType() const override { return DeviceType::VIRTUAL; }
-    std::string getName() const override { return name_; }
-    std::string getPort() const override { return virtualPort_; }
-    
-    json getInfo() const override;
+    bool connect() override;
+    bool disconnect() override;
+    bool sendMessage(const MidiMessage& message) override;
+    MidiMessage receiveMessage() override;
+    bool isConnected() const override;
     
     // ========================================================================
-    // SPÉCIFIQUE VIRTUAL
+    // ADDITIONAL METHODS
     // ========================================================================
     
     /**
-     * @brief Définit si le port est Input, Output ou Both
-     * 
-     * @param input true pour Input
-     * @param output true pour Output
+     * @brief Check if messages are available
+     */
+    bool hasMessages() const override;
+    
+    /**
+     * @brief Get port string
+     */
+    std::string getPort() const override;
+    
+    /**
+     * @brief Get device info
+     */
+    json getInfo() const override;
+    
+    // ========================================================================
+    // CONFIGURATION
+    // ========================================================================
+    
+    /**
+     * @brief Set port direction
+     * @param input Enable input
+     * @param output Enable output
      */
     void setPortDirection(bool input, bool output);
     
     /**
-     * @brief Récupère le nombre de messages en attente
+     * @brief Get message count in queue
      */
     size_t getMessageCount() const;
     
     /**
-     * @brief Vide la file de messages
+     * @brief Clear message queues
      */
     void clearMessages();
+    
+    // ========================================================================
+    // CALLBACK
+    // ========================================================================
+    
+    /**
+     * @brief Set message received callback
+     * @param callback Callback function
+     */
+    void setMessageCallback(std::function<void(const MidiMessage&)> callback);
 
 private:
     // ========================================================================
-    // MEMBRES PRIVÉS
+    // PRIVATE METHODS - ALSA
     // ========================================================================
     
-    /// Nom du port virtuel
-    std::string name_;
+    /**
+     * @brief Open ALSA sequencer
+     */
+    bool openSequencer();
     
-    /// Port virtuel (nom système)
-    std::string virtualPort_;
+    /**
+     * @brief Close ALSA sequencer
+     */
+    void closeSequencer();
     
-    /// File de messages entrants (lock-free)
-    std::unique_ptr<LockFreeQueue<MidiMessage>> inputQueue_;
+    /**
+     * @brief Create virtual port
+     */
+    bool createVirtualPort();
     
-    /// File de messages sortants (lock-free)
-    std::unique_ptr<LockFreeQueue<MidiMessage>> outputQueue_;
+    /**
+     * @brief Delete virtual port
+     */
+    void deleteVirtualPort();
     
-    /// Direction du port
+    // ========================================================================
+    // PRIVATE METHODS - THREADING
+    // ========================================================================
+    
+    /**
+     * @brief Receive thread function
+     */
+    void receiveThreadFunc();
+    
+    /**
+     * @brief Process ALSA event
+     */
+    void processAlsaEvent(const snd_seq_event_t* ev);
+    
+    // ========================================================================
+    // PRIVATE METHODS - CONVERSION
+    // ========================================================================
+    
+    /**
+     * @brief Convert MidiMessage to ALSA event
+     */
+    void midiMessageToAlsaEvent(const MidiMessage& msg, snd_seq_event_t* ev);
+    
+    /**
+     * @brief Convert ALSA event to MidiMessage
+     */
+    MidiMessage alsaEventToMidiMessage(const snd_seq_event_t* ev);
+    
+    // ========================================================================
+    // MEMBER VARIABLES
+    // ========================================================================
+    
+#ifdef __linux__
+    /// ALSA sequencer handle
+    snd_seq_t* alsaSeq_;
+#else
+    void* alsaSeq_;  // Placeholder
+#endif
+    
+    /// Virtual port number
+    int virtualPort_;
+    
+    /// Port capabilities
     bool isInput_;
     bool isOutput_;
     
-    /// État d'ouverture
-    std::atomic<bool> isOpen_;
+    /// Receive thread
+    std::thread receiveThread_;
     
-    /// Handle ALSA (optionnel)
-    void* alsaHandle_;
+    /// Stop flag
+    std::atomic<bool> shouldStop_;
+    
+    /// Receive queue
+    std::queue<MidiMessage> receiveQueue_;
+    mutable std::mutex receiveMutex_;
+    
+    /// Send queue (for non-ALSA mode)
+    std::queue<MidiMessage> sendQueue_;
+    mutable std::mutex sendMutex_;
+    
+    /// Max queue size
+    static constexpr size_t MAX_QUEUE_SIZE = 1000;
+    
+    /// Message callback
+    std::function<void(const MidiMessage&)> messageCallback_;
+    std::mutex callbackMutex_;
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER VirtualMidiDevice.h
-// ============================================================================

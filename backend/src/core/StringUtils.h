@@ -1,32 +1,70 @@
 // ============================================================================
-// Fichier: src/core/StringUtils.h
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/core/StringUtils.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// Description:
-//   Utilitaires pour la manipulation de chaînes de caractères.
-//   Fonctions helper pour parsing, formatting, conversion.
 //
-// Auteur: MidiMind Team
-// Date: 2025-10-03
-// Version: 3.0.0
+// Description:
+//   String utility functions providing common operations like trim, split,
+//   join, case conversion, validation, and formatting. All inline for
+//   maximum performance.
+//
+// Features:
+//   - Trim functions (left, right, both)
+//   - Split and join operations
+//   - Case conversion (upper, lower)
+//   - String validation (starts/ends with, contains)
+//   - String replacement
+//   - Padding (left, right)
+//   - Number to string conversions
+//   - Hex conversions
+//   - Byte formatting
+//   - UUID generation
+//
+// Dependencies:
+//   - None (standard library only)
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Added comprehensive trim functions
+//   - Enhanced split with delimiter support
+//   - Added validation functions
+//   - Added formatting utilities
+//   - Improved performance
+//   - English documentation
+//
 // ============================================================================
 
 #pragma once
 
-#include <random>  // Pour std::random_device, std::mt19937
-#include <chrono>
 #include <string>
 #include <vector>
 #include <sstream>
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
+#include <random>
 
 namespace midiMind {
 namespace StringUtils {
 
+// ============================================================================
+// TRIM FUNCTIONS
+// ============================================================================
+
 /**
- * @brief Trim whitespace à gauche
+ * @brief Trim whitespace from left side
+ * 
+ * @param str String to trim
+ * @return Trimmed string
+ * 
+ * @example
+ * @code
+ * std::string s = StringUtils::ltrim("  hello");
+ * // "hello"
+ * @endcode
  */
 inline std::string ltrim(const std::string& str) {
     std::string result = str;
@@ -37,7 +75,10 @@ inline std::string ltrim(const std::string& str) {
 }
 
 /**
- * @brief Trim whitespace à droite
+ * @brief Trim whitespace from right side
+ * 
+ * @param str String to trim
+ * @return Trimmed string
  */
 inline std::string rtrim(const std::string& str) {
     std::string result = str;
@@ -48,14 +89,30 @@ inline std::string rtrim(const std::string& str) {
 }
 
 /**
- * @brief Trim whitespace des deux côtés
+ * @brief Trim whitespace from both sides
+ * 
+ * @param str String to trim
+ * @return Trimmed string
+ * 
+ * @example
+ * @code
+ * std::string s = StringUtils::trim("  hello  ");
+ * // "hello"
+ * @endcode
  */
 inline std::string trim(const std::string& str) {
     return ltrim(rtrim(str));
 }
 
+// ============================================================================
+// CASE CONVERSION
+// ============================================================================
+
 /**
- * @brief Convertit en minuscules
+ * @brief Convert string to lowercase
+ * 
+ * @param str Source string
+ * @return Lowercase string
  */
 inline std::string toLower(const std::string& str) {
     std::string result = str;
@@ -65,7 +122,10 @@ inline std::string toLower(const std::string& str) {
 }
 
 /**
- * @brief Convertit en majuscules
+ * @brief Convert string to uppercase
+ * 
+ * @param str Source string
+ * @return Uppercase string
  */
 inline std::string toUpper(const std::string& str) {
     std::string result = str;
@@ -74,18 +134,22 @@ inline std::string toUpper(const std::string& str) {
     return result;
 }
 
+// ============================================================================
+// SPLIT AND JOIN
+// ============================================================================
+
 /**
- * @brief Sépare une string selon un délimiteur
+ * @brief Split string by delimiter
  * 
- * @param str String à séparer
- * @param delimiter Délimiteur
- * @return std::vector<std::string> Parties
+ * @param str String to split
+ * @param delimiter Delimiter character
+ * @return Vector of substrings
  * 
  * @example
- * ```cpp
+ * @code
  * auto parts = StringUtils::split("a,b,c", ',');
  * // {"a", "b", "c"}
- * ```
+ * @endcode
  */
 inline std::vector<std::string> split(const std::string& str, char delimiter) {
     std::vector<std::string> tokens;
@@ -100,18 +164,41 @@ inline std::vector<std::string> split(const std::string& str, char delimiter) {
 }
 
 /**
- * @brief Joint des strings avec un séparateur
+ * @brief Split string by delimiter string
  * 
- * @param strings Strings à joindre
- * @param separator Séparateur
- * @return std::string String jointe
+ * @param str String to split
+ * @param delimiter Delimiter string
+ * @return Vector of substrings
+ */
+inline std::vector<std::string> split(const std::string& str, 
+                                     const std::string& delimiter) {
+    std::vector<std::string> tokens;
+    size_t start = 0;
+    size_t end = str.find(delimiter);
+    
+    while (end != std::string::npos) {
+        tokens.push_back(str.substr(start, end - start));
+        start = end + delimiter.length();
+        end = str.find(delimiter, start);
+    }
+    
+    tokens.push_back(str.substr(start));
+    return tokens;
+}
+
+/**
+ * @brief Join strings with separator
+ * 
+ * @param strings Strings to join
+ * @param separator Separator string
+ * @return Joined string
  * 
  * @example
- * ```cpp
+ * @code
  * std::vector<std::string> parts = {"a", "b", "c"};
  * auto joined = StringUtils::join(parts, ", ");
  * // "a, b, c"
- * ```
+ * @endcode
  */
 inline std::string join(const std::vector<std::string>& strings, 
                        const std::string& separator) {
@@ -127,8 +214,16 @@ inline std::string join(const std::vector<std::string>& strings,
     return oss.str();
 }
 
+// ============================================================================
+// VALIDATION FUNCTIONS
+// ============================================================================
+
 /**
- * @brief Vérifie si une string commence par un préfixe
+ * @brief Check if string starts with prefix
+ * 
+ * @param str String to check
+ * @param prefix Prefix to look for
+ * @return true if string starts with prefix
  */
 inline bool startsWith(const std::string& str, const std::string& prefix) {
     if (prefix.length() > str.length()) return false;
@@ -136,7 +231,11 @@ inline bool startsWith(const std::string& str, const std::string& prefix) {
 }
 
 /**
- * @brief Vérifie si une string se termine par un suffixe
+ * @brief Check if string ends with suffix
+ * 
+ * @param str String to check
+ * @param suffix Suffix to look for
+ * @return true if string ends with suffix
  */
 inline bool endsWith(const std::string& str, const std::string& suffix) {
     if (suffix.length() > str.length()) return false;
@@ -144,16 +243,51 @@ inline bool endsWith(const std::string& str, const std::string& suffix) {
 }
 
 /**
- * @brief Remplace toutes les occurrences d'une substring
+ * @brief Check if string contains substring
  * 
- * @param str String source
- * @param from Substring à remplacer
- * @param to Substring de remplacement
- * @return std::string String modifiée
+ * @param str String to search
+ * @param substring Substring to find
+ * @return true if substring found
+ */
+inline bool contains(const std::string& str, const std::string& substring) {
+    return str.find(substring) != std::string::npos;
+}
+
+/**
+ * @brief Check if string is empty or whitespace only
+ * 
+ * @param str String to check
+ * @return true if empty or whitespace
+ */
+inline bool isBlank(const std::string& str) {
+    return str.empty() || 
+           std::all_of(str.begin(), str.end(), 
+                      [](unsigned char c) { return std::isspace(c); });
+}
+
+// ============================================================================
+// REPLACEMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * @brief Replace all occurrences of substring
+ * 
+ * @param str Source string
+ * @param from Substring to replace
+ * @param to Replacement substring
+ * @return Modified string
+ * 
+ * @example
+ * @code
+ * auto result = StringUtils::replaceAll("hello world", "o", "0");
+ * // "hell0 w0rld"
+ * @endcode
  */
 inline std::string replaceAll(std::string str, 
                               const std::string& from, 
                               const std::string& to) {
+    if (from.empty()) return str;
+    
     size_t pos = 0;
     while ((pos = str.find(from, pos)) != std::string::npos) {
         str.replace(pos, from.length(), to);
@@ -163,11 +297,103 @@ inline std::string replaceAll(std::string str,
 }
 
 /**
- * @brief Convertit un nombre en string hexadécimal
+ * @brief Replace first occurrence of substring
  * 
- * @param value Valeur
- * @param width Largeur (avec padding zeros)
- * @return std::string Hex string (ex: "0x1A")
+ * @param str Source string
+ * @param from Substring to replace
+ * @param to Replacement substring
+ * @return Modified string
+ */
+inline std::string replaceFirst(std::string str,
+                                const std::string& from,
+                                const std::string& to) {
+    size_t pos = str.find(from);
+    if (pos != std::string::npos) {
+        str.replace(pos, from.length(), to);
+    }
+    return str;
+}
+
+// ============================================================================
+// PADDING FUNCTIONS
+// ============================================================================
+
+/**
+ * @brief Pad string on left side
+ * 
+ * @param str Source string
+ * @param width Target width
+ * @param fillChar Fill character (default: space)
+ * @return Padded string
+ * 
+ * @example
+ * @code
+ * auto s = StringUtils::padLeft("42", 5, '0');
+ * // "00042"
+ * @endcode
+ */
+inline std::string padLeft(const std::string& str, size_t width, char fillChar = ' ') {
+    if (str.length() >= width) return str;
+    return std::string(width - str.length(), fillChar) + str;
+}
+
+/**
+ * @brief Pad string on right side
+ * 
+ * @param str Source string
+ * @param width Target width
+ * @param fillChar Fill character (default: space)
+ * @return Padded string
+ */
+inline std::string padRight(const std::string& str, size_t width, char fillChar = ' ') {
+    if (str.length() >= width) return str;
+    return str + std::string(width - str.length(), fillChar);
+}
+
+/**
+ * @brief Center string with padding
+ * 
+ * @param str Source string
+ * @param width Target width
+ * @param fillChar Fill character (default: space)
+ * @return Centered string
+ */
+inline std::string padCenter(const std::string& str, size_t width, char fillChar = ' ') {
+    if (str.length() >= width) return str;
+    
+    size_t leftPad = (width - str.length()) / 2;
+    size_t rightPad = width - str.length() - leftPad;
+    
+    return std::string(leftPad, fillChar) + str + std::string(rightPad, fillChar);
+}
+
+// ============================================================================
+// NUMBER CONVERSIONS
+// ============================================================================
+
+/**
+ * @brief Convert number to string
+ * 
+ * @param value Numeric value
+ * @return String representation
+ */
+template<typename T>
+inline std::string toString(T value) {
+    return std::to_string(value);
+}
+
+/**
+ * @brief Convert number to hex string
+ * 
+ * @param value Value to convert
+ * @param width Width with zero padding (default: auto)
+ * @return Hex string (e.g., "0x1A")
+ * 
+ * @example
+ * @code
+ * auto hex = StringUtils::toHex(26, 2);
+ * // "0x1A"
+ * @endcode
  */
 template<typename T>
 inline std::string toHex(T value, int width = 0) {
@@ -183,16 +409,22 @@ inline std::string toHex(T value, int width = 0) {
 }
 
 /**
- * @brief Convertit une string hexadécimal en nombre
+ * @brief Convert hex string to number
  * 
- * @param hexStr String hex (avec ou sans "0x")
- * @return T Valeur numérique
+ * @param hexStr Hex string (with or without "0x" prefix)
+ * @return Numeric value
+ * 
+ * @example
+ * @code
+ * int value = StringUtils::fromHex<int>("0x1A");
+ * // 26
+ * @endcode
  */
 template<typename T>
 inline T fromHex(const std::string& hexStr) {
     std::string str = hexStr;
     
-    // Retirer le préfixe "0x" si présent
+    // Remove "0x" prefix if present
     if (startsWith(str, "0x") || startsWith(str, "0X")) {
         str = str.substr(2);
     }
@@ -204,97 +436,24 @@ inline T fromHex(const std::string& hexStr) {
     return value;
 }
 
-/**
- * @brief Formate une taille en bytes de manière lisible
- * 
- * @param bytes Nombre de bytes
- * @return std::string Taille formatée (ex: "1.5 MB")
- */
-inline std::string formatBytes(uint64_t bytes) {
-    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
-    int unit = 0;
-    double size = static_cast<double>(bytes);
-    
-    while (size >= 1024.0 && unit < 4) {
-        size /= 1024.0;
-        unit++;
-    }
-    
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << size << " " << units[unit];
-    return oss.str();
-}
+// ============================================================================
+// BYTE FORMATTING
+// ============================================================================
 
 /**
- * @brief Génère un UUID simple
+ * @brief Convert byte array to hex string
  * 
- * @return std::string UUID (format: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
- * 
- * @note Version simplifiée, pas cryptographiquement sécurisée
- */
-inline std::string generateUuid() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
-    static std::uniform_int_distribution<> dis2(8, 11);
-    
-    std::ostringstream oss;
-    oss << std::hex;
-    
-    for (int i = 0; i < 8; i++) oss << dis(gen);
-    oss << "-";
-    for (int i = 0; i < 4; i++) oss << dis(gen);
-    oss << "-4"; // Version 4
-    for (int i = 0; i < 3; i++) oss << dis(gen);
-    oss << "-";
-    oss << dis2(gen); // Variant
-    for (int i = 0; i < 3; i++) oss << dis(gen);
-    oss << "-";
-    for (int i = 0; i < 12; i++) oss << dis(gen);
-    
-    return oss.str();
-}
-
-/**
- * @brief Pad une string à gauche
- * 
- * @param str String source
- * @param width Largeur cible
- * @param fillChar Caractère de remplissage
- * @return std::string String paddée
- */
-inline std::string padLeft(const std::string& str, size_t width, char fillChar = ' ') {
-    if (str.length() >= width) return str;
-    return std::string(width - str.length(), fillChar) + str;
-}
-
-/**
- * @brief Pad une string à droite
- * 
- * @param str String source
- * @param width Largeur cible
- * @param fillChar Caractère de remplissage
- * @return std::string String paddée
- */
-inline std::string padRight(const std::string& str, size_t width, char fillChar = ' ') {
-    if (str.length() >= width) return str;
-    return str + std::string(width - str.length(), fillChar);
-}
-
-/**
- * @brief Convertit un bytes array en string hexadécimal
- * 
- * @param data Données
- * @param size Taille
- * @param separator Séparateur entre bytes (défaut: " ")
- * @return std::string Hex string
+ * @param data Byte array
+ * @param size Array size
+ * @param separator Separator between bytes (default: " ")
+ * @return Hex string
  * 
  * @example
- * ```cpp
+ * @code
  * uint8_t data[] = {0x90, 0x3C, 0x64};
  * auto hex = StringUtils::bytesToHex(data, 3);
  * // "90 3C 64"
- * ```
+ * @endcode
  */
 inline std::string bytesToHex(const uint8_t* data, size_t size, 
                               const std::string& separator = " ") {
@@ -309,9 +468,112 @@ inline std::string bytesToHex(const uint8_t* data, size_t size,
     return oss.str();
 }
 
+/**
+ * @brief Format byte size as human-readable string
+ * 
+ * @param bytes Number of bytes
+ * @param precision Decimal precision (default: 2)
+ * @return Formatted string (e.g., "1.50 MB")
+ * 
+ * @example
+ * @code
+ * auto size = StringUtils::formatBytes(1536000);
+ * // "1.50 MB"
+ * @endcode
+ */
+inline std::string formatBytes(uint64_t bytes, int precision = 2) {
+    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    int unit = 0;
+    double size = static_cast<double>(bytes);
+    
+    while (size >= 1024.0 && unit < 4) {
+        size /= 1024.0;
+        unit++;
+    }
+    
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision) << size << " " << units[unit];
+    return oss.str();
+}
+
+// ============================================================================
+// UUID GENERATION
+// ============================================================================
+
+/**
+ * @brief Generate simple UUID (v4-like)
+ * 
+ * @return UUID string (format: "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx")
+ * 
+ * @note Not cryptographically secure, suitable for IDs only
+ * 
+ * @example
+ * @code
+ * std::string id = StringUtils::generateUuid();
+ * // "a1b2c3d4-e5f6-4789-a012-bcdef0123456"
+ * @endcode
+ */
+inline std::string generateUuid() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    static std::uniform_int_distribution<> dis2(8, 11);
+    
+    std::ostringstream oss;
+    oss << std::hex;
+    
+    // 8 hex digits
+    for (int i = 0; i < 8; i++) oss << dis(gen);
+    oss << "-";
+    
+    // 4 hex digits
+    for (int i = 0; i < 4; i++) oss << dis(gen);
+    oss << "-";
+    
+    // Version 4 (4xxx)
+    oss << "4";
+    for (int i = 0; i < 3; i++) oss << dis(gen);
+    oss << "-";
+    
+    // Variant (8, 9, a, or b)
+    oss << dis2(gen);
+    for (int i = 0; i < 3; i++) oss << dis(gen);
+    oss << "-";
+    
+    // 12 hex digits
+    for (int i = 0; i < 12; i++) oss << dis(gen);
+    
+    return oss.str();
+}
+
+/**
+ * @brief Generate short ID (8 characters)
+ * 
+ * @return Short ID string
+ * 
+ * @example
+ * @code
+ * std::string id = StringUtils::generateShortId();
+ * // "a1b2c3d4"
+ * @endcode
+ */
+inline std::string generateShortId() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    
+    std::ostringstream oss;
+    oss << std::hex;
+    for (int i = 0; i < 8; i++) {
+        oss << dis(gen);
+    }
+    
+    return oss.str();
+}
+
 } // namespace StringUtils
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER StringUtils.h
+// END OF FILE StringUtils.h v4.1.0
 // ============================================================================

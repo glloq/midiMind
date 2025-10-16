@@ -1,449 +1,269 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/RoutingView.js
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: frontend/js/views/RoutingView.js
+// Version: v3.1.0 - SIMPLIFIED
+// Date: 2025-10-16
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// Description:
-//   Vue principale pour l'interface de routage MIDI.
-//   Affiche la matrice de routage et les contrôles par canal.
-//
-// Auteur: midiMind Team
-// Date: 2025-10-04
-// Version: 3.0.0
+// MODIFICATIONS v3.1.0:
+// ✓ Interface simplifiée (pas de matrice complexe)
+// ✓ Mode simple uniquement (1→1)
+// ✓ Stats visibles
+// ✓ Actions basiques
 // ============================================================================
 
 class RoutingView extends BaseView {
-    constructor(containerId, eventBus) {
-        super(containerId, eventBus);
+    constructor(container, eventBus, debugConsole) {
+        super(container, eventBus, debugConsole, {
+            name: 'RoutingView',
+            autoRender: false
+        });
         
-        // Configuration spécifique
-        this.config.autoRender = true;
-        this.config.preserveState = true;
-        
-        // Composants enfants
+        // Composants
         this.routingMatrix = null;
         
-        // État local de la vue
-        this.viewState = {
-            selectedChannel: null,
-            showAdvanced: false,
-            compactMode: false
-        };
+        // Données
+        this.channels = [];
+        this.instruments = [];
+        this.routes = [];
+        this.presets = [];
         
-        this.initialize();
+        this.logDebug('routing', '✓ RoutingView initialized (simple mode)');
     }
     
     // ========================================================================
-    // INITIALISATION
+    // RENDERING PRINCIPAL
     // ========================================================================
     
-    initialize() {
-        this.bindCustomEvents();
-    }
-    
-    bindCustomEvents() {
-        // Écouter les changements du modèle de routage
-        this.eventBus.on('routing:channel-assigned', () => this.updateView());
-        this.eventBus.on('routing:channel-muted', () => this.updateView());
-        this.eventBus.on('routing:channel-solo', () => this.updateView());
-        this.eventBus.on('routing:devices-updated', () => this.render(this.data));
-        this.eventBus.on('routing:preset-loaded', () => this.render(this.data));
-    }
-    
-    // ========================================================================
-    // RENDU
-    // ========================================================================
-    
-    /**
-     * Construire le template HTML
-     */
-    buildTemplate(data) {
-        const { 
-            channels = [], 
-            devices = [], 
-            masterVolume = 100,
-            presets = [],
-            activePreset = null
-        } = data;
+    render() {
+        if (!this.container) return;
         
-        return `
-            <div class="routing-view">
-                <!-- En-tête avec titre et actions -->
-                <div class="routing-header">
-                    <div class="routing-title">
-                        <h2>🔀 Routage MIDI</h2>
-                        <span class="routing-subtitle">
-                            ${channels.filter(ch => ch.device).length}/16 canaux assignés
-                        </span>
-                    </div>
-                    
-                    <div class="routing-actions">
-                        <!-- Presets -->
-                        <div class="preset-controls">
-                            <select class="preset-selector" id="presetSelector">
-                                <option value="">-- Preset --</option>
-                                ${this.buildPresetOptions(presets, activePreset)}
-                            </select>
-                            <button class="btn btn-sm" onclick="app.routingController.savePreset()">
-                                💾 Save
-                            </button>
-                            <button class="btn btn-sm btn-danger" onclick="app.routingController.deleteCurrentPreset()">
-                                🗑️
-                            </button>
-                        </div>
-                        
-                        <!-- Actions globales -->
-                        <div class="global-actions">
-                            <button class="btn btn-sm" onclick="app.routingController.muteAll()">
-                                🔇 Mute All
-                            </button>
-                            <button class="btn btn-sm" onclick="app.routingController.unmuteAll()">
-                                🔊 Unmute All
-                            </button>
-                            <button class="btn btn-sm btn-danger" onclick="app.routingController.resetAll()">
-                                🔄 Reset
-                            </button>
-                        </div>
-                        
-                        <!-- Mode d'affichage -->
-                        <div class="view-mode-toggle">
-                            <button class="btn btn-sm ${!this.viewState.compactMode ? 'active' : ''}"
-                                    onclick="app.routingView.setCompactMode(false)">
-                                📊 Détaillé
-                            </button>
-                            <button class="btn btn-sm ${this.viewState.compactMode ? 'active' : ''}"
-                                    onclick="app.routingView.setCompactMode(true)">
-                                📱 Compact
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Volume Master -->
-                <div class="master-volume-section">
-                    <label class="master-volume-label">
-                        🎚️ Volume Master
-                    </label>
-                    <div class="volume-slider-container">
-                        <input type="range" 
-                               class="volume-slider master-volume-slider"
-                               min="0" max="127" 
-                               value="${masterVolume}"
-                               oninput="app.routingController.setMasterVolume(this.value)">
-                        <span class="volume-value">${Math.round((masterVolume / 127) * 100)}%</span>
-                    </div>
-                </div>
-                
-                <!-- Contenu principal -->
-                <div class="routing-content">
-                    ${this.viewState.compactMode ? 
-                        this.buildCompactView(channels, devices) :
-                        this.buildDetailedView(channels, devices)
-                    }
-                </div>
-                
-                <!-- Matrice de routage (mode détaillé uniquement) -->
-                ${!this.viewState.compactMode ? `
-                    <div class="routing-matrix-container" id="routingMatrixContainer">
-                        <!-- La matrice sera insérée ici -->
-                    </div>
-                ` : ''}
-                
-                <!-- Panneau de détails du canal sélectionné -->
-                ${this.viewState.selectedChannel ? 
-                    this.buildChannelDetails(channels[this.viewState.selectedChannel - 1]) : ''
-                }
-            </div>
-        `;
+        // Vérifier mode performance
+        if (!PerformanceConfig.routing.allowComplexRouting) {
+            this.renderSimpleRouting();
+        } else {
+            // Mode avancé (désactivé par défaut)
+            this.renderAdvancedRouting();
+        }
     }
     
-    /**
-     * Construire la vue détaillée (avec tous les contrôles)
-     */
-    buildDetailedView(channels, devices) {
-        return `
-            <div class="channels-grid detailed">
-                ${channels.map(channel => `
-                    <div class="channel-card ${channel.device ? 'assigned' : ''} 
-                                ${channel.active ? 'active' : ''}"
-                         data-channel="${channel.number}"
-                         style="border-color: ${channel.color};">
-                        
-                        <!-- En-tête du canal -->
-                        <div class="channel-header">
-                            <div class="channel-number" style="background: ${channel.color};">
-                                ${channel.number}
-                            </div>
-                            <div class="channel-name">
-                                ${channel.name}
-                            </div>
-                            <div class="channel-indicators">
-                                ${channel.active ? '<span class="indicator-active">●</span>' : ''}
-                                ${channel.muted ? '<span class="indicator-mute">M</span>' : ''}
-                                ${channel.solo ? '<span class="indicator-solo">S</span>' : ''}
-                            </div>
-                        </div>
-                        
-                        <!-- Device assigné -->
-                        <div class="channel-device">
-                            <select class="device-selector" 
-                                    onchange="app.routingController.assignChannelToDevice(${channel.number}, this.value)">
-                                <option value="">-- Non assigné --</option>
-                                ${devices.map(device => `
-                                    <option value="${device.id}" 
-                                            ${channel.device === device.id ? 'selected' : ''}>
-                                        ${device.name} ${device.status === 'connected' ? '✓' : '✗'}
-                                    </option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        
-                        <!-- Contrôles Mute/Solo -->
-                        <div class="channel-controls">
-                            <button class="btn-mute ${channel.muted ? 'active' : ''}"
-                                    onclick="app.routingController.muteChannel(${channel.number})">
-                                M
-                            </button>
-                            <button class="btn-solo ${channel.solo ? 'active' : ''}"
-                                    onclick="app.routingController.soloChannel(${channel.number})">
-                                S
-                            </button>
-                        </div>
-                        
-                        <!-- Volume -->
-                        <div class="channel-volume">
-                            <label>Vol</label>
-                            <input type="range" 
-                                   class="volume-slider"
-                                   min="0" max="127" 
-                                   value="${channel.volume}"
-                                   oninput="app.routingController.setChannelVolume(${channel.number}, this.value)">
-                            <span class="volume-value">${Math.round((channel.volume / 127) * 100)}%</span>
-                        </div>
-                        
-                        <!-- Pan -->
-                        <div class="channel-pan">
-                            <label>Pan</label>
-                            <input type="range" 
-                                   class="pan-slider"
-                                   min="0" max="127" 
-                                   value="${channel.pan}"
-                                   oninput="app.routingController.setChannelPan(${channel.number}, this.value)">
-                            <span class="pan-value">${this.formatPan(channel.pan)}</span>
-                        </div>
-                        
-                        <!-- Transposition -->
-                        <div class="channel-transpose">
-                            <label>Transpose</label>
-                            <input type="number" 
-                                   class="transpose-input"
-                                   min="-24" max="24" 
-                                   value="${channel.transpose}"
-                                   onchange="app.routingController.setChannelTranspose(${channel.number}, this.value)">
-                            <span class="transpose-unit">st</span>
-                        </div>
-                        
-                        <!-- Statistiques -->
-                        <div class="channel-stats">
-                            <span class="stat-notes">♪ ${channel.noteCount}</span>
-                            ${channel.lastNote ? 
-                                `<span class="stat-last-note">Last: ${this.getNoteName(channel.lastNote)}</span>` 
-                                : ''
-                            }
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
+    // ========================================================================
+    // MODE SIMPLE (1→1)
+    // ========================================================================
     
-    /**
-     * Construire la vue compacte (minimaliste)
-     */
-    buildCompactView(channels, devices) {
-        return `
-            <div class="channels-list compact">
-                <table class="channels-table">
-                    <thead>
-                        <tr>
-                            <th>Ch</th>
-                            <th>Device</th>
-                            <th>M</th>
-                            <th>S</th>
-                            <th>Vol</th>
-                            <th>Pan</th>
-                            <th>Tr</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${channels.map(channel => `
-                            <tr class="channel-row ${channel.device ? 'assigned' : ''}"
-                                data-channel="${channel.number}">
-                                <td class="channel-number">
-                                    <span style="color: ${channel.color};">●</span> ${channel.number}
-                                </td>
-                                <td class="channel-device">
-                                    <select class="device-selector-compact" 
-                                            onchange="app.routingController.assignChannelToDevice(${channel.number}, this.value)">
-                                        <option value="">--</option>
-                                        ${devices.map(device => `
-                                            <option value="${device.id}" 
-                                                    ${channel.device === device.id ? 'selected' : ''}>
-                                                ${device.name}
-                                            </option>
-                                        `).join('')}
-                                    </select>
-                                </td>
-                                <td>
-                                    <button class="btn-mute-compact ${channel.muted ? 'active' : ''}"
-                                            onclick="app.routingController.muteChannel(${channel.number})">
-                                        ${channel.muted ? '✓' : ''}
-                                    </button>
-                                </td>
-                                <td>
-                                    <button class="btn-solo-compact ${channel.solo ? 'active' : ''}"
-                                            onclick="app.routingController.soloChannel(${channel.number})">
-                                        ${channel.solo ? '✓' : ''}
-                                    </button>
-                                </td>
-                                <td>
-                                    <input type="number" 
-                                           class="volume-input-compact"
-                                           min="0" max="127" 
-                                           value="${channel.volume}"
-                                           onchange="app.routingController.setChannelVolume(${channel.number}, this.value)">
-                                </td>
-                                <td>
-                                    <input type="number" 
-                                           class="pan-input-compact"
-                                           min="0" max="127" 
-                                           value="${channel.pan}"
-                                           onchange="app.routingController.setChannelPan(${channel.number}, this.value)">
-                                </td>
-                                <td>
-                                    <input type="number" 
-                                           class="transpose-input-compact"
-                                           min="-24" max="24" 
-                                           value="${channel.transpose}"
-                                           onchange="app.routingController.setChannelTranspose(${channel.number}, this.value)">
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-    
-    /**
-     * Construire les options de presets
-     */
-    buildPresetOptions(presets, activePreset) {
-        return presets.map(preset => `
-            <option value="${preset.id}" ${preset.id === activePreset ? 'selected' : ''}>
-                ${preset.name}
-            </option>
-        `).join('');
-    }
-    
-    /**
-     * Construire le panneau de détails d'un canal
-     */
-    buildChannelDetails(channel) {
-        if (!channel) return '';
-        
-        return `
-            <div class="channel-details-panel">
-                <div class="details-header">
-                    <h3>Canal ${channel.number} - ${channel.name}</h3>
-                    <button class="btn-close" onclick="app.routingView.closeChannelDetails()">✕</button>
+    renderSimpleRouting() {
+        const html = `
+            <div class="routing-page-simple">
+                <!-- Header -->
+                <div class="page-header">
+                    <h2>🔀 Routage MIDI (Mode Simple)</h2>
+                    <p class="page-description">
+                        Assignez chaque canal MIDI à un instrument (routing 1→1)
+                    </p>
                 </div>
                 
-                <div class="details-content">
-                    <!-- Configuration avancée -->
-                    <div class="details-section">
-                        <h4>Configuration MIDI</h4>
-                        
-                        <div class="detail-row">
-                            <label>Program Change:</label>
-                            <input type="number" min="0" max="127" 
-                                   value="${channel.programChange || 0}"
-                                   onchange="app.routingController.setChannelProgram(${channel.number}, this.value)">
-                        </div>
-                        
-                        <div class="detail-row">
-                            <label>Bank Select:</label>
-                            <input type="number" min="0" max="127" 
-                                   value="${channel.bankSelect || 0}"
-                                   onchange="app.routingController.setChannelBank(${channel.number}, this.value)">
+                <!-- Info Banner -->
+                <div class="info-banner">
+                    ℹ️ Mode performance : Routing simple uniquement (1 canal → 1 instrument)
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="routing-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">🎹</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Canaux actifs</span>
+                            <span class="stat-value" id="stat-channels">0</span>
                         </div>
                     </div>
                     
-                    <!-- Effets -->
-                    <div class="details-section">
-                        <h4>Effets</h4>
-                        
-                        <div class="detail-row">
-                            <label>Reverb:</label>
-                            <input type="range" min="0" max="127" 
-                                   value="${channel.effects?.reverb || 0}"
-                                   onchange="app.routingController.setChannelEffect(${channel.number}, 'reverb', this.value)">
-                        </div>
-                        
-                        <div class="detail-row">
-                            <label>Chorus:</label>
-                            <input type="range" min="0" max="127" 
-                                   value="${channel.effects?.chorus || 0}"
-                                   onchange="app.routingController.setChannelEffect(${channel.number}, 'chorus', this.value)">
-                        </div>
-                        
-                        <div class="detail-row">
-                            <label>Delay:</label>
-                            <input type="range" min="0" max="127" 
-                                   value="${channel.effects?.delay || 0}"
-                                   onchange="app.routingController.setChannelEffect(${channel.number}, 'delay', this.value)">
+                    <div class="stat-card">
+                        <div class="stat-icon">🎸</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Instruments connectés</span>
+                            <span class="stat-value" id="stat-instruments">0</span>
                         </div>
                     </div>
                     
-                    <!-- Statistiques -->
-                    <div class="details-section">
-                        <h4>Statistiques</h4>
-                        <p>Notes jouées: ${channel.noteCount}</p>
-                        <p>Dernière note: ${channel.lastNote ? this.getNoteName(channel.lastNote) : 'Aucune'}</p>
-                        <p>Dernière activité: ${channel.lastActivity ? 
-                            new Date(channel.lastActivity).toLocaleTimeString() : 'Jamais'}</p>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔗</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Routes actives</span>
+                            <span class="stat-value" id="stat-routes">0</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Canaux non assignés</span>
+                            <span class="stat-value" id="stat-unassigned">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Matrice de routage (liste simple) -->
+                <div class="routing-matrix-container" id="routing-matrix-container">
+                    <!-- RoutingMatrix component ici -->
+                </div>
+                
+                <!-- Actions -->
+                <div class="routing-actions-panel">
+                    <div class="actions-group">
+                        <h4>Actions</h4>
+                        <button class="btn btn-secondary" id="btn-refresh-routing">
+                            🔄 Rafraîchir
+                        </button>
+                        <button class="btn btn-secondary" id="btn-export-routing">
+                            💾 Exporter
+                        </button>
+                        <button class="btn btn-secondary" id="btn-import-routing">
+                            📂 Importer
+                        </button>
+                    </div>
+                    
+                    <div class="actions-group">
+                        <h4>Presets</h4>
+                        <select class="preset-select" id="preset-select">
+                            <option value="">-- Sélectionner preset --</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btn-save-preset">
+                            💾 Sauvegarder preset
+                        </button>
+                        <button class="btn btn-secondary" id="btn-load-preset">
+                            📂 Charger preset
+                        </button>
                     </div>
                 </div>
             </div>
         `;
+        
+        this.container.innerHTML = html;
+        
+        // Initialiser matrice simple
+        this.initRoutingMatrix();
+        
+        // Attacher listeners
+        this.attachEventListeners();
+        
+        // Mettre à jour stats
+        this.updateStats();
     }
     
     // ========================================================================
-    // APRÈS RENDU
+    // MODE AVANCÉ (désactivé par défaut)
     // ========================================================================
     
-    afterRender() {
-        // Créer le composant RoutingMatrix si nécessaire
-        if (!this.viewState.compactMode) {
-            const container = document.getElementById('routingMatrixContainer');
-            if (container && typeof RoutingMatrix !== 'undefined') {
-                this.routingMatrix = new RoutingMatrix(container, this.data);
-            }
+    renderAdvancedRouting() {
+        const html = `
+            <div class="routing-page-advanced">
+                <div class="info-banner warning">
+                    ⚠️ Mode avancé désactivé en mode performance
+                </div>
+                <p>Pour activer le mode avancé, modifiez PerformanceConfig.routing.allowComplexRouting</p>
+            </div>
+        `;
+        
+        this.container.innerHTML = html;
+    }
+    
+    // ========================================================================
+    // INITIALISATION MATRICE
+    // ========================================================================
+    
+    initRoutingMatrix() {
+        const matrixContainer = this.container.querySelector('#routing-matrix-container');
+        
+        if (!matrixContainer) {
+            this.logDebug('routing', 'Matrix container not found', 'warn');
+            return;
         }
         
-        // Attacher les événements personnalisés
-        this.attachChannelEvents();
+        // Créer composant RoutingMatrix
+        this.routingMatrix = new RoutingMatrix(matrixContainer, {
+            mode: 'simple',
+            channels: this.channels,
+            instruments: this.instruments,
+            onRouteChange: (channel, instrumentId) => {
+                this.handleRouteChange(channel, instrumentId);
+            },
+            onTestRoute: (channel, instrumentId) => {
+                this.handleTestRoute(channel, instrumentId);
+            }
+        });
+        
+        this.logDebug('routing', 'Matrix initialized');
     }
     
-    attachChannelEvents() {
-        // Click sur les cartes de canaux pour sélection
-        const cards = this.container.querySelectorAll('.channel-card');
-        cards.forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
-                    const channelNumber = parseInt(card.dataset.channel);
-                    this.selectChannel(channelNumber);
-                }
+    // ========================================================================
+    // EVENT LISTENERS
+    // ========================================================================
+    
+    attachEventListeners() {
+        // Refresh
+        const refreshBtn = this.container.querySelector('#btn-refresh-routing');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refresh();
             });
+        }
+        
+        // Export
+        const exportBtn = this.container.querySelector('#btn-export-routing');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.exportRouting();
+            });
+        }
+        
+        // Import
+        const importBtn = this.container.querySelector('#btn-import-routing');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => {
+                this.importRouting();
+            });
+        }
+        
+        // Save preset
+        const savePresetBtn = this.container.querySelector('#btn-save-preset');
+        if (savePresetBtn) {
+            savePresetBtn.addEventListener('click', () => {
+                this.savePreset();
+            });
+        }
+        
+        // Load preset
+        const loadPresetBtn = this.container.querySelector('#btn-load-preset');
+        if (loadPresetBtn) {
+            loadPresetBtn.addEventListener('click', () => {
+                this.loadPreset();
+            });
+        }
+    }
+    
+    // ========================================================================
+    // HANDLERS
+    // ========================================================================
+    
+    handleRouteChange(channel, instrumentId) {
+        this.logDebug('routing', `Route changed: CH${channel} → ${instrumentId || 'none'}`);
+        
+        // Émettre événement
+        this.eventBus.emit('routing:route-changed', {
+            channel,
+            instrumentId
+        });
+        
+        // Mettre à jour stats
+        this.updateStats();
+    }
+    
+    handleTestRoute(channel, instrumentId) {
+        this.logDebug('routing', `Testing route: CH${channel} → ${instrumentId}`);
+        
+        // Émettre événement de test
+        this.eventBus.emit('routing:test-route', {
+            channel,
+            instrumentId
         });
     }
     
@@ -451,85 +271,237 @@ class RoutingView extends BaseView {
     // ACTIONS
     // ========================================================================
     
-    /**
-     * Sélectionner un canal
-     */
-    selectChannel(channelNumber) {
-        this.viewState.selectedChannel = channelNumber;
-        this.render(this.data);
-    }
-    
-    /**
-     * Fermer le panneau de détails
-     */
-    closeChannelDetails() {
-        this.viewState.selectedChannel = null;
-        this.render(this.data);
-    }
-    
-    /**
-     * Changer le mode d'affichage
-     */
-    setCompactMode(compact) {
-        this.viewState.compactMode = compact;
-        this.render(this.data);
-    }
-    
-    /**
-     * Mettre à jour la vue (sans re-render complet)
-     */
-    updateView() {
-        // Mise à jour partielle des éléments DOM
-        // Plus efficace que re-render complet
+    refresh() {
+        this.logDebug('routing', 'Refreshing routing view');
         
-        // Exemple: mettre à jour les indicateurs mute/solo
-        if (this.data.channels) {
-            this.data.channels.forEach(channel => {
-                const card = this.container.querySelector(`[data-channel="${channel.number}"]`);
-                if (card) {
-                    // Mettre à jour les classes
-                    card.classList.toggle('muted', channel.muted);
-                    card.classList.toggle('solo', channel.solo);
+        // Réinitialiser matrice avec données actuelles
+        if (this.routingMatrix) {
+            this.routingMatrix.setChannels(this.channels);
+            this.routingMatrix.setInstruments(this.instruments);
+        }
+        
+        this.updateStats();
+    }
+    
+    exportRouting() {
+        if (!this.routingMatrix) {
+            alert('Aucune route à exporter');
+            return;
+        }
+        
+        const routes = this.routingMatrix.getRoutes();
+        
+        const data = {
+            version: '3.1.0',
+            type: 'simple_routing',
+            routes: routes,
+            exported: new Date().toISOString()
+        };
+        
+        // Télécharger fichier JSON
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `routing_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        this.logDebug('routing', 'Routing exported');
+    }
+    
+    importRouting() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
                     
-                    // Mettre à jour les boutons
-                    const muteBtn = card.querySelector('.btn-mute, .btn-mute-compact');
-                    const soloBtn = card.querySelector('.btn-solo, .btn-solo-compact');
-                    
-                    if (muteBtn) {
-                        muteBtn.classList.toggle('active', channel.muted);
+                    if (data.routes && this.routingMatrix) {
+                        this.routingMatrix.setRoutes(data.routes);
+                        this.logDebug('routing', 'Routing imported');
+                        alert('Routage importé avec succès');
                     }
-                    if (soloBtn) {
-                        soloBtn.classList.toggle('active', channel.solo);
-                    }
+                } catch (error) {
+                    alert('Erreur lors de l\'import: ' + error.message);
                 }
-            });
-        }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
     }
     
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-    
-    /**
-     * Formater la valeur de pan
-     */
-    formatPan(value) {
-        if (value === 64) return 'C';
-        if (value < 64) return `L${64 - value}`;
-        return `R${value - 64}`;
-    }
-    
-    /**
-     * Obtenir le nom d'une note MIDI
-     */
-    getNoteName(noteNumber) {
-        if (typeof MidiConstants !== 'undefined') {
-            return MidiConstants.getNoteName(noteNumber);
+    savePreset() {
+        if (!this.routingMatrix) {
+            alert('Aucune route à sauvegarder');
+            return;
         }
         
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const octave = Math.floor(noteNumber / 12) - 1;
-        const note = notes[noteNumber % 12];
-        return `${note}${octave}`;
+        const name = prompt('Nom du preset:');
+        if (!name) return;
+        
+        const routes = this.routingMatrix.getRoutes();
+        
+        const preset = {
+            id: `preset_${Date.now()}`,
+            name: name,
+            routes: routes,
+            created: new Date().toISOString()
+        };
+        
+        this.presets.push(preset);
+        
+        // Mettre à jour dropdown
+        this.updatePresetsDropdown();
+        
+        // Émettre événement
+        this.eventBus.emit('routing:preset-saved', { preset });
+        
+        this.logDebug('routing', `Preset saved: ${name}`);
+        alert('Preset sauvegardé');
     }
+    
+    loadPreset() {
+        const select = this.container.querySelector('#preset-select');
+        const presetId = select?.value;
+        
+        if (!presetId) {
+            alert('Sélectionnez un preset');
+            return;
+        }
+        
+        const preset = this.presets.find(p => p.id === presetId);
+        
+        if (!preset) {
+            alert('Preset non trouvé');
+            return;
+        }
+        
+        if (this.routingMatrix) {
+            this.routingMatrix.setRoutes(preset.routes);
+            
+            // Émettre événement
+            this.eventBus.emit('routing:preset-loaded', { preset });
+            
+            this.logDebug('routing', `Preset loaded: ${preset.name}`);
+            alert('Preset chargé');
+        }
+    }
+    
+    // ========================================================================
+    // UPDATE DATA
+    // ========================================================================
+    
+    setChannels(channels) {
+        this.channels = channels || [];
+        
+        if (this.routingMatrix) {
+            this.routingMatrix.setChannels(this.channels);
+        }
+        
+        this.updateStats();
+    }
+    
+    setInstruments(instruments) {
+        this.instruments = instruments || [];
+        
+        if (this.routingMatrix) {
+            this.routingMatrix.setInstruments(this.instruments);
+        }
+        
+        this.updateStats();
+    }
+    
+    setRoutes(routes) {
+        this.routes = routes || [];
+        
+        if (this.routingMatrix) {
+            this.routingMatrix.setRoutes(this.routes);
+        }
+        
+        this.updateStats();
+    }
+    
+    setPresets(presets) {
+        this.presets = presets || [];
+        this.updatePresetsDropdown();
+    }
+    
+    // ========================================================================
+    // STATS
+    // ========================================================================
+    
+    updateStats() {
+        const activeChannels = this.routingMatrix ? 
+            this.routingMatrix.getActiveChannels().length : 
+            0;
+        
+        const connectedInstruments = this.instruments.filter(i => i.connected).length;
+        
+        const activeRoutes = this.routingMatrix ? 
+            this.routingMatrix.getRoutes().length : 
+            0;
+        
+        const unassigned = this.channels.length - activeChannels;
+        
+        // Mettre à jour UI
+        this.updateStatValue('stat-channels', this.channels.length);
+        this.updateStatValue('stat-instruments', connectedInstruments);
+        this.updateStatValue('stat-routes', activeRoutes);
+        this.updateStatValue('stat-unassigned', unassigned);
+    }
+    
+    updateStatValue(id, value) {
+        const elem = this.container.querySelector(`#${id}`);
+        if (elem) {
+            elem.textContent = value;
+        }
+    }
+    
+    updatePresetsDropdown() {
+        const select = this.container.querySelector('#preset-select');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">-- Sélectionner preset --</option>';
+        
+        this.presets.forEach(preset => {
+            const option = document.createElement('option');
+            option.value = preset.id;
+            option.textContent = preset.name;
+            select.appendChild(option);
+        });
+    }
+    
+    // ========================================================================
+    // DESTRUCTION
+    // ========================================================================
+    
+    destroy() {
+        if (this.routingMatrix) {
+            this.routingMatrix.destroy();
+            this.routingMatrix = null;
+        }
+        
+        super.destroy();
+    }
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = RoutingView;
+}
+
+if (typeof window !== 'undefined') {
+    window.RoutingView = RoutingView;
 }

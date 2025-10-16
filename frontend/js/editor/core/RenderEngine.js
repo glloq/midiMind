@@ -1,571 +1,463 @@
 // ============================================================================
-// Fichier: frontend/js/editor/core/RenderEngine.js
-// Projet: MidiMind v3.2.1 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.2.1 (Complétée selon audit 2025-10-14)
-// Date: 2025-10-14
+// Fichier: frontend/js/editor/renderers/RenderEngine.js
+// Version: v3.1.0 - PERFORMANCE OPTIMIZED
+// Date: 2025-10-16
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// Description:
-//   Moteur de rendu orchestrant tous les renderers (Grid, Notes, Timeline, etc).
-//   Gère l'ordre de rendu, les clipping zones, et la performance.
-//
-// Fonctionnalités:
-//   - Orchestration complète renderers
-//   - Ordre de rendu (layers)
-//   - Clipping zones
-//   - Gestion qualité (LOD)
-//   - Performance monitoring
-//   - Boucle de rendu optimisée
-//
-// Corrections v3.2.1:
-//   ✅ clearCanvas() - Couleur fond configurable
-//   ✅ getUIOffsets() - Calculs robustes avec fallbacks
-//   ✅ getNoteRenderZone() - Calculs complets et précis
-//   ✅ adjustQualityForPerformance() - LOD adaptatif selon FPS
-//
-// Architecture:
-//   RenderEngine (classe orchestrateur)
-//   - GridRenderer, NoteRenderer, TimelineRenderer, PianoRollRenderer
-//   - Gestion layers et z-index
-//   - Optimisation performance
-//
-// Auteur: MidiMind Team
+// MODIFICATIONS v3.1.0:
+// ✓ FPS limité à 10 (au lieu de 60)
+// ✓ Anti-aliasing désactivé
+// ✓ Animations désactivées
+// ✓ Rendering optimisé (batch processing)
 // ============================================================================
 
 class RenderEngine {
-    constructor(canvas, config = {}) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+    constructor(container, eventBus, debugConsole) {
+        this.container = container;
+        this.eventBus = eventBus;
+        this.debugConsole = debugConsole;
         
-        // Renderers spécialisés
-        this.gridRenderer = new GridRenderer(config.grid);
-        this.noteRenderer = new NoteRenderer(config.notes);
-        this.timelineRenderer = new TimelineRenderer(config.timeline);
-        this.pianoRollRenderer = new PianoRollRenderer(config.pianoRoll);
-        this.ccRenderer = new CCRenderer(config.cc);
-        this.velocityEditor = new VelocityEditorRenderer(config.velocity);
-        
-        // Configuration
+        // Configuration (OPTIMISÉ)
         this.config = {
-            clearColor: config.clearColor || '#0a0a0a',
-            showPianoRoll: config.showPianoRoll !== false,
-            showTimeline: config.showTimeline !== false,
-            showCC: config.showCC || false,
-            showVelocity: config.showVelocity || false,
-            showTrackHeaders: config.showTrackHeaders || false,
-            enablePerformanceMonitoring: config.enablePerformanceMonitoring !== false,
-            targetFPS: config.targetFPS || 60,
-            autoAdjustQuality: config.autoAdjustQuality !== false,
-            ...config
+            targetFPS: PerformanceConfig.rendering.targetFPS || 10,  // ✓ RÉDUIT à 10 fps
+            enableAntiAliasing: PerformanceConfig.rendering.enableAntiAliasing || false,  // ✓ DÉSACTIVÉ
+            maxVisibleNotes: PerformanceConfig.rendering.maxVisibleNotes || 500,
+            updateInterval: PerformanceConfig.rendering.updateInterval || 100,
+            enableAnimations: PerformanceConfig.rendering.enableAnimations || false,  // ✓ DÉSACTIVÉ
+            renderBatchSize: PerformanceConfig.editor.renderBatchSize || 100
         };
         
-        // Qualité de rendu
-        this.quality = {
-            antialiasing: true,
-            shadows: false,
-            details: true,
-            level: 'medium' // 'low', 'medium', 'high'
-        };
+        // Canvas
+        this.canvas = null;
+        this.ctx = null;
+        this.width = 0;
+        this.height = 0;
+        this.dpr = 1;  // Device Pixel Ratio (fixe à 1 pour performance)
         
-        // Performance
-        this.lastRenderTime = 0;
-        this.fpsHistory = [];
-        this.maxFPSHistory = 10;
-        this.lowFPSThreshold = 30;
-        this.highFPSThreshold = 55;
-        
-        // Boucle de rendu
-        this.needsRedraw = false;
-        this.isRendering = false;
+        // Animation loop
         this.animationFrameId = null;
+        this.isRendering = false;
+        this.lastFrameTime = 0;
+        this.frameInterval = 1000 / this.config.targetFPS;  // ✓ ~100ms entre frames
+        this.frameCount = 0;
+        this.fps = 0;
         
-        // Référence au visualizer
-        this.visualizer = null;
+        // État
+        this.needsRedraw = true;
+        this.viewport = {
+            startTime: 0,
+            endTime: 10000,
+            minNote: 21,
+            maxNote: 108,
+            scrollX: 0,
+            scrollY: 0,
+            zoom: 1
+        };
         
-        // Renderer additionnel (pour modes)
-        this.modeRenderer = null;
+        // Renderers (sous-composants)
+        this.renderers = {
+            grid: null,
+            timeline: null,
+            pianoRoll: null
+        };
+        
+        // Données à rendre
+        this.data = {
+            notes: [],
+            selection: new Set(),
+            metadata: null
+        };
+        
+        // Performance tracking
+        this.perfStats = {
+            frameTime: 0,
+            renderTime: 0,
+            droppedFrames: 0,
+            totalFrames: 0
+        };
+        
+        this.logDebug('render', '✓ RenderEngine initialized (performance mode)');
+        
+        this.init();
     }
-
+    
     // ========================================================================
     // INITIALISATION
     // ========================================================================
-
-    /**
-     * Définit la référence au visualizer
-     * @param {Object} visualizer - Instance MidiVisualizer
-     */
-    setVisualizer(visualizer) {
-        this.visualizer = visualizer;
+    
+    init() {
+        this.createCanvas();
+        this.setupContext();
+        this.attachEvents();
+        
+        this.logDebug('render', `Canvas: ${this.width}x${this.height}, FPS: ${this.config.targetFPS}`);
     }
-
-    // ========================================================================
-    // RENDU PRINCIPAL
-    // ========================================================================
-
-    /**
-     * Rendu complet de la scène
-     * @param {Object} midiData - Données MIDI
-     * @param {Object} viewport - Viewport actuel
-     * @param {Object} coordSystem - Système de coordonnées
-     * @param {Object} selection - Gestionnaire sélection
-     * @param {Array} activeNotes - Notes actives (playback)
-     */
-    render(midiData, viewport, coordSystem, selection = null, activeNotes = null) {
-        if (!midiData || !midiData.timeline) {
-            this.clearCanvas();
-            return;
+    
+    createCanvas() {
+        // Récupérer ou créer canvas
+        this.canvas = this.container.querySelector('canvas');
+        
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.container.appendChild(this.canvas);
         }
         
-        const startTime = performance.now();
+        // Taille initiale
+        this.resize();
+    }
+    
+    setupContext() {
+        this.ctx = this.canvas.getContext('2d', {
+            alpha: false,  // Pas de transparence = plus rapide
+            desynchronized: true  // Meilleure perf pour animations
+        });
         
-        // Nettoyer le canvas
-        this.clearCanvas();
-        
-        // Activer antialiasing
-        this.ctx.imageSmoothingEnabled = this.quality.antialiasing;
-        
-        // Calculer les dimensions des zones
-        const pianoRollWidth = this.config.showPianoRoll ? 
-            this.pianoRollRenderer.getWidth() : 0;
-        const timelineHeight = this.config.showTimeline ? 
-            this.timelineRenderer.getHeight() : 0;
-        const velocityHeight = this.config.showVelocity ? 
-            this.velocityEditor.getHeight() : 0;
-        const ccHeight = this.config.showCC ? 
-            this.ccRenderer.getHeight() : 0;
-        
-        // Zone de rendu des notes
-        const noteZoneHeight = this.canvas.height - timelineHeight - velocityHeight - ccHeight;
-        
-        // ====================================================================
-        // 1. ZONE PRINCIPALE (Notes + Grille)
-        // ====================================================================
-        
-        this.ctx.save();
-        this.ctx.translate(pianoRollWidth, timelineHeight);
-        
-        // Clipping pour la zone de notes
-        this.ctx.beginPath();
-        this.ctx.rect(0, 0, this.canvas.width - pianoRollWidth, noteZoneHeight);
-        this.ctx.clip();
-        
-        // 1a. Grille
-        this.gridRenderer.render(
-            this.ctx,
-            viewport,
-            coordSystem,
-            midiData.metadata
-        );
-        
-        // 1b. Notes normales
-        const notes = midiData.timeline.filter(e => e.type === 'noteOn');
-        this.noteRenderer.render(
-            this.ctx,
-            notes,
-            viewport,
-            coordSystem,
-            selection
-        );
-        
-        // 1c. Notes actives (pendant lecture)
-        if (activeNotes && activeNotes.length > 0) {
-            this.noteRenderer.renderActiveNotes(
-                this.ctx,
-                activeNotes,
-                viewport,
-                coordSystem
-            );
-        }
-        
-        // 1d. Rendu additionnel du mode
-        if (this.modeRenderer) {
-            this.modeRenderer(this.ctx);
-        }
-        
-        this.ctx.restore();
-        
-        // ====================================================================
-        // 2. CONTROL CHANGES (sous la zone de notes)
-        // ====================================================================
-        
-        if (this.config.showCC) {
-            const ccEvents = midiData.timeline.filter(e => e.type === 'cc');
-            if (ccEvents.length > 0) {
-                this.ctx.save();
-                this.ctx.translate(pianoRollWidth, timelineHeight + noteZoneHeight);
-                
-                this.ccRenderer.render(
-                    this.ctx,
-                    ccEvents,
-                    viewport,
-                    coordSystem,
-                    ccHeight
-                );
-                
-                this.ctx.restore();
+        // ✓ DÉSACTIVER ANTI-ALIASING pour performance
+        if (!this.config.enableAntiAliasing) {
+            this.ctx.imageSmoothingEnabled = false;
+            
+            // Compatibilité navigateurs
+            if (this.ctx.webkitImageSmoothingEnabled !== undefined) {
+                this.ctx.webkitImageSmoothingEnabled = false;
             }
-        }
-        
-        // ====================================================================
-        // 3. VELOCITY EDITOR (bas du canvas)
-        // ====================================================================
-        
-        if (this.config.showVelocity) {
-            this.ctx.save();
-            this.ctx.translate(pianoRollWidth, this.canvas.height - velocityHeight);
-            
-            this.velocityEditor.render(
-                this.ctx,
-                notes,
-                viewport,
-                coordSystem,
-                selection,
-                this.canvas.height
-            );
-            
-            this.ctx.restore();
-        }
-        
-        // ====================================================================
-        // 4. PIANO ROLL (gauche)
-        // ====================================================================
-        
-        if (this.config.showPianoRoll) {
-            this.ctx.save();
-            this.ctx.translate(0, timelineHeight);
-            
-            this.pianoRollRenderer.render(
-                this.ctx,
-                viewport,
-                coordSystem,
-                noteZoneHeight
-            );
-            
-            // Mettre à jour les notes actives
-            if (activeNotes) {
-                this.pianoRollRenderer.setActiveNotes(activeNotes);
+            if (this.ctx.mozImageSmoothingEnabled !== undefined) {
+                this.ctx.mozImageSmoothingEnabled = false;
+            }
+            if (this.ctx.msImageSmoothingEnabled !== undefined) {
+                this.ctx.msImageSmoothingEnabled = false;
             }
             
-            this.ctx.restore();
+            this.logDebug('render', '✓ Anti-aliasing disabled');
         }
-        
-        // ====================================================================
-        // 5. TIMELINE (haut)
-        // ====================================================================
-        
-        if (this.config.showTimeline) {
-            this.timelineRenderer.renderWithOffset(
-                this.ctx,
-                viewport,
-                coordSystem,
-                midiData.metadata,
-                pianoRollWidth
-            );
-        }
-        
-        // Mesurer le temps de rendu
-        const renderTime = performance.now() - startTime;
-        this.lastRenderTime = renderTime;
-        
-        // Ajuster qualité si nécessaire
-        if (this.config.autoAdjustQuality && this.config.enablePerformanceMonitoring) {
-            this.adjustQualityForPerformance(renderTime);
-        }
-        
-        this.needsRedraw = false;
     }
-
-    // ====================================================================
-    // BOUCLE DE RENDU
-    // ====================================================================
-
-    /**
-     * Démarre la boucle de rendu
-     * @param {Function} renderCallback - Callback de rendu
-     */
-    startRenderLoop(renderCallback) {
+    
+    resize() {
+        // Taille du container
+        const rect = this.container.getBoundingClientRect();
+        
+        // ✓ Fixer DPR à 1 pour éviter suréchantillonnage
+        this.dpr = 1;
+        
+        this.width = rect.width;
+        this.height = rect.height;
+        
+        // Appliquer au canvas
+        this.canvas.width = this.width * this.dpr;
+        this.canvas.height = this.height * this.dpr;
+        this.canvas.style.width = `${this.width}px`;
+        this.canvas.style.height = `${this.height}px`;
+        
+        // Rescaler le contexte si DPR > 1
+        if (this.dpr > 1) {
+            this.ctx.scale(this.dpr, this.dpr);
+        }
+        
+        this.needsRedraw = true;
+        
+        this.logDebug('render', `Resized: ${this.width}x${this.height} (DPR: ${this.dpr})`);
+    }
+    
+    attachEvents() {
+        // Resize window
+        window.addEventListener('resize', () => {
+            this.resize();
+        });
+        
+        // Redraw sur demande
+        this.eventBus.on('render:redraw', () => {
+            this.needsRedraw = true;
+        });
+        
+        // Update viewport
+        this.eventBus.on('render:viewport-changed', (viewport) => {
+            this.setViewport(viewport);
+        });
+    }
+    
+    // ========================================================================
+    // RENDERERS (sous-composants)
+    // ========================================================================
+    
+    setRenderer(type, renderer) {
+        if (['grid', 'timeline', 'pianoRoll'].includes(type)) {
+            this.renderers[type] = renderer;
+            this.logDebug('render', `Renderer set: ${type}`);
+        }
+    }
+    
+    // ========================================================================
+    // ANIMATION LOOP (OPTIMISÉ)
+    // ========================================================================
+    
+    start() {
         if (this.isRendering) return;
         
         this.isRendering = true;
+        this.lastFrameTime = performance.now();
         
-        const loop = () => {
-            if (!this.isRendering) return;
-            
-            if (this.needsRedraw) {
-                renderCallback();
-            }
-            
-            this.animationFrameId = requestAnimationFrame(loop);
-        };
+        this.animate();
         
-        loop();
+        this.logDebug('render', `Rendering started (${this.config.targetFPS} fps)`);
     }
-
-    /**
-     * Arrête la boucle de rendu
-     */
-    stopRenderLoop() {
+    
+    stop() {
+        if (!this.isRendering) return;
+        
         this.isRendering = false;
+        
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+        
+        this.logDebug('render', 'Rendering stopped');
     }
-
-    /**
-     * Demande un nouveau rendu
-     */
+    
+    animate() {
+        if (!this.isRendering) return;
+        
+        const now = performance.now();
+        const elapsed = now - this.lastFrameTime;
+        
+        // ✓ LIMITER FPS en sautant des frames
+        if (elapsed >= this.frameInterval) {
+            // Enregistrer frame time
+            const frameStart = now;
+            
+            // Render si nécessaire
+            if (this.needsRedraw) {
+                this.render();
+                this.needsRedraw = false;
+            }
+            
+            // Stats performance
+            this.perfStats.renderTime = performance.now() - frameStart;
+            this.perfStats.frameTime = elapsed;
+            this.perfStats.totalFrames++;
+            
+            // FPS actuel
+            this.fps = 1000 / elapsed;
+            
+            // Frame droppée si trop lent
+            if (this.perfStats.renderTime > this.frameInterval) {
+                this.perfStats.droppedFrames++;
+            }
+            
+            this.lastFrameTime = now - (elapsed % this.frameInterval);
+            this.frameCount++;
+        }
+        
+        // Prochaine frame
+        this.animationFrameId = requestAnimationFrame(() => this.animate());
+    }
+    
+    // ========================================================================
+    // RENDERING PRINCIPAL
+    // ========================================================================
+    
+    render() {
+        const renderStart = performance.now();
+        
+        // Clear canvas
+        this.clear();
+        
+        // Render layers (dans l'ordre)
+        this.renderGrid();
+        this.renderNotes();
+        this.renderTimeline();
+        this.renderOverlay();
+        
+        const renderTime = performance.now() - renderStart;
+        
+        if (renderTime > 50) {  // Warning si > 50ms
+            this.logDebug('render', `Slow render: ${renderTime.toFixed(2)}ms`, 'warn');
+        }
+    }
+    
+    clear() {
+        this.ctx.fillStyle = '#1a1a1a';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+    }
+    
+    renderGrid() {
+        if (this.renderers.grid) {
+            this.renderers.grid.render(this.ctx, this.viewport);
+        }
+    }
+    
+    renderNotes() {
+        if (this.renderers.pianoRoll) {
+            // ✓ LIMITER nombre de notes visibles
+            const visibleNotes = this.getVisibleNotes();
+            const limitedNotes = visibleNotes.slice(0, this.config.maxVisibleNotes);
+            
+            if (visibleNotes.length > this.config.maxVisibleNotes) {
+                this.logDebug('render', 
+                    `⚠️ ${visibleNotes.length} notes (showing ${this.config.maxVisibleNotes})`, 
+                    'warn'
+                );
+            }
+            
+            // Render par batch pour performance
+            this.renderNotesBatched(limitedNotes);
+        }
+    }
+    
+    renderNotesBatched(notes) {
+        const batchSize = this.config.renderBatchSize;
+        
+        for (let i = 0; i < notes.length; i += batchSize) {
+            const batch = notes.slice(i, i + batchSize);
+            this.renderers.pianoRoll.renderNotes(this.ctx, batch, this.viewport, this.data.selection);
+        }
+    }
+    
+    renderTimeline() {
+        if (this.renderers.timeline) {
+            this.renderers.timeline.render(this.ctx, this.viewport, this.data.metadata);
+        }
+    }
+    
+    renderOverlay() {
+        // Debug info si activé
+        if (PerformanceConfig.debug.enableFPSCounter) {
+            this.renderDebugInfo();
+        }
+    }
+    
+    renderDebugInfo() {
+        this.ctx.save();
+        
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, 10, 200, 80);
+        
+        this.ctx.fillStyle = '#00ff00';
+        this.ctx.font = '12px monospace';
+        this.ctx.fillText(`FPS: ${this.fps.toFixed(1)}`, 20, 30);
+        this.ctx.fillText(`Render: ${this.perfStats.renderTime.toFixed(2)}ms`, 20, 50);
+        this.ctx.fillText(`Notes: ${this.data.notes.length}`, 20, 70);
+        
+        this.ctx.restore();
+    }
+    
+    // ========================================================================
+    // DONNÉES
+    // ========================================================================
+    
+    setNotes(notes) {
+        this.data.notes = notes || [];
+        this.needsRedraw = true;
+    }
+    
+    setSelection(selection) {
+        this.data.selection = selection || new Set();
+        this.needsRedraw = true;
+    }
+    
+    setMetadata(metadata) {
+        this.data.metadata = metadata;
+        this.needsRedraw = true;
+    }
+    
+    // ========================================================================
+    // VIEWPORT
+    // ========================================================================
+    
+    setViewport(viewport) {
+        this.viewport = { ...this.viewport, ...viewport };
+        this.needsRedraw = true;
+    }
+    
+    getViewport() {
+        return { ...this.viewport };
+    }
+    
+    getVisibleNotes() {
+        if (!this.data.notes) return [];
+        
+        return this.data.notes.filter(note => {
+            return note.time >= this.viewport.startTime &&
+                   note.time <= this.viewport.endTime &&
+                   note.note >= this.viewport.minNote &&
+                   note.note <= this.viewport.maxNote;
+        });
+    }
+    
+    // ========================================================================
+    // COORDONNÉES
+    // ========================================================================
+    
+    timeToX(time) {
+        const range = this.viewport.endTime - this.viewport.startTime;
+        return ((time - this.viewport.startTime) / range) * this.width;
+    }
+    
+    noteToY(note) {
+        const range = this.viewport.maxNote - this.viewport.minNote;
+        return this.height - (((note - this.viewport.minNote) / range) * this.height);
+    }
+    
+    xToTime(x) {
+        const range = this.viewport.endTime - this.viewport.startTime;
+        return this.viewport.startTime + (x / this.width) * range;
+    }
+    
+    yToNote(y) {
+        const range = this.viewport.maxNote - this.viewport.minNote;
+        return Math.round(this.viewport.minNote + ((this.height - y) / this.height) * range);
+    }
+    
+    // ========================================================================
+    // GETTERS
+    // ========================================================================
+    
+    getCanvas() {
+        return this.canvas;
+    }
+    
+    getContext() {
+        return this.ctx;
+    }
+    
+    getStats() {
+        return {
+            ...this.perfStats,
+            fps: this.fps,
+            isRendering: this.isRendering,
+            noteCount: this.data.notes.length,
+            visibleNotes: this.getVisibleNotes().length
+        };
+    }
+    
+    // ========================================================================
+    // UTILITAIRES
+    // ========================================================================
+    
     requestRedraw() {
         this.needsRedraw = true;
     }
-
-    // ====================================================================
-    // CANVAS
-    // ====================================================================
-
-    /**
-     * ✅ AMÉLIORÉ: Nettoie le canvas avec couleur configurable
-     */
-    clearCanvas() {
-        // Remplir avec couleur de fond
-        this.ctx.fillStyle = this.config.clearColor || '#0a0a0a';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Reset transformations
-        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        
-        // Reset compositing
-        this.ctx.globalAlpha = 1.0;
-        this.ctx.globalCompositeOperation = 'source-over';
-    }
-
-    /**
-     * Redimensionne le canvas
-     * @param {number} width - Largeur
-     * @param {number} height - Hauteur
-     */
-    resize(width, height) {
-        // Utiliser device pixel ratio pour netteté sur écrans haute résolution
-        const dpr = window.devicePixelRatio || 1;
-        
-        this.canvas.width = width * dpr;
-        this.canvas.height = height * dpr;
-        this.canvas.style.width = `${width}px`;
-        this.canvas.style.height = `${height}px`;
-        
-        // Réappliquer scale
-        this.ctx.scale(dpr, dpr);
-        
-        this.requestRedraw();
-    }
-
-    // ====================================================================
-    // QUALITÉ
-    // ====================================================================
-
-    /**
-     * Définit le niveau de qualité
-     * @param {string} level - 'low', 'medium', 'high'
-     */
-    setQuality(level) {
-        this.quality.level = level;
-        
-        switch (level) {
-            case 'high':
-                this.quality.antialiasing = true;
-                this.quality.shadows = true;
-                this.quality.details = true;
-                this.noteRenderer.config.enableLOD = false;
-                this.noteRenderer.config.showVelocityGradient = true;
-                break;
-                
-            case 'medium':
-                this.quality.antialiasing = true;
-                this.quality.shadows = false;
-                this.quality.details = true;
-                this.noteRenderer.config.enableLOD = true;
-                this.noteRenderer.config.showVelocityGradient = true;
-                break;
-                
-            case 'low':
-                this.quality.antialiasing = false;
-                this.quality.shadows = false;
-                this.quality.details = false;
-                this.noteRenderer.config.enableLOD = true;
-                this.noteRenderer.config.showVelocityGradient = false;
-                break;
-        }
-        
-        this.requestRedraw();
-    }
-
-    /**
-     * ✅ NOUVEAU: Ajuste automatiquement la qualité selon les performances
-     * @param {number} renderTime - Temps de rendu en ms
-     */
-    adjustQualityForPerformance(renderTime) {
-        // Calculer FPS actuel
-        const currentFPS = renderTime > 0 ? 1000 / renderTime : 60;
-        
-        // Ajouter à l'historique
-        this.fpsHistory.push(currentFPS);
-        if (this.fpsHistory.length > this.maxFPSHistory) {
-            this.fpsHistory.shift();
-        }
-        
-        // Ne rien faire si pas assez d'historique
-        if (this.fpsHistory.length < this.maxFPSHistory) return;
-        
-        // Calculer FPS moyen
-        const avgFPS = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
-        
-        // Ajuster qualité selon FPS moyen
-        if (avgFPS < this.lowFPSThreshold && this.quality.level !== 'low') {
-            console.log(`[RenderEngine] Low FPS detected (${Math.round(avgFPS)}), reducing quality`);
-            this.setQuality('low');
-        } else if (avgFPS > this.highFPSThreshold && avgFPS < this.config.targetFPS && this.quality.level === 'high') {
-            console.log(`[RenderEngine] Medium FPS detected (${Math.round(avgFPS)}), using medium quality`);
-            this.setQuality('medium');
-        } else if (avgFPS >= this.config.targetFPS && this.quality.level !== 'high') {
-            console.log(`[RenderEngine] High FPS detected (${Math.round(avgFPS)}), increasing quality`);
-            this.setQuality('high');
+    
+    logDebug(category, message, level = 'info') {
+        if (this.debugConsole) {
+            this.debugConsole.log(category, message, level);
         }
     }
-
-    // ====================================================================
-    // MODE RENDERER
-    // ====================================================================
-
-    /**
-     * Définit un renderer additionnel pour le mode actif
-     * @param {Function} renderer - Fonction de rendu
-     */
-    setModeRenderer(renderer) {
-        this.modeRenderer = renderer;
-    }
-
-    // ====================================================================
-    // AFFICHAGE DES COMPOSANTS
-    // ====================================================================
-
-    setShowPianoRoll(show) {
-        this.config.showPianoRoll = show;
-        this.requestRedraw();
-    }
-
-    setShowTimeline(show) {
-        this.config.showTimeline = show;
-        this.requestRedraw();
-    }
-
-    setShowCC(show) {
-        this.config.showCC = show;
-        this.ccRenderer.setVisible(show);
-        this.requestRedraw();
-    }
-
-    setShowVelocity(show) {
-        this.config.showVelocity = show;
-        this.velocityEditor.setVisible(show);
-        this.requestRedraw();
-    }
-
-    setShowTrackHeaders(show) {
-        this.config.showTrackHeaders = show;
-        this.requestRedraw();
-    }
-
-    // ====================================================================
-    // GETTERS
-    // ====================================================================
-
-    /**
-     * ✅ ROBUSTIFIÉ: Obtient les offsets des zones UI
-     * @returns {Object} {left, top, bottom, right}
-     */
-    getUIOffsets() {
-        const left = this.config.showPianoRoll ? 
-            (this.pianoRollRenderer.getWidth ? this.pianoRollRenderer.getWidth() : 80) : 0;
-        
-        const top = this.config.showTimeline ? 
-            (this.timelineRenderer.getHeight ? this.timelineRenderer.getHeight() : 60) : 0;
-        
-        const ccHeight = this.config.showCC ? 
-            (this.ccRenderer.getHeight ? this.ccRenderer.getHeight() : 100) : 0;
-        
-        const velocityHeight = this.config.showVelocity ? 
-            (this.velocityEditor.getHeight ? this.velocityEditor.getHeight() : 80) : 0;
-        
-        const bottom = ccHeight + velocityHeight;
-        
-        return {
-            left: left,
-            top: top,
-            bottom: bottom,
-            right: 0
-        };
-    }
-
-    /**
-     * ✅ COMPLET: Obtient la zone de rendu des notes
-     * @returns {Object} {x, y, width, height}
-     */
-    getNoteRenderZone() {
-        const offsets = this.getUIOffsets();
-        
-        const zone = {
-            x: offsets.left,
-            y: offsets.top,
-            width: Math.max(0, this.canvas.width - offsets.left - offsets.right),
-            height: Math.max(0, this.canvas.height - offsets.top - offsets.bottom)
-        };
-        
-        return zone;
-    }
-
-    /**
-     * Obtient le dernier temps de rendu
-     * @returns {number} Temps en ms
-     */
-    getLastRenderTime() {
-        return this.lastRenderTime;
-    }
-
-    /**
-     * Obtient la qualité actuelle
-     * @returns {Object} Informations qualité
-     */
-    getQualityInfo() {
-        return {
-            ...this.quality,
-            avgFPS: this.fpsHistory.length > 0 ?
-                Math.round(this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length) :
-                0
-        };
-    }
-
-    /**
-     * Nettoie le cache
-     */
-    clearCache() {
-        if (this.noteRenderer.clearCache) {
-            this.noteRenderer.clearCache();
-        }
-        if (this.gridRenderer.invalidateCache) {
-            this.gridRenderer.invalidateCache();
-        }
-    }
-
-    /**
-     * Nettoie les ressources
-     */
+    
+    // ========================================================================
+    // DESTRUCTION
+    // ========================================================================
+    
     destroy() {
-        this.stopRenderLoop();
-        this.clearCache();
+        this.stop();
         
-        // Nettoyer références
-        this.visualizer = null;
-        this.modeRenderer = null;
-        this.fpsHistory = [];
+        if (this.canvas && this.canvas.parentNode) {
+            this.canvas.parentNode.removeChild(this.canvas);
+        }
+        
+        this.canvas = null;
+        this.ctx = null;
+        
+        this.logDebug('render', '✓ RenderEngine destroyed');
     }
 }
 
@@ -575,4 +467,8 @@ class RenderEngine {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = RenderEngine;
+}
+
+if (typeof window !== 'undefined') {
+    window.RenderEngine = RenderEngine;
 }

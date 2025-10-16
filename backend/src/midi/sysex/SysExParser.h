@@ -1,296 +1,280 @@
 // ============================================================================
-// Fichier: backend/src/midi/sysex/SysExParser.h
-// Version: 3.0.2 - CORRECTION DES REDÉFINITIONS
+// File: backend/src/midi/sysex/SysExParser.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-
-// CORRECTIFS APPLIQUÉS:
-// - ✅ Suppression de la redéfinition de DeviceIdentity (utilise DeviceIdentity.h)
-// - ✅ Ajout des constantes manquantes dans UniversalSysEx.h (MTC, etc.)
-// - ✅ Correction manufacturerId → manufacturer dans parseIdentityReply
+//
+// Description:
+//   Parser for SysEx messages. Handles standard MIDI SysEx (Identity) and
+//   Custom SysEx protocol (0x7D). Focuses on Blocks 1-2 for v4.1.0.
+//
+// Dependencies:
+//   - None (header-only utilities, implementation in .cpp)
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified to Blocks 1-2 only
+//   - Added static helper methods
+//   - Removed unused block parsers
+//
 // ============================================================================
 
 #pragma once
 
-#include "SysExMessage.h"
-#include "DeviceIdentity.h"  // ✅ Utilise la définition officielle
-#include "UniversalSysEx.h"
-#include <optional>
 #include <vector>
+#include <string>
+#include <optional>
 #include <cstdint>
 
 namespace midiMind {
 
 // ============================================================================
-// STRUCTURES POUR PARSING
+// DATA STRUCTURES
 // ============================================================================
 
 /**
- * @struct MTCFullFrame
- * @brief MIDI Time Code Full Frame
+ * @struct DeviceIdentity
+ * @brief Standard MIDI Device Identity (Universal SysEx)
  */
-struct MTCFullFrame {
-    uint8_t hours;
-    uint8_t minutes;
-    uint8_t seconds;
-    uint8_t frames;
-    uint8_t frameRate;  // 0=24fps, 1=25fps, 2=29.97fps, 3=30fps
+struct DeviceIdentity {
+    uint16_t manufacturerId;    // MIDI Manufacturer ID (0x00-0x7F or extended)
+    uint16_t familyCode;        // Device family (0x0000-0x3FFF)
+    uint16_t modelNumber;       // Model number (0x0000-0x3FFF)
+    uint8_t versionMajor;       // Firmware version major
+    uint8_t versionMinor;       // Firmware version minor
+    uint8_t versionPatch;       // Firmware version patch
+    uint8_t versionBuild;       // Firmware version build
+    
+    /**
+     * @brief Convert to human-readable string
+     * @return String representation
+     */
+    std::string toString() const;
 };
 
 /**
- * @struct SampleDumpHeader
- * @brief En-tête de Sample Dump
+ * @struct CustomDeviceIdentity
+ * @brief Custom Device Identity (Block 1)
  */
-struct SampleDumpHeader {
-    uint8_t deviceId;
-    uint16_t sampleNumber;
-    uint8_t sampleFormat;
-    uint32_t samplePeriod;
-    uint32_t sampleLength;
-    uint32_t loopStart;
-    uint32_t loopEnd;
-    uint8_t loopType;
+struct CustomDeviceIdentity {
+    uint8_t blockVersion;           // Block format version
+    uint32_t deviceId;              // Unique device ID (32-bit)
+    std::string deviceName;         // Device name (max 32 chars)
+    uint8_t firmwareVersion[3];     // Firmware [major, minor, patch]
+    uint32_t featureFlags;          // Supported features bitmask
+    
+    /**
+     * @brief Convert to human-readable string
+     * @return String representation
+     */
+    std::string toString() const;
+    
+    /**
+     * @brief Check if feature is supported
+     * @param bit Feature bit (0-31)
+     * @return True if feature enabled
+     */
+    bool hasFeature(uint8_t bit) const {
+        return (featureFlags & (1u << bit)) != 0;
+    }
+};
+
+/**
+ * @struct NoteMappingEntry
+ * @brief Single note mapping entry
+ */
+struct NoteMappingEntry {
+    uint8_t midiNote;       // MIDI note number (0-127)
+    uint8_t channel;        // MIDI channel (0-15)
+    std::string name;       // Human-readable name (e.g., "Kick", "Snare")
+    uint8_t velocity;       // Default velocity (0-127)
+};
+
+/**
+ * @struct NoteMap
+ * @brief Complete note mapping (Block 2)
+ */
+struct NoteMap {
+    uint8_t blockVersion;                   // Block format version
+    uint8_t minNote;                        // Minimum supported note
+    uint8_t maxNote;                        // Maximum supported note
+    uint8_t polyphony;                      // Max simultaneous notes
+    std::vector<NoteMappingEntry> mappings; // Note mappings
+    
+    /**
+     * @brief Convert to human-readable string
+     * @return String representation
+     */
+    std::string toString() const;
+    
+    /**
+     * @brief Find mapping for a MIDI note
+     * @param note MIDI note number
+     * @return Pointer to mapping or nullptr
+     */
+    const NoteMappingEntry* findMapping(uint8_t note) const;
 };
 
 // ============================================================================
-// CLASSE SYSEXPARSER
+// SYSEX PARSER
 // ============================================================================
 
 /**
  * @class SysExParser
- * @brief Parser pour messages System Exclusive (SysEx)
+ * @brief Static parser for SysEx messages
+ * 
+ * @details
+ * Provides static methods to parse various SysEx message types.
+ * All methods are thread-safe (no internal state).
  */
 class SysExParser {
 public:
     // ========================================================================
-    // MÉTHODES DE VÉRIFICATION DE TYPE
+    // MESSAGE TYPE DETECTION
     // ========================================================================
     
     /**
-     * @brief Vérifie si c'est un Identity Reply
+     * @brief Check if data is valid SysEx message
+     * @param data Raw MIDI data
+     * @return True if valid SysEx (starts with F0, ends with F7)
      */
-    static bool isIdentityReply(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 5) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::GENERAL_INFO &&
-               msg.getSubId2() == SysEx::GeneralInfo::IDENTITY_REPLY;
-    }
+    static bool isValidSysEx(const std::vector<uint8_t>& data);
     
     /**
-     * @brief Vérifie si c'est un Identity Request
+     * @brief Check if message is Identity Reply
+     * @param data Raw SysEx data
+     * @return True if Identity Reply (F0 7E ... 06 02 ...)
      */
-    static bool isIdentityRequest(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 5) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::GENERAL_INFO &&
-               msg.getSubId2() == SysEx::GeneralInfo::IDENTITY_REQUEST;
-    }
+    static bool isIdentityReply(const std::vector<uint8_t>& data);
     
     /**
-     * @brief Vérifie si c'est un message General MIDI
+     * @brief Check if message is Custom SysEx (0x7D)
+     * @param data Raw SysEx data
+     * @return True if Custom SysEx
      */
-    static bool isGeneralMidi(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::GENERAL_MIDI;
-    }
+    static bool isCustomSysEx(const std::vector<uint8_t>& data);
     
     /**
-     * @brief Vérifie si c'est un message Device Control
+     * @brief Get Custom SysEx block ID
+     * @param data Raw SysEx data
+     * @return Block ID (1-8) or nullopt if invalid
      */
-    static bool isDeviceControl(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_REALTIME &&
-               msg.getSubId1() == SysEx::RealTime::DEVICE_CONTROL;
-    }
+    static std::optional<uint8_t> getCustomBlockId(const std::vector<uint8_t>& data);
     
     /**
-     * @brief ✅ CORRECTION: Vérifie si c'est un message MTC
+     * @brief Get Custom SysEx block version
+     * @param data Raw SysEx data
+     * @return Block version or nullopt if invalid
      */
-    static bool isMTC(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_REALTIME &&
-               msg.getSubId1() == SysEx::RealTime::MIDI_TIME_CODE;
-    }
-    
-    /**
-     * @brief ✅ CORRECTION: Vérifie si c'est un message Sample Dump
-     */
-    static bool isSampleDump(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::SAMPLE_DUMP;
-    }
-    
-    /**
-     * @brief Vérifie si c'est un message File Dump
-     */
-    static bool isFileDump(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::FILE_DUMP;
-    }
-    
-    /**
-     * @brief ✅ CORRECTION: Vérifie si c'est un message Tuning Standard
-     */
-    static bool isTuningStandard(const SysExMessage& msg) {
-        if (!msg.isUniversal() || msg.getSize() < 4) {
-            return false;
-        }
-        return msg.getManufacturerId() == SysEx::UNIVERSAL_NON_REALTIME &&
-               msg.getSubId1() == SysEx::NonRealTime::MIDI_TUNING_STANDARD;
-    }
+    static std::optional<uint8_t> getCustomBlockVersion(const std::vector<uint8_t>& data);
     
     // ========================================================================
-    // PARSING - IDENTITY
+    // STANDARD SYSEX PARSING
     // ========================================================================
     
     /**
-     * @brief ✅ CORRECTION: Parse un Identity Reply message
-     * Format: F0 7E <device> 06 02 <mfg> <family:2> <model:2> <version:4> F7
+     * @brief Parse Identity Reply message
+     * @param data Raw SysEx data (F0 7E ... 06 02 ... F7)
+     * @return DeviceIdentity or nullopt if parsing fails
+     * 
+     * @details Format:
+     *   F0 7E <device> 06 02 <manufacturer> <family> <model> <version> F7
      */
-    static std::optional<DeviceIdentity> parseIdentityReply(const SysExMessage& msg) {
-        if (!isIdentityReply(msg) || msg.getSize() < 15) {
-            return std::nullopt;
-        }
-        
-        const auto& data = msg.getRawData();
-        
-        DeviceIdentity identity;
-        identity.deviceId = data[2];
-        
-        // ✅ CORRECTION: Utilise 'manufacturer' au lieu de 'manufacturerId'
-        identity.manufacturer.id = data[5];
-        
-        // Family Code (2 bytes, LSB first)
-        identity.familyCode = data[6] | (data[7] << 7);
-        
-        // Model Number (2 bytes, LSB first)
-        identity.modelNumber = data[8] | (data[9] << 7);
-        
-        // Version Number (4 bytes)
-        identity.softwareRevision = {
-            data[10],
-            data[11],
-            data[12],
-            data[13]
-        };
-        
-        return identity;
-    }
+    static std::optional<DeviceIdentity> parseIdentityReply(
+        const std::vector<uint8_t>& data);
     
     // ========================================================================
-    // PARSING - MTC
+    // CUSTOM SYSEX PARSING (BLOCKS 1-2)
     // ========================================================================
     
     /**
-     * @brief Parse un MTC Full Frame
+     * @brief Parse Custom Identification (Block 1)
+     * @param data Raw SysEx data (F0 7D 00 01 01 ... F7)
+     * @return CustomDeviceIdentity or nullopt if parsing fails
+     * 
+     * @details Format:
+     *   F0 7D 00 01 01 <version> <id[4]> <name[32]> <fw[3]> <features[4]> F7
      */
-    static std::optional<MTCFullFrame> parseMTCFullFrame(const SysExMessage& msg) {
-        if (!isMTC(msg) || msg.getSize() < 10) {
-            return std::nullopt;
-        }
-        
-        const auto& data = msg.getRawData();
-        
-        // Vérifier Sub-ID2 = 0x01 (Full Message)
-        if (msg.getSubId2() != 0x01) {
-            return std::nullopt;
-        }
-        
-        MTCFullFrame frame;
-        frame.hours = data[5] & 0x1F;
-        frame.frameRate = (data[5] >> 5) & 0x03;
-        frame.minutes = data[6];
-        frame.seconds = data[7];
-        frame.frames = data[8];
-        
-        return frame;
-    }
+    static std::optional<CustomDeviceIdentity> parseCustomIdentification(
+        const std::vector<uint8_t>& data);
     
+    /**
+     * @brief Parse Note Map (Block 2)
+     * @param data Raw SysEx data (F0 7D 00 02 01 ... F7)
+     * @return NoteMap or nullopt if parsing fails
+     * 
+     * @details Format:
+     *   F0 7D 00 02 01 <version> <min> <max> <poly> <count> [entries...] F7
+     */
+    static std::optional<NoteMap> parseNoteMap(
+        const std::vector<uint8_t>& data);
+    
+private:
     // ========================================================================
-    // PARSING - DEVICE CONTROL
+    // HELPERS
     // ========================================================================
     
     /**
-     * @brief Parse Device Control message
+     * @brief Decode 7-bit encoded 32-bit value
+     * @param data Source data
+     * @param offset Offset to start reading
+     * @return Decoded 32-bit value
+     * 
+     * @details MIDI SysEx uses 7-bit encoding (MSB = 0)
+     *   4 bytes of 7-bit data = 28 bits decoded
      */
-    static std::optional<uint8_t> parseDeviceControl(const SysExMessage& msg) {
-        if (!isDeviceControl(msg)) {
-            return std::nullopt;
-        }
-        
-        return msg.getSubId2();
-    }
-    
-    // ========================================================================
-    // PARSING - SAMPLE DUMP
-    // ========================================================================
+    static uint32_t decode7BitTo32Bit(const std::vector<uint8_t>& data, 
+                                      size_t offset);
     
     /**
-     * @brief Parse Sample Dump Header
+     * @brief Extract null-terminated string
+     * @param data Source data
+     * @param offset Offset to start reading
+     * @param maxLen Maximum string length
+     * @return Extracted string
      */
-    static std::optional<SampleDumpHeader> parseSampleDumpHeader(const SysExMessage& msg);
-    
-    // ========================================================================
-    // ENCODAGE / DÉCODAGE
-    // ========================================================================
+    static std::string extractString(const std::vector<uint8_t>& data,
+                                    size_t offset,
+                                    size_t maxLen);
+};
+
+// ============================================================================
+// SYSEX BUILDER (for requests)
+// ============================================================================
+
+/**
+ * @class SysExBuilder
+ * @brief Helper to build SysEx request messages
+ */
+class SysExBuilder {
+public:
+    /**
+     * @brief Build Identity Request
+     * @return Raw SysEx data (F0 7E 7F 06 01 F7)
+     */
+    static std::vector<uint8_t> buildIdentityRequest();
     
     /**
-     * @brief Encode des données 8-bit en 7-bit pour SysEx
+     * @brief Build Custom Identification Request (Block 1)
+     * @return Raw SysEx data (F0 7D 00 01 00 F7)
      */
-    static std::vector<uint8_t> encode8bitTo7bit(const std::vector<uint8_t>& data8bit);
+    static std::vector<uint8_t> buildCustomIdentificationRequest();
     
     /**
-     * @brief Décode des données 7-bit en 8-bit
+     * @brief Build Note Map Request (Block 2)
+     * @return Raw SysEx data (F0 7D 00 02 00 F7)
      */
-    static std::vector<uint8_t> decode7bitTo8bit(const std::vector<uint8_t>& data7bit);
+    static std::vector<uint8_t> buildNoteMapRequest();
     
-    // ========================================================================
-    // CHECKSUM
-    // ========================================================================
-    
+private:
     /**
-     * @brief Calcule le checksum 7-bit
+     * @brief Build generic Custom SysEx request
+     * @param blockId Block ID (1-8)
+     * @return Raw SysEx data
      */
-    static uint8_t calculateChecksum(const std::vector<uint8_t>& data);
-    
-    /**
-     * @brief Vérifie le checksum
-     */
-    static bool verifyChecksum(const std::vector<uint8_t>& data, uint8_t expectedChecksum);
-    
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-    
-    /**
-     * @brief Vérifie si un manufacturer ID est valide
-     */
-    static bool isValidManufacturerId(uint8_t id);
-    
-    /**
-     * @brief Convertit le type de message en string
-     */
-    static std::string messageTypeToString(const SysExMessage& msg);
+    static std::vector<uint8_t> buildCustomRequest(uint8_t blockId);
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// FIN DU FICHIER SysExParser.h
-// ============================================================================

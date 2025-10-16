@@ -1,347 +1,383 @@
 // ============================================================================
-// Fichier: backend/src/midi/MidiValidator.h
-// Version: 3.1.0
-// Date: 2025-10-10
-// Projet: MidiMind v3.1 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/midi/MidiValidator.h
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
 // Description:
-//   Validateur pour données MIDI et JsonMidi.
-//   Vérifie l'intégrité, la validité des valeurs MIDI,
-//   et détecte les problèmes courants.
+//   MIDI data validation utilities.
+//   Validates MIDI messages, files, and data structures.
 //
-// Fonctionnalités:
-//   - Validation header JsonMidi (format, tracks, ppq)
-//   - Validation events (types, ranges MIDI 0-127)
-//   - Détection overlaps de notes
-//   - Vérification tri temporel
-//   - Validation références (track, channel)
-//   - Rapport d'erreurs et warnings détaillé
+// Features:
+//   - MIDI message validation
+//   - Value range checking (0-127, channels, etc.)
+//   - File format validation
+//   - Detailed error reporting
 //
-// Utilisation:
-//   MidiValidator validator;
-//   ValidationResult result = validator.validate(jsonMidi);
-//   if (!result.isValid) {
-//     for (const auto& error : result.errors) {
-//       Logger::error("Validator", error);
-//     }
-//   }
+// Author: MidiMind Team
+// Date: 2025-10-16
 //
-// Auteur: MidiMind Team
-// Statut: ✅ PHASE 1 - COMPLET
+// Changes v4.1.0:
+//   - Enhanced validation rules
+//   - Better error messages
+//   - Support for all MIDI message types
+//
 // ============================================================================
 
-#ifndef MIDIMIND_MIDI_VALIDATOR_H
-#define MIDIMIND_MIDI_VALIDATOR_H
+#pragma once
 
+#include "MidiMessage.h"
 #include <string>
 #include <vector>
 #include <set>
-#include "../core/json.hpp"
 
 namespace midiMind {
 
-using json = nlohmann::json;
-
-// ============================================================================
-// ENUMS: Niveaux de sévérité
-// ============================================================================
-
+/**
+ * @enum ValidationSeverity
+ * @brief Severity levels for validation issues
+ */
 enum class ValidationSeverity {
-    ERROR,      // Erreur bloquante (données invalides)
-    WARNING,    // Avertissement (données valides mais suspectes)
-    INFO        // Information (suggestion d'amélioration)
+    ERROR,      ///< Blocking error (invalid data)
+    WARNING,    ///< Warning (valid but suspicious)
+    INFO        ///< Information (suggestion)
 };
 
-// ============================================================================
-// STRUCTURE: ValidationIssue
-// Représente un problème de validation
-// ============================================================================
+/**
+ * @struct ValidationIssue
+ * @brief Represents a validation issue
+ */
 struct ValidationIssue {
+    /// Severity level
     ValidationSeverity severity;
-    std::string category;           // "header", "event", "note", "timeline"
-    std::string message;            // Description du problème
-    std::string location;           // Localisation (ex: "track 0, event 15")
-    json context;                   // Données contextuelles (optionnel)
     
-    ValidationIssue(ValidationSeverity sev, 
+    /// Category (e.g., "message", "value", "range")
+    std::string category;
+    
+    /// Issue description
+    std::string message;
+    
+    /// Location in data (optional)
+    std::string location;
+    
+    /**
+     * @brief Constructor
+     */
+    ValidationIssue(ValidationSeverity sev,
                    const std::string& cat,
                    const std::string& msg,
-                   const std::string& loc = "",
-                   const json& ctx = json::object())
+                   const std::string& loc = "")
         : severity(sev)
         , category(cat)
         , message(msg)
         , location(loc)
-        , context(ctx)
     {}
     
     /**
-     * @brief Convertit en JSON pour rapport
+     * @brief Convert to string
      */
-    json toJson() const {
-        return {
-            {"severity", severityToString()},
-            {"category", category},
-            {"message", message},
-            {"location", location},
-            {"context", context}
-        };
-    }
-    
-    /**
-     * @brief Convertit la sévérité en string
-     */
-    std::string severityToString() const {
+    std::string toString() const {
+        std::string prefix;
         switch (severity) {
-            case ValidationSeverity::ERROR:   return "ERROR";
-            case ValidationSeverity::WARNING: return "WARNING";
-            case ValidationSeverity::INFO:    return "INFO";
-            default: return "UNKNOWN";
-        }
-    }
-};
-
-// ============================================================================
-// STRUCTURE: ValidationResult
-// Résultat de validation
-// ============================================================================
-struct ValidationResult {
-    bool isValid;                       // true si aucune erreur
-    std::vector<ValidationIssue> errors;    // Erreurs bloquantes
-    std::vector<ValidationIssue> warnings;  // Avertissements
-    std::vector<ValidationIssue> infos;     // Informations
-    
-    ValidationResult() : isValid(true) {}
-    
-    /**
-     * @brief Ajoute une issue
-     */
-    void addIssue(const ValidationIssue& issue) {
-        switch (issue.severity) {
-            case ValidationSeverity::ERROR:
-                errors.push_back(issue);
-                isValid = false;
-                break;
-            case ValidationSeverity::WARNING:
-                warnings.push_back(issue);
-                break;
-            case ValidationSeverity::INFO:
-                infos.push_back(issue);
-                break;
-        }
-    }
-    
-    /**
-     * @brief Compte total des issues
-     */
-    size_t getTotalIssues() const {
-        return errors.size() + warnings.size() + infos.size();
-    }
-    
-    /**
-     * @brief Convertit en JSON pour rapport
-     */
-    json toJson() const {
-        json result = {
-            {"valid", isValid},
-            {"errorCount", errors.size()},
-            {"warningCount", warnings.size()},
-            {"infoCount", infos.size()}
-        };
-        
-        if (!errors.empty()) {
-            result["errors"] = json::array();
-            for (const auto& error : errors) {
-                result["errors"].push_back(error.toJson());
-            }
+            case ValidationSeverity::ERROR: prefix = "ERROR"; break;
+            case ValidationSeverity::WARNING: prefix = "WARNING"; break;
+            case ValidationSeverity::INFO: prefix = "INFO"; break;
         }
         
-        if (!warnings.empty()) {
-            result["warnings"] = json::array();
-            for (const auto& warning : warnings) {
-                result["warnings"].push_back(warning.toJson());
-            }
+        std::string result = prefix + ": [" + category + "] " + message;
+        if (!location.empty()) {
+            result += " (at: " + location + ")";
         }
-        
-        if (!infos.empty()) {
-            result["infos"] = json::array();
-            for (const auto& info : infos) {
-                result["infos"].push_back(info.toJson());
-            }
-        }
-        
         return result;
     }
 };
 
-// ============================================================================
-// CLASSE: MidiValidator
-// Validateur de données MIDI
-// ============================================================================
+/**
+ * @struct ValidationResult
+ * @brief Result of a validation operation
+ */
+struct ValidationResult {
+    /// Validation passed
+    bool isValid;
+    
+    /// List of errors
+    std::vector<ValidationIssue> errors;
+    
+    /// List of warnings
+    std::vector<ValidationIssue> warnings;
+    
+    /// List of info messages
+    std::vector<ValidationIssue> infos;
+    
+    /**
+     * @brief Constructor
+     */
+    ValidationResult()
+        : isValid(true)
+    {}
+    
+    /**
+     * @brief Check if has any issues
+     */
+    bool hasIssues() const {
+        return !errors.empty() || !warnings.empty() || !infos.empty();
+    }
+    
+    /**
+     * @brief Get total issue count
+     */
+    size_t getIssueCount() const {
+        return errors.size() + warnings.size() + infos.size();
+    }
+    
+    /**
+     * @brief Get all issues as strings
+     */
+    std::vector<std::string> getAllMessages() const {
+        std::vector<std::string> messages;
+        
+        for (const auto& error : errors) {
+            messages.push_back(error.toString());
+        }
+        for (const auto& warning : warnings) {
+            messages.push_back(warning.toString());
+        }
+        for (const auto& info : infos) {
+            messages.push_back(info.toString());
+        }
+        
+        return messages;
+    }
+};
+
+/**
+ * @class MidiValidator
+ * @brief MIDI data validation utilities
+ * 
+ * Provides comprehensive validation for MIDI messages and data.
+ * 
+ * Thread Safety: YES (stateless)
+ * 
+ * Example:
+ * ```cpp
+ * MidiValidator validator;
+ * 
+ * // Validate message
+ * auto msg = MidiMessage::noteOn(0, 60, 100);
+ * auto result = validator.validateMessage(msg);
+ * 
+ * if (!result.isValid) {
+ *     for (const auto& error : result.errors) {
+ *         std::cout << error.toString() << "\n";
+ *     }
+ * }
+ * 
+ * // Validate values
+ * if (validator.isValidNote(60)) {
+ *     // Valid note
+ * }
+ * ```
+ */
 class MidiValidator {
 public:
     // ========================================================================
-    // CONSTRUCTION
+    // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
+    /**
+     * @brief Constructor
+     */
     MidiValidator();
+    
+    /**
+     * @brief Destructor
+     */
     ~MidiValidator() = default;
     
     // ========================================================================
-    // VALIDATION PRINCIPALE
+    // MESSAGE VALIDATION
     // ========================================================================
     
     /**
-     * @brief Valide un JsonMidi complet
-     * 
-     * @param jsonMidi Données JsonMidi à valider
-     * @return ValidationResult Résultat avec erreurs/warnings
-     * 
-     * @note Valide header, tracks, events, timeline
+     * @brief Validate MIDI message
+     * @param message Message to validate
+     * @return ValidationResult Validation result
      */
-    ValidationResult validate(const json& jsonMidi) const;
+    ValidationResult validateMessage(const MidiMessage& message) const;
     
     /**
-     * @brief Valide uniquement le header
-     * 
-     * @param header Header JsonMidi
-     * @return ValidationResult Résultat
+     * @brief Validate raw MIDI data
+     * @param data Raw MIDI bytes
+     * @return ValidationResult Validation result
      */
-    ValidationResult validateHeader(const json& header) const;
-    
-    /**
-     * @brief Valide une piste
-     * 
-     * @param track Piste JsonMidi
-     * @param trackIndex Index de la piste (pour messages)
-     * @return ValidationResult Résultat
-     */
-    ValidationResult validateTrack(const json& track, int trackIndex) const;
-    
-    /**
-     * @brief Valide un event MIDI
-     * 
-     * @param event Event JsonMidi
-     * @param location Localisation pour messages
-     * @return ValidationResult Résultat
-     */
-    ValidationResult validateEvent(const json& event, const std::string& location) const;
+    ValidationResult validateRawData(const std::vector<uint8_t>& data) const;
     
     // ========================================================================
-    // VALIDATION SPÉCIFIQUE
+    // VALUE VALIDATION
     // ========================================================================
     
     /**
-     * @brief Valide une note MIDI
-     * 
-     * @param note Event de type note
-     * @param location Localisation
-     * @return ValidationResult Résultat
+     * @brief Check if value is valid 7-bit MIDI value (0-127)
+     * @param value Value to check
+     * @return true if valid
      */
-    ValidationResult validateNote(const json& note, const std::string& location) const;
+    static bool isValidMidiValue(int value) {
+        return value >= 0 && value <= 127;
+    }
     
     /**
-     * @brief Valide un Control Change
-     * 
-     * @param cc Event de type cc
-     * @param location Localisation
-     * @return ValidationResult Résultat
+     * @brief Check if note number is valid (0-127)
+     * @param note Note number
+     * @return true if valid
      */
-    ValidationResult validateCC(const json& cc, const std::string& location) const;
+    static bool isValidNote(int note) {
+        return isValidMidiValue(note);
+    }
     
     /**
-     * @brief Détecte les overlaps de notes
-     * 
-     * @param track Piste à analyser
-     * @param trackIndex Index de la piste
-     * @return ValidationResult Résultat avec warnings si overlaps
+     * @brief Check if velocity is valid (0-127)
+     * @param velocity Velocity value
+     * @return true if valid
      */
-    ValidationResult detectNoteOverlaps(const json& track, int trackIndex) const;
+    static bool isValidVelocity(int velocity) {
+        return isValidMidiValue(velocity);
+    }
     
     /**
-     * @brief Vérifie le tri temporel de la timeline
-     * 
-     * @param track Piste à analyser
-     * @param trackIndex Index de la piste
-     * @return ValidationResult Résultat avec erreurs si non trié
+     * @brief Check if channel is valid (0-15)
+     * @param channel Channel number
+     * @return true if valid
      */
-    ValidationResult validateTimelineSorting(const json& track, int trackIndex) const;
+    static bool isValidChannel(int channel) {
+        return channel >= 0 && channel <= 15;
+    }
+    
+    /**
+     * @brief Check if controller number is valid (0-127)
+     * @param controller Controller number
+     * @return true if valid
+     */
+    static bool isValidController(int controller) {
+        return isValidMidiValue(controller);
+    }
+    
+    /**
+     * @brief Check if program number is valid (0-127)
+     * @param program Program number
+     * @return true if valid
+     */
+    static bool isValidProgram(int program) {
+        return isValidMidiValue(program);
+    }
+    
+    /**
+     * @brief Check if pitch bend value is valid (-8192 to 8191)
+     * @param value Pitch bend value
+     * @return true if valid
+     */
+    static bool isValidPitchBend(int value) {
+        return value >= -8192 && value <= 8191;
+    }
+    
+    /**
+     * @brief Check if status byte is valid (0x80-0xFF)
+     * @param status Status byte
+     * @return true if valid
+     */
+    static bool isValidStatusByte(uint8_t status) {
+        return status >= 0x80;
+    }
+    
+    /**
+     * @brief Check if data byte is valid (0x00-0x7F)
+     * @param data Data byte
+     * @return true if valid
+     */
+    static bool isValidDataByte(uint8_t data) {
+        return data <= 0x7F;
+    }
     
     // ========================================================================
-    // UTILITAIRES
+    // RANGE VALIDATION
     // ========================================================================
     
     /**
-     * @brief Vérifie si une valeur MIDI est valide (0-127)
+     * @brief Validate note range
+     * @param note Note number
+     * @param minNote Minimum note (default: 0)
+     * @param maxNote Maximum note (default: 127)
+     * @return ValidationResult Validation result
      */
-    static bool isValidMidiValue(int value);
+    ValidationResult validateNoteRange(int note, int minNote = 0, int maxNote = 127) const;
     
     /**
-     * @brief Vérifie si un channel MIDI est valide (0-15)
+     * @brief Validate velocity range
+     * @param velocity Velocity value
+     * @param minVelocity Minimum velocity (default: 1)
+     * @param maxVelocity Maximum velocity (default: 127)
+     * @return ValidationResult Validation result
      */
-    static bool isValidMidiChannel(int channel);
+    ValidationResult validateVelocityRange(int velocity, 
+                                          int minVelocity = 1, 
+                                          int maxVelocity = 127) const;
+    
+    // ========================================================================
+    // SEMANTIC VALIDATION
+    // ========================================================================
     
     /**
-     * @brief Vérifie si un type d'event est connu
+     * @brief Check if note is in standard piano range (21-108, A0-C8)
+     * @param note Note number
+     * @return true if in piano range
      */
-    static bool isValidEventType(const std::string& type);
+    static bool isInPianoRange(int note) {
+        return note >= 21 && note <= 108;
+    }
     
     /**
-     * @brief Liste des types d'events valides
+     * @brief Check if note is in audible range (approximately)
+     * @param note Note number
+     * @return true if likely audible
      */
-    static const std::set<std::string>& getValidEventTypes();
+    static bool isInAudibleRange(int note) {
+        return note >= 12 && note <= 120;  // ~16Hz to ~8.4kHz
+    }
+    
+    /**
+     * @brief Get note name
+     * @param note Note number (0-127)
+     * @return std::string Note name (e.g., "C4", "A#5")
+     */
+    static std::string getNoteName(int note);
     
 private:
     // ========================================================================
-    // MÉTHODES PRIVÉES
+    // PRIVATE HELPER METHODS
     // ========================================================================
     
     /**
-     * @brief Valide la structure de base d'un objet JSON
-     */
-    bool hasRequiredFields(const json& obj, 
-                          const std::vector<std::string>& fields,
-                          ValidationResult& result,
-                          const std::string& location) const;
-    
-    /**
-     * @brief Ajoute une erreur au résultat
+     * @brief Add error to result
      */
     void addError(ValidationResult& result,
                  const std::string& category,
                  const std::string& message,
-                 const std::string& location = "",
-                 const json& context = json::object()) const;
+                 const std::string& location = "") const;
     
     /**
-     * @brief Ajoute un warning au résultat
+     * @brief Add warning to result
      */
     void addWarning(ValidationResult& result,
                    const std::string& category,
                    const std::string& message,
-                   const std::string& location = "",
-                   const json& context = json::object()) const;
+                   const std::string& location = "") const;
     
     /**
-     * @brief Ajoute une info au résultat
+     * @brief Add info to result
      */
     void addInfo(ValidationResult& result,
                 const std::string& category,
                 const std::string& message,
-                const std::string& location = "",
-                const json& context = json::object()) const;
-    
-    // ========================================================================
-    // TYPES D'EVENTS VALIDES
-    // ========================================================================
-    
-    static const std::set<std::string> VALID_EVENT_TYPES;
+                const std::string& location = "") const;
 };
 
 } // namespace midiMind
-
-#endif // MIDIMIND_MIDI_VALIDATOR_H
-
-// ============================================================================
-// FIN DU FICHIER MidiValidator.h
-// ============================================================================

@@ -1,93 +1,59 @@
 // ============================================================================
-// Fichier: backend/src/storage/Settings.cpp
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0 - 2025-10-09
+// File: backend/src/storage/Settings.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-// Description:
-//   Gestionnaire de paramètres applicatifs avec persistence en base de données
 //
-// Fonctionnalités:
-//   - Get/Set pour différents types (string, int, bool, double, json)
-//   - Valeurs par défaut
-//   - Persistence automatique
-//   - Thread-safe
+// Description:
+//   Implementation of Settings class.
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Simplified implementation
+//   - Better error handling
+//   - Enhanced logging
+//
 // ============================================================================
 
 #include "Settings.h"
-#include "../core/Logger.h"
+#include <algorithm>
+#include <cctype>
 
 namespace midiMind {
 
 // ============================================================================
-// CONSTRUCTION / DESTRUCTION
+// CONSTRUCTOR / DESTRUCTOR
 // ============================================================================
 
-Settings::Settings(std::shared_ptr<Database> database)
-    : database_(database) {
-    
-    Logger::info("Settings", "Settings manager created");
-    
-    // Initialiser les valeurs par défaut
+Settings::Settings(Database& database)
+    : database_(database)
+{
+    Logger::info("Settings", "Settings instance created");
     initializeDefaults();
-    
-    // Charger depuis la BDD
-    load();
 }
 
 Settings::~Settings() {
-    // Sauvegarder automatiquement à la destruction
-    save();
-    
-    Logger::info("Settings", "Settings manager destroyed");
+    Logger::debug("Settings", "Settings instance destroyed");
 }
 
 // ============================================================================
-// INITIALISATION
+// PERSISTENCE
 // ============================================================================
 
-void Settings::initializeDefaults() {
-    // Paramètres MIDI
-    cache_["midi.input_device"] = "default";
-    cache_["midi.output_device"] = "default";
-    cache_["midi.clock_source"] = "internal";
-    cache_["midi.sync_enabled"] = "true";
-    
-    // Paramètres audio
-    cache_["audio.sample_rate"] = "44100";
-    cache_["audio.buffer_size"] = "256";
-    cache_["audio.latency"] = "low";
-    
-    // Paramètres réseau
-    cache_["network.rtpmidi_enabled"] = "true";
-    cache_["network.rtpmidi_port"] = "5004";
-    cache_["network.wifi_hotspot"] = "false";
-    cache_["network.hostname"] = "midimind";
-    
-    // Paramètres interface
-    cache_["ui.theme"] = "dark";
-    cache_["ui.language"] = "en";
-    cache_["ui.auto_save"] = "true";
-    cache_["ui.auto_save_interval"] = "300";
-    
-    // Paramètres système
-    cache_["system.log_level"] = "info";
-    cache_["system.max_polyphony"] = "64";
-    cache_["system.cpu_priority"] = "high";
-    
-    Logger::debug("Settings", "Default settings initialized");
-}
-
-// ============================================================================
-// CHARGEMENT / SAUVEGARDE
-// ============================================================================
-
-void Settings::load() {
+bool Settings::load() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     Logger::info("Settings", "Loading settings from database...");
     
     try {
-        auto result = database_->query("SELECT key, value FROM settings");
+        auto result = database_.query("SELECT key, value FROM settings");
+        
+        if (!result.success) {
+            Logger::error("Settings", "Failed to query settings: " + result.error);
+            return false;
+        }
         
         size_t count = 0;
         for (const auto& row : result.rows) {
@@ -99,60 +65,73 @@ void Settings::load() {
         }
         
         Logger::info("Settings", "✓ Loaded " + std::to_string(count) + " settings");
+        return true;
         
     } catch (const std::exception& e) {
-        Logger::error("Settings", "Failed to load: " + std::string(e.what()));
+        Logger::error("Settings", "Failed to load settings: " + std::string(e.what()));
+        return false;
     }
 }
 
-void Settings::save() {
+bool Settings::save() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     Logger::info("Settings", "Saving settings to database...");
     
     try {
-        database_->beginTransaction();
-        
-        for (const auto& [key, value] : cache_) {
-            // Upsert (INSERT OR REPLACE)
-            database_->execute(
-                "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-                {key, value}
-            );
+        if (!database_.beginTransaction()) {
+            Logger::error("Settings", "Failed to begin transaction");
+            return false;
         }
         
-        database_->commit();
+        size_t count = 0;
         
-        Logger::info("Settings", "✓ Saved " + std::to_string(cache_.size()) + " settings");
+        for (const auto& [key, value] : cache_) {
+            auto result = database_.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                {key, value}
+            );
+            
+            if (result.success) {
+                count++;
+            } else {
+                Logger::warn("Settings", "Failed to save: " + key);
+            }
+        }
+        
+        if (!database_.commit()) {
+            Logger::error("Settings", "Failed to commit transaction");
+            database_.rollback();
+            return false;
+        }
+        
+        Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
+        return true;
         
     } catch (const std::exception& e) {
-        database_->rollback();
-        Logger::error("Settings", "Failed to save: " + std::string(e.what()));
+        Logger::error("Settings", "Failed to save settings: " + std::string(e.what()));
+        database_.rollback();
+        return false;
     }
 }
 
 void Settings::reset() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    Logger::info("Settings", "Resetting settings to defaults...");
+    Logger::info("Settings", "Resetting to default values...");
     
     cache_.clear();
     initializeDefaults();
     
-    // Supprimer de la BDD
-    try {
-        database_->execute("DELETE FROM settings");
-        Logger::info("Settings", "✓ Settings reset");
-    } catch (const std::exception& e) {
-        Logger::error("Settings", "Failed to reset: " + std::string(e.what()));
-    }
+    Logger::info("Settings", "✓ Settings reset to defaults");
 }
 
 // ============================================================================
-// GETTERS - STRING
+// GETTERS
 // ============================================================================
 
-std::string Settings::getString(const std::string& key, const std::string& defaultValue) {
+std::string Settings::getString(const std::string& key, 
+                                const std::string& defaultValue) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     auto it = cache_.find(key);
@@ -163,10 +142,6 @@ std::string Settings::getString(const std::string& key, const std::string& defau
     return defaultValue;
 }
 
-// ============================================================================
-// GETTERS - INT
-// ============================================================================
-
 int Settings::getInt(const std::string& key, int defaultValue) {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -175,17 +150,13 @@ int Settings::getInt(const std::string& key, int defaultValue) {
         try {
             return std::stoi(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid int for key '" + key + "': " + it->second);
+            Logger::warn("Settings", "Invalid int for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
     
     return defaultValue;
 }
-
-// ============================================================================
-// GETTERS - BOOL
-// ============================================================================
 
 bool Settings::getBool(const std::string& key, bool defaultValue) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -194,7 +165,7 @@ bool Settings::getBool(const std::string& key, bool defaultValue) {
     if (it != cache_.end()) {
         std::string value = it->second;
         
-        // Convertir en lowercase pour comparaison
+        // Convert to lowercase for comparison
         std::transform(value.begin(), value.end(), value.begin(), ::tolower);
         
         if (value == "true" || value == "1" || value == "yes" || value == "on") {
@@ -204,16 +175,12 @@ bool Settings::getBool(const std::string& key, bool defaultValue) {
             return false;
         }
         
-        Logger::warn("Settings", "Invalid bool for key '" + key + "': " + it->second);
+        Logger::warn("Settings", "Invalid bool for '" + key + "': " + it->second);
         return defaultValue;
     }
     
     return defaultValue;
 }
-
-// ============================================================================
-// GETTERS - DOUBLE
-// ============================================================================
 
 double Settings::getDouble(const std::string& key, double defaultValue) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -223,17 +190,13 @@ double Settings::getDouble(const std::string& key, double defaultValue) {
         try {
             return std::stod(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid double for key '" + key + "': " + it->second);
+            Logger::warn("Settings", "Invalid double for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
     
     return defaultValue;
 }
-
-// ============================================================================
-// GETTERS - JSON
-// ============================================================================
 
 json Settings::getJson(const std::string& key, const json& defaultValue) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -243,7 +206,7 @@ json Settings::getJson(const std::string& key, const json& defaultValue) {
         try {
             return json::parse(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid JSON for key '" + key + "': " + it->second);
+            Logger::warn("Settings", "Invalid JSON for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
@@ -252,277 +215,123 @@ json Settings::getJson(const std::string& key, const json& defaultValue) {
 }
 
 // ============================================================================
-// SETTERS - STRING
+// SETTERS
 // ============================================================================
 
-void Settings::setString(const std::string& key, const std::string& value) {
+void Settings::set(const std::string& key, const std::string& value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     cache_[key] = value;
-    
     Logger::debug("Settings", "Set " + key + " = " + value);
 }
 
-// ============================================================================
-// SETTERS - INT
-// ============================================================================
-
-void Settings::setInt(const std::string& key, int value) {
+void Settings::set(const std::string& key, int value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     cache_[key] = std::to_string(value);
-    
     Logger::debug("Settings", "Set " + key + " = " + std::to_string(value));
 }
 
-// ============================================================================
-// SETTERS - BOOL
-// ============================================================================
-
-void Settings::setBool(const std::string& key, bool value) {
+void Settings::set(const std::string& key, bool value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     cache_[key] = value ? "true" : "false";
-    
     Logger::debug("Settings", "Set " + key + " = " + (value ? "true" : "false"));
 }
 
-// ============================================================================
-// SETTERS - DOUBLE
-// ============================================================================
-
-void Settings::setDouble(const std::string& key, double value) {
+void Settings::set(const std::string& key, double value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     cache_[key] = std::to_string(value);
-    
     Logger::debug("Settings", "Set " + key + " = " + std::to_string(value));
 }
 
-// ============================================================================
-// SETTERS - JSON
-// ============================================================================
-
-void Settings::setJson(const std::string& key, const json& value) {
+void Settings::set(const std::string& key, const json& value) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     cache_[key] = value.dump();
-    
-    Logger::debug("Settings", "Set " + key + " = [JSON]");
+    Logger::debug("Settings", "Set " + key + " = <JSON>");
 }
 
 // ============================================================================
-// VÉRIFICATION
+// UTILITIES
 // ============================================================================
 
 bool Settings::has(const std::string& key) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    
     return cache_.find(key) != cache_.end();
 }
 
 void Settings::remove(const std::string& key) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    cache_.erase(key);
-    
-    // Supprimer de la BDD aussi
-    try {
-        database_->execute("DELETE FROM settings WHERE key = ?", {key});
-        Logger::debug("Settings", "Removed key: " + key);
-    } catch (const std::exception& e) {
-        Logger::error("Settings", "Failed to remove key: " + std::string(e.what()));
+    auto it = cache_.find(key);
+    if (it != cache_.end()) {
+        cache_.erase(it);
+        Logger::debug("Settings", "Removed: " + key);
     }
 }
 
-// ============================================================================
-// EXPORT / IMPORT
-// ============================================================================
+std::vector<std::string> Settings::getKeys() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::vector<std::string> keys;
+    keys.reserve(cache_.size());
+    
+    for (const auto& [key, _] : cache_) {
+        keys.push_back(key);
+    }
+    
+    return keys;
+}
 
-json Settings::toJson() const {
+json Settings::getAll() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     json result;
     
     for (const auto& [key, value] : cache_) {
-        // Essayer de parser comme JSON si possible
-        try {
-            result[key] = json::parse(value);
-        } catch (...) {
-            // Sinon, stocker comme string
-            result[key] = value;
-        }
+        result[key] = value;
     }
     
     return result;
 }
 
-void Settings::fromJson(const json& data) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    cache_.clear();
-    
-    for (auto& [key, value] : data.items()) {
-        if (value.is_string()) {
-            cache_[key] = value.get<std::string>();
-        } else {
-            cache_[key] = value.dump();
-        }
-    }
-    
-    Logger::info("Settings", "Imported " + std::to_string(cache_.size()) + " settings");
-}
-
-std::map<std::string, std::string> Settings::getAll() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return cache_;
-}
-
-size_t Settings::count() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return cache_.size();
-}
-
-void Settings::clear() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    cache_.clear();
-    
-    try {
-        database_->execute("DELETE FROM settings");
-        Logger::info("Settings", "✓ All settings cleared");
-    } catch (const std::exception& e) {
-        Logger::error("Settings", "Failed to clear: " + std::string(e.what()));
-    }
-}
-
 // ============================================================================
-// GESTION PAR CATÉGORIE
+// PRIVATE METHODS
 // ============================================================================
 
-std::map<std::string, std::string> Settings::getByPrefix(const std::string& prefix) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+void Settings::initializeDefaults() {
+    // MIDI settings
+    cache_["midi.clock_bpm"] = "120";
+    cache_["midi.input_device"] = "";
+    cache_["midi.output_device"] = "";
     
-    std::map<std::string, std::string> result;
+    // API settings
+    cache_["api.port"] = "8080";
+    cache_["api.host"] = "0.0.0.0";
     
-    for (const auto& [key, value] : cache_) {
-        if (key.find(prefix) == 0) {
-            result[key] = value;
-        }
-    }
+    // Logging settings
+    cache_["log.level"] = "INFO";
+    cache_["log.file_enabled"] = "true";
+    cache_["log.console_enabled"] = "true";
     
-    return result;
-}
-
-void Settings::removeByPrefix(const std::string& prefix) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Auto-save settings
+    cache_["auto_save.enabled"] = "true";
+    cache_["auto_save.interval"] = "300";
     
-    // Trouver toutes les clés avec ce préfixe
-    std::vector<std::string> keysToRemove;
+    // Hot-plug settings
+    cache_["hotplug.enabled"] = "true";
+    cache_["hotplug.scan_interval"] = "2000";
     
-    for (const auto& [key, value] : cache_) {
-        if (key.find(prefix) == 0) {
-            keysToRemove.push_back(key);
-        }
-    }
+    // Status broadcast settings
+    cache_["status.broadcast_enabled"] = "true";
+    cache_["status.broadcast_interval"] = "5000";
     
-    // Supprimer
-    for (const auto& key : keysToRemove) {
-        cache_.erase(key);
-        
-        try {
-            database_->execute("DELETE FROM settings WHERE key = ?", {key});
-        } catch (const std::exception& e) {
-            Logger::error("Settings", 
-                "Failed to remove key '" + key + "': " + std::string(e.what()));
-        }
-    }
+    // System settings
+    cache_["system.max_polyphony"] = "128";
+    cache_["system.buffer_size"] = "256";
     
-    Logger::info("Settings", 
-        "Removed " + std::to_string(keysToRemove.size()) + " settings with prefix '" + prefix + "'");
-}
-
-// ============================================================================
-// VALIDATION
-// ============================================================================
-
-bool Settings::validate() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    bool valid = true;
-    
-    // Vérifier que les paramètres critiques existent
-    std::vector<std::string> requiredKeys = {
-        "midi.input_device",
-        "midi.output_device",
-        "system.log_level"
-    };
-    
-    for (const auto& key : requiredKeys) {
-        if (cache_.find(key) == cache_.end()) {
-            Logger::error("Settings", "Missing required key: " + key);
-            valid = false;
-        }
-    }
-    
-    // Vérifier les valeurs numériques
-    if (has("audio.sample_rate")) {
-        int sampleRate = getInt("audio.sample_rate", 0);
-        if (sampleRate < 8000 || sampleRate > 192000) {
-            Logger::error("Settings", "Invalid sample rate: " + std::to_string(sampleRate));
-            valid = false;
-        }
-    }
-    
-    if (has("audio.buffer_size")) {
-        int bufferSize = getInt("audio.buffer_size", 0);
-        if (bufferSize < 32 || bufferSize > 8192) {
-            Logger::error("Settings", "Invalid buffer size: " + std::to_string(bufferSize));
-            valid = false;
-        }
-    }
-    
-    return valid;
-}
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-std::string Settings::getLogLevel() const {
-    return getString("system.log_level", "info");
-}
-
-void Settings::setLogLevel(const std::string& level) {
-    setString("system.log_level", level);
-}
-
-int Settings::getMaxPolyphony() const {
-    return getInt("system.max_polyphony", 64);
-}
-
-void Settings::setMaxPolyphony(int polyphony) {
-    setInt("system.max_polyphony", polyphony);
-}
-
-bool Settings::isAutoSaveEnabled() const {
-    return getBool("ui.auto_save", true);
-}
-
-void Settings::setAutoSaveEnabled(bool enabled) {
-    setBool("ui.auto_save", enabled);
-}
-
-int Settings::getAutoSaveInterval() const {
-    return getInt("ui.auto_save_interval", 300);
-}
-
-void Settings::setAutoSaveInterval(int seconds) {
-    setInt("ui.auto_save_interval", seconds);
+    Logger::debug("Settings", "Default settings initialized");
 }
 
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER Settings.cpp
+// END OF FILE Settings.cpp
 // ============================================================================

@@ -1,43 +1,63 @@
 // ============================================================================
-// Fichier: src/midi/MidiMessage.cpp
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// File: backend/src/midi/MidiMessage.cpp
+// Version: 4.1.0
+// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Description:
+//   Implementation of MidiMessage class.
+//
+// Author: MidiMind Team
+// Date: 2025-10-16
+//
+// Changes v4.1.0:
+//   - Complete implementation
+//   - Enhanced validation
+//   - JSON support
+//
 // ============================================================================
 
 #include "MidiMessage.h"
-#include "../core/StringUtils.h"
-#include "../core/TimeUtils.h"
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 namespace midiMind {
 
 // ============================================================================
-// CONSTRUCTEURS
+// CONSTRUCTORS
 // ============================================================================
 
-MidiMessage::MidiMessage() 
-    : timestamp_(TimeUtils::getCurrentTimestampUs()) {
-    data_.reserve(3);  // Plupart des messages = 3 octets
+MidiMessage::MidiMessage()
+    : timestamp_(0)
+{
 }
 
 MidiMessage::MidiMessage(const std::vector<uint8_t>& data)
     : data_(data)
-    , timestamp_(TimeUtils::getCurrentTimestampUs()) {
-}
-
-MidiMessage::MidiMessage(uint8_t status, uint8_t data1, uint8_t data2)
-    : data_{status, data1, data2} 
-    , timestamp_(TimeUtils::getCurrentTimestampUs()) {
-}
-
-MidiMessage::MidiMessage(uint8_t status, uint8_t data1)
-    : data_{status, data1}
-    , timestamp_(TimeUtils::getCurrentTimestampUs()) {
+    , timestamp_(0)
+{
 }
 
 MidiMessage::MidiMessage(uint8_t status)
-    : data_{status}
-    , timestamp_(TimeUtils::getCurrentTimestampUs()) {
+    : timestamp_(0)
+{
+    data_.push_back(status);
+}
+
+MidiMessage::MidiMessage(uint8_t status, uint8_t data1)
+    : timestamp_(0)
+{
+    data_.push_back(status);
+    data_.push_back(data1);
+}
+
+MidiMessage::MidiMessage(uint8_t status, uint8_t data1, uint8_t data2)
+    : timestamp_(0)
+{
+    data_.push_back(status);
+    data_.push_back(data1);
+    data_.push_back(data2);
 }
 
 // ============================================================================
@@ -87,11 +107,11 @@ MidiMessage MidiMessage::channelPressure(uint8_t channel, uint8_t pressure) {
 }
 
 MidiMessage MidiMessage::pitchBend(uint8_t channel, int16_t value) {
-    // Limiter la valeur
+    // Clamp value
     if (value < -8192) value = -8192;
     if (value > 8191) value = 8191;
     
-    // Convertir en valeur 14-bit (0-16383)
+    // Convert to 14-bit value (0-16383)
     uint16_t bendValue = static_cast<uint16_t>(value + 8192);
     
     return MidiMessage(
@@ -101,8 +121,16 @@ MidiMessage MidiMessage::pitchBend(uint8_t channel, int16_t value) {
     );
 }
 
+MidiMessage MidiMessage::polyPressure(uint8_t channel, uint8_t note, uint8_t pressure) {
+    return MidiMessage(
+        0xA0 | clampChannel(channel),
+        clamp7bit(note),
+        clamp7bit(pressure)
+    );
+}
+
 // ============================================================================
-// FACTORY METHODS - SYSTEM
+// FACTORY METHODS - SYSTEM REAL-TIME
 // ============================================================================
 
 MidiMessage MidiMessage::clock() {
@@ -129,8 +157,20 @@ MidiMessage MidiMessage::systemReset() {
     return MidiMessage(0xFF);
 }
 
+// ============================================================================
+// FACTORY METHODS - HELPERS
+// ============================================================================
+
 MidiMessage MidiMessage::allNotesOff(uint8_t channel) {
     return controlChange(channel, ControllerType::ALL_NOTES_OFF, 0);
+}
+
+MidiMessage MidiMessage::allSoundOff(uint8_t channel) {
+    return controlChange(channel, ControllerType::ALL_SOUND_OFF, 0);
+}
+
+MidiMessage MidiMessage::resetAllControllers(uint8_t channel) {
+    return controlChange(channel, ControllerType::RESET_ALL_CONTROLLERS, 0);
 }
 
 // ============================================================================
@@ -142,7 +182,7 @@ MidiMessageType MidiMessage::getType() const {
     
     uint8_t status = data_[0];
     
-    // Messages système en temps réel
+    // Real-time messages
     if (status >= 0xF8) {
         switch (status) {
             case 0xF8: return MidiMessageType::CLOCK;
@@ -155,7 +195,7 @@ MidiMessageType MidiMessage::getType() const {
         }
     }
     
-    // Messages système communs
+    // System common messages
     if (status >= 0xF0) {
         switch (status) {
             case 0xF0: return MidiMessageType::SYSTEM_EXCLUSIVE;
@@ -168,7 +208,7 @@ MidiMessageType MidiMessage::getType() const {
         }
     }
     
-    // Messages canal
+    // Channel messages
     return static_cast<MidiMessageType>(status & 0xF0);
 }
 
@@ -181,7 +221,7 @@ int MidiMessage::getChannel() const {
     
     uint8_t status = data_[0];
     
-    // Les messages système n'ont pas de canal
+    // System messages don't have channel
     if (status >= 0xF0) return -1;
     
     return status & 0x0F;
@@ -196,7 +236,7 @@ uint8_t MidiMessage::getData2() const {
 }
 
 // ============================================================================
-// PRÉDICATS
+// PREDICATES
 // ============================================================================
 
 bool MidiMessage::isNoteOn() const {
@@ -245,30 +285,34 @@ bool MidiMessage::isValid() const {
     
     uint8_t status = data_[0];
     
-    // Vérifier que c'est un status byte valide
+    // Must be a status byte
     if (status < 0x80) return false;
     
-    // Vérifier la taille selon le type
+    // Check size based on type
     if (status >= 0xF8) return data_.size() == 1;  // Real-time
     if (status == 0xF6) return data_.size() == 1;  // Tune Request
     if (status == 0xF1 || status == 0xF3) return data_.size() == 2;  // MTC, Song Select
     if (status == 0xF2) return data_.size() == 3;  // Song Position
     
-    // Messages canal
+    // Channel messages
     if ((status & 0xF0) == 0xC0 || (status & 0xF0) == 0xD0) {
         return data_.size() == 2;  // Program Change, Channel Pressure
     }
     
     if (status < 0xF0) {
-        return data_.size() == 3;  // Autres messages canal
+        return data_.size() == 3;  // Other channel messages
     }
     
     return true;
 }
 
 // ============================================================================
-// UTILITAIRES
+// UTILITIES
 // ============================================================================
+
+std::string MidiMessage::getTypeName() const {
+    return messageTypeToString(getType());
+}
 
 std::string MidiMessage::messageTypeToString(MidiMessageType type) {
     switch (type) {
@@ -295,10 +339,6 @@ std::string MidiMessage::messageTypeToString(MidiMessageType type) {
     }
 }
 
-std::string MidiMessage::getTypeName() const {
-    return messageTypeToString(getType());
-}
-
 json MidiMessage::toJson() const {
     json j;
     
@@ -307,13 +347,13 @@ json MidiMessage::toJson() const {
     j["size"] = data_.size();
     j["timestamp"] = timestamp_;
     
-    // Canal si applicable
+    // Channel if applicable
     int channel = getChannel();
     if (channel >= 0) {
-        j["channel"] = channel + 1;  // Afficher 1-16
+        j["channel"] = channel + 1;  // Display as 1-16
     }
     
-    // Données spécifiques selon le type
+    // Type-specific data
     if (isNoteOn() || isNoteOff()) {
         j["note"] = getData1();
         j["velocity"] = getData2();
@@ -327,59 +367,64 @@ json MidiMessage::toJson() const {
         j["pitch_bend"] = bend - 8192;
     }
     
-    // Données brutes en hex
+    // Raw hex
     j["hex"] = toHexString();
     
     return j;
 }
 
 MidiMessage MidiMessage::fromJson(const json& j) {
+    // Try to reconstruct from type
+    if (j.contains("type")) {
+        std::string type = j["type"];
+        
+        if (type == "NOTE_ON") {
+            return noteOn(j["channel"].get<int>() - 1, j["note"], j["velocity"]);
+        } else if (type == "NOTE_OFF") {
+            return noteOff(j["channel"].get<int>() - 1, j["note"], 
+                          j.value("velocity", 0));
+        } else if (type == "CONTROL_CHANGE") {
+            return controlChange(j["channel"].get<int>() - 1, 
+                               j["controller"], j["value"]);
+        } else if (type == "PROGRAM_CHANGE") {
+            return programChange(j["channel"].get<int>() - 1, j["program"]);
+        } else if (type == "PITCH_BEND") {
+            return pitchBend(j["channel"].get<int>() - 1, j["pitch_bend"]);
+        }
+    }
+    
+    // Fallback: reconstruct from hex
     if (j.contains("hex")) {
-        // Reconstruire depuis hex
         std::string hex = j["hex"];
         std::vector<uint8_t> data;
         
-        // Parser l'hex string
         std::istringstream iss(hex);
-        std::string byte;
+        std::string byteStr;
         
-        while (iss >> byte) {
-            data.push_back(static_cast<uint8_t>(std::stoi(byte, nullptr, 16)));
+        while (iss >> byteStr) {
+            data.push_back(static_cast<uint8_t>(std::stoi(byteStr, nullptr, 16)));
         }
         
-        return MidiMessage(data);
-    }
-    
-    // Reconstruire depuis les champs
-    std::string type = j["type"];
-    
-    if (type == "NOTE_ON") {
-        return noteOn(j["channel"] - 1, j["note"], j["velocity"]);
-    } else if (type == "NOTE_OFF") {
-        return noteOff(j["channel"] - 1, j["note"], j.value("velocity", 0));
-    } else if (type == "CONTROL_CHANGE") {
-        return controlChange(j["channel"] - 1, j["controller"], j["value"]);
-    } else if (type == "PROGRAM_CHANGE") {
-        return programChange(j["channel"] - 1, j["program"]);
-    }
-     MidiMessage msg;
-        
-        if (j.contains("status")) msg.status_ = j["status"];
-        if (j.contains("data1")) msg.data1_ = j["data1"];
-        if (j.contains("data2")) msg.data2_ = j["data2"];
-        
-        // <-- AJOUTER CES LIGNES
+        MidiMessage msg(data);
         if (j.contains("timestamp")) {
-            msg.timestamp_ = j["timestamp"];
+            msg.setTimestamp(j["timestamp"]);
         }
-        
         return msg;
-    // Type non supporté
+    }
+    
     return MidiMessage();
 }
 
 std::string MidiMessage::toHexString() const {
-    return StringUtils::bytesToHex(data_.data(), data_.size());
+    std::ostringstream oss;
+    
+    for (size_t i = 0; i < data_.size(); ++i) {
+        if (i > 0) oss << " ";
+        oss << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+            << static_cast<int>(data_[i]);
+    }
+    
+    return oss.str();
 }
 
 bool MidiMessage::operator==(const MidiMessage& other) const {
@@ -387,7 +432,7 @@ bool MidiMessage::operator==(const MidiMessage& other) const {
 }
 
 // ============================================================================
-// MÉTHODES PRIVÉES
+// PRIVATE HELPERS
 // ============================================================================
 
 uint8_t MidiMessage::clamp7bit(uint8_t value) {
@@ -401,5 +446,5 @@ uint8_t MidiMessage::clampChannel(uint8_t channel) {
 } // namespace midiMind
 
 // ============================================================================
-// FIN DU FICHIER MidiMessage.cpp
+// END OF FILE MidiMessage.cpp
 // ============================================================================
