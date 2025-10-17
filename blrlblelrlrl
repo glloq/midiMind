@@ -1,29 +1,38 @@
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp: In member function ‘int64_t midiMind::LatencyCompensator::getInstrumentCompensation(const std::string&) const’:
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:275:5: error: non-member ‘instrumentMutex_’ cannot be declared ‘mutable’
-  275 |     mutable std::mutex instrumentMutex_;
-      |     ^~~~~~~
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:295:17: error: ‘lock’ was not declared in this scope; did you mean ‘std::lock’?
-  295 |                 lock.~lock_guard();
-      |                 ^~~~
-      |                 std::lock
-In file included from /home/pi/midiMind/backend/src/timing/LatencyCompensator.h:35,
-                 from /home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:20:
-/usr/include/c++/14/mutex:698:5: note: ‘std::lock’ declared here
-  698 |     lock(_L1& __l1, _L2& __l2, _L3&... __l3)
-      |     ^~~~
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:295:33: error: expected class-name before ‘(’ token
-  295 |                 lock.~lock_guard();
-      |                                 ^
-/home/pi/midiMind/backend/src/midi/MidiRouter.cpp: In member function ‘void midiMind::MidiRouter::registerDevice(std::shared_ptr<midiMind::MidiDevice>)’:
-/home/pi/midiMind/backend/src/midi/MidiRouter.cpp:217:34: error: invalid use of incomplete type ‘using std::__shared_ptr_access<midiMind::MidiDevice, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiDevice’ {aka ‘class midiMind::MidiDevice’}
-  217 |     std::string deviceId = device->getId();
-      |                                  ^~
-In file included from /home/pi/midiMind/backend/src/midi/MidiRouter.cpp:20:
-/home/pi/midiMind/backend/src/midi/MidiRouter.h:47:7: note: forward declaration of ‘using std::__shared_ptr_access<midiMind::MidiDevice, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiDevice’ {aka ‘class midiMind::MidiDevice’}
-   47 | class MidiDevice;
-      |       ^~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:247: CMakeFiles/midimind.dir/src/timing/LatencyCompensator.cpp.o] Error 1
+/home/pi/midiMind/backend/src/midi/devices/MidiDeviceManager.cpp:21:10: fatal error: ../core/Logger.h: No such file or directory
+   21 | #include "../core/Logger.h"
+      |          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[2]: *** [CMakeFiles/midimind.dir/build.make:317: CMakeFiles/midimind.dir/src/midi/devices/MidiDeviceManager.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
-make[2]: *** [CMakeFiles/midimind.dir/build.make:275: CMakeFiles/midimind.dir/src/midi/MidiRouter.cpp.o] Error 1
+In file included from /home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp:19:
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h: In function ‘midiMind::JsonMidi midiMind::loadJsonMidi(const std::string&)’:
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h:389:32: error: variable ‘std::ifstream file’ has initializer but incomplete type
+  389 |     std::ifstream file(filepath);
+      |                                ^
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h:35:1: note: ‘std::ifstream’ is defined in header ‘<fstream>’; this is probably fixable by adding ‘#include <fstream>’
+   34 | #include <optional>
+  +++ |+#include <fstream>
+   35 | #include <nlohmann/json.hpp>
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h: In function ‘void midiMind::saveJsonMidi(const JsonMidi&, const std::string&)’:
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h:403:32: error: variable ‘std::ofstream file’ has initializer but incomplete type
+  403 |     std::ofstream file(filepath);
+      |                                ^
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.h:403:32: note: ‘std::ofstream’ is defined in header ‘<fstream>’; this is probably fixable by adding ‘#include <fstream>’
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp: In member function ‘bool midiMind::JsonMidiConverter::validate(const midiMind::JsonMidi&, std::string&) const’:
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp:395:10: error: ‘set’ is not a member of ‘std’
+  395 |     std::set<std::string> ids;
+      |          ^~~
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp:21:1: note: ‘std::set’ is defined in header ‘<set>’; this is probably fixable by adding ‘#include <set>’
+   20 | #include "../core/Logger.h"
+  +++ |+#include <set>
+   21 | #include <algorithm>
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp:395:25: error: expected primary-expression before ‘>’ token
+  395 |     std::set<std::string> ids;
+      |                         ^
+/home/pi/midiMind/backend/src/midi/JsonMidiConverter.cpp:395:27: error: ‘ids’ was not declared in this scope
+  395 |     std::set<std::string> ids;
+      |                           ^~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:303: CMakeFiles/midimind.dir/src/midi/JsonMidiConverter.cpp.o] Error 1
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
+✓ Compilation terminée
