@@ -391,7 +391,7 @@ bool Application::initializeApi() {
 			deviceManager_,
 			router_,
 			player_,
-			4 
+			fileManager_ 
         );
         
         Logger::info("Application", "  ✓ CommandHandler ready");

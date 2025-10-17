@@ -272,7 +272,7 @@ private:
     std::shared_ptr<MidiDeviceManager> deviceManager_;
     std::shared_ptr<MidiRouter> router_;
     std::shared_ptr<MidiPlayer> player_;
-    std::shared_ptr<FileManager> fileManager
+    std::shared_ptr<FileManager> fileManager;
 };
 
 } // namespace midiMind
