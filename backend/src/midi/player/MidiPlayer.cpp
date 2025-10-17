@@ -1,20 +1,18 @@
 // ============================================================================
 // File: backend/src/midi/player/MidiPlayer.cpp
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
-//   Complete implementation of MIDI player
+//   Complete implementation of MIDI player (compilation fixes)
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-10-17
 //
-// Changes v4.1.0:
-//   - Complete implementation with MidiFileReader v4.1.0
-//   - Enhanced timing precision
-//   - Better thread synchronization
-//   - Improved metadata extraction
+// Changes v4.1.1:
+//   - Fixed MidiMessage initialization (no setters available)
+//   - Use proper MidiMessage constructor with status byte
 //
 // ============================================================================
 
@@ -497,20 +495,22 @@ void MidiPlayer::parseAllTracks() {
                 scheduled.trackNumber = static_cast<uint16_t>(i);
                 scheduled.processed = false;
                 
-                // Convert to MidiMessage
-                MidiMessage msg;
-                msg.setTimestamp(event.absoluteTime);
-                msg.setStatus(event.status);
-                msg.setChannel(event.channel);
+                // Create MidiMessage with proper constructor
+                // Format: status byte includes channel
+                uint8_t statusByte = event.status | event.channel;
                 
-                if (!event.data.empty()) {
-                    msg.setData1(event.data[0]);
-                }
-                if (event.data.size() > 1) {
-                    msg.setData2(event.data[1]);
+                if (event.data.size() >= 2) {
+                    // Three-byte message
+                    scheduled.message = MidiMessage(statusByte, event.data[0], event.data[1]);
+                } else if (event.data.size() == 1) {
+                    // Two-byte message
+                    scheduled.message = MidiMessage(statusByte, event.data[0]);
+                } else {
+                    // One-byte message (rare)
+                    scheduled.message = MidiMessage(statusByte);
                 }
                 
-                scheduled.message = msg;
+                scheduled.message.setTimestamp(event.absoluteTime);
                 allEvents_.push_back(scheduled);
             }
         }
@@ -703,40 +703,46 @@ bool MidiPlayer::shouldPlayEvent(const ScheduledEvent& event) const {
 
 MidiMessage MidiPlayer::applyModifications(const MidiMessage& message, 
                                           uint16_t trackNumber) const {
-    MidiMessage modified = message;
-    
-    // Apply transposition
+    // Apply transposition to note messages
     int transposeValue = transpose_.load();
-    if (transposeValue != 0 && 
-        (modified.isNoteOn() || modified.isNoteOff())) {
-        
-        int newNote = static_cast<int>(modified.getData1()) + transposeValue;
+    if (transposeValue != 0 && (message.isNoteOn() || message.isNoteOff())) {
+        int newNote = static_cast<int>(message.getData1()) + transposeValue;
         newNote = std::clamp(newNote, 0, 127);
-        modified.setData1(static_cast<uint8_t>(newNote));
+        
+        // Create new message with transposed note
+        uint8_t status = message.getStatus();
+        uint8_t velocity = message.getData2();
+        return MidiMessage(status, static_cast<uint8_t>(newNote), velocity);
     }
     
-    return modified;
+    return message;
 }
 
 MidiMessage MidiPlayer::applyMasterVolume(const MidiMessage& message) const {
-    MidiMessage modified = message;
     float volume = masterVolume_.load();
     
     if (message.isNoteOn() || message.isNoteOff()) {
         uint8_t velocity = message.getData2();
         float newVelocity = velocity * volume;
         newVelocity = std::clamp(newVelocity, 0.0f, 127.0f);
-        modified.setData2(static_cast<uint8_t>(newVelocity));
+        
+        // Create new message with adjusted velocity
+        uint8_t status = message.getStatus();
+        uint8_t note = message.getData1();
+        return MidiMessage(status, note, static_cast<uint8_t>(newVelocity));
     }
     else if (message.isControlChange() && message.getData1() == 7) {
         // Volume CC
         uint8_t value = message.getData2();
         float newValue = value * volume;
         newValue = std::clamp(newValue, 0.0f, 127.0f);
-        modified.setData2(static_cast<uint8_t>(newValue));
+        
+        // Create new message with adjusted volume
+        uint8_t status = message.getStatus();
+        return MidiMessage(status, 7, static_cast<uint8_t>(newValue));
     }
     
-    return modified;
+    return message;
 }
 
 void MidiPlayer::sendAllNotesOff() {
@@ -745,12 +751,9 @@ void MidiPlayer::sendAllNotesOff() {
     }
     
     for (int channel = 0; channel < 16; ++channel) {
-        MidiMessage msg;
-        msg.setStatus(0xB0 | channel);  // Control Change
-        msg.setChannel(channel);
-        msg.setData1(123);  // All Notes Off
-        msg.setData2(0);
-        
+        // Control Change: All Notes Off (CC 123)
+        uint8_t statusByte = 0xB0 | channel;  // Control Change + channel
+        MidiMessage msg(statusByte, 123, 0);
         router_->route(msg);
     }
 }
@@ -810,5 +813,5 @@ MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE MidiPlayer.cpp v4.1.0
+// END OF FILE MidiPlayer.cpp v4.1.1
 // ============================================================================
