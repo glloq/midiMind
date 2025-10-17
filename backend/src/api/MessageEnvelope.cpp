@@ -1,19 +1,14 @@
 // ============================================================================
 // File: backend/src/api/MessageEnvelope.cpp
-// Version: 4.1.1
+// Version: 4.1.2 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Implementation of MessageEnvelope (FIXED for compilation)
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.1:
-//   - Fixed generateUUID() call (now in protocol namespace)
-//   - Fixed timestamp assignment (use getISO8601Timestamp())
-//   - Fixed toJson/fromJson calls on protocol structures
+// Changes v4.1.2:
+//   - Fixed response_ assignment (use emplace instead of make_unique)
+//   - Removed timeout parameter from createRequest
+//   - Removed retryable and source parameters from factory methods
+//   - Match header signatures exactly
 //
 // ============================================================================
 
@@ -42,17 +37,15 @@ MessageEnvelope::MessageEnvelope(protocol::MessageType type) {
 // ============================================================================
 
 MessageEnvelope MessageEnvelope::createRequest(const std::string& command,
-                                              const json& params,
-                                              int timeout) {
+                                              const json& params) {
     MessageEnvelope msg(protocol::MessageType::REQUEST);
     
     protocol::Request request;
     request.id = msg.envelope_.id;
     request.command = command;
     request.params = params;
-    request.timeout = timeout;
     
-    msg.request_ = std::make_unique<protocol::Request>(request);
+    msg.request_ = request;
     
     return msg;
 }
@@ -72,7 +65,7 @@ MessageEnvelope MessageEnvelope::createSuccessResponse(const std::string& reques
     response.data = data;
     response.latency = latency;
     
-    msg.response_ = std::make_unique<protocol::Response>(response);
+    msg.response_ = response;
     
     return msg;
 }
@@ -90,7 +83,7 @@ MessageEnvelope MessageEnvelope::createErrorResponse(const std::string& requestI
     response.errorMessage = message;
     response.data = details;
     
-    msg.response_ = std::make_unique<protocol::Response>(response);
+    msg.response_ = response;
     
     return msg;
 }
@@ -101,17 +94,15 @@ MessageEnvelope MessageEnvelope::createErrorResponse(const std::string& requestI
 
 MessageEnvelope MessageEnvelope::createEvent(const std::string& name,
                                             const json& data,
-                                            protocol::EventPriority priority,
-                                            const std::string& source) {
+                                            protocol::EventPriority priority) {
     MessageEnvelope msg(protocol::MessageType::EVENT);
     
     protocol::Event event;
     event.name = name;
     event.data = data;
     event.priority = priority;
-    event.source = source;
     
-    msg.event_ = std::make_unique<protocol::Event>(event);
+    msg.event_ = event;
     
     return msg;
 }
@@ -122,19 +113,15 @@ MessageEnvelope MessageEnvelope::createEvent(const std::string& name,
 
 MessageEnvelope MessageEnvelope::createError(protocol::ErrorCode code,
                                             const std::string& message,
-                                            const json& details,
-                                            bool retryable,
-                                            const std::string& requestId) {
+                                            const json& details) {
     MessageEnvelope msg(protocol::MessageType::ERROR);
     
     protocol::Error error;
     error.code = code;
     error.message = message;
     error.details = details;
-    error.retryable = retryable;
-    error.requestId = requestId;
     
-    msg.error_ = std::make_unique<protocol::Error>(error);
+    msg.error_ = error;
     
     return msg;
 }
@@ -142,14 +129,6 @@ MessageEnvelope MessageEnvelope::createError(protocol::ErrorCode code,
 // ============================================================================
 // GETTERS
 // ============================================================================
-
-protocol::MessageType MessageEnvelope::getType() const {
-    return envelope_.type;
-}
-
-const protocol::Envelope& MessageEnvelope::getEnvelope() const {
-    return envelope_;
-}
 
 const protocol::Request& MessageEnvelope::getRequest() const {
     if (!request_.has_value()) {
@@ -407,5 +386,5 @@ std::vector<std::string> MessageEnvelope::getValidationErrors() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE MessageEnvelope.cpp v4.1.1
+// END OF FILE MessageEnvelope.cpp v4.1.2
 // ============================================================================

@@ -1,20 +1,14 @@
 // ============================================================================
 // File: backend/src/api/CommandHandler.cpp
-// Version: 4.1.2
+// Version: 4.1.3 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Complete implementation - FIXED for compilation
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.2:
-//   - Fixed constructor signature (FileManager instead of MidiFileManager)
-//   - Removed compensator_ and instrumentDb_ (not in header)
-//   - Fixed device.toJson() calls
-//   - Simplified file commands (commented until FileManager API ready)
+// Changes v4.1.3:
+//   - Fixed device commands: use getInfo() instead of MidiDeviceInfo
+//   - Fixed routing commands: addRoute() returns void, use setRouteEnabled()
+//   - Fixed logger commands: use setLevel() and getLevel()
+//   - Added status field to device info
 //
 // ============================================================================
 
@@ -44,7 +38,6 @@ CommandHandler::CommandHandler(
 {
     Logger::info("CommandHandler", "Initializing CommandHandler...");
     
-    // Register all commands
     registerAllCommands();
     
     Logger::info("CommandHandler", 
@@ -62,7 +55,6 @@ CommandHandler::~CommandHandler() {
 
 json CommandHandler::processCommand(const json& command) {
     try {
-        // Validate command structure
         std::string error;
         if (!validateCommand(command, error)) {
             return createErrorResponse(error, "INVALID_COMMAND");
@@ -71,7 +63,6 @@ json CommandHandler::processCommand(const json& command) {
         std::string commandName = command["command"];
         json params = command.value("params", json::object());
         
-        // Look up command
         std::lock_guard<std::mutex> lock(commandsMutex_);
         
         auto it = commands_.find(commandName);
@@ -81,7 +72,6 @@ json CommandHandler::processCommand(const json& command) {
                 "UNKNOWN_COMMAND");
         }
         
-        // Execute command
         try {
             json data = it->second(params);
             return createSuccessResponse(data);
@@ -118,9 +108,7 @@ json CommandHandler::processCommand(const std::string& jsonString) {
 void CommandHandler::registerCommand(const std::string& name, 
                                     CommandFunction function) {
     std::lock_guard<std::mutex> lock(commandsMutex_);
-    
     commands_[name] = function;
-    
     Logger::debug("CommandHandler", "Registered command: " + name);
 }
 
@@ -175,7 +163,6 @@ CommandHandler::listCommandsByCategory() const {
         result[category].push_back(name);
     }
     
-    // Sort each category
     for (auto& [category, commands] : result) {
         std::sort(commands.begin(), commands.end());
     }
@@ -265,15 +252,14 @@ void CommandHandler::registerDeviceCommands() {
         auto devices = deviceManager_->getAvailableDevices();
         
         json devicesJson = json::array();
-        for (const auto& device : devices) {
-            // Create JSON manually since toJson() doesn't exist
-            json deviceInfo = {
-                {"id", device.id},
-                {"name", device.name},
-                {"type", static_cast<int>(device.type)},
-                {"connected", device.connected}
-            };
-            devicesJson.push_back(deviceInfo);
+        for (const auto& deviceInfo : devices) {
+            devicesJson.push_back({
+                {"id", deviceInfo.id},
+                {"name", deviceInfo.name},
+                {"type", static_cast<int>(deviceInfo.type)},
+                {"status", static_cast<int>(deviceInfo.status)},
+                {"available", deviceInfo.available}
+            });
         }
         
         return json{{"devices", devicesJson}};
@@ -285,14 +271,14 @@ void CommandHandler::registerDeviceCommands() {
         auto devices = deviceManager_->discoverDevices(fullScan);
         
         json devicesJson = json::array();
-        for (const auto& device : devices) {
-            json deviceInfo = {
-                {"id", device.id},
-                {"name", device.name},
-                {"type", static_cast<int>(device.type)},
-                {"connected", device.connected}
-            };
-            devicesJson.push_back(deviceInfo);
+        for (const auto& deviceInfo : devices) {
+            devicesJson.push_back({
+                {"id", deviceInfo.id},
+                {"name", deviceInfo.name},
+                {"type", static_cast<int>(deviceInfo.type)},
+                {"status", static_cast<int>(deviceInfo.status)},
+                {"available", deviceInfo.available}
+            });
         }
         
         return json{
@@ -373,9 +359,9 @@ void CommandHandler::registerRoutingCommands() {
         route->destinationDeviceId = params.value("destination_device_id", "");
         route->enabled = params.value("enabled", true);
         
-        bool success = router_->addRoute(route);
+        router_->addRoute(route);
         
-        return json{{"added", success}};
+        return json{{"added", true}};
     });
     
     // routing.remove
@@ -397,7 +383,7 @@ void CommandHandler::registerRoutingCommands() {
         }
         
         std::string routeId = params["route_id"];
-        router_->enableRoute(routeId);
+        router_->setRouteEnabled(routeId, true);
         
         return json{{"enabled", true}};
     });
@@ -409,7 +395,7 @@ void CommandHandler::registerRoutingCommands() {
         }
         
         std::string routeId = params["route_id"];
-        router_->disableRoute(routeId);
+        router_->setRouteEnabled(routeId, false);
         
         return json{{"disabled", true}};
     });
@@ -501,7 +487,6 @@ void CommandHandler::registerPlaybackCommands() {
 }
 
 void CommandHandler::registerFileCommands() {
-    // TODO: Implement when FileManager API is complete
     Logger::warning("CommandHandler", "File commands not yet implemented");
 }
 
@@ -533,7 +518,6 @@ void CommandHandler::registerSystemCommands() {
 }
 
 void CommandHandler::registerNetworkCommands() {
-    // TODO: Implement network commands
     Logger::warning("CommandHandler", "Network commands not yet implemented");
 }
 
@@ -544,15 +528,35 @@ void CommandHandler::registerLoggerCommands() {
             throw std::runtime_error("Missing level parameter");
         }
         
-        std::string level = params["level"];
-        Logger::setGlobalLevel(level);
+        std::string levelStr = params["level"];
         
-        return json{{"level", level}};
+        Logger::Level level;
+        if (levelStr == "DEBUG") level = Logger::Level::DEBUG;
+        else if (levelStr == "INFO") level = Logger::Level::INFO;
+        else if (levelStr == "WARNING") level = Logger::Level::WARNING;
+        else if (levelStr == "ERROR") level = Logger::Level::ERROR;
+        else if (levelStr == "CRITICAL") level = Logger::Level::CRITICAL;
+        else throw std::runtime_error("Invalid level: " + levelStr);
+        
+        Logger::setLevel(level);
+        
+        return json{{"level", levelStr}};
     });
     
     // logger.getLevel
     registerCommand("logger.getLevel", [](const json& params) {
-        return json{{"level", Logger::getGlobalLevelString()}};
+        Logger::Level level = Logger::getLevel();
+        
+        std::string levelStr;
+        switch (level) {
+            case Logger::Level::DEBUG: levelStr = "DEBUG"; break;
+            case Logger::Level::INFO: levelStr = "INFO"; break;
+            case Logger::Level::WARNING: levelStr = "WARNING"; break;
+            case Logger::Level::ERROR: levelStr = "ERROR"; break;
+            case Logger::Level::CRITICAL: levelStr = "CRITICAL"; break;
+        }
+        
+        return json{{"level", levelStr}};
     });
     
     Logger::debug("CommandHandler", "✓ Logger commands registered (2 commands)");
@@ -561,5 +565,5 @@ void CommandHandler::registerLoggerCommands() {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE CommandHandler.cpp v4.1.2
+// END OF FILE CommandHandler.cpp v4.1.3
 // ============================================================================
