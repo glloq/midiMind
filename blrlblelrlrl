@@ -1,404 +1,176 @@
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In member function ‘void midiMind::ProcessorManager::resetStatistics()’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:582:16: warning: unused structured binding declaration [-Wunused-variable]
-  582 |     for (auto& [id, chain] : chains_) {
-      |                ^~~~~~~~~~~
-[ 83%] Building CXX object CMakeFiles/midimind.dir/src/midi/sysex/SysExHandler.cpp.o
-[ 86%] Building CXX object CMakeFiles/midimind.dir/src/midi/sysex/SysExParser.cpp.o
-[ 90%] Building CXX object CMakeFiles/midimind.dir/src/api/ApiServer.cpp.o
-[ 93%] Building CXX object CMakeFiles/midimind.dir/src/api/CommandHandler.cpp.o
-[ 96%] Building CXX object CMakeFiles/midimind.dir/src/api/MessageEnvelope.cpp.o
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:42:21: error: ‘MidiFileManager’ was not declared in this scope; did you mean ‘MidiFileReader’?
-   42 |     std::shared_ptr<MidiFileManager> fileManager,
-      |                     ^~~~~~~~~~~~~~~
-      |                     MidiFileReader
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:42:36: error: template argument 1 is invalid
-   42 |     std::shared_ptr<MidiFileManager> fileManager,
-      |                                    ^
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:38:1: error: no declaration matches ‘midiMind::CommandHandler::CommandHandler(std::shared_ptr<midiMind::MidiDeviceManager>, std::shared_ptr<midiMind::MidiRouter>, std::shared_ptr<midiMind::MidiPlayer>, int, std::shared_ptr<midiMind::LatencyCompensator>, std::shared_ptr<midiMind::InstrumentDatabase>)’
-   38 | CommandHandler::CommandHandler(
-      | ^~~~~~~~~~~~~~
-In file included from /home/pi/midiMind/backend/src/api/CommandHandler.cpp:24:
-/home/pi/midiMind/backend/src/api/CommandHandler.h:118:5: note: candidates are: ‘midiMind::CommandHandler::CommandHandler(const midiMind::CommandHandler&)’
-  118 |     CommandHandler(const CommandHandler&) = delete;
-      |     ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.h:105:5: note:                 ‘midiMind::CommandHandler::CommandHandler(std::shared_ptr<midiMind::MidiDeviceManager>, std::shared_ptr<midiMind::MidiRouter>, std::shared_ptr<midiMind::MidiPlayer>, std::shared_ptr<midiMind::FileManager>)’
-  105 |     CommandHandler(
-      |     ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.h:81:7: note: ‘class midiMind::CommandHandler’ defined here
-   81 | class CommandHandler {
-      |       ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:533:42: error: ‘const struct midiMind::MidiDeviceInfo’ has no member named ‘toJson’
-  533 |             devicesJson.push_back(device.toJson());
-      |                                          ^~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:546:42: error: ‘const struct midiMind::MidiDeviceInfo’ has no member named ‘toJson’
-  546 |             devicesJson.push_back(device.toJson());
-      |                                          ^~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In member function ‘void midiMind::CommandHandler::registerFileCommands()’:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:816:10: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  816 |     if (!fileManager_) {
-      |          ^~~~~~~~~~~~
-      |          fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:825:22: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  825 |         auto files = fileManager_->listFiles(directory);
-      |                      ^~~~~~~~~~~~
-      |                      fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:835:9: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
-  835 |         };
+In file included from /home/pi/midiMind/backend/src/core/../api/MessageEnvelope.h:29,
+                 from /home/pi/midiMind/backend/src/core/../api/ApiServer.h:30,
+                 from /home/pi/midiMind/backend/src/core/Application.cpp:49:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In member function ‘midiMind::json midiMind::protocol::Envelope::toJson() const’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:151:22: error: ‘messageTypeToString’ was not declared in this scope
+  151 |             {"type", messageTypeToString(type)},
+      |                      ^~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:154:9: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
+  154 |         };
       |         ^
-In file included from /home/pi/midiMind/backend/src/api/../midi/devices/../MidiMessage.h:33,
-                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDevice.h:30,
-                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDeviceManager.h:14,
-                 from /home/pi/midiMind/backend/src/api/CommandHandler.h:30:
+In file included from /home/pi/midiMind/backend/src/core/Application.h:25,
+                 from /home/pi/midiMind/backend/src/core/Application.cpp:34:
 /usr/include/nlohmann/json.hpp:1141:5: note: candidate: ‘template<class JsonRef, typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long int, long unsigned int, double, std::allocator, nlohmann::json_abi_v3_11_3::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void> > >::value, int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const JsonRef&) [with typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value, int>::type <anonymous> = JsonRef; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1141 |     basic_json(const JsonRef& ref) : basic_json(ref.moved_or_copied()) {}
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1141:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1141:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1032:5: note: candidate: ‘template<class InputIT, typename std::enable_if<(std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<> > >::value || std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<> > >::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(InputIT, InputIT) [with typename std::enable_if<(std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value || std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value), int>::type <anonymous> = InputIT; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1032 |     basic_json(InputIT first, InputIT last)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1032:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:835:9: note:   couldn’t deduce template parameter ‘InputIT’
-  835 |         };
-      |         ^
+/usr/include/nlohmann/json.hpp:1032:5: note:   candidate expects 2 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:849:5: note: candidate: ‘template<class BasicJsonType, typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<>, BasicJsonType>::value)), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const BasicJsonType&) [with typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, BasicJsonType>::value)), int>::type <anonymous> = BasicJsonType; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
   849 |     basic_json(const BasicJsonType& val)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:849:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:849:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:835:5: note: candidate: ‘template<class CompatibleType, class U, typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<T>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<>, U>::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(CompatibleType&&) [with U = CompatibleType; typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<U>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, U>::value), int>::type <anonymous> = U; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
   835 |     basic_json(CompatibleType && val) noexcept(noexcept( // NOLINT(bugprone-forwarding-reference-overload,bugprone-exception-escape)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:835:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:835:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1214:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1214 |     basic_json(basic_json&& other) noexcept
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1214:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1214:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1145:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1145 |     basic_json(const basic_json& other)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1145:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1145:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1020:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(size_type, const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; size_type = long unsigned int]’
  1020 |     basic_json(size_type cnt, const basic_json& val):
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1020:26: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>::size_type’ {aka ‘long unsigned int’}
- 1020 |     basic_json(size_type cnt, const basic_json& val):
-      |                ~~~~~~~~~~^~~
+/usr/include/nlohmann/json.hpp:1020:5: note:   candidate expects 2 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:902:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(initializer_list_t, bool, value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; initializer_list_t = std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
   902 |     basic_json(initializer_list_t init,
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:903:21: note:   no known conversion for argument 2 from ‘<brace-enclosed initializer list>’ to ‘bool’
-  903 |                bool type_deduction = true,
-      |                ~~~~~^~~~~~~~~~~~~~~~~~~~~
+/usr/include/nlohmann/json.hpp:902:5: note:   candidate expects 3 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:823:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(std::nullptr_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; std::nullptr_t = std::nullptr_t]’
   823 |     basic_json(std::nullptr_t = nullptr) noexcept // NOLINT(bugprone-exception-escape)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:823:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:823:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:815:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
   815 |     basic_json(const value_t v)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:815:5: note:   candidate expects 1 argument, 2 provided
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In member function ‘void midiMind::CommandHandler::registerFileCommands()’:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:823:35: error: cannot convert ‘midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>’ to ‘midiMind::CommandHandler::CommandFunction’ {aka ‘std::function<nlohmann::json_abi_v3_11_3::basic_json<>(const nlohmann::json_abi_v3_11_3::basic_json<>&)>’}
-  823 |     registerCommand("files.list", [this](const json& params) {
-      |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      |                                   |
-      |                                   midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>
-  824 |         std::string directory = params.value("directory", "");
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  825 |         auto files = fileManager_->listFiles(directory);
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  826 | 
-      |                                    
-  827 |         json filesJson = json::array();
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  828 |         for (const auto& file : files) {
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  829 |             filesJson.push_back(file.toJson());
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  830 |         }
-      |         ~                          
-  831 | 
-      |                                    
-  832 |         return json{
-      |         ~~~~~~~~~~~~               
-  833 |             {"files", filesJson},
-      |             ~~~~~~~~~~~~~~~~~~~~~  
-  834 |             {"count", files.size()}
-      |             ~~~~~~~~~~~~~~~~~~~~~~~
-  835 |         };
-      |         ~~                         
-  836 |     });
-      |     ~                              
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:138:79: note:   initializing argument 2 of ‘void midiMind::CommandHandler::registerCommand(const std::string&, CommandFunction)’
-  138 | void CommandHandler::registerCommand(const std::string& name, CommandFunction function) {
-      |                                                               ~~~~~~~~~~~~~~~~^~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:843:24: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  843 |         size_t count = fileManager_->scanDirectory(directory, recursive);
-      |                        ^~~~~~~~~~~~
-      |                        fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:858:25: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  858 |         auto metadata = fileManager_->getFileMetadata(fileId);
-      |                         ^~~~~~~~~~~~
-      |                         fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In member function ‘void midiMind::CommandHandler::registerFileCommands()’:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:852:42: error: cannot convert ‘midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>’ to ‘midiMind::CommandHandler::CommandFunction’ {aka ‘std::function<nlohmann::json_abi_v3_11_3::basic_json<>(const nlohmann::json_abi_v3_11_3::basic_json<>&)>’}
-  852 |     registerCommand("files.getMetadata", [this](const json& params) {
-      |                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      |                                          |
-      |                                          midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>
-  853 |         if (!params.contains("file_id")) {
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  854 |             throw std::runtime_error("Missing file_id parameter");
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  855 |         }
-      |         ~                                 
-  856 | 
-      |                                           
-  857 |         std::string fileId = params["file_id"];
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  858 |         auto metadata = fileManager_->getFileMetadata(fileId);
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  859 | 
-      |                                           
-  860 |         if (!metadata.has_value()) {
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~      
-  861 |             throw std::runtime_error("File not found: " + fileId);
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  862 |         }
-      |         ~                                 
-  863 | 
-      |                                           
-  864 |         return metadata->toJson();
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~        
-  865 |     });
-      |     ~                                     
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:138:79: note:   initializing argument 2 of ‘void midiMind::CommandHandler::registerCommand(const std::string&, CommandFunction)’
-  138 | void CommandHandler::registerCommand(const std::string& name, CommandFunction function) {
-      |                                                               ~~~~~~~~~~~~~~~~^~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:874:24: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  874 |         bool success = fileManager_->deleteFile(fileId);
-      |                        ^~~~~~~~~~~~
-      |                        fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:888:24: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  888 |         bool success = fileManager_->moveFile(fileId, newPath);
-      |                        ^~~~~~~~~~~~
-      |                        fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:909:23: error: ‘fileManager_’ was not declared in this scope; did you mean ‘fileManager’?
-  909 |         auto fileId = fileManager_->indexFile(tempPath);
-      |                       ^~~~~~~~~~~~
-      |                       fileManager
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:918:9: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
-  918 |         };
+/usr/include/nlohmann/json.hpp:815:5: note:   candidate expects 1 argument, 4 provided
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In static member function ‘static midiMind::protocol::Envelope midiMind::protocol::Envelope::fromJson(const midiMind::json&)’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:160:20: error: ‘stringToMessageType’ was not declared in this scope; did you mean ‘MidiMessageType’?
+  160 |         env.type = stringToMessageType(j.value("type", "request"));
+      |                    ^~~~~~~~~~~~~~~~~~~
+      |                    MidiMessageType
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In member function ‘midiMind::json midiMind::protocol::Response::toJson() const’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:221:49: error: cannot convert ‘const midiMind::protocol::ErrorCode’ to ‘midiMind::ErrorCode’
+  221 |             j["error_code"] = errorCodeToString(errorCode);
+      |                                                 ^~~~~~~~~
+      |                                                 |
+      |                                                 const midiMind::protocol::ErrorCode
+In file included from /home/pi/midiMind/backend/src/core/Config.h:46,
+                 from /home/pi/midiMind/backend/src/core/Application.cpp:36:
+/home/pi/midiMind/backend/src/core/Error.h:144:48: note:   initializing argument 1 of ‘const char* midiMind::errorCodeToString(ErrorCode)’
+  144 | inline const char* errorCodeToString(ErrorCode code) {
+      |                                      ~~~~~~~~~~^~~~
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In member function ‘midiMind::json midiMind::protocol::Event::toJson() const’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:260:26: error: ‘eventPriorityToString’ was not declared in this scope
+  260 |             {"priority", eventPriorityToString(priority)},
+      |                          ^~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:262:9: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
+  262 |         };
       |         ^
 /usr/include/nlohmann/json.hpp:1141:5: note: candidate: ‘template<class JsonRef, typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long int, long unsigned int, double, std::allocator, nlohmann::json_abi_v3_11_3::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void> > >::value, int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const JsonRef&) [with typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value, int>::type <anonymous> = JsonRef; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1141 |     basic_json(const JsonRef& ref) : basic_json(ref.moved_or_copied()) {}
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1141:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1141:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1032:5: note: candidate: ‘template<class InputIT, typename std::enable_if<(std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<> > >::value || std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<> > >::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(InputIT, InputIT) [with typename std::enable_if<(std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value || std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value), int>::type <anonymous> = InputIT; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1032 |     basic_json(InputIT first, InputIT last)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1032:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:918:9: note:   couldn’t deduce template parameter ‘InputIT’
-  918 |         };
-      |         ^
+/usr/include/nlohmann/json.hpp:1032:5: note:   candidate expects 2 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:849:5: note: candidate: ‘template<class BasicJsonType, typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<>, BasicJsonType>::value)), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const BasicJsonType&) [with typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, BasicJsonType>::value)), int>::type <anonymous> = BasicJsonType; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
   849 |     basic_json(const BasicJsonType& val)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:849:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:849:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:835:5: note: candidate: ‘template<class CompatibleType, class U, typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<T>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<>, U>::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(CompatibleType&&) [with U = CompatibleType; typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<U>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, U>::value), int>::type <anonymous> = U; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
   835 |     basic_json(CompatibleType && val) noexcept(noexcept( // NOLINT(bugprone-forwarding-reference-overload,bugprone-exception-escape)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:835:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:835:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1214:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1214 |     basic_json(basic_json&& other) noexcept
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1214:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1214:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1145:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
  1145 |     basic_json(const basic_json& other)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1145:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:1145:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:1020:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(size_type, const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; size_type = long unsigned int]’
  1020 |     basic_json(size_type cnt, const basic_json& val):
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:1020:26: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>::size_type’ {aka ‘long unsigned int’}
- 1020 |     basic_json(size_type cnt, const basic_json& val):
-      |                ~~~~~~~~~~^~~
+/usr/include/nlohmann/json.hpp:1020:5: note:   candidate expects 2 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:902:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(initializer_list_t, bool, value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; initializer_list_t = std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
   902 |     basic_json(initializer_list_t init,
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:903:21: note:   no known conversion for argument 2 from ‘<brace-enclosed initializer list>’ to ‘bool’
-  903 |                bool type_deduction = true,
-      |                ~~~~~^~~~~~~~~~~~~~~~~~~~~
+/usr/include/nlohmann/json.hpp:902:5: note:   candidate expects 3 arguments, 4 provided
 /usr/include/nlohmann/json.hpp:823:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(std::nullptr_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; std::nullptr_t = std::nullptr_t]’
   823 |     basic_json(std::nullptr_t = nullptr) noexcept // NOLINT(bugprone-exception-escape)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:823:5: note:   candidate expects 1 argument, 2 provided
+/usr/include/nlohmann/json.hpp:823:5: note:   candidate expects 1 argument, 4 provided
 /usr/include/nlohmann/json.hpp:815:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
   815 |     basic_json(const value_t v)
       |     ^~~~~~~~~~
-/usr/include/nlohmann/json.hpp:815:5: note:   candidate expects 1 argument, 2 provided
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In member function ‘void midiMind::CommandHandler::registerFileCommands()’:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:894:37: error: cannot convert ‘midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>’ to ‘midiMind::CommandHandler::CommandFunction’ {aka ‘std::function<nlohmann::json_abi_v3_11_3::basic_json<>(const nlohmann::json_abi_v3_11_3::basic_json<>&)>’}
-  894 |     registerCommand("files.upload", [this](const json& params) {
-      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      |                                     |
-      |                                     midiMind::CommandHandler::registerFileCommands()::<lambda(const json&)>
-  895 |         if (!params.contains("filename") || !params.contains("data")) {
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  896 |             throw std::runtime_error("Missing filename or data parameter");
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  897 |         }
-      |         ~                            
-  898 | 
-      |                                      
-  899 |         std::string filename = params["filename"];
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  900 |         std::string data = params["data"];
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  901 | 
-      |                                      
-  902 |         // Save to temporary location
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  903 |         std::string tempPath = "/tmp/" + filename;
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  904 |         std::ofstream outFile(tempPath, std::ios::binary);
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  905 |         outFile.write(data.c_str(), data.size());
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  906 |         outFile.close();
-      |         ~~~~~~~~~~~~~~~~             
-  907 | 
-      |                                      
-  908 |         // Index the file
-      |         ~~~~~~~~~~~~~~~~~            
-  909 |         auto fileId = fileManager_->indexFile(tempPath);
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  910 | 
-      |                                      
-  911 |         if (!fileId.has_value()) {
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~   
-  912 |             throw std::runtime_error("Failed to index uploaded file");
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  913 |         }
-      |         ~                            
-  914 | 
-      |                                      
-  915 |         return json{
-      |         ~~~~~~~~~~~~                 
-  916 |             {"uploaded", true},
-      |             ~~~~~~~~~~~~~~~~~~~      
-  917 |             {"file_id", fileId.value()}
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  918 |         };
-      |         ~~                           
-  919 |     });
-      |     ~                                
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:138:79: note:   initializing argument 2 of ‘void midiMind::CommandHandler::registerCommand(const std::string&, CommandFunction)’
-  138 | void CommandHandler::registerCommand(const std::string& name, CommandFunction function) {
-      |                                                               ~~~~~~~~~~~~~~~~^~~~~~~~
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
-/home/pi/midiMind/backend/src/api/CommandHandler.cpp:1125:13: warning: unused variable ‘limit’ [-Wunused-variable]
- 1125 |         int limit = params.value("limit", 100);
-      |             ^~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: In constructor ‘midiMind::MessageEnvelope::MessageEnvelope(midiMind::protocol::MessageType)’:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:39:40: error: ‘generateUUID’ is not a member of ‘midiMind::protocol::Envelope’
-   39 |     envelope_.id = protocol::Envelope::generateUUID();
-      |                                        ^~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:40:58: error: no match for ‘operator=’ (operand types are ‘std::string’ {aka ‘std::__cxx11::basic_string<char>’} and ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’})
-   40 |     envelope_.timestamp = std::chrono::system_clock::now();
-      |                                                          ^
-In file included from /usr/include/c++/14/string:54,
-                 from /home/pi/midiMind/backend/src/api/Protocol.h:25,
-                 from /home/pi/midiMind/backend/src/api/MessageEnvelope.h:29,
-                 from /home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:20:
-/usr/include/c++/14/bits/basic_string.h:941:8: note: candidate: ‘template<class _Tp> std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::_If_sv<_Tp, std::__cxx11::basic_string<_CharT, _Traits, _Alloc>&> std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(const _Tp&) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  941 |        operator=(const _Tp& __svt)
-      |        ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:941:8: note:   template argument deduction/substitution failed:
-In file included from /usr/include/c++/14/bits/char_traits.h:50,
-                 from /usr/include/c++/14/string:42:
-/usr/include/c++/14/type_traits: In substitution of ‘template<bool _Cond, class _Tp> using std::enable_if_t = typename std::enable_if::type [with bool _Cond = false; _Tp = std::__cxx11::basic_string<char>&]’:
-/usr/include/c++/14/bits/basic_string.h:149:8:   required by substitution of ‘template<class _CharT, class _Traits, class _Alloc> template<class _Tp, class _Res> using std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::_If_sv = std::enable_if_t<((bool)std::__and_<std::is_convertible<const _Tp&, std::basic_string_view<_CharT, _Traits> >, std::__not_<std::is_convertible<const _Tp*, const std::__cxx11::basic_string<_CharT, _Traits, _Alloc>*> >, std::__not_<std::is_convertible<const _Tp&, const _CharT*> > >::value), _Res> [with _Tp = std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >; _Res = std::__cxx11::basic_string<char>&; _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  149 |         using _If_sv = enable_if_t<
-      |               ^~~~~~
-/usr/include/c++/14/bits/basic_string.h:941:8:   required by substitution of ‘template<class _Tp> std::__cxx11::basic_string<char>::_If_sv<_Tp, std::__cxx11::basic_string<char>&> std::__cxx11::basic_string<char>::operator=(const _Tp&) [with _Tp = std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >]’
-  941 |        operator=(const _Tp& __svt)
-      |        ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:40:58:   required from here
-   40 |     envelope_.timestamp = std::chrono::system_clock::now();
-      |                                                          ^
-/usr/include/c++/14/type_traits:2711:11: error: no type named ‘type’ in ‘struct std::enable_if<false, std::__cxx11::basic_string<char>&>’
- 2711 |     using enable_if_t = typename enable_if<_Cond, _Tp>::type;
-      |           ^~~~~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:817:7: note: candidate: ‘std::__cxx11::basic_string<_CharT, _Traits, _Alloc>& std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(const std::__cxx11::basic_string<_CharT, _Traits, _Alloc>&) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  817 |       operator=(const basic_string& __str)
-      |       ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:817:37: note:   no known conversion for argument 1 from ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’} to ‘const std::__cxx11::basic_string<char>&’
-  817 |       operator=(const basic_string& __str)
-      |                 ~~~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/bits/basic_string.h:828:7: note: candidate: ‘std::__cxx11::basic_string<_CharT, _Traits, _Alloc>& std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(const _CharT*) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  828 |       operator=(const _CharT* __s)
-      |       ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:828:31: note:   no known conversion for argument 1 from ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’} to ‘const char*’
-  828 |       operator=(const _CharT* __s)
-      |                 ~~~~~~~~~~~~~~^~~
-/usr/include/c++/14/bits/basic_string.h:840:7: note: candidate: ‘std::__cxx11::basic_string<_CharT, _Traits, _Alloc>& std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(_CharT) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  840 |       operator=(_CharT __c)
-      |       ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:840:24: note:   no known conversion for argument 1 from ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’} to ‘char’
-  840 |       operator=(_CharT __c)
-      |                 ~~~~~~~^~~
-/usr/include/c++/14/bits/basic_string.h:858:7: note: candidate: ‘std::__cxx11::basic_string<_CharT, _Traits, _Alloc>& std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(std::__cxx11::basic_string<_CharT, _Traits, _Alloc>&&) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  858 |       operator=(basic_string&& __str)
-      |       ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:858:32: note:   no known conversion for argument 1 from ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’} to ‘std::__cxx11::basic_string<char>&&’
-  858 |       operator=(basic_string&& __str)
-      |                 ~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/bits/basic_string.h:926:7: note: candidate: ‘std::__cxx11::basic_string<_CharT, _Traits, _Alloc>& std::__cxx11::basic_string<_CharT, _Traits, _Alloc>::operator=(std::initializer_list<_Tp>) [with _CharT = char; _Traits = std::char_traits<char>; _Alloc = std::allocator<char>]’
-  926 |       operator=(initializer_list<_CharT> __l)
-      |       ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:926:42: note:   no known conversion for argument 1 from ‘std::chrono::_V2::system_clock::time_point’ {aka ‘std::chrono::time_point<std::chrono::_V2::system_clock, std::chrono::duration<long int, std::ratio<1, 1000000000> > >’} to ‘std::initializer_list<char>’
-  926 |       operator=(initializer_list<_CharT> __l)
-      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~^~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: In static member function ‘static std::optional<midiMind::MessageEnvelope> midiMind::MessageEnvelope::fromJson(const json&)’:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:179:45: error: ‘fromJson’ is not a member of ‘midiMind::protocol::Envelope’
-  179 |         msg.envelope_ = protocol::Envelope::fromJson(j["envelope"]);
-      |                                             ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:188:51: error: ‘fromJson’ is not a member of ‘midiMind::protocol::Request’
-  188 |                 msg.request_ = protocol::Request::fromJson(j["request"]);
-      |                                                   ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:196:53: error: ‘fromJson’ is not a member of ‘midiMind::protocol::Response’
-  196 |                 msg.response_ = protocol::Response::fromJson(j["response"]);
-      |                                                     ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:204:47: error: ‘fromJson’ is not a member of ‘midiMind::protocol::Event’
-  204 |                 msg.event_ = protocol::Event::fromJson(j["event"]);
-      |                                               ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:212:47: error: ‘fromJson’ is not a member of ‘midiMind::protocol::Error’
-  212 |                 msg.error_ = protocol::Error::fromJson(j["error"]);
-      |                                               ^~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: In member function ‘json midiMind::MessageEnvelope::toJson() const’:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:243:31: error: ‘const struct midiMind::protocol::Envelope’ has no member named ‘toJson’
-  243 |     j["envelope"] = envelope_.toJson();
-      |                               ^~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:249:42: error: ‘const struct midiMind::protocol::Request’ has no member named ‘toJson’
-  249 |                 j["request"] = request_->toJson();
-      |                                          ^~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:255:44: error: ‘const struct midiMind::protocol::Response’ has no member named ‘toJson’
-  255 |                 j["response"] = response_->toJson();
-      |                                            ^~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:261:38: error: ‘const struct midiMind::protocol::Event’ has no member named ‘toJson’
-  261 |                 j["event"] = event_->toJson();
-      |                                      ^~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:267:38: error: ‘const struct midiMind::protocol::Error’ has no member named ‘toJson’
-  267 |                 j["error"] = error_->toJson();
-      |                                      ^~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:471: CMakeFiles/midimind.dir/src/api/MessageEnvelope.cpp.o] Error 1
+/usr/include/nlohmann/json.hpp:815:5: note:   candidate expects 1 argument, 4 provided
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In static member function ‘static midiMind::protocol::Event midiMind::protocol::Event::fromJson(const midiMind::json&)’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:269:24: error: ‘stringToEventPriority’ was not declared in this scope
+  269 |         evt.priority = stringToEventPriority(j.value("priority", "normal"));
+      |                        ^~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/core/../api/Protocol.h: In member function ‘midiMind::json midiMind::protocol::Error::toJson() const’:
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:289:40: error: cannot convert ‘const midiMind::protocol::ErrorCode’ to ‘midiMind::ErrorCode’
+  289 |             {"code", errorCodeToString(code)},
+      |                                        ^~~~
+      |                                        |
+      |                                        const midiMind::protocol::ErrorCode
+/home/pi/midiMind/backend/src/core/Error.h:144:48: note:   initializing argument 1 of ‘const char* midiMind::errorCodeToString(ErrorCode)’
+  144 | inline const char* errorCodeToString(ErrorCode code) {
+      |                                      ~~~~~~~~~~^~~~
+/home/pi/midiMind/backend/src/core/../api/Protocol.h:294:9: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
+  294 |         };
+      |         ^
+/usr/include/nlohmann/json.hpp:1141:5: note: candidate: ‘template<class JsonRef, typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long int, long unsigned int, double, std::allocator, nlohmann::json_abi_v3_11_3::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void> > >::value, int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const JsonRef&) [with typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value, int>::type <anonymous> = JsonRef; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1141 |     basic_json(const JsonRef& ref) : basic_json(ref.moved_or_copied()) {}
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1141:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:1032:5: note: candidate: ‘template<class InputIT, typename std::enable_if<(std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<> > >::value || std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<> > >::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(InputIT, InputIT) [with typename std::enable_if<(std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value || std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value), int>::type <anonymous> = InputIT; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1032 |     basic_json(InputIT first, InputIT last)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1032:5: note:   candidate expects 2 arguments, 5 provided
+/usr/include/nlohmann/json.hpp:849:5: note: candidate: ‘template<class BasicJsonType, typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<>, BasicJsonType>::value)), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const BasicJsonType&) [with typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, BasicJsonType>::value)), int>::type <anonymous> = BasicJsonType; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+  849 |     basic_json(const BasicJsonType& val)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:849:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:835:5: note: candidate: ‘template<class CompatibleType, class U, typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<T>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<>, U>::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(CompatibleType&&) [with U = CompatibleType; typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<U>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, U>::value), int>::type <anonymous> = U; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+  835 |     basic_json(CompatibleType && val) noexcept(noexcept( // NOLINT(bugprone-forwarding-reference-overload,bugprone-exception-escape)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:835:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:1214:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1214 |     basic_json(basic_json&& other) noexcept
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1214:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:1145:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1145 |     basic_json(const basic_json& other)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1145:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:1020:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(size_type, const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; size_type = long unsigned int]’
+ 1020 |     basic_json(size_type cnt, const basic_json& val):
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1020:5: note:   candidate expects 2 arguments, 5 provided
+/usr/include/nlohmann/json.hpp:902:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(initializer_list_t, bool, value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; initializer_list_t = std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
+  902 |     basic_json(initializer_list_t init,
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:902:5: note:   candidate expects 3 arguments, 5 provided
+/usr/include/nlohmann/json.hpp:823:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(std::nullptr_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; std::nullptr_t = std::nullptr_t]’
+  823 |     basic_json(std::nullptr_t = nullptr) noexcept // NOLINT(bugprone-exception-escape)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:823:5: note:   candidate expects 1 argument, 5 provided
+/usr/include/nlohmann/json.hpp:815:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
+  815 |     basic_json(const value_t v)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:815:5: note:   candidate expects 1 argument, 5 provided
+[ 20%] Building CXX object CMakeFiles/midimind.dir/src/storage/FileManager.cpp.o
+make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
-make[2]: *** [CMakeFiles/midimind.dir/build.make:457: CMakeFiles/midimind.dir/src/api/CommandHandler.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
+make: *** [Makefile:136: all] Error 2
