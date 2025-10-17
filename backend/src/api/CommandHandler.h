@@ -103,10 +103,10 @@ public:
      * @param fileManager File manager
      */
     CommandHandler(
-        std::shared_ptr<MidiDeviceManager> deviceManager,
-        std::shared_ptr<MidiRouter> router,
-        std::shared_ptr<MidiPlayer> player,
-        std::shared_ptr<FileManager> fileManager
+        std::shared_ptr<MidiDeviceManager> deviceManager_,
+        std::shared_ptr<MidiRouter> router_,
+        std::shared_ptr<MidiPlayer> player_,
+        std::shared_ptr<FileManager> fileManager_
     );
     
     /**
@@ -272,7 +272,7 @@ private:
     std::shared_ptr<MidiDeviceManager> deviceManager_;
     std::shared_ptr<MidiRouter> router_;
     std::shared_ptr<MidiPlayer> player_;
-    std::shared_ptr<FileManager> fileManager;
+    std::shared_ptr<FileManager> fileManager_;
 };
 
 } // namespace midiMind

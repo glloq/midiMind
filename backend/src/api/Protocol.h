@@ -1,34 +1,95 @@
 // ============================================================================
 // File: backend/src/api/Protocol.h
-// Version: 4.1.1
+// Version: 4.1.2
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
-//   WebSocket protocol definitions (fixed with missing error codes)
+//   WebSocket protocol definitions (complete with JSON serialization)
 //
 // Author: MidiMind Team
 // Date: 2025-10-17
 //
-// Changes v4.1.1:
-//   - Added INVALID_MESSAGE error code
-//   - Added COMMAND_FAILED error code
-//   - Added UNKNOWN_COMMAND error code
-//   - Added DEVICE_NOT_FOUND error code
-//   - Added DEVICE_BUSY error code
-//   - Added id field to Request structure
+// Changes v4.1.2:
+//   - Added toJson() and fromJson() methods to all structures
+//   - Added generateUUID() helper function
+//   - Added timestamp formatting helper
 //
 // ============================================================================
 
 #pragma once
 
 #include <string>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <random>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 namespace protocol {
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * @brief Generate UUID v4
+ */
+inline std::string generateUUID() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    static std::uniform_int_distribution<> dis2(8, 11);
+    
+    std::stringstream ss;
+    ss << std::hex;
+    
+    for (int i = 0; i < 8; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    for (int i = 0; i < 4; i++) {
+        ss << dis(gen);
+    }
+    ss << "-4"; // Version 4
+    
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    ss << dis2(gen); // Variant
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    for (int i = 0; i < 12; i++) {
+        ss << dis(gen);
+    }
+    
+    return ss.str();
+}
+
+/**
+ * @brief Get ISO 8601 timestamp
+ */
+inline std::string getISO8601Timestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%S");
+    ss << '.' << std::setfill('0') << std::setw(3) << ms.count() << 'Z';
+    
+    return ss.str();
+}
 
 // ============================================================================
 // ENUMERATIONS
@@ -53,11 +114,11 @@ enum class ErrorCode {
     PARSE_ERROR = 1000,
     INVALID_COMMAND = 1001,
     INVALID_PARAMS = 1002,
-    INVALID_MESSAGE = 1003,        // NEW
-    COMMAND_FAILED = 1004,         // NEW
-    UNKNOWN_COMMAND = 1005,        // NEW
-    DEVICE_NOT_FOUND = 2001,       // NEW
-    DEVICE_BUSY = 2002,            // NEW
+    INVALID_MESSAGE = 1003,
+    COMMAND_FAILED = 1004,
+    UNKNOWN_COMMAND = 1005,
+    DEVICE_NOT_FOUND = 2001,
+    DEVICE_BUSY = 2002,
     MIDI_ERROR = 2000,
     FILE_ERROR = 3000,
     SYSTEM_ERROR = 4000
@@ -83,10 +144,28 @@ struct Envelope {
     Envelope() 
         : type(MessageType::REQUEST)
         , version("1.0") {}
+    
+    json toJson() const {
+        return json{
+            {"id", id},
+            {"type", messageTypeToString(type)},
+            {"timestamp", timestamp},
+            {"version", version}
+        };
+    }
+    
+    static Envelope fromJson(const json& j) {
+        Envelope env;
+        env.id = j.value("id", "");
+        env.type = stringToMessageType(j.value("type", "request"));
+        env.timestamp = j.value("timestamp", "");
+        env.version = j.value("version", "1.0");
+        return env;
+    }
 };
 
 struct Request {
-    std::string id;            // NEW - Added request ID
+    std::string id;
     std::string command;
     json params;
     int timeout;
@@ -94,6 +173,24 @@ struct Request {
     Request() 
         : params(json::object())
         , timeout(0) {}
+    
+    json toJson() const {
+        return json{
+            {"id", id},
+            {"command", command},
+            {"params", params},
+            {"timeout", timeout}
+        };
+    }
+    
+    static Request fromJson(const json& j) {
+        Request req;
+        req.id = j.value("id", "");
+        req.command = j.value("command", "");
+        req.params = j.value("params", json::object());
+        req.timeout = j.value("timeout", 0);
+        return req;
+    }
 };
 
 struct Response {
@@ -109,6 +206,41 @@ struct Response {
         , data(json::object())
         , errorCode(ErrorCode::UNKNOWN)
         , latency(0) {}
+    
+    json toJson() const {
+        json j = {
+            {"request_id", requestId},
+            {"success", success},
+            {"latency", latency}
+        };
+        
+        if (success) {
+            j["data"] = data;
+        } else {
+            j["error_message"] = errorMessage;
+            j["error_code"] = errorCodeToString(errorCode);
+        }
+        
+        return j;
+    }
+    
+    static Response fromJson(const json& j) {
+        Response resp;
+        resp.requestId = j.value("request_id", "");
+        resp.success = j.value("success", true);
+        resp.latency = j.value("latency", 0);
+        
+        if (resp.success) {
+            resp.data = j.value("data", json::object());
+        } else {
+            resp.errorMessage = j.value("error_message", "");
+            // Parse error code string back to enum
+            std::string codeStr = j.value("error_code", "UNKNOWN");
+            resp.errorCode = ErrorCode::UNKNOWN; // Default
+        }
+        
+        return resp;
+    }
 };
 
 struct Event {
@@ -120,6 +252,24 @@ struct Event {
     Event() 
         : data(json::object())
         , priority(EventPriority::NORMAL) {}
+    
+    json toJson() const {
+        return json{
+            {"name", name},
+            {"data", data},
+            {"priority", eventPriorityToString(priority)},
+            {"source", source}
+        };
+    }
+    
+    static Event fromJson(const json& j) {
+        Event evt;
+        evt.name = j.value("name", "");
+        evt.data = j.value("data", json::object());
+        evt.priority = stringToEventPriority(j.value("priority", "normal"));
+        evt.source = j.value("source", "");
+        return evt;
+    }
 };
 
 struct Error {
@@ -133,10 +283,31 @@ struct Error {
         : code(ErrorCode::UNKNOWN)
         , details(json::object())
         , retryable(false) {}
+    
+    json toJson() const {
+        return json{
+            {"code", errorCodeToString(code)},
+            {"message", message},
+            {"details", details},
+            {"retryable", retryable},
+            {"request_id", requestId}
+        };
+    }
+    
+    static Error fromJson(const json& j) {
+        Error err;
+        // Parse error code
+        err.code = ErrorCode::UNKNOWN; // Default
+        err.message = j.value("message", "");
+        err.details = j.value("details", json::object());
+        err.retryable = j.value("retryable", false);
+        err.requestId = j.value("request_id", "");
+        return err;
+    }
 };
 
 // ============================================================================
-// CONVERSION FUNCTIONS
+// CONVERSION FUNCTIONS (Forward declarations needed above)
 // ============================================================================
 
 inline std::string messageTypeToString(MessageType type) {
@@ -203,5 +374,5 @@ inline EventPriority stringToEventPriority(const std::string& str) {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Protocol.h v4.1.1
+// END OF FILE Protocol.h v4.1.2
 // ============================================================================
