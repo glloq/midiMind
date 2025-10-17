@@ -1,29 +1,59 @@
-In file included from /home/pi/midiMind/backend/src/midi/file/MidiFileReader.h:33,
-                 from /home/pi/midiMind/backend/src/midi/file/MidiFileReader.cpp:22:
-/home/pi/midiMind/backend/src/midi/file/MidiFileReader.cpp: In member function ‘midiMind::MidiFile midiMind::MidiFileReader::readFromBuffer(const uint8_t*, size_t)’:
-/home/pi/midiMind/backend/src/midi/file/MidiFileReader.cpp:202:32: error: ‘MIDI_FILE_READ_FAILED’ is not a member of ‘midiMind::ErrorCode’
-  202 |         THROW_ERROR(ErrorCode::MIDI_FILE_READ_FAILED,
-      |                                ^~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/file/../../core/Error.h:276:39: note: in definition of macro ‘THROW_ERROR’
-  276 |     throw midiMind::MidiMindException(code, message)
-      |                                       ^~~~
-In file included from /home/pi/midiMind/backend/src/midi/file/MidiFileReader.h:33,
-                 from /home/pi/midiMind/backend/src/midi/file/MidiFileWriter.cpp:22:
-/home/pi/midiMind/backend/src/midi/file/MidiFileWriter.cpp: In member function ‘midiMind::MidiFile midiMind::MidiFileReader::readFromBuffer(const uint8_t*, size_t)’:
-/home/pi/midiMind/backend/src/midi/file/MidiFileWriter.cpp:202:32: error: ‘MIDI_FILE_READ_FAILED’ is not a member of ‘midiMind::ErrorCode’
-  202 |         THROW_ERROR(ErrorCode::MIDI_FILE_READ_FAILED,
-      |                                ^~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/file/../../core/Error.h:276:39: note: in definition of macro ‘THROW_ERROR’
-  276 |     throw midiMind::MidiMindException(code, message)
-      |                                       ^~~~
-/home/pi/midiMind/backend/src/midi/file/MidiFileReader.cpp:204:5: warning: control reaches end of non-void function [-Wreturn-type]
-  204 |     }
-      |     ^
-/home/pi/midiMind/backend/src/midi/file/MidiFileWriter.cpp:204:5: warning: control reaches end of non-void function [-Wreturn-type]
-  204 |     }
-      |     ^
-make[2]: *** [CMakeFiles/midimind.dir/build.make:359: CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o] Error 1
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp: In member function ‘void midiMind::MidiPlayer::parseAllTracks()’:
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:503:21: error: ‘class midiMind::MidiMessage’ has no member named ‘setStatus’; did you mean ‘getStatus’?
+  503 |                 msg.setStatus(event.status);
+      |                     ^~~~~~~~~
+      |                     getStatus
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:504:21: error: ‘class midiMind::MidiMessage’ has no member named ‘setChannel’; did you mean ‘getChannel’?
+  504 |                 msg.setChannel(event.channel);
+      |                     ^~~~~~~~~~
+      |                     getChannel
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:507:25: error: ‘class midiMind::MidiMessage’ has no member named ‘setData1’; did you mean ‘getData1’?
+  507 |                     msg.setData1(event.data[0]);
+      |                         ^~~~~~~~
+      |                         getData1
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:510:25: error: ‘class midiMind::MidiMessage’ has no member named ‘setData2’; did you mean ‘getData2’?
+  510 |                     msg.setData2(event.data[1]);
+      |                         ^~~~~~~~
+      |                         getData2
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp: In member function ‘midiMind::MidiMessage midiMind::MidiPlayer::applyModifications(const midiMind::MidiMessage&, uint16_t) const’:
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:715:18: error: ‘class midiMind::MidiMessage’ has no member named ‘setData1’; did you mean ‘getData1’?
+  715 |         modified.setData1(static_cast<uint8_t>(newNote));
+      |                  ^~~~~~~~
+      |                  getData1
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp: In member function ‘midiMind::MidiMessage midiMind::MidiPlayer::applyMasterVolume(const midiMind::MidiMessage&) const’:
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:729:18: error: ‘class midiMind::MidiMessage’ has no member named ‘setData2’; did you mean ‘getData2’?
+  729 |         modified.setData2(static_cast<uint8_t>(newVelocity));
+      |                  ^~~~~~~~
+      |                  getData2
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:736:18: error: ‘class midiMind::MidiMessage’ has no member named ‘setData2’; did you mean ‘getData2’?
+  736 |         modified.setData2(static_cast<uint8_t>(newValue));
+      |                  ^~~~~~~~
+      |                  getData2
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp: In member function ‘void midiMind::MidiPlayer::sendAllNotesOff()’:
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:749:13: error: ‘class midiMind::MidiMessage’ has no member named ‘setStatus’; did you mean ‘getStatus’?
+  749 |         msg.setStatus(0xB0 | channel);  // Control Change
+      |             ^~~~~~~~~
+      |             getStatus
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:750:13: error: ‘class midiMind::MidiMessage’ has no member named ‘setChannel’; did you mean ‘getChannel’?
+  750 |         msg.setChannel(channel);
+      |             ^~~~~~~~~~
+      |             getChannel
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:751:13: error: ‘class midiMind::MidiMessage’ has no member named ‘setData1’; did you mean ‘getData1’?
+  751 |         msg.setData1(123);  // All Notes Off
+      |             ^~~~~~~~
+      |             getData1
+/home/pi/midiMind/backend/src/midi/player/MidiPlayer.cpp:752:13: error: ‘class midiMind::MidiMessage’ has no member named ‘setData2’; did you mean ‘getData2’?
+  752 |         msg.setData2(0);
+      |             ^~~~~~~~
+      |             getData2
+[ 80%] Building CXX object CMakeFiles/midimind.dir/src/midi/processing/ProcessorManager.cpp.o
+In file included from /home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:21:
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.h:32:10: fatal error: ProcessorChain.h: No such file or directory
+   32 | #include "ProcessorChain.h"
+      |          ^~~~~~~~~~~~~~~~~~
+compilation terminated.
+make[2]: *** [CMakeFiles/midimind.dir/build.make:401: CMakeFiles/midimind.dir/src/midi/processing/ProcessorManager.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
-make[2]: *** [CMakeFiles/midimind.dir/build.make:373: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o] Error 1
+make[2]: *** [CMakeFiles/midimind.dir/build.make:387: CMakeFiles/midimind.dir/src/midi/player/MidiPlayer.cpp.o] Error 1
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
