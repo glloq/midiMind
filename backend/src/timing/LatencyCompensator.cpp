@@ -272,7 +272,7 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
 }
 
 int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrumentId) const {
-    std::lock_guard<std::mutex> lock(instrumentMutex_);
+    mutable std::mutex instrumentMutex_;
     
     auto it = instruments_.find(instrumentId);
     if (it == instruments_.end()) {

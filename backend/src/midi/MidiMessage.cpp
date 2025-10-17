@@ -21,6 +21,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include "devices/MidiDevice.h"
 
 namespace midiMind {
 
@@ -384,8 +385,9 @@ MidiMessage MidiMessage::fromJson(const json& j) {
             return noteOff(j["channel"].get<int>() - 1, j["note"], 
                           j.value("velocity", 0));
         } else if (type == "CONTROL_CHANGE") {
-            return controlChange(j["channel"].get<int>() - 1, 
-                               j["controller"], j["value"]);
+            return controlChange(j["channel"].get<int>() - 1,
+                    j["controller"].get<uint8_t>(), 
+                    j["value"].get<uint8_t>());
         } else if (type == "PROGRAM_CHANGE") {
             return programChange(j["channel"].get<int>() - 1, j["program"]);
         } else if (type == "PITCH_BEND") {
