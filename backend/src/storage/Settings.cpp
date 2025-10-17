@@ -76,26 +76,24 @@ bool Settings::load() {
 bool Settings::save() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!isLoaded_) {
-        Logger::error("Settings", "Cannot save: not loaded");
-        return false;
-    }
     
     Logger::info("Settings", "Saving settings...");
     
-    int count = 0;  // ✅ Déclarer count AVANT le lambda
+    int count = 0;
     
-    bool success = database_.transaction([&]() {  // ✅ Capturer par référence [&]
+    // ✅ Capturer this pour accéder aux membres de la classe
+    bool success = database_.transaction([this, &count]() {
         for (const auto& [key, value] : settings_) {
+            // ✅ Utiliser la liste d'initialisation directement
             auto result = database_.execute(
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                std::vector<std::string>{key, value}  // ✅ Convertir explicitement
+                {key, value}
             );
             
             if (!result.success) {
                 Logger::warning("Settings", "Failed to save: " + key);
             } else {
-                count++;  // ✅ count est accessible car capturé par [&]
+                count++;
             }
         }
     });
@@ -108,7 +106,6 @@ bool Settings::save() {
     Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
     return true;
 }
-
 
 void Settings::reset() {
     std::lock_guard<std::mutex> lock(mutex_);
