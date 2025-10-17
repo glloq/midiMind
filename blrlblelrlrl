@@ -1,64 +1,34 @@
-In file included from /home/pi/midiMind/backend/src/core/Application.cpp:50:
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:275:34: error: expected ‘;’ at end of member declaration
-  275 |     std::shared_ptr<FileManager> fileManager
-      |                                  ^~~~~~~~~~~
-      |                                             ;
-[ 20%] Building CXX object CMakeFiles/midimind.dir/src/storage/FileManager.cpp.o
-In file included from /usr/include/c++/14/bits/alloc_traits.h:33,
-                 from /usr/include/c++/14/ext/alloc_traits.h:34,
-                 from /usr/include/c++/14/bits/basic_string.h:39,
-                 from /usr/include/c++/14/string:54,
-                 from /home/pi/midiMind/backend/src/core/Application.h:19,
-                 from /home/pi/midiMind/backend/src/core/Application.cpp:34:
-/usr/include/c++/14/bits/stl_construct.h: In instantiation of ‘void std::_Construct(_Tp*, _Args&& ...) [with _Tp = midiMind::CommandHandler; _Args = {shared_ptr<midiMind::MidiDeviceManager>&, shared_ptr<midiMind::MidiRouter>&, shared_ptr<midiMind::MidiPlayer>&, int}]’:
-/usr/include/c++/14/bits/alloc_traits.h:706:19:   required from ‘static void std::allocator_traits<std::allocator<void> >::construct(allocator_type&, _Up*, _Args&& ...) [with _Up = midiMind::CommandHandler; _Args = {std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int}; allocator_type = std::allocator<void>]’
-  706 |         { std::_Construct(__p, std::forward<_Args>(__args)...); }
-      |           ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:607:39:   required from ‘std::_Sp_counted_ptr_inplace<_Tp, _Alloc, _Lp>::_Sp_counted_ptr_inplace(_Alloc, _Args&& ...) [with _Args = {std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int}; _Tp = midiMind::CommandHandler; _Alloc = std::allocator<void>; __gnu_cxx::_Lock_policy _Lp = __gnu_cxx::_S_atomic]’
-  607 |           allocator_traits<_Alloc>::construct(__a, _M_ptr(),
-      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~
-  608 |               std::forward<_Args>(__args)...); // might throw
-      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-/usr/include/c++/14/bits/shared_ptr_base.h:969:16:   required from ‘std::__shared_count<_Lp>::__shared_count(_Tp*&, std::_Sp_alloc_shared_tag<_Alloc>, _Args&& ...) [with _Tp = midiMind::CommandHandler; _Alloc = std::allocator<void>; _Args = {std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int}; __gnu_cxx::_Lock_policy _Lp = __gnu_cxx::_S_atomic]’
-  969 |           auto __pi = ::new (__mem)
-      |                       ^~~~~~~~~~~~~
-  970 |             _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1713:14:   required from ‘std::__shared_ptr<_Tp, _Lp>::__shared_ptr(std::_Sp_alloc_shared_tag<_Tp>, _Args&& ...) [with _Alloc = std::allocator<void>; _Args = {std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int}; _Tp = midiMind::CommandHandler; __gnu_cxx::_Lock_policy _Lp = __gnu_cxx::_S_atomic]’
- 1713 |         : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
-      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:463:59:   required from ‘std::shared_ptr<_Tp>::shared_ptr(std::_Sp_alloc_shared_tag<_Tp>, _Args&& ...) [with _Alloc = std::allocator<void>; _Args = {std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int}; _Tp = midiMind::CommandHandler]’
-  463 |         : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
-      |                                                                  ^
-/usr/include/c++/14/bits/shared_ptr.h:1007:14:   required from ‘std::shared_ptr<typename std::enable_if<(! std::is_array<_Tp>::value), _Tp>::type> std::make_shared(_Args&& ...) [with _Tp = midiMind::CommandHandler; _Args = {shared_ptr<midiMind::MidiDeviceManager>&, shared_ptr<midiMind::MidiRouter>&, shared_ptr<midiMind::MidiPlayer>&, int}; typename enable_if<(! is_array<_Tp>::value), _Tp>::type = midiMind::CommandHandler]’
- 1007 |       return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
-      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- 1008 |                              std::forward<_Args>(__args)...);
-      |                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp:390:59:   required from here
-  390 |         commandHandler_ = std::make_shared<CommandHandler>(
-      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-  391 |                         deviceManager_,
-      |                         ~~~~~~~~~~~~~~~                    
-  392 |                         router_,
-      |                         ~~~~~~~~                           
-  393 |                         player_,
-      |                         ~~~~~~~~                           
-  394 |                         4
-      |                         ~                                  
-  395 |         );
-      |         ~                                                  
-/usr/include/c++/14/bits/stl_construct.h:119:7: error: no matching function for call to ‘midiMind::CommandHandler::CommandHandler(std::shared_ptr<midiMind::MidiDeviceManager>&, std::shared_ptr<midiMind::MidiRouter>&, std::shared_ptr<midiMind::MidiPlayer>&, int)’
-  119 |       ::new((void*)__p) _Tp(std::forward<_Args>(__args)...);
-      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:105:5: note: candidate: ‘midiMind::CommandHandler::CommandHandler(std::shared_ptr<midiMind::MidiDeviceManager>, std::shared_ptr<midiMind::MidiRouter>, std::shared_ptr<midiMind::MidiPlayer>, std::shared_ptr<midiMind::FileManager>)’
-  105 |     CommandHandler(
-      |     ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:109:38: note:   no known conversion for argument 4 from ‘int’ to ‘std::shared_ptr<midiMind::FileManager>’
-  109 |         std::shared_ptr<FileManager> fileManager
-      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In lambda function:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:83:57: error: ‘settings_’ was not declared in this scope; did you mean ‘Settings’?
+   83 |                         for (const auto& [key, value] : settings_) {
+      |                                                         ^~~~~~~~~
+      |                                                         Settings
+/home/pi/midiMind/backend/src/storage/Settings.cpp:84:64: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&’
+   84 |                                 auto result = database_.execute(
+      |                                               ~~~~~~~~~~~~~~~~~^
+   85 |                                         "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+      |                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   86 |                                         {key, value}
+      |                                         ~~~~~~~~~~~~            
+   87 |                                 );
+      |                                 ~                               
+In file included from /home/pi/midiMind/backend/src/storage/Settings.h:37,
+                 from /home/pi/midiMind/backend/src/storage/Settings.cpp:20:
+/home/pi/midiMind/backend/src/storage/Database.h:212:59: note:   initializing argument 2 of ‘midiMind::DatabaseResult midiMind::Database::execute(const std::string&, const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&)’
+  212 |                           const std::vector<std::string>& params = {});
+      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘bool midiMind::Settings::save()’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:100:62: error: ‘count’ was not declared in this scope; did you mean ‘std::count’?
+  100 |         Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
+      |                                                              ^~~~~
+      |                                                              std::count
+In file included from /usr/include/c++/14/algorithm:86,
+                 from /usr/include/nlohmann/json.hpp:21,
+                 from /home/pi/midiMind/backend/src/storage/Settings.h:35:
+/usr/include/c++/14/pstl/glue_algorithm_defs.h:101:1: note: ‘std::count’ declared here
+  101 | count(_ExecutionPolicy&& __exec, _ForwardIterator __first, _ForwardIterator __last, const _Tp& __value);
+      | ^~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:177: CMakeFiles/midimind.dir/src/storage/Settings.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
-✓ Compilation terminée
