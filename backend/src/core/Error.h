@@ -84,6 +84,7 @@ enum class ErrorCode {
     MIDI_FILE_PARSE_ERROR,
     MIDI_FILE_INVALID_FORMAT,
     MIDI_FILE_CORRUPTED,
+	MIDI_FILE_READ_FAILED,
     
     // Network
     NETWORK_ERROR,
@@ -184,6 +185,7 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::MIDI_FILE_PARSE_ERROR: return "MIDI_FILE_PARSE_ERROR";
         case ErrorCode::MIDI_FILE_INVALID_FORMAT: return "MIDI_FILE_INVALID_FORMAT";
         case ErrorCode::MIDI_FILE_CORRUPTED: return "MIDI_FILE_CORRUPTED";
+		case ErrorCode::MIDI_FILE_READ_FAILED: return "MIDI_FILE_READ_FAILED"; 
         
         case ErrorCode::NETWORK_ERROR: return "NETWORK_ERROR";
         case ErrorCode::NETWORK_CONNECTION_FAILED: return "NETWORK_CONNECTION_FAILED";
