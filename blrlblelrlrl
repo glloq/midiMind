@@ -1,23 +1,15 @@
-/home/pi/midiMind/backend/src/storage/Settings.cpp: In lambda function:
-/home/pi/midiMind/backend/src/storage/Settings.cpp:86:41: error: ‘settings_’ was not declared in this scope; did you mean ‘Settings’?
-   86 |         for (const auto& [key, value] : settings_) {
-      |                                         ^~~~~~~~~
-      |                                         Settings
-/home/pi/midiMind/backend/src/storage/Settings.cpp:88:44: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&’
-   88 |             auto result = database_.execute(
-      |                           ~~~~~~~~~~~~~~~~~^
-   89 |                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   90 |                 {key, value}
-      |                 ~~~~~~~~~~~~                
-   91 |             );
-      |             ~                               
-In file included from /home/pi/midiMind/backend/src/storage/Settings.h:37,
-                 from /home/pi/midiMind/backend/src/storage/Settings.cpp:20:
-/home/pi/midiMind/backend/src/storage/Database.h:212:59: note:   initializing argument 2 of ‘midiMind::DatabaseResult midiMind::Database::execute(const std::string&, const std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > >&)’
-  212 |                           const std::vector<std::string>& params = {});
-      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:177: CMakeFiles/midimind.dir/src/storage/Settings.cpp.o] Error 1
+/home/pi/midiMind/backend/src/storage/SessionManager.cpp:29:9: warning: #pragma once in main file
+   29 | #pragma once
+      |         ^~~~
+[ 40%] Building CXX object CMakeFiles/midimind.dir/src/timing/TimestampManager.cpp.o
+/home/pi/midiMind/backend/src/storage/SessionManager.cpp:184:10: error: ‘optional’ in namespace ‘std’ does not name a template type
+  184 |     std::optional<Session> load(int id);
+      |          ^~~~~~~~
+/home/pi/midiMind/backend/src/storage/SessionManager.cpp:39:1: note: ‘std::optional’ is defined in header ‘<optional>’; this is probably fixable by adding ‘#include <optional>’
+   38 | #include <thread>
+  +++ |+#include <optional>
+   39 | #include <functional>
+make[2]: *** [CMakeFiles/midimind.dir/build.make:219: CMakeFiles/midimind.dir/src/storage/SessionManager.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
