@@ -1,828 +1,268 @@
-her_f_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:3707:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const student_t_distribution<_RealType>&, const student_t_distribution<_RealType>&)’
- 3707 |     operator!=(const std::student_t_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3707:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::student_t_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:4183:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const binomial_distribution<_IntType>&, const binomial_distribution<_IntType>&)’
- 4183 |     operator!=(const std::binomial_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4183:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::binomial_distribution<_IntType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:4368:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const geometric_distribution<_IntType>&, const geometric_distribution<_IntType>&)’
- 4368 |     operator!=(const std::geometric_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4368:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::geometric_distribution<_IntType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:4629:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const negative_binomial_distribution<_IntType>&, const negative_binomial_distribution<_IntType>&)’
- 4629 |     operator!=(const std::negative_binomial_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4629:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::negative_binomial_distribution<_IntType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:4861:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const poisson_distribution<_IntType>&, const poisson_distribution<_IntType>&)’
- 4861 |     operator!=(const std::poisson_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4861:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::poisson_distribution<_IntType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:5058:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const exponential_distribution<_RealType>&, const exponential_distribution<_RealType>&)’
- 5058 |     operator!=(const std::exponential_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5058:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::exponential_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:5275:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const weibull_distribution<_RealType>&, const weibull_distribution<_RealType>&)’
- 5275 |     operator!=(const std::weibull_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5275:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::weibull_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:5492:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const extreme_value_distribution<_RealType>&, const extreme_value_distribution<_RealType>&)’
- 5492 |     operator!=(const std::extreme_value_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5492:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::extreme_value_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:5772:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const discrete_distribution<_IntType>&, const discrete_distribution<_IntType>&)’
- 5772 |     operator!=(const std::discrete_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5772:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::discrete_distribution<_IntType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:6056:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const piecewise_constant_distribution<_RealType>&, const piecewise_constant_distribution<_RealType>&)’
- 6056 |     operator!=(const std::piecewise_constant_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:6056:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::piecewise_constant_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/random.h:6338:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const piecewise_linear_distribution<_RealType>&, const piecewise_linear_distribution<_RealType>&)’
- 6338 |     operator!=(const std::piecewise_linear_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:6338:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::piecewise_linear_distribution<_RealType>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/std_function.h:761:5: note: candidate: ‘template<class _Res, class ... _Args> bool std::operator!=(const function<_Res(_ArgTypes ...)>&, nullptr_t)’
-  761 |     operator!=(const function<_Res(_Args...)>& __f, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/std_function.h:761:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::function<_Res(_ArgTypes ...)>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/std_function.h:767:5: note: candidate: ‘template<class _Res, class ... _Args> bool std::operator!=(nullptr_t, const function<_Res(_ArgTypes ...)>&)’
-  767 |     operator!=(nullptr_t, const function<_Res(_Args...)>& __f) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/std_function.h:767:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::function<_Res(_ArgTypes ...)>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2151:5: note: candidate: ‘template<class _Key, class _Tp, class _Hash, class _Pred, class _Alloc> bool std::operator!=(const unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&, const unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&)’
- 2151 |     operator!=(const unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2151:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2165:5: note: candidate: ‘template<class _Key, class _Tp, class _Hash, class _Pred, class _Alloc> bool std::operator!=(const unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&, const unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&)’
- 2165 |     operator!=(const unordered_multimap<_Key, _Tp, _Hash, _Pred, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2165:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/array:332:5: note: candidate: ‘template<class _Tp, long unsigned int _Nm> bool std::operator!=(const array<_Tp, _Nm>&, const array<_Tp, _Nm>&)’
-  332 |     operator!=(const array<_Tp, _Nm>& __one, const array<_Tp, _Nm>& __two)
-      |     ^~~~~~~~
-/usr/include/c++/14/array:332:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::array<_Tp, _Nm>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:862:5: note: candidate: ‘template<class _Tp, class _Dp, class _Up, class _Ep> bool std::operator!=(const unique_ptr<_Tp, _Dp>&, const unique_ptr<_Up, _Ep>&)’
-  862 |     operator!=(const unique_ptr<_Tp, _Dp>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:862:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::unique_ptr<_Tp, _Dp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:870:5: note: candidate: ‘template<class _Tp, class _Dp> bool std::operator!=(const unique_ptr<_Tp, _Dp>&, nullptr_t)’
-  870 |     operator!=(const unique_ptr<_Tp, _Dp>& __x, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:870:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::unique_ptr<_Tp, _Dp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:877:5: note: candidate: ‘template<class _Tp, class _Dp> bool std::operator!=(nullptr_t, const unique_ptr<_Tp, _Dp>&)’
-  877 |     operator!=(nullptr_t, const unique_ptr<_Tp, _Dp>& __x) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:877:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::unique_ptr<_Tp, _Dp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1828:5: note: candidate: ‘template<class _Tp1, class _Tp2, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(const __shared_ptr<_Tp1, _Lp>&, const __shared_ptr<_Tp2, _Lp>&)’
- 1828 |     operator!=(const __shared_ptr<_Tp1, _Lp>& __a,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1828:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::__shared_ptr<_Tp1, _Lp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1834:5: note: candidate: ‘template<class _Tp, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(const __shared_ptr<_Tp, _Lp>&, nullptr_t)’
- 1834 |     operator!=(const __shared_ptr<_Tp, _Lp>& __a, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1834:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::__shared_ptr<_Tp, _Lp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1839:5: note: candidate: ‘template<class _Tp, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(nullptr_t, const __shared_ptr<_Tp, _Lp>&)’
- 1839 |     operator!=(nullptr_t, const __shared_ptr<_Tp, _Lp>& __a) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1839:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::__shared_ptr<_Tp, _Lp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:587:5: note: candidate: ‘template<class _Tp, class _Up> bool std::operator!=(const shared_ptr<_Tp>&, const shared_ptr<_Tp>&)’
-  587 |     operator!=(const shared_ptr<_Tp>& __a, const shared_ptr<_Up>& __b) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:587:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::shared_ptr<_Tp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:593:5: note: candidate: ‘template<class _Tp> bool std::operator!=(const shared_ptr<_Tp>&, nullptr_t)’
-  593 |     operator!=(const shared_ptr<_Tp>& __a, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:593:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::shared_ptr<_Tp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:599:5: note: candidate: ‘template<class _Tp> bool std::operator!=(nullptr_t, const shared_ptr<_Tp>&)’
-  599 |     operator!=(nullptr_t, const shared_ptr<_Tp>& __a) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:599:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::shared_ptr<_Tp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/forward_list.h:1507:5: note: candidate: ‘template<class _Tp, class _Alloc> bool std::operator!=(const forward_list<_Tp, _Alloc>&, const forward_list<_Tp, _Alloc>&)’
- 1507 |     operator!=(const forward_list<_Tp, _Alloc>& __lx,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/forward_list.h:1507:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::forward_list<_Tp, _Alloc>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/stl_map.h:1557:5: note: candidate: ‘template<class _Key, class _Tp, class _Compare, class _Alloc> bool std::operator!=(const map<_Key, _Tp, _Compare, _Allocator>&, const map<_Key, _Tp, _Compare, _Allocator>&)’
- 1557 |     operator!=(const map<_Key, _Tp, _Compare, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_map.h:1557:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::map<_Key, _Tp, _Compare, _Allocator>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/stl_multimap.h:1179:5: note: candidate: ‘template<class _Key, class _Tp, class _Compare, class _Alloc> bool std::operator!=(const multimap<_Key, _Tp, _Compare, _Allocator>&, const multimap<_Key, _Tp, _Compare, _Allocator>&)’
- 1179 |     operator!=(const multimap<_Key, _Tp, _Compare, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_multimap.h:1179:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::multimap<_Key, _Tp, _Compare, _Allocator>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom1, class _Dom2> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_Expr, _Dom1, _Dom2>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const _Expr<_Dom2, typename _Dom2::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_Constant, _Dom, typename _Dom::value_type>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const typename _Dom::value_type&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Constant, std::_Expr, typename _Dom::value_type, _Dom>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const typename _Dom::value_type&, const _Expr<_Dom1, typename _Dom1::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_ValArray, _Dom, typename _Dom::value_type>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const valarray<typename _Dom::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_Expr, typename _Dom::value_type, _Dom>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const valarray<typename _Dom::value_type>&, const _Expr<_Dom1, typename _Dom1::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_ValArray, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const valarray<_Tp>&, const valarray<_Tp>&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::valarray<_Tp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_Constant, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const valarray<_Tp>&, const typename valarray<_Tp>::value_type&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   ‘const std::optional<midiMind::protocol::Error>’ is not derived from ‘const std::valarray<_Tp>’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Constant, std::_ValArray, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const typename valarray<_Tp>::value_type&, const valarray<_Tp>&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::valarray<_Tp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/optional:1241:5: note: candidate: ‘template<class _Tp, class _Up> constexpr std::__optional_ne_t<_Tp, _Up> std::operator!=(const optional<_Tp>&, const optional<_Up>&)’
- 1241 |     operator!=(const optional<_Tp>& __lhs, const optional<_Up>& __rhs)
-      |     ^~~~~~~~
-/usr/include/c++/14/optional:1241:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::optional<_Up>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/optional:1308:5: note: candidate: ‘template<class _Tp> constexpr bool std::operator!=(const optional<_Tp>&, nullopt_t)’
- 1308 |     operator!=(const optional<_Tp>& __lhs, nullopt_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/optional:1308:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   cannot convert ‘nullptr’ (type ‘std::nullptr_t’) to type ‘std::nullopt_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/optional:1313:5: note: candidate: ‘template<class _Tp> constexpr bool std::operator!=(nullopt_t, const optional<_Tp>&)’
- 1313 |     operator!=(nullopt_t, const optional<_Tp>& __rhs) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/optional:1313:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::optional<_Tp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/optional:1372:5: note: candidate: ‘template<class _Tp, class _Up> constexpr std::__optional_ne_t<_Tp, _Up> std::operator!=(const optional<_Tp>&, const _Up&)’
- 1372 |     operator!=(const optional<_Tp>& __lhs, const _Up& __rhs)
-      |     ^~~~~~~~
-/usr/include/c++/14/optional:1372:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional: In substitution of ‘template<class _Tp, class _Up> using std::__optional_ne_t = std::__optional_relop_t<decltype ((declval<const _Tp&>() != declval<const _Up&>()))> [with _Tp = midiMind::protocol::Error; _Up = std::nullptr_t]’:
-/usr/include/c++/14/optional:1372:5:   required by substitution of ‘template<class _Tp, class _Up> constexpr std::__optional_ne_t<_Tp, _Up> std::operator!=(const optional<_Tp>&, const _Up&) [with _Tp = midiMind::protocol::Error; _Up = std::nullptr_t]’
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30:   required from here
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/optional:1206:43: error: no match for ‘operator!=’ (operand types are ‘const midiMind::protocol::Error’ and ‘std::nullptr_t’)
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/postypes.h:197:5: note: candidate: ‘template<class _StateT> bool std::operator!=(const fpos<_StateT>&, const fpos<_StateT>&)’
-  197 |     operator!=(const fpos<_StateT>& __lhs, const fpos<_StateT>& __rhs)
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/postypes.h:197:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::fpos<_StateT>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/allocator.h:243:5: note: candidate: ‘template<class _T1, class _T2> bool std::operator!=(const allocator<_CharT>&, const allocator<_T2>&)’
-  243 |     operator!=(const allocator<_T1>&, const allocator<_T2>&)
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/allocator.h:243:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::allocator<_CharT>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:455:5: note: candidate: ‘template<class _Iterator> constexpr bool std::operator!=(const reverse_iterator<_Iterator>&, const reverse_iterator<_Iterator>&)’
-  455 |     operator!=(const reverse_iterator<_Iterator>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:455:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::reverse_iterator<_Iterator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:500:5: note: candidate: ‘template<class _IteratorL, class _IteratorR> constexpr bool std::operator!=(const reverse_iterator<_Iterator>&, const reverse_iterator<_IteratorR>&)’
-  500 |     operator!=(const reverse_iterator<_IteratorL>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:500:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::reverse_iterator<_Iterator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:1686:5: note: candidate: ‘template<class _IteratorL, class _IteratorR> constexpr bool std::operator!=(const move_iterator<_IteratorL>&, const move_iterator<_IteratorR>&)’
- 1686 |     operator!=(const move_iterator<_IteratorL>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:1686:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::move_iterator<_IteratorL>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:1753:5: note: candidate: ‘template<class _Iterator> constexpr bool std::operator!=(const move_iterator<_IteratorL>&, const move_iterator<_IteratorL>&)’
- 1753 |     operator!=(const move_iterator<_Iterator>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_iterator.h:1753:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::move_iterator<_IteratorL>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_pair.h:1052:5: note: candidate: ‘template<class _T1, class _T2> constexpr bool std::operator!=(const pair<_T1, _T2>&, const pair<_T1, _T2>&)’
- 1052 |     operator!=(const pair<_T1, _T2>& __x, const pair<_T1, _T2>& __y)
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_pair.h:1052:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::pair<_T1, _T2>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/string_view:651:5: note: candidate: ‘template<class _CharT, class _Traits> constexpr bool std::operator!=(basic_string_view<_CharT, _Traits>, basic_string_view<_CharT, _Traits>)’
-  651 |     operator!=(basic_string_view<_CharT, _Traits> __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/string_view:651:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘midiMind::protocol::Error’ is not derived from ‘std::basic_string_view<_CharT, _Traits>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/string_view:658:5: note: candidate: ‘template<class _CharT, class _Traits> constexpr bool std::operator!=(basic_string_view<_CharT, _Traits>, __type_identity_t<basic_string_view<_CharT, _Traits> >)’
-  658 |     operator!=(basic_string_view<_CharT, _Traits> __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/string_view:658:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘midiMind::protocol::Error’ is not derived from ‘std::basic_string_view<_CharT, _Traits>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/string_view:666:5: note: candidate: ‘template<class _CharT, class _Traits> constexpr bool std::operator!=(__type_identity_t<basic_string_view<_CharT, _Traits> >, basic_string_view<_CharT, _Traits>)’
-  666 |     operator!=(__type_identity_t<basic_string_view<_CharT, _Traits>> __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/string_view:666:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘std::basic_string_view<_CharT, _Traits>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3833:5: note: candidate: ‘template<class _CharT, class _Traits, class _Alloc> bool std::operator!=(const __cxx11::basic_string<_CharT, _Traits, _Allocator>&, const __cxx11::basic_string<_CharT, _Traits, _Allocator>&)’
- 3833 |     operator!=(const basic_string<_CharT, _Traits, _Alloc>& __lhs,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3833:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::__cxx11::basic_string<_CharT, _Traits, _Allocator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3847:5: note: candidate: ‘template<class _CharT, class _Traits, class _Alloc> bool std::operator!=(const _CharT*, const __cxx11::basic_string<_CharT, _Traits, _Allocator>&)’
- 3847 |     operator!=(const _CharT* __lhs,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3847:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const _CharT*’ and ‘midiMind::protocol::Error’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3860:5: note: candidate: ‘template<class _CharT, class _Traits, class _Alloc> bool std::operator!=(const __cxx11::basic_string<_CharT, _Traits, _Allocator>&, const _CharT*)’
- 3860 |     operator!=(const basic_string<_CharT, _Traits, _Alloc>& __lhs,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/basic_string.h:3860:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::__cxx11::basic_string<_CharT, _Traits, _Allocator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/tuple:2613:5: note: candidate: ‘template<class ... _TElements, class ... _UElements> constexpr bool std::operator!=(const tuple<_UTypes ...>&, const tuple<_Elements ...>&)’
- 2613 |     operator!=(const tuple<_TElements...>& __t,
-      |     ^~~~~~~~
-/usr/include/c++/14/tuple:2613:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::tuple<_UTypes ...>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/streambuf_iterator.h:242:5: note: candidate: ‘template<class _CharT, class _Traits> bool std::operator!=(const istreambuf_iterator<_CharT, _Traits>&, const istreambuf_iterator<_CharT, _Traits>&)’
-  242 |     operator!=(const istreambuf_iterator<_CharT, _Traits>& __a,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/streambuf_iterator.h:242:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::istreambuf_iterator<_CharT, _Traits>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_vector.h:2096:5: note: candidate: ‘template<class _Tp, class _Alloc> bool std::operator!=(const vector<_Tp, _Alloc>&, const vector<_Tp, _Alloc>&)’
- 2096 |     operator!=(const vector<_Tp, _Alloc>& __x, const vector<_Tp, _Alloc>& __y)
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_vector.h:2096:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::vector<_Tp, _Alloc>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:545:5: note: candidate: ‘template<class _UIntType, _UIntType __a, _UIntType __c, _UIntType __m> bool std::operator!=(const linear_congruential_engine<_UIntType, __a, __c, __m>&, const linear_congruential_engine<_UIntType, __a, __c, __m>&)’
-  545 |     operator!=(const std::linear_congruential_engine<_UIntType, __a,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:545:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::linear_congruential_engine<_UIntType, __a, __c, __m>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:787:5: note: candidate: ‘template<class _UIntType, long unsigned int __w, long unsigned int __n, long unsigned int __m, long unsigned int __r, _UIntType __a, long unsigned int __u, _UIntType __d, long unsigned int __s, _UIntType __b, long unsigned int __t, _UIntType __c, long unsigned int __l, _UIntType __f> bool std::operator!=(const mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d, __s, __b, __t, __c, __l, __f>&, const mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d, __s, __b, __t, __c, __l, __f>&)’
-  787 |     operator!=(const std::mersenne_twister_engine<_UIntType, __w, __n, __m,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:787:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d, __s, __b, __t, __c, __l, __f>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:993:5: note: candidate: ‘template<class _UIntType, long unsigned int __w, long unsigned int __s, long unsigned int __r> bool std::operator!=(const subtract_with_carry_engine<_UIntType, __w, __s, __r>&, const subtract_with_carry_engine<_UIntType, __w, __s, __r>&)’
-  993 |     operator!=(const std::subtract_with_carry_engine<_UIntType, __w,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:993:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::subtract_with_carry_engine<_UIntType, __w, __s, __r>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:1221:5: note: candidate: ‘template<class _RandomNumberEngine, long unsigned int __p, long unsigned int __r> bool std::operator!=(const discard_block_engine<_RandomNumberEngine, __p, __r>&, const discard_block_engine<_RandomNumberEngine, __p, __r>&)’
- 1221 |     operator!=(const std::discard_block_engine<_RandomNumberEngine, __p,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:1221:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::discard_block_engine<_RandomNumberEngine, __p, __r>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:1423:5: note: candidate: ‘template<class _RandomNumberEngine, long unsigned int __w, class _UIntType> bool std::operator!=(const independent_bits_engine<_RandomNumberEngine, __w, _UIntType>&, const independent_bits_engine<_RandomNumberEngine, __w, _UIntType>&)’
- 1423 |     operator!=(const std::independent_bits_engine<_RandomNumberEngine, __w,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:1423:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::independent_bits_engine<_RandomNumberEngine, __w, _UIntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:1684:5: note: candidate: ‘template<class _RandomNumberEngine, long unsigned int __k> bool std::operator!=(const shuffle_order_engine<_RandomNumberEngine, __k>&, const shuffle_order_engine<_RandomNumberEngine, __k>&)’
- 1684 |     operator!=(const std::shuffle_order_engine<_RandomNumberEngine,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:1684:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::shuffle_order_engine<_RandomNumberEngine, __k>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:1835:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const uniform_int_distribution<_IntType>&, const uniform_int_distribution<_IntType>&)’
- 1835 |     operator!=(const std::uniform_int_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:1835:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::uniform_int_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:2063:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const uniform_real_distribution<_IntType>&, const uniform_real_distribution<_IntType>&)’
- 2063 |     operator!=(const std::uniform_real_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:2063:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::uniform_real_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:2327:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const normal_distribution<_RealType>&, const normal_distribution<_RealType>&)’
- 2327 |     operator!=(const std::normal_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:2327:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::normal_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:2544:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const lognormal_distribution<_RealType>&, const lognormal_distribution<_RealType>&)’
- 2544 |     operator!=(const std::lognormal_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:2544:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::lognormal_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:2789:6: note: candidate: ‘template<class _RealType> bool std::operator!=(const gamma_distribution<_RealType>&, const gamma_distribution<_RealType>&)’
- 2789 |      operator!=(const std::gamma_distribution<_RealType>& __d1,
-      |      ^~~~~~~~
-/usr/include/c++/14/bits/random.h:2789:6: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::gamma_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:3027:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const chi_squared_distribution<_RealType>&, const chi_squared_distribution<_RealType>&)’
- 3027 |     operator!=(const std::chi_squared_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3027:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::chi_squared_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:3207:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const cauchy_distribution<_RealType>&, const cauchy_distribution<_RealType>&)’
- 3207 |     operator!=(const std::cauchy_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3207:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::cauchy_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:3478:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const fisher_f_distribution<_RealType>&, const fisher_f_distribution<_RealType>&)’
- 3478 |     operator!=(const std::fisher_f_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3478:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::fisher_f_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:3707:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const student_t_distribution<_RealType>&, const student_t_distribution<_RealType>&)’
- 3707 |     operator!=(const std::student_t_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3707:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::student_t_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:4183:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const binomial_distribution<_IntType>&, const binomial_distribution<_IntType>&)’
- 4183 |     operator!=(const std::binomial_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4183:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::binomial_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:4368:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const geometric_distribution<_IntType>&, const geometric_distribution<_IntType>&)’
- 4368 |     operator!=(const std::geometric_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4368:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::geometric_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:4629:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const negative_binomial_distribution<_IntType>&, const negative_binomial_distribution<_IntType>&)’
- 4629 |     operator!=(const std::negative_binomial_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4629:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::negative_binomial_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:4861:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const poisson_distribution<_IntType>&, const poisson_distribution<_IntType>&)’
- 4861 |     operator!=(const std::poisson_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:4861:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::poisson_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:5058:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const exponential_distribution<_RealType>&, const exponential_distribution<_RealType>&)’
- 5058 |     operator!=(const std::exponential_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5058:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::exponential_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:5275:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const weibull_distribution<_RealType>&, const weibull_distribution<_RealType>&)’
- 5275 |     operator!=(const std::weibull_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5275:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::weibull_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:5492:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const extreme_value_distribution<_RealType>&, const extreme_value_distribution<_RealType>&)’
- 5492 |     operator!=(const std::extreme_value_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5492:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::extreme_value_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:5772:5: note: candidate: ‘template<class _IntType> bool std::operator!=(const discrete_distribution<_IntType>&, const discrete_distribution<_IntType>&)’
- 5772 |     operator!=(const std::discrete_distribution<_IntType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:5772:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::discrete_distribution<_IntType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:6056:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const piecewise_constant_distribution<_RealType>&, const piecewise_constant_distribution<_RealType>&)’
- 6056 |     operator!=(const std::piecewise_constant_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:6056:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::piecewise_constant_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/random.h:6338:5: note: candidate: ‘template<class _RealType> bool std::operator!=(const piecewise_linear_distribution<_RealType>&, const piecewise_linear_distribution<_RealType>&)’
- 6338 |     operator!=(const std::piecewise_linear_distribution<_RealType>& __d1,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/random.h:6338:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::piecewise_linear_distribution<_RealType>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/std_function.h:761:5: note: candidate: ‘template<class _Res, class ... _Args> bool std::operator!=(const function<_Res(_ArgTypes ...)>&, nullptr_t)’
-  761 |     operator!=(const function<_Res(_Args...)>& __f, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/std_function.h:761:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::function<_Res(_ArgTypes ...)>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/std_function.h:767:5: note: candidate: ‘template<class _Res, class ... _Args> bool std::operator!=(nullptr_t, const function<_Res(_ArgTypes ...)>&)’
-  767 |     operator!=(nullptr_t, const function<_Res(_Args...)>& __f) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/std_function.h:767:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::function<_Res(_ArgTypes ...)>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2151:5: note: candidate: ‘template<class _Key, class _Tp, class _Hash, class _Pred, class _Alloc> bool std::operator!=(const unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&, const unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&)’
- 2151 |     operator!=(const unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2151:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::unordered_map<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2165:5: note: candidate: ‘template<class _Key, class _Tp, class _Hash, class _Pred, class _Alloc> bool std::operator!=(const unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&, const unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>&)’
- 2165 |     operator!=(const unordered_multimap<_Key, _Tp, _Hash, _Pred, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unordered_map.h:2165:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::unordered_multimap<_Key1, _Tp1, _Hash1, _Pred1, _Alloc1>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/array:332:5: note: candidate: ‘template<class _Tp, long unsigned int _Nm> bool std::operator!=(const array<_Tp, _Nm>&, const array<_Tp, _Nm>&)’
-  332 |     operator!=(const array<_Tp, _Nm>& __one, const array<_Tp, _Nm>& __two)
-      |     ^~~~~~~~
-/usr/include/c++/14/array:332:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::array<_Tp, _Nm>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:862:5: note: candidate: ‘template<class _Tp, class _Dp, class _Up, class _Ep> bool std::operator!=(const unique_ptr<_Tp, _Dp>&, const unique_ptr<_Up, _Ep>&)’
-  862 |     operator!=(const unique_ptr<_Tp, _Dp>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:862:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::unique_ptr<_Tp, _Dp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:870:5: note: candidate: ‘template<class _Tp, class _Dp> bool std::operator!=(const unique_ptr<_Tp, _Dp>&, nullptr_t)’
-  870 |     operator!=(const unique_ptr<_Tp, _Dp>& __x, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:870:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::unique_ptr<_Tp, _Dp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:877:5: note: candidate: ‘template<class _Tp, class _Dp> bool std::operator!=(nullptr_t, const unique_ptr<_Tp, _Dp>&)’
-  877 |     operator!=(nullptr_t, const unique_ptr<_Tp, _Dp>& __x) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:877:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::unique_ptr<_Tp, _Dp>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1828:5: note: candidate: ‘template<class _Tp1, class _Tp2, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(const __shared_ptr<_Tp1, _Lp>&, const __shared_ptr<_Tp2, _Lp>&)’
- 1828 |     operator!=(const __shared_ptr<_Tp1, _Lp>& __a,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1828:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::__shared_ptr<_Tp1, _Lp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1834:5: note: candidate: ‘template<class _Tp, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(const __shared_ptr<_Tp, _Lp>&, nullptr_t)’
- 1834 |     operator!=(const __shared_ptr<_Tp, _Lp>& __a, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1834:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::__shared_ptr<_Tp, _Lp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1839:5: note: candidate: ‘template<class _Tp, __gnu_cxx::_Lock_policy _Lp> bool std::operator!=(nullptr_t, const __shared_ptr<_Tp, _Lp>&)’
- 1839 |     operator!=(nullptr_t, const __shared_ptr<_Tp, _Lp>& __a) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr_base.h:1839:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::__shared_ptr<_Tp, _Lp>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:587:5: note: candidate: ‘template<class _Tp, class _Up> bool std::operator!=(const shared_ptr<_Tp>&, const shared_ptr<_Tp>&)’
-  587 |     operator!=(const shared_ptr<_Tp>& __a, const shared_ptr<_Up>& __b) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:587:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::shared_ptr<_Tp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:593:5: note: candidate: ‘template<class _Tp> bool std::operator!=(const shared_ptr<_Tp>&, nullptr_t)’
-  593 |     operator!=(const shared_ptr<_Tp>& __a, nullptr_t) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:593:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::shared_ptr<_Tp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:599:5: note: candidate: ‘template<class _Tp> bool std::operator!=(nullptr_t, const shared_ptr<_Tp>&)’
-  599 |     operator!=(nullptr_t, const shared_ptr<_Tp>& __a) noexcept
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/shared_ptr.h:599:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::shared_ptr<_Tp>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/forward_list.h:1507:5: note: candidate: ‘template<class _Tp, class _Alloc> bool std::operator!=(const forward_list<_Tp, _Alloc>&, const forward_list<_Tp, _Alloc>&)’
- 1507 |     operator!=(const forward_list<_Tp, _Alloc>& __lx,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/forward_list.h:1507:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::forward_list<_Tp, _Alloc>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_map.h:1557:5: note: candidate: ‘template<class _Key, class _Tp, class _Compare, class _Alloc> bool std::operator!=(const map<_Key, _Tp, _Compare, _Allocator>&, const map<_Key, _Tp, _Compare, _Allocator>&)’
- 1557 |     operator!=(const map<_Key, _Tp, _Compare, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_map.h:1557:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::map<_Key, _Tp, _Compare, _Allocator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/stl_multimap.h:1179:5: note: candidate: ‘template<class _Key, class _Tp, class _Compare, class _Alloc> bool std::operator!=(const multimap<_Key, _Tp, _Compare, _Allocator>&, const multimap<_Key, _Tp, _Compare, _Allocator>&)’
- 1179 |     operator!=(const multimap<_Key, _Tp, _Compare, _Alloc>& __x,
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/stl_multimap.h:1179:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::multimap<_Key, _Tp, _Compare, _Allocator>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom1, class _Dom2> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_Expr, _Dom1, _Dom2>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const _Expr<_Dom2, typename _Dom2::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_Constant, _Dom, typename _Dom::value_type>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const typename _Dom::value_type&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Constant, std::_Expr, typename _Dom::value_type, _Dom>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const typename _Dom::value_type&, const _Expr<_Dom1, typename _Dom1::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Expr, std::_ValArray, _Dom, typename _Dom::value_type>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const _Expr<_Dom1, typename _Dom1::value_type>&, const valarray<typename _Dom::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note: candidate: ‘template<class _Dom> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_Expr, typename _Dom::value_type, _Dom>, typename std::__fun<std::__not_equal_to, typename _Dom1::value_type>::result_type> std::operator!=(const valarray<typename _Dom::value_type>&, const _Expr<_Dom1, typename _Dom1::value_type>&)’
-  418 |     _DEFINE_EXPR_BINARY_OPERATOR(!=, struct std::__not_equal_to)
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/bits/valarray_after.h:418:5: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::_Expr<_Dom1, typename _Dom1::value_type>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_ValArray, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const valarray<_Tp>&, const valarray<_Tp>&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::valarray<_Tp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_ValArray, std::_Constant, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const valarray<_Tp>&, const typename valarray<_Tp>::value_type&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   ‘const midiMind::protocol::Error’ is not derived from ‘const std::valarray<_Tp>’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note: candidate: ‘template<class _Tp> std::_Expr<std::__detail::_BinClos<std::__not_equal_to, std::_Constant, std::_ValArray, _Tp, _Tp>, typename std::__fun<std::__not_equal_to, _Tp>::result_type> std::operator!=(const typename valarray<_Tp>::value_type&, const valarray<_Tp>&)’
- 1209 | _DEFINE_BINARY_OPERATOR(!=, __not_equal_to)
-      | ^~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/valarray:1209:1: note:   template argument deduction/substitution failed:
-/usr/include/c++/14/optional:1206:43: note:   mismatched types ‘const std::valarray<_Tp>’ and ‘std::nullptr_t’
- 1206 |       decltype(std::declval<const _Tp&>() != std::declval<const _Up&>())
-      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/usr/include/c++/14/system_error:525:3: note: candidate: ‘bool std::operator!=(const error_code&, const error_code&)’
-  525 |   operator!=(const error_code& __lhs, const error_code& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:525:32: note:   no known conversion for argument 1 from ‘const midiMind::protocol::Error’ to ‘const std::error_code&’
-  525 |   operator!=(const error_code& __lhs, const error_code& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:530:3: note: candidate: ‘bool std::operator!=(const error_code&, const error_condition&)’
-  530 |   operator!=(const error_code& __lhs, const error_condition& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:530:32: note:   no known conversion for argument 1 from ‘const midiMind::protocol::Error’ to ‘const std::error_code&’
-  530 |   operator!=(const error_code& __lhs, const error_condition& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:535:3: note: candidate: ‘bool std::operator!=(const error_condition&, const error_code&)’
-  535 |   operator!=(const error_condition& __lhs, const error_code& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:535:37: note:   no known conversion for argument 1 from ‘const midiMind::protocol::Error’ to ‘const std::error_condition&’
-  535 |   operator!=(const error_condition& __lhs, const error_code& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:540:3: note: candidate: ‘bool std::operator!=(const error_condition&, const error_condition&)’
-  540 |   operator!=(const error_condition& __lhs,
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:540:37: note:   no known conversion for argument 1 from ‘const midiMind::protocol::Error’ to ‘const std::error_condition&’
-  540 |   operator!=(const error_condition& __lhs,
-      |              ~~~~~~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/bits/random.h:3901:3: note: candidate: ‘bool std::operator!=(const bernoulli_distribution&, const bernoulli_distribution&)’
- 3901 |   operator!=(const std::bernoulli_distribution& __d1,
-      |   ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3901:49: note:   no known conversion for argument 1 from ‘const midiMind::protocol::Error’ to ‘const std::bernoulli_distribution&’
- 3901 |   operator!=(const std::bernoulli_distribution& __d1,
-      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
-/usr/include/c++/14/optional:1378:5: note: candidate: ‘template<class _Tp, class _Up> constexpr std::__optional_ne_t<_Up, _Tp> std::operator!=(const _Up&, const optional<_Tp>&)’
- 1378 |     operator!=(const _Up& __lhs, const optional<_Tp>& __rhs)
-      |     ^~~~~~~~
-/usr/include/c++/14/optional:1378:5: note:   template argument deduction/substitution failed:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:337:30: note:   mismatched types ‘const std::optional<_Tp>’ and ‘std::nullptr_t’
-  337 |             return error_ != nullptr;
-      |                              ^~~~~~~
-/usr/include/c++/14/system_error:525:3: note: candidate: ‘bool std::operator!=(const error_code&, const error_code&)’
-  525 |   operator!=(const error_code& __lhs, const error_code& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:525:32: note:   no known conversion for argument 1 from ‘const std::optional<midiMind::protocol::Error>’ to ‘const std::error_code&’
-  525 |   operator!=(const error_code& __lhs, const error_code& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:530:3: note: candidate: ‘bool std::operator!=(const error_code&, const error_condition&)’
-  530 |   operator!=(const error_code& __lhs, const error_condition& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:530:32: note:   no known conversion for argument 1 from ‘const std::optional<midiMind::protocol::Error>’ to ‘const std::error_code&’
-  530 |   operator!=(const error_code& __lhs, const error_condition& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:535:3: note: candidate: ‘bool std::operator!=(const error_condition&, const error_code&)’
-  535 |   operator!=(const error_condition& __lhs, const error_code& __rhs) noexcept
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:535:37: note:   no known conversion for argument 1 from ‘const std::optional<midiMind::protocol::Error>’ to ‘const std::error_condition&’
-  535 |   operator!=(const error_condition& __lhs, const error_code& __rhs) noexcept
-      |              ~~~~~~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/system_error:540:3: note: candidate: ‘bool std::operator!=(const error_condition&, const error_condition&)’
-  540 |   operator!=(const error_condition& __lhs,
-      |   ^~~~~~~~
-/usr/include/c++/14/system_error:540:37: note:   no known conversion for argument 1 from ‘const std::optional<midiMind::protocol::Error>’ to ‘const std::error_condition&’
-  540 |   operator!=(const error_condition& __lhs,
-      |              ~~~~~~~~~~~~~~~~~~~~~~~^~~~~
-/usr/include/c++/14/bits/random.h:3901:3: note: candidate: ‘bool std::operator!=(const bernoulli_distribution&, const bernoulli_distribution&)’
- 3901 |   operator!=(const std::bernoulli_distribution& __d1,
-      |   ^~~~~~~~
-/usr/include/c++/14/bits/random.h:3901:49: note:   no known conversion for argument 1 from ‘const std::optional<midiMind::protocol::Error>’ to ‘const std::bernoulli_distribution&’
- 3901 |   operator!=(const std::bernoulli_distribution& __d1,
-      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: At global scope:
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:343:26: error: no declaration matches ‘std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > > midiMind::MessageEnvelope::validate() const’
-  343 | std::vector<std::string> MessageEnvelope::validate() const {
-      |                          ^~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:343:26: note: no functions named ‘std::vector<std::__cxx11::basic_string<char>, std::allocator<std::__cxx11::basic_string<char> > > midiMind::MessageEnvelope::validate() const’
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In member function ‘void midiMind::ProcessorManager::resetStatistics()’:
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:582:16: warning: unused structured binding declaration [-Wunused-variable]
+  582 |     for (auto& [id, chain] : chains_) {
+      |                ^~~~~~~~~~~
+[ 86%] Building CXX object CMakeFiles/midimind.dir/src/midi/sysex/SysExParser.cpp.o
+[ 90%] Building CXX object CMakeFiles/midimind.dir/src/api/ApiServer.cpp.o
+[ 93%] Building CXX object CMakeFiles/midimind.dir/src/api/CommandHandler.cpp.o
+[ 96%] Building CXX object CMakeFiles/midimind.dir/src/api/MessageEnvelope.cpp.o
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:44:17: error: no declaration matches ‘midiMind::MessageEnvelope midiMind::MessageEnvelope::createRequest(const std::string&, const json&, int)’
+   44 | MessageEnvelope MessageEnvelope::createRequest(const std::string& command,
+      |                 ^~~~~~~~~~~~~~~
+In file included from /home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:20:
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:101:28: note: candidate is: ‘static midiMind::MessageEnvelope midiMind::MessageEnvelope::createRequest(const std::string&, const json&)’
+  101 |     static MessageEnvelope createRequest(
+      |                            ^~~~~~~~~~~~~
 /home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
    74 | class MessageEnvelope {
       |       ^~~~~~~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:457: CMakeFiles/midimind.dir/src/api/CommandHandler.cpp.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: In static member function ‘static midiMind::MessageEnvelope midiMind::MessageEnvelope::createSuccessResponse(const std::string&, const json&, int)’:
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:75:66: error: no match for ‘operator=’ (operand types are ‘std::optional<midiMind::protocol::Response>’ and ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’)
+   75 |     msg.response_ = std::make_unique<protocol::Response>(response);
+      |                                                                  ^
+In file included from /home/pi/midiMind/backend/src/api/MessageEnvelope.h:31:
+/usr/include/c++/14/optional:844:9: note: candidate: ‘template<class _Up> std::enable_if_t<((bool)__and_v<std::__not_<std::is_same<std::optional<_Tp>, typename std::remove_cv<typename std::remove_reference<_Up>::type>::type> >, std::__not_<std::__and_<std::is_scalar<_Tp>, std::is_same<_Tp, typename std::decay<_Func>::type> > >, std::is_constructible<_T1, _U1>, std::is_assignable<_T1&, _U1> >), std::optional<_Tp>&> std::optional<_Tp>::operator=(_Up&&) [with _Tp = midiMind::protocol::Response]’
+  844 |         operator=(_Up&& __u)
+      |         ^~~~~~~~
+/usr/include/c++/14/optional:844:9: note:   template argument deduction/substitution failed:
+In file included from /usr/include/c++/14/bits/char_traits.h:50,
+                 from /usr/include/c++/14/string:42,
+                 from /home/pi/midiMind/backend/src/api/Protocol.h:22,
+                 from /home/pi/midiMind/backend/src/api/MessageEnvelope.h:29:
+/usr/include/c++/14/type_traits: In substitution of ‘template<bool _Cond, class _Tp> using std::enable_if_t = typename std::enable_if::type [with bool _Cond = false; _Tp = std::optional<midiMind::protocol::Response>&]’:
+/usr/include/c++/14/optional:844:2:   required by substitution of ‘template<class _Up> std::enable_if_t<((bool)__and_v<std::__not_<std::is_same<std::optional<midiMind::protocol::Response>, typename std::remove_cv<typename std::remove_reference<_Tp>::type>::type> >, std::__not_<std::__and_<std::is_scalar<midiMind::protocol::Response>, std::is_same<midiMind::protocol::Response, typename std::decay<_Tp>::type> > >, std::is_constructible<midiMind::protocol::Response, _U1>, std::is_assignable<midiMind::protocol::Response&, _U1> >), std::optional<midiMind::protocol::Response>&> std::optional<midiMind::protocol::Response>::operator=(_Up&&) [with _Up = std::unique_ptr<midiMind::protocol::Response, std::default_delete<midiMind::protocol::Response> >]’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:75:66:   required from here
+   75 |     msg.response_ = std::make_unique<protocol::Response>(response);
+      |                                                                  ^
+/usr/include/c++/14/type_traits:2711:11: error: no type named ‘type’ in ‘struct std::enable_if<false, std::optional<midiMind::protocol::Response>&>’
+ 2711 |     using enable_if_t = typename enable_if<_Cond, _Tp>::type;
+      |           ^~~~~~~~~~~
+/usr/include/c++/14/optional:864:9: note: candidate: ‘template<class _Up> std::enable_if_t<((bool)__and_v<std::__not_<std::is_same<_T1, _U1> >, std::is_constructible<_T1, const _U1&>, std::is_assignable<_T1&, const _U1&>, std::__not_<std::__or_<std::is_constructible<_Tp, const std::optional<_Up>&>, std::is_constructible<_Tp, std::optional<_Up>&>, std::is_constructible<_Tp, const std::optional<_Up>&&>, std::is_constructible<_Tp, std::optional<_Up>&&>, std::is_convertible<const std::optional<_Up>&, _Tp>, std::is_convertible<std::optional<_Up>&, _Tp>, std::is_convertible<const std::optional<_Up>&&, _Tp>, std::is_convertible<std::optional<_Up>&&, _Tp> > >, std::__not_<std::__or_<std::is_assignable<_Tp&, const std::optional<_Up>&>, std::is_assignable<_Tp&, std::optional<_Up>&>, std::is_assignable<_Tp&, const std::optional<_Up>&&>, std::is_assignable<_Tp&, std::optional<_Up>&&> > > >), std::optional<_Tp>&> std::optional<_Tp>::operator=(const std::optional<_Up>&) [with _Tp = midiMind::protocol::Response]’
+  864 |         operator=(const optional<_Up>& __u)
+      |         ^~~~~~~~
+/usr/include/c++/14/optional:864:9: note:   template argument deduction/substitution failed:
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:75:66: note:   ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’ is not derived from ‘const std::optional<_Tp>’
+   75 |     msg.response_ = std::make_unique<protocol::Response>(response);
+      |                                                                  ^
+/usr/include/c++/14/optional:890:9: note: candidate: ‘template<class _Up> std::enable_if_t<((bool)__and_v<std::__not_<std::is_same<_T1, _U1> >, std::is_constructible<_T1, _U1>, std::is_assignable<_T1&, _U1>, std::__not_<std::__or_<std::is_constructible<_Tp, const std::optional<_Up>&>, std::is_constructible<_Tp, std::optional<_Up>&>, std::is_constructible<_Tp, const std::optional<_Up>&&>, std::is_constructible<_Tp, std::optional<_Up>&&>, std::is_convertible<const std::optional<_Up>&, _Tp>, std::is_convertible<std::optional<_Up>&, _Tp>, std::is_convertible<const std::optional<_Up>&&, _Tp>, std::is_convertible<std::optional<_Up>&&, _Tp> > >, std::__not_<std::__or_<std::is_assignable<_Tp&, const std::optional<_Up>&>, std::is_assignable<_Tp&, std::optional<_Up>&>, std::is_assignable<_Tp&, const std::optional<_Up>&&>, std::is_assignable<_Tp&, std::optional<_Up>&&> > > >), std::optional<_Tp>&> std::optional<_Tp>::operator=(std::optional<_Up>&&) [with _Tp = midiMind::protocol::Response]’
+  890 |         operator=(optional<_Up>&& __u)
+      |         ^~~~~~~~
+/usr/include/c++/14/optional:890:9: note:   template argument deduction/substitution failed:
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:75:66: note:   ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’ is not derived from ‘std::optional<_Tp>’
+   75 |     msg.response_ = std::make_unique<protocol::Response>(response);
+      |                                                                  ^
+/usr/include/c++/14/optional:830:7: note: candidate: ‘std::optional<_Tp>& std::optional<_Tp>::operator=(std::nullopt_t) [with _Tp = midiMind::protocol::Response]’
+  830 |       operator=(nullopt_t) noexcept
+      |       ^~~~~~~~
+/usr/include/c++/14/optional:830:17: note:   no known conversion for argument 1 from ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’ to ‘std::nullopt_t’
+  830 |       operator=(nullopt_t) noexcept
+      |                 ^~~~~~~~~
+/usr/include/c++/14/optional:703:11: note: candidate: ‘constexpr std::optional<midiMind::protocol::Response>& std::optional<midiMind::protocol::Response>::operator=(const std::optional<midiMind::protocol::Response>&)’
+  703 |     class optional
+      |           ^~~~~~~~
+/usr/include/c++/14/optional:703:11: note:   no known conversion for argument 1 from ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’ to ‘const std::optional<midiMind::protocol::Response>&’
+/usr/include/c++/14/optional:703:11: note: candidate: ‘constexpr std::optional<midiMind::protocol::Response>& std::optional<midiMind::protocol::Response>::operator=(std::optional<midiMind::protocol::Response>&&)’
+/usr/include/c++/14/optional:703:11: note:   no known conversion for argument 1 from ‘std::__detail::__unique_ptr_t<midiMind::protocol::Response>’ to ‘std::optional<midiMind::protocol::Response>&&’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp: At global scope:
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:80:17: error: no declaration matches ‘midiMind::MessageEnvelope midiMind::MessageEnvelope::createErrorResponse(const std::string&, midiMind::protocol::ErrorCode, const std::string&, const json&)’
+   80 | MessageEnvelope MessageEnvelope::createErrorResponse(const std::string& requestId,
+      |                 ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:132:28: note: candidate is: ‘static midiMind::MessageEnvelope midiMind::MessageEnvelope::createErrorResponse(const std::string&, midiMind::protocol::ErrorCode, const std::string&, const json&, bool)’
+  132 |     static MessageEnvelope createErrorResponse(
+      |                            ^~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:102:17: error: no declaration matches ‘midiMind::MessageEnvelope midiMind::MessageEnvelope::createEvent(const std::string&, const json&, midiMind::protocol::EventPriority, const std::string&)’
+  102 | MessageEnvelope MessageEnvelope::createEvent(const std::string& name,
+      |                 ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:151:28: note: candidate is: ‘static midiMind::MessageEnvelope midiMind::MessageEnvelope::createEvent(const std::string&, const json&, midiMind::protocol::EventPriority)’
+  151 |     static MessageEnvelope createEvent(
+      |                            ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:123:17: error: no declaration matches ‘midiMind::MessageEnvelope midiMind::MessageEnvelope::createError(midiMind::protocol::ErrorCode, const std::string&, const json&, bool, const std::string&)’
+  123 | MessageEnvelope MessageEnvelope::createError(protocol::ErrorCode code,
+      |                 ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:168:28: note: candidate is: ‘static midiMind::MessageEnvelope midiMind::MessageEnvelope::createError(midiMind::protocol::ErrorCode, const std::string&, const json&)’
+  168 |     static MessageEnvelope createError(
+      |                            ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:146:23: error: redefinition of ‘midiMind::protocol::MessageType midiMind::MessageEnvelope::getType() const’
+  146 | protocol::MessageType MessageEnvelope::getType() const {
+      |                       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:270:27: note: ‘midiMind::protocol::MessageType midiMind::MessageEnvelope::getType() const’ previously defined here
+  270 |     protocol::MessageType getType() const { return envelope_.type; }
+      |                           ^~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:150:27: error: redefinition of ‘const midiMind::protocol::Envelope& midiMind::MessageEnvelope::getEnvelope() const’
+  150 | const protocol::Envelope& MessageEnvelope::getEnvelope() const {
+      |                           ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:240:31: note: ‘const midiMind::protocol::Envelope& midiMind::MessageEnvelope::getEnvelope() const’ previously defined here
+  240 |     const protocol::Envelope& getEnvelope() const { return envelope_; }
+      |                               ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:182:6: error: no declaration matches ‘bool midiMind::MessageEnvelope::hasRequest() const’
+  182 | bool MessageEnvelope::hasRequest() const {
+      |      ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:182:6: note: no functions named ‘bool midiMind::MessageEnvelope::hasRequest() const’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:186:6: error: no declaration matches ‘bool midiMind::MessageEnvelope::hasResponse() const’
+  186 | bool MessageEnvelope::hasResponse() const {
+      |      ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:186:6: note: no functions named ‘bool midiMind::MessageEnvelope::hasResponse() const’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:190:6: error: no declaration matches ‘bool midiMind::MessageEnvelope::hasEvent() const’
+  190 | bool MessageEnvelope::hasEvent() const {
+      |      ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:190:6: note: no functions named ‘bool midiMind::MessageEnvelope::hasEvent() const’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:194:6: error: no declaration matches ‘bool midiMind::MessageEnvelope::hasError() const’
+  194 | bool MessageEnvelope::hasError() const {
+      |      ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:194:6: note: no functions named ‘bool midiMind::MessageEnvelope::hasError() const’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:274:38: error: ‘const struct midiMind::MidiDeviceInfo’ has no member named ‘connected’
+  274 |                 {"connected", device.connected}
+      |                                      ^~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:275:13: error: could not convert ‘{{"id", device.midiMind::MidiDeviceInfo::id}, {"name", device.midiMind::MidiDeviceInfo::name}, {"type", ((int)((midiMind::DeviceType)device.midiMind::MidiDeviceInfo::type))}, {"connected", <expression error>}}’ from ‘<brace-enclosed initializer list>’ to ‘json’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’}
+  275 |             };
+      |             ^
+      |             |
+      |             <brace-enclosed initializer list>
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:293:38: error: ‘const struct midiMind::MidiDeviceInfo’ has no member named ‘connected’
+  293 |                 {"connected", device.connected}
+      |                                      ^~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:294:13: error: could not convert ‘{{"id", device.midiMind::MidiDeviceInfo::id}, {"name", device.midiMind::MidiDeviceInfo::name}, {"type", ((int)((midiMind::DeviceType)device.midiMind::MidiDeviceInfo::type))}, {"connected", <expression error>}}’ from ‘<brace-enclosed initializer list>’ to ‘json’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’}
+  294 |             };
+      |             ^
+      |             |
+      |             <brace-enclosed initializer list>
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:255:32: error: no declaration matches ‘std::optional<midiMind::MessageEnvelope> midiMind::MessageEnvelope::fromString(const std::string&)’
+  255 | std::optional<MessageEnvelope> MessageEnvelope::fromString(const std::string& str) {
+      |                                ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:255:32: note: no functions named ‘std::optional<midiMind::MessageEnvelope> midiMind::MessageEnvelope::fromString(const std::string&)’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:303:13: error: no declaration matches ‘std::string midiMind::MessageEnvelope::toString() const’
+  303 | std::string MessageEnvelope::toString() const {
+      |             ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/MessageEnvelope.cpp:303:13: note: no functions named ‘std::string midiMind::MessageEnvelope::toString() const’
+/home/pi/midiMind/backend/src/api/MessageEnvelope.h:74:7: note: ‘class midiMind::MessageEnvelope’ defined here
+   74 | class MessageEnvelope {
+      |       ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:376:41: error: void value not ignored as it ought to be
+  376 |         bool success = router_->addRoute(route);
+      |                        ~~~~~~~~~~~~~~~~~^~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:400:18: error: ‘using std::__shared_ptr_access<midiMind::MidiRouter, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiRouter’ {aka ‘class midiMind::MidiRouter’} has no member named ‘enableRoute’
+  400 |         router_->enableRoute(routeId);
+      |                  ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:412:18: error: ‘using std::__shared_ptr_access<midiMind::MidiRouter, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiRouter’ {aka ‘class midiMind::MidiRouter’} has no member named ‘disableRoute’
+  412 |         router_->disableRoute(routeId);
+      |                  ^~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:548:17: error: ‘setGlobalLevel’ is not a member of ‘midiMind::Logger’
+  548 |         Logger::setGlobalLevel(level);
+      |                 ^~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In lambda function:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:555:39: error: ‘getGlobalLevelString’ is not a member of ‘midiMind::Logger’
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |                                       ^~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:555:62: error: no matching function for call to ‘nlohmann::json_abi_v3_11_3::basic_json<>::basic_json(<brace-enclosed initializer list>)’
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |                                                              ^
+In file included from /home/pi/midiMind/backend/src/api/../midi/devices/../MidiMessage.h:33,
+                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDevice.h:30,
+                 from /home/pi/midiMind/backend/src/api/../midi/devices/MidiDeviceManager.h:14,
+                 from /home/pi/midiMind/backend/src/api/CommandHandler.h:30,
+                 from /home/pi/midiMind/backend/src/api/CommandHandler.cpp:21:
+/usr/include/nlohmann/json.hpp:1141:5: note: candidate: ‘template<class JsonRef, typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long int, long unsigned int, double, std::allocator, nlohmann::json_abi_v3_11_3::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void> > >::value, int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const JsonRef&) [with typename std::enable_if<nlohmann::json_abi_v3_11_3::detail::conjunction<nlohmann::json_abi_v3_11_3::detail::is_json_ref<JsonRef>, std::is_same<typename JsonRef::value_type, nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value, int>::type <anonymous> = JsonRef; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1141 |     basic_json(const JsonRef& ref) : basic_json(ref.moved_or_copied()) {}
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1141:5: note:   template argument deduction/substitution failed:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:555:62: note:   couldn’t deduce template parameter ‘JsonRef’
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |                                                              ^
+/usr/include/nlohmann/json.hpp:1032:5: note: candidate: ‘template<class InputIT, typename std::enable_if<(std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<> > >::value || std::is_same<IterImpl, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<> > >::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(InputIT, InputIT) [with typename std::enable_if<(std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value || std::is_same<InputIT, nlohmann::json_abi_v3_11_3::detail::iter_impl<const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass> > >::value), int>::type <anonymous> = InputIT; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1032 |     basic_json(InputIT first, InputIT last)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1032:5: note:   candidate expects 2 arguments, 1 provided
+/usr/include/nlohmann/json.hpp:849:5: note: candidate: ‘template<class BasicJsonType, typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<>, BasicJsonType>::value)), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const BasicJsonType&) [with typename std::enable_if<(nlohmann::json_abi_v3_11_3::detail::is_basic_json<BasicJsonType>::value && (! std::is_same<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, BasicJsonType>::value)), int>::type <anonymous> = BasicJsonType; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+  849 |     basic_json(const BasicJsonType& val)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:849:5: note:   template argument deduction/substitution failed:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:555:62: note:   couldn’t deduce template parameter ‘BasicJsonType’
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |                                                              ^
+/usr/include/nlohmann/json.hpp:835:5: note: candidate: ‘template<class CompatibleType, class U, typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<T>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<>, U>::value), int>::type <anonymous> > nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(CompatibleType&&) [with U = CompatibleType; typename std::enable_if<((! nlohmann::json_abi_v3_11_3::detail::is_basic_json<U>::value) && nlohmann::json_abi_v3_11_3::detail::is_compatible_type<nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>, U>::value), int>::type <anonymous> = U; ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+  835 |     basic_json(CompatibleType && val) noexcept(noexcept( // NOLINT(bugprone-forwarding-reference-overload,bugprone-exception-escape)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:835:5: note:   template argument deduction/substitution failed:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:555:62: note:   couldn’t deduce template parameter ‘CompatibleType’
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |                                                              ^
+/usr/include/nlohmann/json.hpp:1214:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1214 |     basic_json(basic_json&& other) noexcept
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1214:29: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>&&’
+ 1214 |     basic_json(basic_json&& other) noexcept
+      |                ~~~~~~~~~~~~~^~~~~
+/usr/include/nlohmann/json.hpp:1145:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’
+ 1145 |     basic_json(const basic_json& other)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1145:34: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘const nlohmann::json_abi_v3_11_3::basic_json<>&’
+ 1145 |     basic_json(const basic_json& other)
+      |                ~~~~~~~~~~~~~~~~~~^~~~~
+/usr/include/nlohmann/json.hpp:1020:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(size_type, const nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>&) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; size_type = long unsigned int]’
+ 1020 |     basic_json(size_type cnt, const basic_json& val):
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:1020:5: note:   candidate expects 2 arguments, 1 provided
+/usr/include/nlohmann/json.hpp:902:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(initializer_list_t, bool, value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; initializer_list_t = std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
+  902 |     basic_json(initializer_list_t init,
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:902:35: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>::initializer_list_t’ {aka ‘std::initializer_list<nlohmann::json_abi_v3_11_3::detail::json_ref<nlohmann::json_abi_v3_11_3::basic_json<> > >’}
+  902 |     basic_json(initializer_list_t init,
+      |                ~~~~~~~~~~~~~~~~~~~^~~~
+/usr/include/nlohmann/json.hpp:823:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(std::nullptr_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; std::nullptr_t = std::nullptr_t]’
+  823 |     basic_json(std::nullptr_t = nullptr) noexcept // NOLINT(bugprone-exception-escape)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:823:16: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘std::nullptr_t’
+  823 |     basic_json(std::nullptr_t = nullptr) noexcept // NOLINT(bugprone-exception-escape)
+      |                ^~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/nlohmann/json.hpp:815:5: note: candidate: ‘nlohmann::json_abi_v3_11_3::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long int; NumberUnsignedType = long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_11_3::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void; value_t = nlohmann::json_abi_v3_11_3::detail::value_t]’
+  815 |     basic_json(const value_t v)
+      |     ^~~~~~~~~~
+/usr/include/nlohmann/json.hpp:815:30: note:   no known conversion for argument 1 from ‘<brace-enclosed initializer list>’ to ‘nlohmann::json_abi_v3_11_3::basic_json<>::value_t’ {aka ‘nlohmann::json_abi_v3_11_3::detail::value_t’}
+  815 |     basic_json(const value_t v)
+      |                ~~~~~~~~~~~~~~^
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp: In member function ‘void midiMind::CommandHandler::registerLoggerCommands()’:
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:554:40: error: cannot convert ‘midiMind::CommandHandler::registerLoggerCommands()::<lambda(const json&)>’ to ‘midiMind::CommandHandler::CommandFunction’ {aka ‘std::function<nlohmann::json_abi_v3_11_3::basic_json<>(const nlohmann::json_abi_v3_11_3::basic_json<>&)>’}
+  554 |     registerCommand("logger.getLevel", [](const json& params) {
+      |                                        ^~~~~~~~~~~~~~~~~~~~~~~~
+      |                                        |
+      |                                        midiMind::CommandHandler::registerLoggerCommands()::<lambda(const json&)>
+  555 |         return json{{"level", Logger::getGlobalLevelString()}};
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  556 |     });
+      |     ~                                   
+/home/pi/midiMind/backend/src/api/CommandHandler.cpp:119:53: note:   initializing argument 2 of ‘void midiMind::CommandHandler::registerCommand(const std::string&, CommandFunction)’
+  119 |                                     CommandFunction function) {
+      |                                     ~~~~~~~~~~~~~~~~^~~~~~~~
 make[2]: *** [CMakeFiles/midimind.dir/build.make:471: CMakeFiles/midimind.dir/src/api/MessageEnvelope.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[2]: *** [CMakeFiles/midimind.dir/build.make:457: CMakeFiles/midimind.dir/src/api/CommandHandler.cpp.o] Error 1
