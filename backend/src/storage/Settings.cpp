@@ -76,36 +76,39 @@ bool Settings::load() {
 bool Settings::save() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    Logger::info("Settings", "Saving settings to database...");
-    
-    try {
-		bool success = database_.transaction([&]() {
-			for (const auto& [key, value] : settings_) {
-				auto result = database_.execute(
-					"INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-					{key, value}
-				);
-				
-				if (!result.success) {
-					Logger::warning("Settings", "Failed to save: " + key);
-				}
-			}
-		});
-
-		if (!success) {
-			Logger::error("Settings", "Transaction failed");
-			return false;
-		}
-        
-        Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
-        return true;
-        
-    } catch (const std::exception& e) {
-        Logger::error("Settings", "Failed to save settings: " + std::string(e.what()));
-        database_.rollback();
+    if (!isLoaded_) {
+        Logger::error("Settings", "Cannot save: not loaded");
         return false;
     }
+    
+    Logger::info("Settings", "Saving settings...");
+    
+    int count = 0;  // ✅ Déclarer count AVANT le lambda
+    
+    bool success = database_.transaction([&]() {  // ✅ Capturer par référence [&]
+        for (const auto& [key, value] : settings_) {
+            auto result = database_.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                std::vector<std::string>{key, value}  // ✅ Convertir explicitement
+            );
+            
+            if (!result.success) {
+                Logger::warning("Settings", "Failed to save: " + key);
+            } else {
+                count++;  // ✅ count est accessible car capturé par [&]
+            }
+        }
+    });
+    
+    if (!success) {
+        Logger::error("Settings", "Transaction failed");
+        return false;
+    }
+    
+    Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
+    return true;
 }
+
 
 void Settings::reset() {
     std::lock_guard<std::mutex> lock(mutex_);
