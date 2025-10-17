@@ -29,7 +29,7 @@
 #pragma once
 
 #include "../MidiMessage.h"
-//#include "ProcessorChain.h"
+#include "ProcessorChain.h"
 #include "MidiProcessor.h"
 #include <string>
 #include <vector>
