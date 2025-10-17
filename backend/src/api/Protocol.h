@@ -1,15 +1,22 @@
 // ============================================================================
 // File: backend/src/api/Protocol.h
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
-//   WebSocket protocol definitions and structures.
-//   Defines message types, envelopes, and protocol structures.
+//   WebSocket protocol definitions (fixed with missing error codes)
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-10-17
+//
+// Changes v4.1.1:
+//   - Added INVALID_MESSAGE error code
+//   - Added COMMAND_FAILED error code
+//   - Added UNKNOWN_COMMAND error code
+//   - Added DEVICE_NOT_FOUND error code
+//   - Added DEVICE_BUSY error code
+//   - Added id field to Request structure
 //
 // ============================================================================
 
@@ -27,21 +34,13 @@ namespace protocol {
 // ENUMERATIONS
 // ============================================================================
 
-/**
- * @enum MessageType
- * @brief Types of WebSocket messages
- */
 enum class MessageType {
-    REQUEST,   ///< Client request
-    RESPONSE,  ///< Server response
-    EVENT,     ///< Server event notification
-    ERROR      ///< Error message
+    REQUEST,
+    RESPONSE,
+    EVENT,
+    ERROR
 };
 
-/**
- * @enum ErrorCode
- * @brief Protocol error codes
- */
 enum class ErrorCode {
     UNKNOWN = 0,
     INVALID_REQUEST = 400,
@@ -54,15 +53,16 @@ enum class ErrorCode {
     PARSE_ERROR = 1000,
     INVALID_COMMAND = 1001,
     INVALID_PARAMS = 1002,
+    INVALID_MESSAGE = 1003,        // NEW
+    COMMAND_FAILED = 1004,         // NEW
+    UNKNOWN_COMMAND = 1005,        // NEW
+    DEVICE_NOT_FOUND = 2001,       // NEW
+    DEVICE_BUSY = 2002,            // NEW
     MIDI_ERROR = 2000,
     FILE_ERROR = 3000,
     SYSTEM_ERROR = 4000
 };
 
-/**
- * @enum EventPriority
- * @brief Event priority levels
- */
 enum class EventPriority {
     LOW = 0,
     NORMAL = 1,
@@ -74,46 +74,35 @@ enum class EventPriority {
 // STRUCTURES
 // ============================================================================
 
-/**
- * @struct Envelope
- * @brief Message envelope (header)
- */
 struct Envelope {
-    std::string id;           ///< Unique message ID
-    MessageType type;         ///< Message type
-    std::string timestamp;    ///< ISO 8601 timestamp
-    std::string version;      ///< Protocol version
+    std::string id;
+    MessageType type;
+    std::string timestamp;
+    std::string version;
     
     Envelope() 
         : type(MessageType::REQUEST)
         , version("1.0") {}
 };
 
-/**
- * @struct Request
- * @brief Client request message
- */
 struct Request {
-    std::string command;      ///< Command name (e.g., "files.list")
-    json params;              ///< Command parameters
-    int timeout;              ///< Timeout in milliseconds (0 = no timeout)
+    std::string id;            // NEW - Added request ID
+    std::string command;
+    json params;
+    int timeout;
     
     Request() 
         : params(json::object())
         , timeout(0) {}
 };
 
-/**
- * @struct Response
- * @brief Server response message
- */
 struct Response {
-    std::string requestId;    ///< Original request ID
-    bool success;             ///< Success flag
-    json data;                ///< Response data (if success)
-    std::string errorMessage; ///< Error message (if !success)
-    ErrorCode errorCode;      ///< Error code (if !success)
-    int latency;              ///< Response time in milliseconds
+    std::string requestId;
+    bool success;
+    json data;
+    std::string errorMessage;
+    ErrorCode errorCode;
+    int latency;
     
     Response() 
         : success(true)
@@ -122,31 +111,23 @@ struct Response {
         , latency(0) {}
 };
 
-/**
- * @struct Event
- * @brief Server event notification
- */
 struct Event {
-    std::string name;         ///< Event name (e.g., "midi:message")
-    json data;                ///< Event data
-    EventPriority priority;   ///< Event priority
-    std::string source;       ///< Event source
+    std::string name;
+    json data;
+    EventPriority priority;
+    std::string source;
     
     Event() 
         : data(json::object())
         , priority(EventPriority::NORMAL) {}
 };
 
-/**
- * @struct Error
- * @brief Standalone error message
- */
 struct Error {
-    ErrorCode code;           ///< Error code
-    std::string message;      ///< Error message
-    json details;             ///< Additional details
-    bool retryable;           ///< Can retry?
-    std::string requestId;    ///< Related request ID (optional)
+    ErrorCode code;
+    std::string message;
+    json details;
+    bool retryable;
+    std::string requestId;
     
     Error() 
         : code(ErrorCode::UNKNOWN)
@@ -158,9 +139,6 @@ struct Error {
 // CONVERSION FUNCTIONS
 // ============================================================================
 
-/**
- * @brief Convert MessageType to string
- */
 inline std::string messageTypeToString(MessageType type) {
     switch (type) {
         case MessageType::REQUEST:  return "request";
@@ -171,9 +149,6 @@ inline std::string messageTypeToString(MessageType type) {
     }
 }
 
-/**
- * @brief Convert string to MessageType
- */
 inline MessageType stringToMessageType(const std::string& str) {
     if (str == "request")  return MessageType::REQUEST;
     if (str == "response") return MessageType::RESPONSE;
@@ -182,9 +157,6 @@ inline MessageType stringToMessageType(const std::string& str) {
     return MessageType::REQUEST;
 }
 
-/**
- * @brief Convert ErrorCode to string
- */
 inline std::string errorCodeToString(ErrorCode code) {
     switch (code) {
         case ErrorCode::INVALID_REQUEST:      return "INVALID_REQUEST";
@@ -197,6 +169,11 @@ inline std::string errorCodeToString(ErrorCode code) {
         case ErrorCode::PARSE_ERROR:          return "PARSE_ERROR";
         case ErrorCode::INVALID_COMMAND:      return "INVALID_COMMAND";
         case ErrorCode::INVALID_PARAMS:       return "INVALID_PARAMS";
+        case ErrorCode::INVALID_MESSAGE:      return "INVALID_MESSAGE";
+        case ErrorCode::COMMAND_FAILED:       return "COMMAND_FAILED";
+        case ErrorCode::UNKNOWN_COMMAND:      return "UNKNOWN_COMMAND";
+        case ErrorCode::DEVICE_NOT_FOUND:     return "DEVICE_NOT_FOUND";
+        case ErrorCode::DEVICE_BUSY:          return "DEVICE_BUSY";
         case ErrorCode::MIDI_ERROR:           return "MIDI_ERROR";
         case ErrorCode::FILE_ERROR:           return "FILE_ERROR";
         case ErrorCode::SYSTEM_ERROR:         return "SYSTEM_ERROR";
@@ -204,9 +181,6 @@ inline std::string errorCodeToString(ErrorCode code) {
     }
 }
 
-/**
- * @brief Convert EventPriority to string
- */
 inline std::string eventPriorityToString(EventPriority priority) {
     switch (priority) {
         case EventPriority::LOW:      return "low";
@@ -217,9 +191,6 @@ inline std::string eventPriorityToString(EventPriority priority) {
     }
 }
 
-/**
- * @brief Convert string to EventPriority
- */
 inline EventPriority stringToEventPriority(const std::string& str) {
     if (str == "low")      return EventPriority::LOW;
     if (str == "normal")   return EventPriority::NORMAL;
@@ -230,3 +201,7 @@ inline EventPriority stringToEventPriority(const std::string& str) {
 
 } // namespace protocol
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE Protocol.h v4.1.1
+// ============================================================================
