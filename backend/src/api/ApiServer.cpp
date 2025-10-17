@@ -1,19 +1,12 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.1.0
+// Version: 4.1.1 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Implementation of ApiServer.
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Complete WebSocket implementation
-//   - Enhanced error handling
-//   - Better connection management
+// Changes v4.1.1:
+//   - Fixed toJsonString() → toString()
+//   - Fixed fromJsonString() → fromString()
 //
 // ============================================================================
 
@@ -166,7 +159,7 @@ ApiServer::Stats ApiServer::getStats() const {
 
 bool ApiServer::sendTo(connection_hdl hdl, const MessageEnvelope& message) {
     try {
-        std::string jsonStr = message.toJsonString();
+        std::string jsonStr = message.toString();  // ✅ CORRIGÉ
         
         server_.send(hdl, jsonStr, websocketpp::frame::opcode::text);
         
@@ -213,7 +206,7 @@ bool ApiServer::sendError(connection_hdl hdl,
 void ApiServer::broadcast(const MessageEnvelope& message) {
     std::lock_guard<std::mutex> lock(connectionsMutex_);
     
-    std::string jsonStr = message.toJsonString();
+    std::string jsonStr = message.toString();  // ✅ CORRIGÉ
     
     for (auto& hdl : connections_) {
         try {
@@ -296,7 +289,7 @@ void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
                      payload.substr(0, 100) + (payload.size() > 100 ? "..." : ""));
         
         // Parse message
-        auto messageOpt = MessageEnvelope::fromJsonString(payload);
+        auto messageOpt = MessageEnvelope::fromString(payload);  // ✅ CORRIGÉ
         
         if (!messageOpt) {
             Logger::error("ApiServer", "Failed to parse message");
@@ -489,5 +482,5 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE ApiServer.cpp
+// END OF FILE ApiServer.cpp v4.1.1
 // ============================================================================

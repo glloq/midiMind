@@ -1,20 +1,12 @@
 // ============================================================================
 // File: backend/src/midi/processing/ProcessorManager.cpp
-// Version: 4.1.1
+// Version: 4.1.2 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Complete implementation of ProcessorManager (compilation fixes)
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.1:
-//   - Fixed missing namespace qualifiers
-//   - Fixed method signatures
-//   - Fixed enable/disable methods
-//   - Fixed closing braces
+// Changes v4.1.2:
+//   - Fixed unused variable warning in resetStatistics()
+//   - Added [[maybe_unused]] attribute to suppress warning
 //
 // ============================================================================
 
@@ -579,8 +571,10 @@ void ProcessorManager::resetStatistics() {
     
     messagesProcessed_ = 0;
     
-    for (auto& [id, chain] : chains_) {
+    // ✅ CORRIGÉ: Suppression du warning pour variable non utilisée
+    for ([[maybe_unused]] auto& [id, chain] : chains_) {
         // Reset chain statistics if implemented
+        // Pour l'instant, on ne fait rien avec id et chain
     }
     
     Logger::info("ProcessorManager", "Statistics reset");
@@ -677,5 +671,5 @@ std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE ProcessorManager.cpp v4.1.1
+// END OF FILE ProcessorManager.cpp v4.1.2
 // ============================================================================
