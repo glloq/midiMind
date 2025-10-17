@@ -20,6 +20,7 @@
 #include "MidiRouter.h"
 #include "../core/Logger.h"
 #include "../timing/TimestampManager.h"
+#include "devices/MidiDevice.h"
 #include <algorithm>
 
 namespace midiMind {

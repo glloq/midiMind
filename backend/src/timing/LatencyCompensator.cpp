@@ -272,7 +272,7 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
 }
 
 int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrumentId) const {
-    mutable std::mutex instrumentMutex_;
+    std::lock_guard<std::mutex> lock(instrumentMutex_);
     
     auto it = instruments_.find(instrumentId);
     if (it == instruments_.end()) {
@@ -291,8 +291,6 @@ int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrum
                     lastUnderscore - secondLastUnderscore - 1
                 );
                 
-                // Unlock instrument mutex before locking device mutex
-                lock.~lock_guard();
                 return getDeviceCompensation(deviceId);
             }
         }
