@@ -1,19 +1,19 @@
 // ============================================================================
 // File: backend/src/api/Protocol.h
-// Version: 4.1.2
+// Version: 4.1.3
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
-//   WebSocket protocol definitions (complete with JSON serialization)
+//   WebSocket protocol - CORRECT ORDER (functions before structures)
 //
 // Author: MidiMind Team
 // Date: 2025-10-17
 //
-// Changes v4.1.2:
-//   - Added toJson() and fromJson() methods to all structures
-//   - Added generateUUID() helper function
-//   - Added timestamp formatting helper
+// Changes v4.1.3:
+//   - FIXED: Functions declared BEFORE structures that use them
+//   - FIXED: Namespace collision with midiMind::ErrorCode
+//   - Use protocol::ErrorCode everywhere
 //
 // ============================================================================
 
@@ -32,67 +32,7 @@ namespace midiMind {
 namespace protocol {
 
 // ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * @brief Generate UUID v4
- */
-inline std::string generateUUID() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
-    static std::uniform_int_distribution<> dis2(8, 11);
-    
-    std::stringstream ss;
-    ss << std::hex;
-    
-    for (int i = 0; i < 8; i++) {
-        ss << dis(gen);
-    }
-    ss << "-";
-    
-    for (int i = 0; i < 4; i++) {
-        ss << dis(gen);
-    }
-    ss << "-4"; // Version 4
-    
-    for (int i = 0; i < 3; i++) {
-        ss << dis(gen);
-    }
-    ss << "-";
-    
-    ss << dis2(gen); // Variant
-    for (int i = 0; i < 3; i++) {
-        ss << dis(gen);
-    }
-    ss << "-";
-    
-    for (int i = 0; i < 12; i++) {
-        ss << dis(gen);
-    }
-    
-    return ss.str();
-}
-
-/**
- * @brief Get ISO 8601 timestamp
- */
-inline std::string getISO8601Timestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-    
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%S");
-    ss << '.' << std::setfill('0') << std::setw(3) << ms.count() << 'Z';
-    
-    return ss.str();
-}
-
-// ============================================================================
-// ENUMERATIONS
+// ENUMERATIONS (must be first)
 // ============================================================================
 
 enum class MessageType {
@@ -132,182 +72,7 @@ enum class EventPriority {
 };
 
 // ============================================================================
-// STRUCTURES
-// ============================================================================
-
-struct Envelope {
-    std::string id;
-    MessageType type;
-    std::string timestamp;
-    std::string version;
-    
-    Envelope() 
-        : type(MessageType::REQUEST)
-        , version("1.0") {}
-    
-    json toJson() const {
-        return json{
-            {"id", id},
-            {"type", messageTypeToString(type)},
-            {"timestamp", timestamp},
-            {"version", version}
-        };
-    }
-    
-    static Envelope fromJson(const json& j) {
-        Envelope env;
-        env.id = j.value("id", "");
-        env.type = stringToMessageType(j.value("type", "request"));
-        env.timestamp = j.value("timestamp", "");
-        env.version = j.value("version", "1.0");
-        return env;
-    }
-};
-
-struct Request {
-    std::string id;
-    std::string command;
-    json params;
-    int timeout;
-    
-    Request() 
-        : params(json::object())
-        , timeout(0) {}
-    
-    json toJson() const {
-        return json{
-            {"id", id},
-            {"command", command},
-            {"params", params},
-            {"timeout", timeout}
-        };
-    }
-    
-    static Request fromJson(const json& j) {
-        Request req;
-        req.id = j.value("id", "");
-        req.command = j.value("command", "");
-        req.params = j.value("params", json::object());
-        req.timeout = j.value("timeout", 0);
-        return req;
-    }
-};
-
-struct Response {
-    std::string requestId;
-    bool success;
-    json data;
-    std::string errorMessage;
-    ErrorCode errorCode;
-    int latency;
-    
-    Response() 
-        : success(true)
-        , data(json::object())
-        , errorCode(ErrorCode::UNKNOWN)
-        , latency(0) {}
-    
-    json toJson() const {
-        json j = {
-            {"request_id", requestId},
-            {"success", success},
-            {"latency", latency}
-        };
-        
-        if (success) {
-            j["data"] = data;
-        } else {
-            j["error_message"] = errorMessage;
-            j["error_code"] = errorCodeToString(errorCode);
-        }
-        
-        return j;
-    }
-    
-    static Response fromJson(const json& j) {
-        Response resp;
-        resp.requestId = j.value("request_id", "");
-        resp.success = j.value("success", true);
-        resp.latency = j.value("latency", 0);
-        
-        if (resp.success) {
-            resp.data = j.value("data", json::object());
-        } else {
-            resp.errorMessage = j.value("error_message", "");
-            // Parse error code string back to enum
-            std::string codeStr = j.value("error_code", "UNKNOWN");
-            resp.errorCode = ErrorCode::UNKNOWN; // Default
-        }
-        
-        return resp;
-    }
-};
-
-struct Event {
-    std::string name;
-    json data;
-    EventPriority priority;
-    std::string source;
-    
-    Event() 
-        : data(json::object())
-        , priority(EventPriority::NORMAL) {}
-    
-    json toJson() const {
-        return json{
-            {"name", name},
-            {"data", data},
-            {"priority", eventPriorityToString(priority)},
-            {"source", source}
-        };
-    }
-    
-    static Event fromJson(const json& j) {
-        Event evt;
-        evt.name = j.value("name", "");
-        evt.data = j.value("data", json::object());
-        evt.priority = stringToEventPriority(j.value("priority", "normal"));
-        evt.source = j.value("source", "");
-        return evt;
-    }
-};
-
-struct Error {
-    ErrorCode code;
-    std::string message;
-    json details;
-    bool retryable;
-    std::string requestId;
-    
-    Error() 
-        : code(ErrorCode::UNKNOWN)
-        , details(json::object())
-        , retryable(false) {}
-    
-    json toJson() const {
-        return json{
-            {"code", errorCodeToString(code)},
-            {"message", message},
-            {"details", details},
-            {"retryable", retryable},
-            {"request_id", requestId}
-        };
-    }
-    
-    static Error fromJson(const json& j) {
-        Error err;
-        // Parse error code
-        err.code = ErrorCode::UNKNOWN; // Default
-        err.message = j.value("message", "");
-        err.details = j.value("details", json::object());
-        err.retryable = j.value("retryable", false);
-        err.requestId = j.value("request_id", "");
-        return err;
-    }
-};
-
-// ============================================================================
-// CONVERSION FUNCTIONS (Forward declarations needed above)
+// CONVERSION FUNCTIONS (must be before structures)
 // ============================================================================
 
 inline std::string messageTypeToString(MessageType type) {
@@ -370,9 +135,234 @@ inline EventPriority stringToEventPriority(const std::string& str) {
     return EventPriority::NORMAL;
 }
 
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+inline std::string generateUUID() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    static std::uniform_int_distribution<> dis2(8, 11);
+    
+    std::stringstream ss;
+    ss << std::hex;
+    
+    for (int i = 0; i < 8; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    for (int i = 0; i < 4; i++) {
+        ss << dis(gen);
+    }
+    ss << "-4";
+    
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    ss << dis2(gen);
+    for (int i = 0; i < 3; i++) {
+        ss << dis(gen);
+    }
+    ss << "-";
+    
+    for (int i = 0; i < 12; i++) {
+        ss << dis(gen);
+    }
+    
+    return ss.str();
+}
+
+inline std::string getISO8601Timestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::stringstream ss;
+    ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%S");
+    ss << '.' << std::setfill('0') << std::setw(3) << ms.count() << 'Z';
+    
+    return ss.str();
+}
+
+// ============================================================================
+// STRUCTURES (after all conversion functions)
+// ============================================================================
+
+struct Envelope {
+    std::string id;
+    MessageType type;
+    std::string timestamp;
+    std::string version;
+    
+    Envelope() 
+        : type(MessageType::REQUEST)
+        , version("1.0") {}
+    
+    json toJson() const {
+        json j;
+        j["id"] = id;
+        j["type"] = messageTypeToString(type);
+        j["timestamp"] = timestamp;
+        j["version"] = version;
+        return j;
+    }
+    
+    static Envelope fromJson(const json& j) {
+        Envelope env;
+        env.id = j.value("id", "");
+        env.type = stringToMessageType(j.value("type", "request"));
+        env.timestamp = j.value("timestamp", "");
+        env.version = j.value("version", "1.0");
+        return env;
+    }
+};
+
+struct Request {
+    std::string id;
+    std::string command;
+    json params;
+    int timeout;
+    
+    Request() 
+        : params(json::object())
+        , timeout(0) {}
+    
+    json toJson() const {
+        json j;
+        j["id"] = id;
+        j["command"] = command;
+        j["params"] = params;
+        j["timeout"] = timeout;
+        return j;
+    }
+    
+    static Request fromJson(const json& j) {
+        Request req;
+        req.id = j.value("id", "");
+        req.command = j.value("command", "");
+        req.params = j.value("params", json::object());
+        req.timeout = j.value("timeout", 0);
+        return req;
+    }
+};
+
+struct Response {
+    std::string requestId;
+    bool success;
+    json data;
+    std::string errorMessage;
+    ErrorCode errorCode;
+    int latency;
+    
+    Response() 
+        : success(true)
+        , data(json::object())
+        , errorCode(ErrorCode::UNKNOWN)
+        , latency(0) {}
+    
+    json toJson() const {
+        json j;
+        j["request_id"] = requestId;
+        j["success"] = success;
+        j["latency"] = latency;
+        
+        if (success) {
+            j["data"] = data;
+        } else {
+            j["error_message"] = errorMessage;
+            j["error_code"] = errorCodeToString(errorCode);
+        }
+        
+        return j;
+    }
+    
+    static Response fromJson(const json& j) {
+        Response resp;
+        resp.requestId = j.value("request_id", "");
+        resp.success = j.value("success", true);
+        resp.latency = j.value("latency", 0);
+        
+        if (resp.success) {
+            resp.data = j.value("data", json::object());
+        } else {
+            resp.errorMessage = j.value("error_message", "");
+            resp.errorCode = ErrorCode::UNKNOWN;
+        }
+        
+        return resp;
+    }
+};
+
+struct Event {
+    std::string name;
+    json data;
+    EventPriority priority;
+    std::string source;
+    
+    Event() 
+        : data(json::object())
+        , priority(EventPriority::NORMAL) {}
+    
+    json toJson() const {
+        json j;
+        j["name"] = name;
+        j["data"] = data;
+        j["priority"] = eventPriorityToString(priority);
+        j["source"] = source;
+        return j;
+    }
+    
+    static Event fromJson(const json& j) {
+        Event evt;
+        evt.name = j.value("name", "");
+        evt.data = j.value("data", json::object());
+        evt.priority = stringToEventPriority(j.value("priority", "normal"));
+        evt.source = j.value("source", "");
+        return evt;
+    }
+};
+
+struct Error {
+    ErrorCode code;
+    std::string message;
+    json details;
+    bool retryable;
+    std::string requestId;
+    
+    Error() 
+        : code(ErrorCode::UNKNOWN)
+        , details(json::object())
+        , retryable(false) {}
+    
+    json toJson() const {
+        json j;
+        j["code"] = errorCodeToString(code);
+        j["message"] = message;
+        j["details"] = details;
+        j["retryable"] = retryable;
+        j["request_id"] = requestId;
+        return j;
+    }
+    
+    static Error fromJson(const json& j) {
+        Error err;
+        err.code = ErrorCode::UNKNOWN;
+        err.message = j.value("message", "");
+        err.details = j.value("details", json::object());
+        err.retryable = j.value("retryable", false);
+        err.requestId = j.value("request_id", "");
+        return err;
+    }
+};
+
 } // namespace protocol
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Protocol.h v4.1.2
+// END OF FILE Protocol.h v4.1.3
 // ============================================================================
