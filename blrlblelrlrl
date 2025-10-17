@@ -1,17 +1,19 @@
-/home/pi/midiMind/backend/src/midi/MidiMessage.cpp: In static member function ‘static midiMind::MidiMessage midiMind::MidiMessage::fromJson(const json&)’:
-/home/pi/midiMind/backend/src/midi/MidiMessage.cpp:387:33: error: call of overloaded ‘controlChange(int, const nlohmann::json_abi_v3_11_3::basic_json<>::value_type&, const nlohmann::json_abi_v3_11_3::basic_json<>::value_type&)’ is ambiguous
-  387 |             return controlChange(j["channel"].get<int>() - 1,
-      |                    ~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  388 |                                j["controller"], j["value"]);
-      |                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/MidiMessage.cpp:83:13: note: candidate: ‘static midiMind::MidiMessage midiMind::MidiMessage::controlChange(uint8_t, uint8_t, uint8_t)’
-   83 | MidiMessage MidiMessage::controlChange(uint8_t channel, uint8_t controller, uint8_t value) {
-      |             ^~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/MidiMessage.cpp:91:13: note: candidate: ‘static midiMind::MidiMessage midiMind::MidiMessage::controlChange(uint8_t, midiMind::ControllerType, uint8_t)’
-   91 | MidiMessage MidiMessage::controlChange(uint8_t channel, ControllerType type, uint8_t value) {
-      |             ^~~~~~~~~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:261: CMakeFiles/midimind.dir/src/midi/MidiMessage.cpp.o] Error 1
-make[2]: *** Waiting for unfinished jobs....
+/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp: In member function ‘int64_t midiMind::LatencyCompensator::getInstrumentCompensation(const std::string&) const’:
+/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:275:5: error: non-member ‘instrumentMutex_’ cannot be declared ‘mutable’
+  275 |     mutable std::mutex instrumentMutex_;
+      |     ^~~~~~~
+/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:295:17: error: ‘lock’ was not declared in this scope; did you mean ‘std::lock’?
+  295 |                 lock.~lock_guard();
+      |                 ^~~~
+      |                 std::lock
+In file included from /home/pi/midiMind/backend/src/timing/LatencyCompensator.h:35,
+                 from /home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:20:
+/usr/include/c++/14/mutex:698:5: note: ‘std::lock’ declared here
+  698 |     lock(_L1& __l1, _L2& __l2, _L3&... __l3)
+      |     ^~~~
+/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:295:33: error: expected class-name before ‘(’ token
+  295 |                 lock.~lock_guard();
+      |                                 ^
 /home/pi/midiMind/backend/src/midi/MidiRouter.cpp: In member function ‘void midiMind::MidiRouter::registerDevice(std::shared_ptr<midiMind::MidiDevice>)’:
 /home/pi/midiMind/backend/src/midi/MidiRouter.cpp:217:34: error: invalid use of incomplete type ‘using std::__shared_ptr_access<midiMind::MidiDevice, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiDevice’ {aka ‘class midiMind::MidiDevice’}
   217 |     std::string deviceId = device->getId();
@@ -20,20 +22,8 @@ In file included from /home/pi/midiMind/backend/src/midi/MidiRouter.cpp:20:
 /home/pi/midiMind/backend/src/midi/MidiRouter.h:47:7: note: forward declaration of ‘using std::__shared_ptr_access<midiMind::MidiDevice, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::MidiDevice’ {aka ‘class midiMind::MidiDevice’}
    47 | class MidiDevice;
       |       ^~~~~~~~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:247: CMakeFiles/midimind.dir/src/timing/LatencyCompensator.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
 make[2]: *** [CMakeFiles/midimind.dir/build.make:275: CMakeFiles/midimind.dir/src/midi/MidiRouter.cpp.o] Error 1
-In file included from /usr/include/c++/14/mutex:47,
-                 from /home/pi/midiMind/backend/src/timing/LatencyCompensator.h:35,
-                 from /home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:20:
-In member function ‘void std::mutex::unlock()’,
-    inlined from ‘std::lock_guard<_Mutex>::~lock_guard() [with _Mutex = std::mutex]’ at /usr/include/c++/14/bits/std_mutex.h:257:25,
-    inlined from ‘int64_t midiMind::LatencyCompensator::getInstrumentCompensation(const std::string&) const’ at /home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:304:1:
-/usr/include/c++/14/bits/std_mutex.h:132:29: warning: ‘lock.std::lock_guard<std::mutex>::_M_device’ may be used uninitialized [-Wmaybe-uninitialized]
-  132 |       __gthread_mutex_unlock(&_M_mutex);
-      |       ~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp: In member function ‘int64_t midiMind::LatencyCompensator::getInstrumentCompensation(const std::string&) const’:
-/home/pi/midiMind/backend/src/timing/LatencyCompensator.cpp:275:33: note: ‘lock.std::lock_guard<std::mutex>::_M_device’ was declared here
-  275 |     std::lock_guard<std::mutex> lock(instrumentMutex_);
-      |                                 ^~~~
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
-✓ Compilation terminée
