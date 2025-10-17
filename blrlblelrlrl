@@ -1,104 +1,60 @@
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In member function ‘bool midiMind::ProcessorManager::setChainEnabled(const std::string&, bool)’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:203:21: error: ‘using std::__shared_ptr_access<midiMind::ProcessorChain, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::ProcessorChain’ {aka ‘class midiMind::ProcessorChain’} has no member named ‘enable’; did you mean ‘bool midiMind::ProcessorChain::enabled_’? (accessible via ‘bool midiMind::ProcessorChain::isEnabled() const’)
-  203 |         it->second->enable();
-      |                     ^~~~~~
-      |                     isEnabled()
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:205:21: error: ‘using std::__shared_ptr_access<midiMind::ProcessorChain, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::ProcessorChain’ {aka ‘class midiMind::ProcessorChain’} has no member named ‘disable’
-  205 |         it->second->disable();
-      |                     ^~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:549:38: error: ‘mutex_’ was not declared in this scope
-  549 |     std::lock_guard<std::mutex> lock(mutex_);
-      |                                      ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:550:5: error: ‘messageOutputCallback_’ does not name a type
-  550 |     messageOutputCallback_ = callback;
-      |     ^~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:557:6: error: ‘ProcessorManager’ has not been declared
-  557 | json ProcessorManager::getStatistics() const {
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:402:6: error: no declaration matches ‘bool midiMind::ProcessorManager::savePreset(const std::string&, const std::string&)’
+  402 | bool ProcessorManager::savePreset(const std::string& chainId,
       |      ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:557:40: error: non-member function ‘json getStatistics()’ cannot have cv-qualifier
-  557 | json ProcessorManager::getStatistics() const {
-      |                                        ^~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In function ‘json getStatistics()’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:558:38: error: ‘mutex_’ was not declared in this scope
-  558 |     std::lock_guard<std::mutex> lock(mutex_);
-      |                                      ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:561:28: error: ‘chains_’ was not declared in this scope
-  561 |     stats["chain_count"] = chains_.size();
-      |                            ^~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:562:35: error: ‘messagesProcessed_’ was not declared in this scope
-  562 |     stats["messages_processed"] = messagesProcessed_.load();
-      |                                   ^~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:574:6: error: ‘ProcessorManager’ has not been declared
-  574 | void ProcessorManager::resetStatistics() {
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:402:6: note: no functions named ‘bool midiMind::ProcessorManager::savePreset(const std::string&, const std::string&)’
+In file included from /home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:21:
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.h:107:7: note: ‘class midiMind::ProcessorManager’ defined here
+  107 | class ProcessorManager {
+      |       ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:421:6: error: no declaration matches ‘bool midiMind::ProcessorManager::deletePreset(const std::string&)’
+  421 | bool ProcessorManager::deletePreset(const std::string& presetName) {
       |      ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In function ‘void resetStatistics()’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:575:38: error: ‘mutex_’ was not declared in this scope
-  575 |     std::lock_guard<std::mutex> lock(mutex_);
-      |                                      ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:577:5: error: ‘messagesProcessed_’ was not declared in this scope
-  577 |     messagesProcessed_ = 0;
-      |     ^~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:579:30: error: ‘chains_’ was not declared in this scope; did you mean ‘chain’?
-  579 |     for (auto& [id, chain] : chains_) {
-      |                              ^~~~~~~
-      |                              chain
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:583:5: error: ‘Logger’ has not been declared
-  583 |     Logger::info("ProcessorManager", "Statistics reset");
-      |     ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:590:13: error: ‘ProcessorManager’ has not been declared
-  590 | std::string ProcessorManager::generateChainId() {
-      |             ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In function ‘std::string generateChainId()’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:591:19: error: ‘chainIdCounter_’ was not declared in this scope
-  591 |     uint32_t id = chainIdCounter_++;
-      |                   ^~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:595:6: error: ‘ProcessorManager’ has not been declared
-  595 | void ProcessorManager::initializePresets() {
-      |      ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In function ‘void initializePresets()’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:596:5: error: ‘Logger’ has not been declared
-  596 |     Logger::info("ProcessorManager", "Initializing presets...");
-      |     ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:599:5: error: ‘presets_’ was not declared in this scope
-  599 |     presets_["transpose_up"] = {
-      |     ^~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:676:5: error: ‘Logger’ has not been declared
-  676 |     Logger::info("ProcessorManager",
-      |     ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:680:17: error: ‘MidiProcessor’ was not declared in this scope; did you mean ‘midiMind::MidiProcessor’?
-  680 | std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
-      |                 ^~~~~~~~~~~~~
-      |                 midiMind::MidiProcessor
-In file included from /home/pi/midiMind/backend/src/midi/processing/ProcessorChain.h:17,
-                 from /home/pi/midiMind/backend/src/midi/processing/ProcessorManager.h:32,
-                 from /home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:21:
-/home/pi/midiMind/backend/src/midi/processing/MidiProcessor.h:34:7: note: ‘midiMind::MidiProcessor’ declared here
-   34 | class MidiProcessor {
-      |       ^~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:680:30: error: template argument 1 is invalid
-  680 | std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
-      |                              ^
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:680:32: error: ‘ProcessorManager’ has not been declared
-  680 | std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
-      |                                ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In function ‘int createProcessorFromType(const std::string&)’:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:684:5: error: ‘Logger’ has not been declared
-  684 |     Logger::warning("ProcessorManager",
-      |     ^~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:686:12: error: cannot convert ‘std::nullptr_t’ to ‘int’ in return
-  686 |     return nullptr;
-      |            ^~~~~~~
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: At global scope:
-/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:689:1: error: expected declaration before ‘}’ token
-  689 | } // namespace midiMind
-      | ^
-[ 86%] Building CXX object CMakeFiles/midimind.dir/src/midi/sysex/SysExParser.cpp.o
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:421:6: note: no functions named ‘bool midiMind::ProcessorManager::deletePreset(const std::string&)’
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.h:107:7: note: ‘class midiMind::ProcessorManager’ defined here
+  107 | class ProcessorManager {
+      |       ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp: In member function ‘void midiMind::ProcessorManager::resetStatistics()’:
+/home/pi/midiMind/backend/src/midi/processing/ProcessorManager.cpp:582:16: warning: unused structured binding declaration [-Wunused-variable]
+  582 |     for (auto& [id, chain] : chains_) {
+      |                ^~~~~~~~~~~
+[ 90%] Building CXX object CMakeFiles/midimind.dir/src/api/ApiServer.cpp.o
 make[2]: *** [CMakeFiles/midimind.dir/build.make:401: CMakeFiles/midimind.dir/src/midi/processing/ProcessorManager.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
+/home/pi/midiMind/backend/src/api/ApiServer.cpp: In member function ‘void midiMind::ApiServer::onMessage(connection_hdl, message_ptr)’:
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:305:43: error: ‘INVALID_MESSAGE’ is not a member of ‘midiMind::protocol::ErrorCode’
+  305 |                      protocol::ErrorCode::INVALID_MESSAGE,
+      |                                           ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:321:43: error: ‘INVALID_MESSAGE’ is not a member of ‘midiMind::protocol::ErrorCode’
+  321 |                      protocol::ErrorCode::INVALID_MESSAGE,
+      |                                           ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp: In member function ‘void midiMind::ApiServer::processRequest(connection_hdl, const midiMind::MessageEnvelope&)’:
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:404:37: error: ‘const struct midiMind::protocol::Request’ has no member named ‘id’
+  404 |                  " (ID: " + request.id + ")");
+      |                                     ^~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:410:32: error: ‘const struct midiMind::protocol::Request’ has no member named ‘id’
+  410 |         sendError(hdl, request.id,
+      |                                ^~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:439:25: error: ‘const struct midiMind::protocol::Request’ has no member named ‘id’
+  439 |                 request.id, data, latency);
+      |                         ^~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:450:61: error: ‘COMMAND_FAILED’ is not a member of ‘midiMind::protocol::ErrorCode’
+  450 |             protocol::ErrorCode code = protocol::ErrorCode::COMMAND_FAILED;
+      |                                                             ^~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:453:45: error: ‘UNKNOWN_COMMAND’ is not a member of ‘midiMind::protocol::ErrorCode’
+  453 |                 code = protocol::ErrorCode::UNKNOWN_COMMAND;
+      |                                             ^~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:457:45: error: ‘DEVICE_NOT_FOUND’ is not a member of ‘midiMind::protocol::ErrorCode’
+  457 |                 code = protocol::ErrorCode::DEVICE_NOT_FOUND;
+      |                                             ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:459:45: error: ‘DEVICE_BUSY’ is not a member of ‘midiMind::protocol::ErrorCode’
+  459 |                 code = protocol::ErrorCode::DEVICE_BUSY;
+      |                                             ^~~~~~~~~~~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:468:25: error: ‘const struct midiMind::protocol::Request’ has no member named ‘id’
+  468 |                 request.id, code, errorMsg, details);
+      |                         ^~
+/home/pi/midiMind/backend/src/api/ApiServer.cpp:482:32: error: ‘const struct midiMind::protocol::Request’ has no member named ‘id’
+  482 |         sendError(hdl, request.id,
+      |                                ^~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:443: CMakeFiles/midimind.dir/src/api/ApiServer.cpp.o] Error 1
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
