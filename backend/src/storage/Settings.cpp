@@ -76,18 +76,21 @@ bool Settings::load() {
 bool Settings::save() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    
     Logger::info("Settings", "Saving settings...");
     
     int count = 0;
     
-    // ✅ Capturer this pour accéder aux membres de la classe
     bool success = database_.transaction([this, &count]() {
-        for (const auto& [key, value] : settings_) {
-            // ✅ Utiliser la liste d'initialisation directement
+        // ✅ Utiliser cache_ au lieu de settings_
+        for (const auto& [key, value] : cache_) {
+            // ✅ Construire explicitement le vecteur
+            std::vector<std::string> params;
+            params.push_back(key);
+            params.push_back(value);
+            
             auto result = database_.execute(
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                {key, value}
+                params
             );
             
             if (!result.success) {
