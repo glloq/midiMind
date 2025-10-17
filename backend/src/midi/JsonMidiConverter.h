@@ -30,6 +30,7 @@
 
 #include "MidiMessage.h"
 #include <string>
+#include <fstream>
 #include <vector>
 #include <optional>
 #include <nlohmann/json.hpp>

@@ -18,7 +18,7 @@
 // ============================================================================
 
 #include "MidiDeviceManager.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
 #include <algorithm>
 #include <chrono>
 #include <thread>
