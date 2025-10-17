@@ -1,15 +1,68 @@
-In file included from /home/pi/midiMind/backend/src/core/Application.cpp:40:
-/home/pi/midiMind/backend/src/core/../storage/Database.h:414:2: error: #endif without #if
-  414 | #endif // DATABASE_H
-      |  ^~~~~
-[ 16%] Building CXX object CMakeFiles/midimind.dir/src/storage/Database.cpp.o
-In file included from /home/pi/midiMind/backend/src/storage/Database.cpp:16:
-/home/pi/midiMind/backend/src/storage/Database.h:414:2: error: #endif without #if
-  414 | #endif // DATABASE_H
-      |  ^~~~~
-[ 20%] Building CXX object CMakeFiles/midimind.dir/src/storage/FileManager.cpp.o
-make[2]: *** [CMakeFiles/midimind.dir/build.make:135: CMakeFiles/midimind.dir/src/storage/Database.cpp.o] Error 1
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘bool midiMind::Settings::save()’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:82:40: error: could not convert ‘(&((midiMind::Settings*)this)->midiMind::Settings::database_)->midiMind::Database::beginTransaction()’ from ‘void’ to ‘bool’
+   82 |         if (!database_.beginTransaction()) {
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+      |                                        |
+      |                                        void
+/home/pi/midiMind/backend/src/storage/Settings.cpp:82:40: error: in argument to unary !
+/home/pi/midiMind/backend/src/storage/Settings.cpp:98:25: error: ‘warn’ is not a member of ‘midiMind::Logger’
+   98 |                 Logger::warn("Settings", "Failed to save: " + key);
+      |                         ^~~~
+/home/pi/midiMind/backend/src/storage/Settings.cpp:102:30: error: could not convert ‘(&((midiMind::Settings*)this)->midiMind::Settings::database_)->midiMind::Database::commit()’ from ‘void’ to ‘bool’
+  102 |         if (!database_.commit()) {
+      |              ~~~~~~~~~~~~~~~~^~
+      |                              |
+      |                              void
+/home/pi/midiMind/backend/src/storage/Settings.cpp:102:30: error: in argument to unary !
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘int midiMind::Settings::getInt(const std::string&, int)’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:153:21: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  153 |             Logger::warn("Settings", "Invalid int for '" + key + "': " + it->second);
+      |                     ^~~~
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘bool midiMind::Settings::getBool(const std::string&, bool)’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:178:17: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  178 |         Logger::warn("Settings", "Invalid bool for '" + key + "': " + it->second);
+      |                 ^~~~
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘double midiMind::Settings::getDouble(const std::string&, double)’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:193:21: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  193 |             Logger::warn("Settings", "Invalid double for '" + key + "': " + it->second);
+      |                     ^~~~
+/home/pi/midiMind/backend/src/storage/Settings.cpp: In member function ‘json midiMind::Settings::getJson(const std::string&, const json&)’:
+/home/pi/midiMind/backend/src/storage/Settings.cpp:209:21: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  209 |             Logger::warn("Settings", "Invalid JSON for '" + key + "': " + it->second);
+      |                     ^~~~
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp: In constructor ‘midiMind::PresetManager::PresetManager(std::shared_ptr<midiMind::Database>)’:
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp:138:35: error: ‘using std::__shared_ptr_access<midiMind::Database, __gnu_cxx::_S_atomic, false, false>::element_type = class midiMind::Database’ {aka ‘class midiMind::Database’} has no member named ‘isOpen’
+  138 |     if (!database_ || !database_->isOpen()) {
+      |                                   ^~~~~~
+In file included from /home/pi/midiMind/backend/src/storage/PresetManager.h:31,
+                 from /home/pi/midiMind/backend/src/storage/PresetManager.cpp:21:
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp:139:32: error: ‘DATABASE_NOT_CONNECTED’ is not a member of ‘midiMind::ErrorCode’; did you mean ‘DATABASE_NOT_FOUND’?
+  139 |         THROW_ERROR(ErrorCode::DATABASE_NOT_CONNECTED,
+      |                                ^~~~~~~~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/../core/Error.h:273:39: note: in definition of macro ‘THROW_ERROR’
+  273 |     throw midiMind::MidiMindException(code, message)
+      |                                       ^~~~
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp: In member function ‘int midiMind::PresetManager::create(const midiMind::Preset&)’:
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp:206:32: error: ‘VALIDATION_ERROR’ is not a member of ‘midiMind::ErrorCode’
+  206 |         THROW_ERROR(ErrorCode::VALIDATION_ERROR, "Preset name cannot be empty");
+      |                                ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/../core/Error.h:273:39: note: in definition of macro ‘THROW_ERROR’
+  273 |     throw midiMind::MidiMindException(code, message)
+      |                                       ^~~~
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp: In member function ‘std::optional<midiMind::Preset> midiMind::PresetManager::load(int)’:
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp:265:21: error: ‘warn’ is not a member of ‘midiMind::Logger’
+  265 |             Logger::warn("PresetManager", "Preset not found: " + std::to_string(id));
+      |                     ^~~~
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp: In member function ‘void midiMind::PresetManager::update(int, const midiMind::Preset&)’:
+/home/pi/midiMind/backend/src/storage/PresetManager.cpp:436:32: error: ‘VALIDATION_ERROR’ is not a member of ‘midiMind::ErrorCode’
+  436 |         THROW_ERROR(ErrorCode::VALIDATION_ERROR, "Preset name cannot be empty");
+      |                                ^~~~~~~~~~~~~~~~
+/home/pi/midiMind/backend/src/storage/../core/Error.h:273:39: note: in definition of macro ‘THROW_ERROR’
+  273 |     throw midiMind::MidiMindException(code, message)
+      |                                       ^~~~
+make[2]: *** [CMakeFiles/midimind.dir/build.make:177: CMakeFiles/midimind.dir/src/storage/Settings.cpp.o] Error 1
 make[2]: *** Waiting for unfinished jobs....
+make[2]: *** [CMakeFiles/midimind.dir/build.make:205: CMakeFiles/midimind.dir/src/storage/PresetManager.cpp.o] Error 1
 In file included from /home/pi/midiMind/backend/src/core/Application.cpp:50:
 /home/pi/midiMind/backend/src/core/../api/CommandHandler.h:109:25: error: ‘MidiFileManager’ was not declared in this scope; did you mean ‘MidiFileReader’?
   109 |         std::shared_ptr<MidiFileManager> fileManager
@@ -25,128 +78,6 @@ In file included from /home/pi/midiMind/backend/src/core/Application.cpp:50:
 /home/pi/midiMind/backend/src/core/../api/CommandHandler.h:275:36: error: template argument 1 is invalid
   275 |     std::shared_ptr<MidiFileManager> fileManager_;
       |                                    ^
-/home/pi/midiMind/backend/src/core/Application.cpp: In function ‘void midiMind::signalHandler(int)’:
-/home/pi/midiMind/backend/src/core/Application.cpp:90:36: error: ‘ExitCode’ has not been declared
-   90 |         std::exit(static_cast<int>(ExitCode::RUNTIME_ERROR));
-      |                                    ^~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp: In member function ‘bool midiMind::Application::initializeDatabase()’:
-/home/pi/midiMind/backend/src/core/Application.cpp:271:38: error: no matching function for call to ‘midiMind::Database::runMigrations()’
-  271 |         if (!database_->runMigrations()) {
-      |              ~~~~~~~~~~~~~~~~~~~~~~~~^~
-/home/pi/midiMind/backend/src/core/../storage/Database.h:300:10: note: candidate: ‘bool midiMind::Database::runMigrations(const std::string&)’
-  300 |     bool runMigrations(const std::string& migrationDir);
-      |          ^~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../storage/Database.h:300:10: note:   candidate expects 1 argument, 0 provided
-/home/pi/midiMind/backend/src/core/Application.cpp: In member function ‘bool midiMind::Application::initializeTiming()’:
-/home/pi/midiMind/backend/src/core/Application.cpp:331:35: error: ‘class midiMind::LatencyCompensator’ has no member named ‘loadFromDatabase’
-  331 |         if (!latencyCompensator_->loadFromDatabase()) {
-      |                                   ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp: In member function ‘void midiMind::Application::stop()’:
-/home/pi/midiMind/backend/src/core/Application.cpp:555:34: error: ‘class midiMind::LatencyCompensator’ has no member named ‘saveToDatabase’
-  555 |             latencyCompensator_->saveToDatabase();
-      |                                  ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp: In member function ‘void midiMind::Application::broadcastStatus()’:
-/home/pi/midiMind/backend/src/core/Application.cpp:612:34: error: ‘currentTimestamp’ is not a member of ‘midiMind::TimeUtils’
-  612 |         {"timestamp", TimeUtils::currentTimestamp()},
-      |                                  ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp:620:5: error: could not convert ‘{{"type", "status"}, {"timestamp", <expression error>}, {"uptime", ((midiMind::Application*)this)->midiMind::Application::getUptime()}, {"components", {{"database", (((midiMind::Application*)this)->midiMind::Application::database_.std::unique_ptr<midiMind::Database>::operator bool() && ((midiMind::Application*)this)->midiMind::Application::database_.std::unique_ptr<midiMind::Database>::operator->()->midiMind::Database::isConnected())}, {"api_server", (((midiMind::Application*)this)->midiMind::Application::apiServer_.std::unique_ptr<midiMind::ApiServer>::operator bool() && ((midiMind::Application*)this)->midiMind::Application::apiServer_.std::unique_ptr<midiMind::ApiServer>::operator->()->midiMind::ApiServer::isRunning())}, {"midi_devices", (((midiMind::Application*)this)->midiMind::Application::deviceManager_.std::unique_ptr<midiMind::MidiDeviceManager>::operator bool() ? ((midiMind::Application*)this)->midiMind::Application::deviceManager_.std::unique_ptr<midiMind::MidiDeviceManager>::operator->()->midiMind::MidiDeviceManager::getDeviceCount() : 0)}, {"latency_compensator", std::operator!=<midiMind::LatencyCompensator, default_delete<midiMind::LatencyCompensator> >(((midiMind::Application*)this)->midiMind::Application::latencyCompensator_, nullptr)}}}}’ from ‘<brace-enclosed initializer list>’ to ‘midiMind::json’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’}
-  620 |     };
-      |     ^
-      |     |
-      |     <brace-enclosed initializer list>
-/home/pi/midiMind/backend/src/core/Application.cpp:622:27: error: cannot convert ‘midiMind::json’ {aka ‘nlohmann::json_abi_v3_11_3::basic_json<>’} to ‘const midiMind::MessageEnvelope&’
-  622 |     apiServer_->broadcast(status);
-      |                           ^~~~~~
-      |                           |
-      |                           midiMind::json {aka nlohmann::json_abi_v3_11_3::basic_json<>}
-In file included from /home/pi/midiMind/backend/src/core/Application.cpp:49:
-/home/pi/midiMind/backend/src/core/../api/ApiServer.h:209:43: note:   initializing argument 1 of ‘void midiMind::ApiServer::broadcast(const midiMind::MessageEnvelope&)’
-  209 |     void broadcast(const MessageEnvelope& message);
-      |                    ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
-In file included from /usr/include/c++/14/memory:78,
-                 from /home/pi/midiMind/backend/src/core/Application.h:20,
-                 from /home/pi/midiMind/backend/src/core/Application.cpp:34:
-/usr/include/c++/14/bits/unique_ptr.h: In instantiation of ‘std::__detail::__unique_ptr_t<_Tp> std::make_unique(_Args&& ...) [with _Tp = midiMind::Database; _Args = {}; __detail::__unique_ptr_t<_Tp> = __detail::__unique_ptr_t<midiMind::Database>]’:
-/home/pi/midiMind/backend/src/core/Application.cpp:260:47:   required from here
-  260 |         database_ = std::make_unique<Database>();
-      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~
-/usr/include/c++/14/bits/unique_ptr.h:1077:30: error: ‘midiMind::Database::Database()’ is private within this context
- 1077 |     { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
-      |                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../storage/Database.h:369:5: note: declared private here
-  369 |     Database();
-      |     ^~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h: In instantiation of ‘std::__detail::__unique_ptr_t<_Tp> std::make_unique(_Args&& ...) [with _Tp = midiMind::MidiPlayer; _Args = {}; __detail::__unique_ptr_t<_Tp> = __detail::__unique_ptr_t<midiMind::MidiPlayer>]’:
-/home/pi/midiMind/backend/src/core/Application.cpp:365:47:   required from here
-  365 |         player_ = std::make_unique<MidiPlayer>();
-      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
-/usr/include/c++/14/bits/unique_ptr.h:1077:30: error: no matching function for call to ‘midiMind::MidiPlayer::MidiPlayer()’
- 1077 |     { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
-      |                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In file included from /home/pi/midiMind/backend/src/core/Application.cpp:48:
-/home/pi/midiMind/backend/src/core/../midi/player/MidiPlayer.h:165:14: note: candidate: ‘midiMind::MidiPlayer::MidiPlayer(std::shared_ptr<midiMind::MidiRouter>)’
-  165 |     explicit MidiPlayer(std::shared_ptr<MidiRouter> router);
-      |              ^~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../midi/player/MidiPlayer.h:165:14: note:   candidate expects 1 argument, 0 provided
-/usr/include/c++/14/bits/unique_ptr.h: In instantiation of ‘std::__detail::__unique_ptr_t<_Tp> std::make_unique(_Args&& ...) [with _Tp = midiMind::CommandHandler; _Args = {unique_ptr<midiMind::MidiDeviceManager, default_delete<midiMind::MidiDeviceManager> >&, unique_ptr<midiMind::MidiRouter, default_delete<midiMind::MidiRouter> >&, unique_ptr<midiMind::MidiPlayer, default_delete<midiMind::MidiPlayer> >&, unique_ptr<midiMind::FileManager, default_delete<midiMind::FileManager> >&, unique_ptr<midiMind::LatencyCompensator, default_delete<midiMind::LatencyCompensator> >&, unique_ptr<midiMind::InstrumentDatabase, default_delete<midiMind::InstrumentDatabase> >&}; __detail::__unique_ptr_t<_Tp> = __detail::__unique_ptr_t<midiMind::CommandHandler>]’:
-/home/pi/midiMind/backend/src/core/Application.cpp:390:59:   required from here
-  390 |         commandHandler_ = std::make_unique<CommandHandler>(
-      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-  391 |             deviceManager_,
-      |             ~~~~~~~~~~~~~~~                                
-  392 |             router_,
-      |             ~~~~~~~~                                       
-  393 |             player_,
-      |             ~~~~~~~~                                       
-  394 |             fileManager_,
-      |             ~~~~~~~~~~~~~                                  
-  395 |             latencyCompensator_,   // ADDED for latency.* commands
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  396 |             instrumentDatabase_    // ADDED for latency.* commands
-      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  397 |         );
-      |         ~                                                  
-/usr/include/c++/14/bits/unique_ptr.h:1077:30: error: no matching function for call to ‘midiMind::CommandHandler::CommandHandler(std::unique_ptr<midiMind::MidiDeviceManager>&, std::unique_ptr<midiMind::MidiRouter>&, std::unique_ptr<midiMind::MidiPlayer>&, std::unique_ptr<midiMind::FileManager>&, std::unique_ptr<midiMind::LatencyCompensator>&, std::unique_ptr<midiMind::InstrumentDatabase>&)’
- 1077 |     { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
-      |                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:105:5: note: candidate: ‘midiMind::CommandHandler::CommandHandler(std::shared_ptr<midiMind::MidiDeviceManager>, std::shared_ptr<midiMind::MidiRouter>, std::shared_ptr<midiMind::MidiPlayer>, int)’
-  105 |     CommandHandler(
-      |     ^~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/CommandHandler.h:105:5: note:   candidate expects 4 arguments, 6 provided
-/usr/include/c++/14/bits/unique_ptr.h: In instantiation of ‘std::__detail::__unique_ptr_t<_Tp> std::make_unique(_Args&& ...) [with _Tp = midiMind::ApiServer; _Args = {int&, __cxx11::basic_string<char, char_traits<char>, allocator<char> >&}; __detail::__unique_ptr_t<_Tp> = __detail::__unique_ptr_t<midiMind::ApiServer>]’:
-/home/pi/midiMind/backend/src/core/Application.cpp:408:49:   required from here
-  408 |         apiServer_ = std::make_unique<ApiServer>(port, host);
-      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
-/usr/include/c++/14/bits/unique_ptr.h:1077:30: error: no matching function for call to ‘midiMind::ApiServer::ApiServer(int&, std::__cxx11::basic_string<char>&)’
- 1077 |     { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
-      |                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/ApiServer.h:127:5: note: candidate: ‘midiMind::ApiServer::ApiServer()’
-  127 |     ApiServer();
-      |     ^~~~~~~~~
-/home/pi/midiMind/backend/src/core/../api/ApiServer.h:127:5: note:   candidate expects 0 arguments, 2 provided
-/usr/include/c++/14/bits/unique_ptr.h: In instantiation of ‘void std::default_delete<_Tp>::operator()(_Tp*) const [with _Tp = midiMind::PathManager]’:
-/usr/include/c++/14/bits/unique_ptr.h:399:17:   required from ‘std::unique_ptr<_Tp, _Dp>::~unique_ptr() [with _Tp = midiMind::PathManager; _Dp = std::default_delete<midiMind::PathManager>]’
-  399 |           get_deleter()(std::move(__ptr));
-      |           ~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/core/Application.cpp:110:36:   required from here
-  110 |     , statusBroadcastRunning_(false)
-      |                                    ^
-/usr/include/c++/14/bits/unique_ptr.h:91:23: error: invalid application of ‘sizeof’ to incomplete type ‘midiMind::PathManager’
-   91 |         static_assert(sizeof(_Tp)>0,
-      |                       ^~~~~~~~~~~
-In file included from /home/pi/midiMind/backend/src/storage/FileManager.h:46,
-                 from /home/pi/midiMind/backend/src/storage/FileManager.cpp:23:
-/home/pi/midiMind/backend/src/storage/FileManager.cpp: In member function ‘std::string midiMind::FileManager::uploadFile(const std::vector<unsigned char>&, const std::string&, midiMind::DirectoryType, bool)’:
-/home/pi/midiMind/backend/src/storage/FileManager.cpp:145:32: error: ‘STORAGE_FILE_EXISTS’ is not a member of ‘midiMind::ErrorCode’
-  145 |         THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS,
-      |                                ^~~~~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/storage/../core/Error.h:271:39: note: in definition of macro ‘THROW_ERROR’
-  271 |     throw midiMind::MidiMindException(code, message)
-      |                                       ^~~~
-/home/pi/midiMind/backend/src/storage/FileManager.cpp:151:32: error: ‘STORAGE_IO_ERROR’ is not a member of ‘midiMind::ErrorCode’
-  151 |         THROW_ERROR(ErrorCode::STORAGE_IO_ERROR,
-      |                                ^~~~~~~~~~~~~~~~
-/home/pi/midiMind/backend/src/storage/../core/Error.h:271:39: note: in definition of macro ‘THROW_ERROR’
-  271 |     throw midiMind::MidiMindException(code, message)
-      |                                       ^~~~
-make[2]: *** [CMakeFiles/midimind.dir/build.make:149: CMakeFiles/midimind.dir/src/storage/FileManager.cpp.o] Error 1
+make[2]: *** [CMakeFiles/midimind.dir/build.make:93: CMakeFiles/midimind.dir/src/core/Application.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
+make: *** [Makefile:136: all] Error 2
