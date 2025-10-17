@@ -152,47 +152,47 @@ const protocol::Envelope& MessageEnvelope::getEnvelope() const {
 }
 
 const protocol::Request& MessageEnvelope::getRequest() const {
-    if (!request_) {
+    if (!request_.has_value()) {
         throw std::runtime_error("Message does not contain a request");
     }
     return *request_;
 }
 
 const protocol::Response& MessageEnvelope::getResponse() const {
-    if (!response_) {
+    if (!response_.has_value()) {
         throw std::runtime_error("Message does not contain a response");
     }
     return *response_;
 }
 
 const protocol::Event& MessageEnvelope::getEvent() const {
-    if (!event_) {
+    if (!event_.has_value()) {
         throw std::runtime_error("Message does not contain an event");
     }
     return *event_;
 }
 
 const protocol::Error& MessageEnvelope::getError() const {
-    if (!error_) {
+    if (!error_.has_value()) {
         throw std::runtime_error("Message does not contain an error");
     }
     return *error_;
 }
 
 bool MessageEnvelope::hasRequest() const {
-    return request_ != nullptr;
+    return request_.has_value();
 }
 
 bool MessageEnvelope::hasResponse() const {
-    return response_ != nullptr;
+    return response_.has_value();
 }
 
 bool MessageEnvelope::hasEvent() const {
-    return event_ != nullptr;
+    return event_.has_value();
 }
 
 bool MessageEnvelope::hasError() const {
-    return error_ != nullptr;
+    return error_.has_value();
 }
 
 // ============================================================================
@@ -220,29 +220,25 @@ std::optional<MessageEnvelope> MessageEnvelope::fromJson(const json& j) {
         switch (msg.envelope_.type) {
             case protocol::MessageType::REQUEST:
                 if (j.contains("request")) {
-                    msg.request_ = std::make_unique<protocol::Request>(
-                        protocol::Request::fromJson(j["request"]));
+                    msg.request_ = protocol::Request::fromJson(j["request"]);
                 }
                 break;
                 
             case protocol::MessageType::RESPONSE:
                 if (j.contains("response")) {
-                    msg.response_ = std::make_unique<protocol::Response>(
-                        protocol::Response::fromJson(j["response"]));
+                    msg.response_ = protocol::Response::fromJson(j["response"]);
                 }
                 break;
                 
             case protocol::MessageType::EVENT:
                 if (j.contains("event")) {
-                    msg.event_ = std::make_unique<protocol::Event>(
-                        protocol::Event::fromJson(j["event"]));
+                    msg.event_ = protocol::Event::fromJson(j["event"]);
                 }
                 break;
                 
             case protocol::MessageType::ERROR:
                 if (j.contains("error")) {
-                    msg.error_ = std::make_unique<protocol::Error>(
-                        protocol::Error::fromJson(j["error"]));
+                    msg.error_ = protocol::Error::fromJson(j["error"]);
                 }
                 break;
         }
@@ -277,25 +273,25 @@ json MessageEnvelope::toJson() const {
     // Add payload based on type
     switch (envelope_.type) {
         case protocol::MessageType::REQUEST:
-            if (request_) {
+            if (request_.has_value()) {
                 j["request"] = request_->toJson();
             }
             break;
             
         case protocol::MessageType::RESPONSE:
-            if (response_) {
+            if (response_.has_value()) {
                 j["response"] = response_->toJson();
             }
             break;
             
         case protocol::MessageType::EVENT:
-            if (event_) {
+            if (event_.has_value()) {
                 j["event"] = event_->toJson();
             }
             break;
             
         case protocol::MessageType::ERROR:
-            if (error_) {
+            if (error_.has_value()) {
                 j["error"] = error_->toJson();
             }
             break;
@@ -325,22 +321,22 @@ bool MessageEnvelope::isValid() const {
     // Check payload exists for type
     switch (envelope_.type) {
         case protocol::MessageType::REQUEST:
-            return request_ != nullptr;
+            return request_.has_value();
             
         case protocol::MessageType::RESPONSE:
-            return response_ != nullptr;
+            return response_.has_value();
             
         case protocol::MessageType::EVENT:
-            return event_ != nullptr;
+            return event_.has_value();
             
         case protocol::MessageType::ERROR:
-            return error_ != nullptr;
+            return error_.has_value();
     }
     
     return false;
 }
 
-std::vector<std::string> MessageEnvelope::validate() const {
+std::vector<std::string> MessageEnvelope::getValidationErrors() const {
     std::vector<std::string> errors;
     
     // Validate envelope
@@ -359,7 +355,7 @@ std::vector<std::string> MessageEnvelope::validate() const {
     // Validate payload
     switch (envelope_.type) {
         case protocol::MessageType::REQUEST:
-            if (!request_) {
+            if (!request_.has_value()) {
                 errors.push_back("REQUEST type but no request payload");
             } else {
                 if (request_->command.empty()) {
@@ -372,7 +368,7 @@ std::vector<std::string> MessageEnvelope::validate() const {
             break;
             
         case protocol::MessageType::RESPONSE:
-            if (!response_) {
+            if (!response_.has_value()) {
                 errors.push_back("RESPONSE type but no response payload");
             } else {
                 if (response_->requestId.empty()) {
@@ -382,7 +378,7 @@ std::vector<std::string> MessageEnvelope::validate() const {
             break;
             
         case protocol::MessageType::EVENT:
-            if (!event_) {
+            if (!event_.has_value()) {
                 errors.push_back("EVENT type but no event payload");
             } else {
                 if (event_->name.empty()) {
@@ -395,7 +391,7 @@ std::vector<std::string> MessageEnvelope::validate() const {
             break;
             
         case protocol::MessageType::ERROR:
-            if (!error_) {
+            if (!error_.has_value()) {
                 errors.push_back("ERROR type but no error payload");
             } else {
                 if (error_->message.empty()) {
