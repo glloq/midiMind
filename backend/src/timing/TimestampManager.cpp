@@ -56,7 +56,7 @@ void TimestampManager::start() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (started_.load(std::memory_order_acquire)) {
-        Logger::warn("TimestampManager", "Already started");
+        Logger::warning("TimestampManager", "Already started");
         return;
     }
     

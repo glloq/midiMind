@@ -88,7 +88,7 @@ json CommandHandler::processCommand(const json& command) {
         
         auto it = commands_.find(commandName);
         if (it == commands_.end()) {
-            Logger::warn("CommandHandler", "Unknown command: " + commandName);
+            Logger::warning("CommandHandler", "Unknown command: " + commandName);
             return createErrorResponse("Unknown command: " + commandName, 
                                       "UNKNOWN_COMMAND");
         }
@@ -519,7 +519,7 @@ void CommandHandler::registerAllCommands() {
 
 void CommandHandler::registerDeviceCommands() {
     if (!deviceManager_) {
-        Logger::warn("CommandHandler", 
+        Logger::warning("CommandHandler", 
                     "DeviceManager not available, skipping device commands");
         return;
     }
@@ -597,7 +597,7 @@ void CommandHandler::registerDeviceCommands() {
 
 void CommandHandler::registerRoutingCommands() {
     if (!router_) {
-        Logger::warn("CommandHandler", 
+        Logger::warning("CommandHandler", 
                     "Router not available, skipping routing commands");
         return;
     }
@@ -672,7 +672,7 @@ void CommandHandler::registerRoutingCommands() {
 
 void CommandHandler::registerPlaybackCommands() {
     if (!player_) {
-        Logger::warn("CommandHandler", 
+        Logger::warning("CommandHandler", 
                     "Player not available, skipping playback commands");
         return;
     }
@@ -814,7 +814,7 @@ void CommandHandler::registerPlaybackCommands() {
 
 void CommandHandler::registerFileCommands() {
     if (!fileManager_) {
-        Logger::warn("CommandHandler", 
+        Logger::warning("CommandHandler", 
                     "FileManager not available, skipping file commands");
         return;
     }
@@ -1031,7 +1031,7 @@ void CommandHandler::registerSystemCommands() {
     
     // system.shutdown
     registerCommand("system.shutdown", [this](const json& params) {
-        Logger::warn("CommandHandler", "Shutdown requested via API");
+        Logger::warning("CommandHandler", "Shutdown requested via API");
         
         // TODO: Implement graceful shutdown
         return json{{"shutdown", "requested"}};
@@ -1039,7 +1039,7 @@ void CommandHandler::registerSystemCommands() {
     
     // system.restart
     registerCommand("system.restart", [this](const json& params) {
-        Logger::warn("CommandHandler", "Restart requested via API");
+        Logger::warning("CommandHandler", "Restart requested via API");
         
         // TODO: Implement restart
         return json{{"restart", "requested"}};

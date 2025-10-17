@@ -69,7 +69,7 @@ std::vector<MidiMessage> ProcessorManager::processMessage(
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return {input};
     }
     
@@ -132,7 +132,7 @@ bool ProcessorManager::deleteChain(const std::string& chainId) {
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return false;
     }
     
@@ -272,7 +272,7 @@ std::shared_ptr<MidiProcessor> ProcessorManager::createProcessor(
             return nullptr;
     }
     
-    Logger::warn("ProcessorManager", 
+    Logger::warning("ProcessorManager", 
                 "Processor creation not yet implemented: " + typeName);
     
     // Apply configuration if processor was created
@@ -291,7 +291,7 @@ bool ProcessorManager::addProcessorToChain(
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return false;
     }
     
@@ -318,7 +318,7 @@ bool ProcessorManager::removeProcessorFromChain(
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return false;
     }
     
@@ -341,7 +341,7 @@ bool ProcessorManager::moveProcessor(const std::string& chainId,
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return false;
     }
     
@@ -365,7 +365,7 @@ std::string ProcessorManager::loadPreset(const std::string& presetName) {
     
     auto it = presets_.find(presetName);
     if (it == presets_.end()) {
-        Logger::warn("ProcessorManager", "Preset not found: " + presetName);
+        Logger::warning("ProcessorManager", "Preset not found: " + presetName);
         return "";
     }
     
@@ -422,7 +422,7 @@ bool ProcessorManager::saveAsPreset(const std::string& chainId,
     
     auto it = chains_.find(chainId);
     if (it == chains_.end()) {
-        Logger::warn("ProcessorManager", "Chain not found: " + chainId);
+        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
         return false;
     }
     
@@ -681,7 +681,7 @@ std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
     const std::string& type)
 {
     // TODO: Implement when processor classes are available
-    Logger::warn("ProcessorManager", 
+    Logger::warning("ProcessorManager", 
                 "Processor creation not yet implemented: " + type);
     return nullptr;
 }

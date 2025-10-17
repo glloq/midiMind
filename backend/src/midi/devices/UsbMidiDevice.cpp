@@ -63,7 +63,7 @@ UsbMidiDevice::~UsbMidiDevice() {
 
 bool UsbMidiDevice::connect() {
     if (isConnected()) {
-        Logger::warn("UsbMidiDevice", "Already connected: " + name_);
+        Logger::warning("UsbMidiDevice", "Already connected: " + name_);
         return true;
     }
     
@@ -156,7 +156,7 @@ bool UsbMidiDevice::sendMessage(const MidiMessage& message) {
         sendBuffer_.push(message);
         
         if (sendBuffer_.size() > MAX_BUFFER_SIZE) {
-            Logger::warn("UsbMidiDevice", "Send buffer overflow, dropping oldest message");
+            Logger::warning("UsbMidiDevice", "Send buffer overflow, dropping oldest message");
             sendBuffer_.pop();
         }
         
@@ -366,7 +366,7 @@ bool UsbMidiDevice::connectToPorts() {
     // Connect for INPUT (device -> us)
     result = snd_seq_connect_from(alsaSeq_, myPort_, alsaClient_, alsaPort_);
     if (result < 0) {
-        Logger::warn("UsbMidiDevice", 
+        Logger::warning("UsbMidiDevice", 
             "Failed to connect from device (input may not be supported): " + 
             std::string(snd_strerror(result)));
         // Not fatal - device may be output only
@@ -529,7 +529,7 @@ void UsbMidiDevice::midiMessageToAlsaEvent(const MidiMessage& msg, snd_seq_event
             break;
             
         default:
-            Logger::warn("UsbMidiDevice", "Unsupported message type for ALSA conversion");
+            Logger::warning("UsbMidiDevice", "Unsupported message type for ALSA conversion");
             break;
     }
 #endif

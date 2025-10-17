@@ -121,7 +121,7 @@ bool LatencyCompensator::registerDevice(const std::string& deviceId) {
     std::lock_guard<std::mutex> lock(deviceMutex_);
     
     if (devices_.find(deviceId) != devices_.end()) {
-        Logger::warn("LatencyCompensator", "Device already registered: " + deviceId);
+        Logger::warning("LatencyCompensator", "Device already registered: " + deviceId);
         return false;
     }
     
@@ -156,7 +156,7 @@ bool LatencyCompensator::registerInstrument(const InstrumentLatencyProfile& prof
     std::lock_guard<std::mutex> lock(instrumentMutex_);
     
     if (instruments_.find(profile.instrumentId) != instruments_.end()) {
-        Logger::warn("LatencyCompensator", 
+        Logger::warning("LatencyCompensator", 
                     "Instrument already registered: " + profile.instrumentId);
         return false;
     }
@@ -191,7 +191,7 @@ void LatencyCompensator::recordDeviceLatency(const std::string& deviceId, uint64
     
     auto it = devices_.find(deviceId);
     if (it == devices_.end()) {
-        Logger::warn("LatencyCompensator", "Device not registered: " + deviceId);
+        Logger::warning("LatencyCompensator", "Device not registered: " + deviceId);
         return;
     }
     
@@ -252,7 +252,7 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
     
     auto it = instruments_.find(instrumentId);
     if (it == instruments_.end()) {
-        Logger::warn("LatencyCompensator", "Instrument not registered: " + instrumentId);
+        Logger::warning("LatencyCompensator", "Instrument not registered: " + instrumentId);
         return;
     }
     
@@ -421,7 +421,7 @@ bool LatencyCompensator::saveInstrumentProfiles() {
                 savedCount++;
             } else {
                 failedCount++;
-                Logger::warn("LatencyCompensator", "Failed to save: " + id);
+                Logger::warning("LatencyCompensator", "Failed to save: " + id);
             }
         }
     }
@@ -484,7 +484,7 @@ bool LatencyCompensator::loadInstrumentProfiles() {
                     }
                 }
             } catch (const std::exception& e) {
-                Logger::warn("LatencyCompensator", 
+                Logger::warning("LatencyCompensator", 
                            "Failed to parse calibration history for " + entry.id);
             }
         }

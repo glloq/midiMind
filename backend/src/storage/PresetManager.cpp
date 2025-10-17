@@ -135,7 +135,7 @@ Preset Preset::fromJson(const json& j) {
 PresetManager::PresetManager(std::shared_ptr<Database> database)
     : database_(database)
 {
-    if (!database_ || !database_->isOpen()) {
+    if (!database_ || !database_->isConnected()) {
         THROW_ERROR(ErrorCode::DATABASE_NOT_CONNECTED, 
                    "Database must be opened before creating PresetManager");
     }
@@ -262,7 +262,7 @@ std::optional<Preset> PresetManager::load(int id) {
         );
         
         if (!result.success || result.rows.empty()) {
-            Logger::warn("PresetManager", "Preset not found: " + std::to_string(id));
+            Logger::warning("PresetManager", "Preset not found: " + std::to_string(id));
             return std::nullopt;
         }
         

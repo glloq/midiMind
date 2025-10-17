@@ -135,7 +135,7 @@ void MidiDeviceManager::scanUSBDevices() {
         snd_seq_t* seq = nullptr;
         
         if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_INPUT, 0) < 0) {
-            Logger::warn("MidiDeviceManager", "Failed to open ALSA sequencer");
+            Logger::warning("MidiDeviceManager", "Failed to open ALSA sequencer");
             return;
         }
         
@@ -206,7 +206,7 @@ void MidiDeviceManager::scanUSBDevices() {
                      std::string(e.what()));
     }
 #else
-    Logger::warn("MidiDeviceManager", "USB MIDI scanning not supported on this platform");
+    Logger::warning("MidiDeviceManager", "USB MIDI scanning not supported on this platform");
 #endif
     
     Logger::info("MidiDeviceManager", "✓ USB scan complete: " + 
@@ -281,7 +281,7 @@ bool MidiDeviceManager::connect(const std::string& deviceId) {
     
     // Check if already connected
     if (connectedDevices_.find(deviceId) != connectedDevices_.end()) {
-        Logger::warn("MidiDeviceManager", "Device already connected: " + deviceId);
+        Logger::warning("MidiDeviceManager", "Device already connected: " + deviceId);
         return true;
     }
     
@@ -448,7 +448,7 @@ std::vector<std::shared_ptr<MidiDevice>> MidiDeviceManager::getDevicesByType(Dev
 
 void MidiDeviceManager::startHotPlugMonitoring() {
     if (hotPlugMonitoring_) {
-        Logger::warn("MidiDeviceManager", "Hot-plug monitoring already active");
+        Logger::warning("MidiDeviceManager", "Hot-plug monitoring already active");
         return;
     }
     
@@ -503,7 +503,7 @@ std::shared_ptr<MidiDevice> MidiDeviceManager::createDevice(const DeviceInfo& in
     // TODO: Implement actual device creation based on type
     // For now, return nullptr as placeholder
     
-    Logger::warn("MidiDeviceManager", "Device creation not yet implemented for type: " + 
+    Logger::warning("MidiDeviceManager", "Device creation not yet implemented for type: " + 
                 MidiDevice::deviceTypeToString(info.type));
     
     return nullptr;

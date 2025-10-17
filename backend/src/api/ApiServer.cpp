@@ -79,7 +79,7 @@ ApiServer::~ApiServer() {
 
 void ApiServer::start(int port) {
     if (running_) {
-        Logger::warn("ApiServer", "Server already running");
+        Logger::warning("ApiServer", "Server already running");
         return;
     }
     
@@ -126,7 +126,7 @@ void ApiServer::stop() {
                     server_.close(hdl, websocketpp::close::status::going_away, 
                                  "Server shutting down");
                 } catch (const std::exception& e) {
-                    Logger::warn("ApiServer", 
+                    Logger::warning("ApiServer", 
                                "Error closing connection: " + std::string(e.what()));
                 }
             }
@@ -223,7 +223,7 @@ void ApiServer::broadcast(const MessageEnvelope& message) {
             stats_.messagesSent++;
             
         } catch (const std::exception& e) {
-            Logger::warn("ApiServer", 
+            Logger::warning("ApiServer", 
                         "Error broadcasting to client: " + std::string(e.what()));
             
             std::lock_guard<std::mutex> statsLock(statsMutex_);
@@ -264,7 +264,7 @@ void ApiServer::onOpen(connection_hdl hdl) {
         Logger::info("ApiServer", "Client connected: " + remote);
         
     } catch (const std::exception& e) {
-        Logger::warn("ApiServer", "Client connected (unknown address)");
+        Logger::warning("ApiServer", "Client connected (unknown address)");
     }
 }
 
@@ -329,7 +329,7 @@ void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
             processRequest(hdl, message);
             
         } else {
-            Logger::warn("ApiServer", "Received non-request message, ignoring");
+            Logger::warning("ApiServer", "Received non-request message, ignoring");
         }
         
     } catch (const std::exception& e) {
@@ -347,7 +347,7 @@ void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
 }
 
 void ApiServer::onFail(connection_hdl hdl) {
-    Logger::warn("ApiServer", "Connection failed");
+    Logger::warning("ApiServer", "Connection failed");
     
     {
         std::lock_guard<std::mutex> lock(connectionsMutex_);
@@ -467,7 +467,7 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
             response = MessageEnvelope::createErrorResponse(
                 request.id, code, errorMsg, details);
             
-            Logger::warn("ApiServer", 
+            Logger::warning("ApiServer", 
                         "Command failed: " + request.command + 
                         " - " + errorMsg);
         }

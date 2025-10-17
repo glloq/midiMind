@@ -79,31 +79,23 @@ bool Settings::save() {
     Logger::info("Settings", "Saving settings to database...");
     
     try {
-        if (!database_.beginTransaction()) {
-            Logger::error("Settings", "Failed to begin transaction");
-            return false;
-        }
-        
-        size_t count = 0;
-        
-        for (const auto& [key, value] : cache_) {
-            auto result = database_.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                {key, value}
-            );
-            
-            if (result.success) {
-                count++;
-            } else {
-                Logger::warn("Settings", "Failed to save: " + key);
-            }
-        }
-        
-        if (!database_.commit()) {
-            Logger::error("Settings", "Failed to commit transaction");
-            database_.rollback();
-            return false;
-        }
+		bool success = database_.transaction([&]() {
+			for (const auto& [key, value] : settings_) {
+				auto result = database_.execute(
+					"INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+					{key, value}
+				);
+				
+				if (!result.success) {
+					Logger::warning("Settings", "Failed to save: " + key);
+				}
+			}
+		});
+
+		if (!success) {
+			Logger::error("Settings", "Transaction failed");
+			return false;
+		}
         
         Logger::info("Settings", "✓ Saved " + std::to_string(count) + " settings");
         return true;
@@ -150,7 +142,7 @@ int Settings::getInt(const std::string& key, int defaultValue) {
         try {
             return std::stoi(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid int for '" + key + "': " + it->second);
+            Logger::warning("Settings", "Invalid int for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
@@ -175,7 +167,7 @@ bool Settings::getBool(const std::string& key, bool defaultValue) {
             return false;
         }
         
-        Logger::warn("Settings", "Invalid bool for '" + key + "': " + it->second);
+        Logger::warning("Settings", "Invalid bool for '" + key + "': " + it->second);
         return defaultValue;
     }
     
@@ -190,7 +182,7 @@ double Settings::getDouble(const std::string& key, double defaultValue) {
         try {
             return std::stod(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid double for '" + key + "': " + it->second);
+            Logger::warning("Settings", "Invalid double for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
@@ -206,7 +198,7 @@ json Settings::getJson(const std::string& key, const json& defaultValue) {
         try {
             return json::parse(it->second);
         } catch (const std::exception& e) {
-            Logger::warn("Settings", "Invalid JSON for '" + key + "': " + it->second);
+            Logger::warning("Settings", "Invalid JSON for '" + key + "': " + it->second);
             return defaultValue;
         }
     }

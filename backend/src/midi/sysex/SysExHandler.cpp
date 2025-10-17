@@ -46,13 +46,13 @@ void SysExHandler::handleSysExMessage(const std::vector<uint8_t>& data,
                                       const std::string& deviceId) {
     // Validate basic SysEx format
     if (data.size() < 4) {
-        Logger::warn("SysExHandler", 
+        Logger::warning("SysExHandler", 
             "Invalid SysEx from " + deviceId + " (too short)");
         return;
     }
     
     if (data[0] != 0xF0 || data[data.size() - 1] != 0xF7) {
-        Logger::warn("SysExHandler",
+        Logger::warning("SysExHandler",
             "Invalid SysEx from " + deviceId + " (missing F0/F7)");
         return;
     }
@@ -76,7 +76,7 @@ void SysExHandler::handleSysExMessage(const std::vector<uint8_t>& data,
         auto blockId = SysExParser::getCustomBlockId(data);
         
         if (!blockId) {
-            Logger::warn("SysExHandler", 
+            Logger::warning("SysExHandler", 
                 "Invalid Custom SysEx from " + deviceId);
             return;
         }
@@ -113,7 +113,7 @@ void SysExHandler::handleIdentityReply(const std::vector<uint8_t>& data,
     // Parse without lock
     auto identity = SysExParser::parseIdentityReply(data);
     if (!identity) {
-        Logger::warn("SysExHandler", "Failed to parse Identity Reply");
+        Logger::warning("SysExHandler", "Failed to parse Identity Reply");
         return;
     }
     
@@ -149,7 +149,7 @@ void SysExHandler::handleCustomIdentification(const std::vector<uint8_t>& data,
     // Parse without lock
     auto identity = SysExParser::parseCustomIdentification(data);
     if (!identity) {
-        Logger::warn("SysExHandler", "Failed to parse Custom Identification");
+        Logger::warning("SysExHandler", "Failed to parse Custom Identification");
         return;
     }
     
@@ -184,7 +184,7 @@ void SysExHandler::handleNoteMap(const std::vector<uint8_t>& data,
     // Parse without lock
     auto noteMap = SysExParser::parseNoteMap(data);
     if (!noteMap) {
-        Logger::warn("SysExHandler", "Failed to parse Note Map");
+        Logger::warning("SysExHandler", "Failed to parse Note Map");
         return;
     }
     

@@ -131,7 +131,7 @@ void MidiRouter::addRoute(std::shared_ptr<MidiRoute> route) {
                           [&route](const auto& r) { return r->id == route->id; });
     
     if (it != routes_.end()) {
-        Logger::warn("MidiRouter", "Route ID already exists: " + route->id);
+        Logger::warning("MidiRouter", "Route ID already exists: " + route->id);
         return;
     }
     
@@ -210,7 +210,7 @@ void MidiRouter::registerDevice(std::shared_ptr<MidiDevice> device) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     
     if (!device) {
-        Logger::warn("MidiRouter", "Cannot register null device");
+        Logger::warning("MidiRouter", "Cannot register null device");
         return;
     }
     
@@ -475,7 +475,7 @@ void MidiRouter::sendToDevice(const std::string& deviceId, const MidiMessage& me
     auto device = getDevice(deviceId);
     
     if (!device) {
-        Logger::warn("MidiRouter", "Device not found: " + deviceId);
+        Logger::warning("MidiRouter", "Device not found: " + deviceId);
         return;
     }
     

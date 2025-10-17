@@ -162,7 +162,7 @@ bool MidiPlayer::play() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (allEvents_.empty()) {
-        Logger::warn("MidiPlayer", "No file loaded");
+        Logger::warning("MidiPlayer", "No file loaded");
         return false;
     }
     
@@ -285,7 +285,7 @@ bool MidiPlayer::seekToBar(uint32_t bar, uint8_t beat, uint16_t tick) {
     
     // Validate
     if (bar < 1 || beat < 1 || beat > timeSignatureNum_) {
-        Logger::warn("MidiPlayer", "Invalid bar/beat position");
+        Logger::warning("MidiPlayer", "Invalid bar/beat position");
         return false;
     }
     

@@ -106,7 +106,7 @@ public:
         std::shared_ptr<MidiDeviceManager> deviceManager,
         std::shared_ptr<MidiRouter> router,
         std::shared_ptr<MidiPlayer> player,
-        std::shared_ptr<MidiFileManager> fileManager
+        std::shared_ptr<FileManager> fileManager
     );
     
     /**
@@ -272,7 +272,7 @@ private:
     std::shared_ptr<MidiDeviceManager> deviceManager_;
     std::shared_ptr<MidiRouter> router_;
     std::shared_ptr<MidiPlayer> player_;
-    std::shared_ptr<MidiFileManager> fileManager_;
+    std::shared_ptr<FileManager> fileManager
 };
 
 } // namespace midiMind

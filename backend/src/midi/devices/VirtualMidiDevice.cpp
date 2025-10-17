@@ -49,7 +49,7 @@ VirtualMidiDevice::~VirtualMidiDevice() {
 
 bool VirtualMidiDevice::connect() {
     if (isConnected()) {
-        Logger::warn("VirtualMidiDevice", "Already connected: " + name_);
+        Logger::warning("VirtualMidiDevice", "Already connected: " + name_);
         return true;
     }
     
@@ -84,7 +84,7 @@ bool VirtualMidiDevice::connect() {
     // Non-ALSA fallback: use queues only
     status_ = DeviceStatus::CONNECTED;
     
-    Logger::warn("VirtualMidiDevice", 
+    Logger::warning("VirtualMidiDevice", 
                 "ALSA not available, using queue-only mode");
     
     return true;
@@ -129,12 +129,12 @@ bool VirtualMidiDevice::isConnected() const {
 
 bool VirtualMidiDevice::sendMessage(const MidiMessage& message) {
     if (!isConnected()) {
-        Logger::warn("VirtualMidiDevice", "Cannot send: not connected");
+        Logger::warning("VirtualMidiDevice", "Cannot send: not connected");
         return false;
     }
     
     if (!isOutput_) {
-        Logger::warn("VirtualMidiDevice", "Cannot send: port is input-only");
+        Logger::warning("VirtualMidiDevice", "Cannot send: port is input-only");
         return false;
     }
     
@@ -169,7 +169,7 @@ bool VirtualMidiDevice::sendMessage(const MidiMessage& message) {
     std::lock_guard<std::mutex> lock(sendMutex_);
     
     if (sendQueue_.size() >= MAX_QUEUE_SIZE) {
-        Logger::warn("VirtualMidiDevice", "Send queue full, dropping message");
+        Logger::warning("VirtualMidiDevice", "Send queue full, dropping message");
         return false;
     }
     
@@ -394,7 +394,7 @@ void VirtualMidiDevice::processAlsaEvent(const snd_seq_event_t* ev) {
             std::lock_guard<std::mutex> lock(receiveMutex_);
             
             if (receiveQueue_.size() >= MAX_QUEUE_SIZE) {
-                Logger::warn("VirtualMidiDevice", "Receive queue full, dropping message");
+                Logger::warning("VirtualMidiDevice", "Receive queue full, dropping message");
                 return;
             }
             

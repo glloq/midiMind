@@ -330,7 +330,7 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
     jsonMidi.format = "jsonmidi-v1.0";
     jsonMidi.version = "1.0.0";
     
-    Logger::warn("JsonMidiConverter", "MIDI file parsing not yet implemented");
+    Logger::warning("JsonMidiConverter", "MIDI file parsing not yet implemented");
     
     return jsonMidi;
 }
@@ -369,7 +369,7 @@ bool JsonMidiConverter::toMidiFile(const JsonMidi& jsonMidi, const std::string& 
     // TODO: Implement actual MIDI file writing
     // For now, just return false
     
-    Logger::warn("JsonMidiConverter", "MIDI file writing not yet implemented");
+    Logger::warning("JsonMidiConverter", "MIDI file writing not yet implemented");
     
     return false;
 }
