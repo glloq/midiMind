@@ -87,8 +87,8 @@ void signalHandler(int signal) {
         g_shutdownRequested = true;
     } else {
         Logger::critical("Signal", "Third signal received. Immediate exit!");
-        std::exit(static_cast<int>(ExitCode::RUNTIME_ERROR));
-    }
+		std::exit(1);    
+	}
 }
 
 // ============================================================================
@@ -132,7 +132,6 @@ Application::~Application() {
     instrumentDatabase_.reset();
     fileManager_.reset();
     settings_.reset();
-    database_.reset();
     
     Logger::info("Application", "Application destroyed successfully");
 }
@@ -257,7 +256,7 @@ bool Application::initializeDatabase() {
         
         Logger::info("Application", "  Connecting to database: " + dbPath);
         
-        database_ = std::make_unique<Database>();
+        database_ = &Database::instance(); 
         
         if (!database_->connect(dbPath)) {
             Logger::error("Application", "  Failed to connect to database");
@@ -268,7 +267,8 @@ bool Application::initializeDatabase() {
         
         // Run migrations
         Logger::info("Application", "  Running migrations...");
-        if (!database_->runMigrations()) {
+        std::string migrationDir = "../../data/migrations";  // ou votre chemin
+		if (!database_->runMigrations(migrationDir)) {
             Logger::error("Application", "  Migrations failed");
             return false;
         }
@@ -289,7 +289,7 @@ bool Application::initializeStorage() {
     
     try {
         Logger::info("Application", "  Creating Settings...");
-        settings_ = std::make_unique<Settings>(*database_);
+        settings_ = std::make_shared<Settings>(*database_);
         if (!settings_->load()) {
             Logger::warning("Application", "  Settings not found, using defaults");
         }
@@ -298,7 +298,7 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  Creating FileManager...");
         std::string rootPath = Config::instance().getString("storage.root", 
                                                             "/var/lib/midimind");
-        fileManager_ = std::make_unique<FileManager>(rootPath);
+        fileManager_ = std::make_shared<FileManager>(rootPath);
         
         if (!fileManager_->initializeDirectories()) {
             Logger::error("Application", "  Failed to initialize directories");
@@ -307,7 +307,7 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  ✓ FileManager ready");
         
         Logger::info("Application", "  Creating InstrumentDatabase...");
-        instrumentDatabase_ = std::make_unique<InstrumentDatabase>(*database_);
+        instrumentDatabase_ = std::make_shared<InstrumentDatabase>(*database_);
         Logger::info("Application", "  ✓ InstrumentDatabase ready");
         
         Logger::info("Application", "");
@@ -325,14 +325,14 @@ bool Application::initializeTiming() {
     
     try {
         Logger::info("Application", "  Creating LatencyCompensator...");
-        latencyCompensator_ = std::make_unique<LatencyCompensator>(*instrumentDatabase_);
+        latencyCompensator_ = std::make_shared<LatencyCompensator>(*instrumentDatabase_);
         
         // Load existing profiles from database
-        if (!latencyCompensator_->loadFromDatabase()) {
+        /*if (!latencyCompensator_->loadFromDatabase()) {
             Logger::warning("Application", "  No instrument profiles loaded");
         } else {
             Logger::info("Application", "  ✓ Instrument profiles loaded");
-        }
+        }*/
         
         Logger::info("Application", "  ✓ LatencyCompensator ready (manual mode)");
         
@@ -354,15 +354,15 @@ bool Application::initializeMidi() {
     
     try {
         Logger::info("Application", "  Creating MidiDeviceManager...");
-        deviceManager_ = std::make_unique<MidiDeviceManager>();
+        deviceManager_ = std::make_shared<MidiDeviceManager>();
         Logger::info("Application", "  ✓ MidiDeviceManager ready");
         
         Logger::info("Application", "  Creating MidiRouter...");
-        router_ = std::make_unique<MidiRouter>(latencyCompensator_.get());
+        router_ = std::make_shared<MidiRouter>(latencyCompensator_.get());
         Logger::info("Application", "  ✓ MidiRouter ready (with latency compensation)");
         
         Logger::info("Application", "  Creating MidiPlayer...");
-        player_ = std::make_unique<MidiPlayer>();
+        player_ = std::make_shared<MidiPlayer>(router_);
         Logger::info("Application", "  ✓ MidiPlayer ready");
         
         // Scan for MIDI devices
@@ -387,13 +387,11 @@ bool Application::initializeApi() {
         Logger::info("Application", "  Creating CommandHandler...");
         
         // Pass latencyCompensator and instrumentDatabase to CommandHandler
-        commandHandler_ = std::make_unique<CommandHandler>(
-            deviceManager_,
-            router_,
-            player_,
-            fileManager_,
-            latencyCompensator_,   // ADDED for latency.* commands
-            instrumentDatabase_    // ADDED for latency.* commands
+        commandHandler_ = std::make_shared<CommandHandler>(
+			deviceManager_,
+			router_,
+			player_,
+			4 
         );
         
         Logger::info("Application", "  ✓ CommandHandler ready");
@@ -405,7 +403,7 @@ bool Application::initializeApi() {
         int port = Config::instance().getInt("api.port", 8080);
         std::string host = Config::instance().getString("api.host", "0.0.0.0");
         
-        apiServer_ = std::make_unique<ApiServer>(port, host);
+        apiServer_ = std::make_shared<ApiServer>();
         
         // Register command callback
         apiServer_->setCommandCallback([this](const json& command) {
@@ -431,7 +429,7 @@ bool Application::initializeEventSystem() {
     
     try {
         Logger::info("Application", "  Creating EventBus...");
-        eventBus_ = std::make_unique<EventBus>();
+        eventBus_ = std::make_shared<EventBus>();
         Logger::info("Application", "  ✓ EventBus ready");
         
         // Subscribe API server to device events
@@ -548,14 +546,14 @@ void Application::stop() {
             apiServer_->stop();
         }
         Logger::info("Application", "✓ API server stopped");
-        
+        /*
         // Save state
         Logger::info("Application", "Saving state...");
         if (latencyCompensator_) {
             latencyCompensator_->saveToDatabase();
         }
         Logger::info("Application", "✓ State saved");
-        
+        */
         running_ = false;
         
         Logger::info("Application", "");
@@ -609,7 +607,7 @@ void Application::broadcastStatus() {
     
     json status = {
         {"type", "status"},
-        {"timestamp", TimeUtils::currentTimestamp()},
+        {"timestamp",std::chrono::system_clock::now().time_since_epoch().count()},
         {"uptime", getUptime()},
         {"components", {
             {"database", database_ && database_->isConnected()},
@@ -618,8 +616,8 @@ void Application::broadcastStatus() {
             {"latency_compensator", latencyCompensator_ != nullptr}
         }}
     };
-    
-    apiServer_->broadcast(status);
+    auto event = MessageEnvelope::createEvent("system:status", status);
+apiServer_->broadcast(event);
 }
 
 // ============================================================================

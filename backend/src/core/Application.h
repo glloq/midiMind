@@ -6,7 +6,7 @@
 //
 // Changes v4.1.1:
 //   - Fixed member variable names to match .cpp
-//   - Fixed pointer types (unique_ptr instead of shared_ptr)
+//   - Fixed pointer types (make_shared instead of shared_ptr)
 //   - Added missing thread variable
 //   - Fixed startTime_ type
 //   - Fixed getUptime() return type
@@ -113,16 +113,16 @@ public:
     // COMPONENT ACCESS
     // ========================================================================
     
-    std::unique_ptr<Database>& getDatabase() { return database_; }
-    std::unique_ptr<Settings>& getSettings() { return settings_; }
-    std::unique_ptr<FileManager>& getFileManager() { return fileManager_; }
-    std::unique_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
-    std::unique_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
-    std::unique_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
-    std::unique_ptr<MidiRouter>& getRouter() { return router_; }
-    std::unique_ptr<MidiPlayer>& getPlayer() { return player_; }
-    std::unique_ptr<ApiServer>& getApiServer() { return apiServer_; }
-    std::unique_ptr<EventBus>& getEventBus() { return eventBus_; }
+	Database* getDatabase() { return database_; }
+    std::shared_ptr<Settings>& getSettings() { return settings_; }
+	std::shared_ptr<FileManager>& getFileManager() { return fileManager_; }
+	std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
+	std::shared_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
+	std::shared_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
+	std::shared_ptr<MidiRouter>& getRouter() { return router_; }
+	std::shared_ptr<MidiPlayer>& getPlayer() { return player_; }
+	std::shared_ptr<ApiServer>& getApiServer() { return apiServer_; }
+	std::shared_ptr<EventBus>& getEventBus() { return eventBus_; }
     
     // ========================================================================
     // STATUS
@@ -207,24 +207,24 @@ private:
     std::thread statusBroadcastThread_;
     
     // Core components
-    std::unique_ptr<Database> database_;
-    std::unique_ptr<Settings> settings_;
-    std::unique_ptr<FileManager> fileManager_;
-    std::unique_ptr<PathManager> pathManager_;
-    std::unique_ptr<InstrumentDatabase> instrumentDatabase_;
-    std::unique_ptr<EventBus> eventBus_;
+    Database* database_; 
+    std::shared_ptr<Settings> settings_;
+    std::shared_ptr<FileManager> fileManager_;
+    std::shared_ptr<PathManager> pathManager_;
+    std::shared_ptr<InstrumentDatabase> instrumentDatabase_;
+    std::shared_ptr<EventBus> eventBus_;
     
     // Timing components
-    std::unique_ptr<LatencyCompensator> latencyCompensator_;
+    std::shared_ptr<LatencyCompensator> latencyCompensator_;
     
     // MIDI components
-    std::unique_ptr<MidiDeviceManager> deviceManager_;
-    std::unique_ptr<MidiRouter> router_;
-    std::unique_ptr<MidiPlayer> player_;
+    std::shared_ptr<MidiDeviceManager> deviceManager_;
+    std::shared_ptr<MidiRouter> router_;
+    std::shared_ptr<MidiPlayer> player_;
     
     // API components
-    std::unique_ptr<ApiServer> apiServer_;
-    std::unique_ptr<CommandHandler> commandHandler_;
+    std::shared_ptr<ApiServer> apiServer_;
+    std::shared_ptr<CommandHandler> commandHandler_;
 };
 
 } // namespace midiMind

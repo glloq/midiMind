@@ -411,4 +411,3 @@ private:
 
 } // namespace midiMind
 
-#endif // DATABASE_H
