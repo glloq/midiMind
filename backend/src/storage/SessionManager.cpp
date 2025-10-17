@@ -26,7 +26,6 @@
 //
 // ============================================================================
 
-#pragma once
 
 #include "../core/Error.h"
 #include "Database.h"
@@ -36,6 +35,7 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <optional>
 #include <functional>
 #include <nlohmann/json.hpp>
 
