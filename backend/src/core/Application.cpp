@@ -136,6 +136,45 @@ Application::~Application() {
     Logger::info("Application", "Application destroyed successfully");
 }
 
+bool Application::isInitialized() const {
+    return initialized_.load();
+}
+
+bool Application::isRunning() const {
+    return running_.load();
+}
+
+json Application::getStatus() const {
+    json status;
+    
+    status["initialized"] = initialized_.load();
+    status["running"] = running_.load();
+    status["version"] = getVersion();
+    status["protocol_version"] = getProtocolVersion();
+    status["uptime"] = getUptime();
+    
+    status["components"] = {
+        {"database", database_ && database_->isConnected()},
+        {"settings", settings_ != nullptr},
+        {"file_manager", fileManager_ != nullptr},
+        {"instrument_database", instrumentDatabase_ != nullptr},
+        {"latency_compensator", latencyCompensator_ != nullptr},
+        {"device_manager", deviceManager_ != nullptr},
+        {"router", router_ != nullptr},
+        {"player", player_ != nullptr},
+        {"api_server", apiServer_ && apiServer_->isRunning()},
+        {"event_bus", eventBus_ != nullptr}
+    };
+    
+    if (deviceManager_) {
+        status["midi_devices"] = deviceManager_->getDeviceCount();
+    }
+    
+    return status;
+}
+
+
+
 // ============================================================================
 // LIFECYCLE - INITIALIZE
 // ============================================================================
