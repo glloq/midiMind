@@ -1,18 +1,16 @@
 #!/bin/bash
 # ============================================================================
 # Fichier: scripts/install.sh
-# Version: 4.1.0 - OPTIMISÉE
-# Date: 2025-10-16
+# Version: 4.1.1 - SIMPLIFIÉE
+# Date: 2025-10-18
 # Projet: MidiMind - Système d'Orchestration MIDI pour Raspberry Pi
 # ============================================================================
 #
-# AMÉLIORATIONS v4.1.0:
-#   ✅ Frontend optionnel (choix utilisateur)
-#   ✅ Installation minimale backend uniquement
-#   ✅ Détection automatique frontend
-#   ✅ Mode développeur (sans Nginx)
-#   ✅ Vérifications renforcées
-#   ✅ Installation plus rapide
+# CHANGEMENTS v4.1.1:
+#   ✅ Installation complète automatique (Backend + Frontend + Nginx)
+#   ✅ Pas de menu de sélection
+#   ✅ Frontend servi depuis le bon dossier
+#   ✅ Configuration optimale par défaut
 #
 # ============================================================================
 
@@ -48,11 +46,6 @@ WEB_DIR="/var/www/midimind"
 LOG_FILE="/var/log/midimind_install.log"
 REAL_USER="${SUDO_USER:-$USER}"
 USER_DIR="/home/$REAL_USER/.midimind"
-
-# Options d'installation
-INSTALL_FRONTEND=true
-INSTALL_NGINX=true
-DEV_MODE=false
 
 # Détection système
 RPI_MODEL=""
@@ -95,73 +88,16 @@ print_banner() {
     cat << "EOF"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║              🎹 MidiMind v4.1.0 Installation ⚡               ║
+║              🎹 MidiMind v4.1.1 Installation ⚡               ║
 ║                                                              ║
 ║          Système d'Orchestration MIDI Professionnel          ║
 ║                  pour Raspberry Pi                           ║
 ║                                                              ║
-║              ⚡ OPTIMISÉE & BACKEND-FIRST ⚡                   ║
+║              Installation Complète Automatique               ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 EOF
     echo -e "${NC}"
-    echo ""
-}
-
-# ============================================================================
-# MENU INSTALLATION
-# ============================================================================
-
-show_install_menu() {
-    echo -e "${BOLD}${CYAN}📦 Type d'installation :${NC}"
-    echo ""
-    echo -e "  ${GREEN}1)${NC} ${BOLD}Installation complète${NC} (Backend + Frontend Web + Nginx)"
-    echo -e "     → Interface web sur port 8000"
-    echo -e "     → Recommandé pour production"
-    echo ""
-    echo -e "  ${YELLOW}2)${NC} ${BOLD}Backend uniquement${NC} (API WebSocket seule)"
-    echo -e "     → Pas d'interface web"
-    echo -e "     → Idéal pour intégration custom ou contrôle externe"
-    echo ""
-    echo -e "  ${BLUE}3)${NC} ${BOLD}Mode développeur${NC} (Backend + Frontend sans Nginx)"
-    echo -e "     → Serveur dev intégré"
-    echo -e "     → Pour développement local"
-    echo ""
-    echo -e "  ${RED}0)${NC} Annuler"
-    echo ""
-    
-    read -p "$(echo -e ${CYAN}Votre choix [1-3]: ${NC})" choice
-    
-    case $choice in
-        1)
-            INSTALL_FRONTEND=true
-            INSTALL_NGINX=true
-            DEV_MODE=false
-            info "Mode sélectionné: Installation complète"
-            ;;
-        2)
-            INSTALL_FRONTEND=false
-            INSTALL_NGINX=false
-            DEV_MODE=false
-            info "Mode sélectionné: Backend uniquement"
-            warning "Aucune interface web ne sera disponible"
-            ;;
-        3)
-            INSTALL_FRONTEND=true
-            INSTALL_NGINX=false
-            DEV_MODE=true
-            info "Mode sélectionné: Développeur"
-            ;;
-        0)
-            echo ""
-            echo -e "${RED}Installation annulée.${NC}"
-            exit 0
-            ;;
-        *)
-            error "Choix invalide: $choice"
-            ;;
-    esac
-    
     echo ""
 }
 
@@ -177,7 +113,7 @@ detect_system() {
     echo -e "  ${BLUE}•${NC} Script:     ${GREEN}$SCRIPT_DIR${NC}"
     echo -e "  ${BLUE}•${NC} Projet:     ${GREEN}$PROJECT_ROOT${NC}"
     echo -e "  ${BLUE}•${NC} Backend:    ${GREEN}$BACKEND_DIR${NC}"
-    echo -e "  ${BLUE}•${NC} Frontend:   ${GREEN}$FRONTEND_DIR${NC} ${CYAN}(racine du projet)${NC}"
+    echo -e "  ${BLUE}•${NC} Frontend:   ${GREEN}$FRONTEND_DIR${NC}"
     echo ""
     
     # ✅ VÉRIFICATION 1: Répertoire backend/
@@ -202,11 +138,7 @@ detect_system() {
     local critical_files=(
         "$BACKEND_DIR/src/main.cpp"
         "$BACKEND_DIR/src/core/Application.cpp"
-        "$BACKEND_DIR/src/core/EventBus.cpp"
         "$BACKEND_DIR/src/api/ApiServer.cpp"
-        "$BACKEND_DIR/src/api/CommandHandler.cpp"
-        "$BACKEND_DIR/src/storage/Database.cpp"
-        "$BACKEND_DIR/src/midi/devices/MidiDeviceManager.cpp"
     )
     
     for file in "${critical_files[@]}"; do
@@ -214,60 +146,26 @@ detect_system() {
             error "Fichier critique manquant: $file"
         fi
     done
-    info "Vérification de la structure CMake..."
+    success "Fichiers critiques backend vérifiés"
     
-    # Vérifier que CMakeLists.txt référence les bons fichiers
-    if ! grep -q "CommandHandler.cpp" "$BACKEND_DIR/CMakeLists.txt"; then
-        warning "CMakeLists.txt ne contient pas CommandHandler.cpp"
-        info "Ceci peut être normal si le fichier utilise un autre nom"
+    # ✅ VÉRIFICATION 4: Frontend
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        error "Frontend introuvable: $FRONTEND_DIR\n  Le frontend doit être dans: $FRONTEND_DIR"
     fi
+    success "Répertoire frontend/ trouvé"
     
-    if grep -q "CommandProcessorV2.cpp" "$BACKEND_DIR/CMakeLists.txt"; then
-        error "CMakeLists.txt référence l'ancien fichier CommandProcessorV2.cpp\n  Fichier attendu: CommandHandler.cpp\n  Veuillez mettre à jour CMakeLists.txt"
+    if [ ! -f "$FRONTEND_DIR/index.html" ]; then
+        error "index.html manquant dans: $FRONTEND_DIR"
     fi
+    success "Frontend index.html trouvé"
     
-    # ✅ VÉRIFICATION 4: Frontend (optionnel)
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        if [ ! -d "$FRONTEND_DIR" ]; then
-            warning "Frontend demandé mais répertoire introuvable: $FRONTEND_DIR"
-            read -p "$(echo -e ${YELLOW}Continuer sans frontend? [O/n]: ${NC})" response
-            if [[ "$response" =~ ^[Nn]$ ]]; then
-                error "Installation annulée par l'utilisateur"
-            fi
-            INSTALL_FRONTEND=false
-            INSTALL_NGINX=false
-        else
-            success "Répertoire frontend/ trouvé"
-            
-            if [ ! -f "$FRONTEND_DIR/index.html" ]; then
-                warning "index.html manquant dans frontend/"
-            else
-                success "Frontend index.html trouvé"
-            fi
-        fi
-    else
-        info "Installation frontend désactivée (mode backend only)"
+    if [ ! -d "$FRONTEND_DIR/js" ]; then
+        error "Dossier js/ manquant dans: $FRONTEND_DIR"
     fi
+    success "Dossier js/ trouvé dans frontend/"
     
     echo ""
     success "✅ Structure du projet validée"
-    
-    # Résumé des vérifications
-    echo ""
-    echo -e "${BOLD}${GREEN}📋 Résumé des vérifications:${NC}"
-    echo -e "  ${GREEN}✓${NC} Core:            4 fichiers .cpp (main, Application, EventBus, JsonValidator)"
-    echo -e "  ${GREEN}✓${NC} Storage:         7 fichiers .cpp (Database, FileManager, PathManager, Settings, InstrumentDB, PresetMgr, SessionMgr)"
-    echo -e "  ${GREEN}✓${NC} Timing:          2 fichiers .cpp (TimestampManager, LatencyCompensator)"
-    echo -e "  ${GREEN}✓${NC} API:             3 fichiers .cpp (ApiServer, CommandHandler, MessageEnvelope)"
-    echo -e "  ${GREEN}✓${NC} MIDI:            2 fichiers .cpp minimum (MidiRouter, MidiDeviceManager)"
-    echo -e "  ${GREEN}✓${NC} Headers:         5 fichiers .h (header-only: Logger, Config, Error, TimeUtils, InstrumentLatencyProfile)"
-    echo -e "  ${GREEN}✓${NC} CMakeLists.txt:  Configuration de build validée"
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        echo -e "  ${GREEN}✓${NC} Frontend:        Répertoire présent"
-    else
-        echo -e "  ${YELLOW}○${NC} Frontend:        Installation désactivée"
-    fi
-    echo -e "  ${CYAN}ℹ${NC} Total vérifié:   ${BOLD}20 fichiers${NC} (.cpp) + ${BOLD}5 headers${NC}"
     echo ""
     
     # Détection plateforme
@@ -362,35 +260,8 @@ install_system_dependencies() {
         bluez libbluetooth-dev bluetooth \
         2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques réseau"
     
-    # Nginx uniquement si nécessaire
-    if [ "$INSTALL_NGINX" = true ]; then
-        info "Installation du serveur web..."
-        apt-get install -y -qq nginx 2>&1 | tee -a "$LOG_FILE" || error "Échec installation nginx"
-    else
-        info "Installation Nginx ignorée (mode: $([[ "$INSTALL_FRONTEND" = false ]] && echo "backend only" || echo "dev"))"
-    fi
-    
-    # Node.js uniquement si frontend installé
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        info "Installation Node.js LTS via NodeSource..."
-        if command -v node &> /dev/null; then
-            local node_version=$(node --version)
-            success "Node.js déjà installé: $node_version"
-        else
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash - 2>&1 | tee -a "$LOG_FILE" || {
-                warning "NodeSource échoué, fallback sur dépôts standard..."
-                apt-get install -y -qq nodejs npm 2>&1 | tee -a "$LOG_FILE"
-            }
-            
-            apt-get install -y -qq nodejs 2>&1 | tee -a "$LOG_FILE" || error "Échec installation Node.js"
-            
-            local node_version=$(node --version)
-            local npm_version=$(npm --version)
-            success "Node.js $node_version installé (npm $npm_version)"
-        fi
-    else
-        info "Installation Node.js ignorée (backend only)"
-    fi
+    info "Installation du serveur web Nginx..."
+    apt-get install -y -qq nginx 2>&1 | tee -a "$LOG_FILE" || error "Échec installation nginx"
     
     success "✅ Dépendances système installées"
 }
@@ -435,7 +306,7 @@ install_cpp_dependencies() {
 # ============================================================================
 
 configure_permissions() {
-    log "🔒 ÉTAPE 4/9: Configuration des permissions"
+    log "🔐 ÉTAPE 4/9: Configuration des permissions"
     
     info "Ajout de l'utilisateur $REAL_USER aux groupes..."
     usermod -a -G audio "$REAL_USER"
@@ -446,7 +317,7 @@ configure_permissions() {
     info "Configuration des permissions temps réel..."
     cat >> /etc/security/limits.conf << EOF
 
-# MidiMind real-time permissions (v4.1.0)
+# MidiMind real-time permissions (v4.1.1)
 @audio   -  rtprio     95
 @audio   -  memlock    unlimited
 @audio   -  nice       -19
@@ -494,7 +365,7 @@ EOF
     info "Configuration audio..."
     cat >> /etc/modprobe.d/alsa-base.conf << EOF
 
-# MidiMind audio optimizations (v4.1.0)
+# MidiMind audio optimizations (v4.1.1)
 options snd-usb-audio nrpacks=1
 EOF
     
@@ -513,20 +384,14 @@ create_directories() {
     mkdir -p "$USER_DIR"/{midi_files,playlists,backups,logs}
     mkdir -p /var/log/midimind
     mkdir -p /etc/midimind
-    
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        mkdir -p "$WEB_DIR"
-    fi
+    mkdir -p "$WEB_DIR"
     
     info "Configuration des permissions..."
     chown -R "$REAL_USER:audio" "$INSTALL_DIR"
     chown -R "$REAL_USER:audio" "$USER_DIR"
     chown -R "$REAL_USER:audio" /var/log/midimind
     chown -R "$REAL_USER:audio" /etc/midimind
-    
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        chown -R www-data:www-data "$WEB_DIR"
-    fi
+    chown -R www-data:www-data "$WEB_DIR"
     
     success "Répertoires créés"
 }
@@ -545,35 +410,6 @@ compile_backend() {
     if [ ! -d "$BACKEND_DIR/src" ]; then
         error "Répertoire src/ introuvable: $BACKEND_DIR/src"
     fi
-    
-    # Vérifier les dépendances critiques avant compilation
-    info "Vérification des dépendances de compilation..."
-    local missing_deps=()
-    
-    # Vérifier ALSA
-    if ! ldconfig -p | grep -q libasound; then
-        missing_deps+=("libasound2-dev")
-    fi
-    
-    # Vérifier SQLite3
-    if ! ldconfig -p | grep -q libsqlite3; then
-        missing_deps+=("libsqlite3-dev")
-    fi
-    
-    # Vérifier nlohmann/json
-    if [ ! -f "/usr/include/nlohmann/json.hpp" ] && [ ! -f "/usr/local/include/nlohmann/json.hpp" ]; then
-        missing_deps+=("nlohmann-json3-dev")
-    fi
-    
-    # Vérifier websocketpp
-    if [ ! -d "/usr/include/websocketpp" ] && [ ! -d "/usr/local/include/websocketpp" ]; then
-        missing_deps+=("libwebsocketpp-dev")
-    fi
-    
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        error "Dépendances manquantes:\n$(printf '  - %s\n' "${missing_deps[@]}")\n  Installez-les avec: sudo apt install ${missing_deps[*]}"
-    fi
-    success "Toutes les dépendances sont présentes"
     
     cd "$BACKEND_DIR"
     
@@ -611,49 +447,54 @@ compile_backend() {
 }
 
 # ============================================================================
-# ÉTAPE 8: INSTALLATION FRONTEND (OPTIONNEL)
+# ÉTAPE 8: INSTALLATION FRONTEND
 # ============================================================================
 
 install_frontend() {
-    if [ "$INSTALL_FRONTEND" = false ]; then
-        log "🌐 ÉTAPE 8/9: Frontend non installé (backend only)"
-        return 0
-    fi
-    
     log "🌐 ÉTAPE 8/9: Installation du frontend"
     
     if [ ! -d "$FRONTEND_DIR" ]; then
-        warning "Répertoire frontend introuvable: $FRONTEND_DIR"
-        return 0
+        error "Répertoire frontend introuvable: $FRONTEND_DIR"
     fi
     
-    info "Copie des fichiers frontend..."
-    cp -r "$FRONTEND_DIR"/* "$WEB_DIR/"
+    info "Copie des fichiers frontend depuis: $FRONTEND_DIR"
+    info "  Destination: $WEB_DIR"
     
+    # Copier tout le contenu du dossier frontend vers /var/www/midimind
+    cp -r "$FRONTEND_DIR"/* "$WEB_DIR/" || error "Échec copie frontend"
+    
+    # Vérifier que les fichiers critiques sont bien copiés
+    if [ ! -f "$WEB_DIR/index.html" ]; then
+        error "index.html non copié vers $WEB_DIR"
+    fi
+    success "index.html copié"
+    
+    if [ ! -d "$WEB_DIR/js" ]; then
+        error "Dossier js/ non copié vers $WEB_DIR"
+    fi
+    success "Dossier js/ copié"
+    
+    # Installer les dépendances npm si package.json existe
     if [ -f "$WEB_DIR/package.json" ]; then
         info "Installation des dépendances npm..."
         cd "$WEB_DIR"
         npm install --production --no-optional 2>&1 | tee -a "$LOG_FILE" || warning "npm install a échoué"
     fi
     
+    # Configurer les permissions
     chown -R www-data:www-data "$WEB_DIR"
+    chmod -R 755 "$WEB_DIR"
     
-    success "Frontend installé"
+    success "✅ Frontend installé"
+    info "  Emplacement: $WEB_DIR"
+    info "  Fichiers: $(find $WEB_DIR -type f | wc -l) fichiers"
 }
 
 # ============================================================================
-# ÉTAPE 9: CONFIGURATION NGINX (OPTIONNEL)
+# ÉTAPE 9: CONFIGURATION NGINX
 # ============================================================================
 
 configure_nginx() {
-    if [ "$INSTALL_NGINX" = false ]; then
-        log "🌐 ÉTAPE 9/9: Nginx non configuré"
-        if [ "$DEV_MODE" = true ]; then
-            info "Mode dev: utilisez un serveur dev local (ex: python -m http.server 8000)"
-        fi
-        return 0
-    fi
-    
     log "🌐 ÉTAPE 9/9: Configuration de Nginx"
     
     info "Création de la configuration Nginx..."
@@ -706,7 +547,9 @@ EOF
     systemctl restart nginx
     systemctl enable nginx
     
-    success "Nginx configuré"
+    success "✅ Nginx configuré"
+    info "  Port: 8000"
+    info "  Root: $WEB_DIR"
 }
 
 # ============================================================================
@@ -719,7 +562,7 @@ configure_systemd_service() {
     info "Création du service systemd..."
     cat > /etc/systemd/system/midimind.service << EOF
 [Unit]
-Description=MidiMind MIDI Orchestration System v4.1.0
+Description=MidiMind MIDI Orchestration System v4.1.1
 After=network.target sound.target
 
 [Service]
@@ -761,7 +604,7 @@ create_config_files() {
     
     cat > /etc/midimind/config.json << 'EOF'
 {
-    "version": "4.1.0",
+    "version": "4.1.1",
     "server": {
         "host": "0.0.0.0",
         "port": 8080,
@@ -814,19 +657,9 @@ print_final_info() {
     
     echo -e "${CYAN}📂 Configuration installée:${NC}"
     echo ""
-    echo -e "  ${BLUE}•${NC} Type:              ${GREEN}$([[ "$INSTALL_FRONTEND" = true ]] && echo "Installation complète" || echo "Backend uniquement")${NC}"
     echo -e "  ${BLUE}•${NC} Backend:           ${GREEN}$INSTALL_DIR/bin/midimind${NC}"
-    
-    if [ "$INSTALL_FRONTEND" = true ]; then
-        if [ "$INSTALL_NGINX" = true ]; then
-            echo -e "  ${BLUE}•${NC} Interface web:     ${GREEN}http://$(hostname -I | awk '{print $1}'):8000${NC}"
-        else
-            echo -e "  ${BLUE}•${NC} Frontend:          ${YELLOW}Mode dev (serveur manuel requis)${NC}"
-        fi
-    else
-        echo -e "  ${BLUE}•${NC} Interface web:     ${YELLOW}Non installée${NC}"
-    fi
-    
+    echo -e "  ${BLUE}•${NC} Frontend:          ${GREEN}$WEB_DIR${NC}"
+    echo -e "  ${BLUE}•${NC} Interface web:     ${GREEN}http://$(hostname -I | awk '{print $1}'):8000${NC}"
     echo -e "  ${BLUE}•${NC} WebSocket API:     ${GREEN}ws://$(hostname -I | awk '{print $1}'):8080${NC}"
     echo -e "  ${BLUE}•${NC} Configuration:     ${GREEN}/etc/midimind/config.json${NC}"
     echo ""
@@ -838,13 +671,9 @@ print_final_info() {
     echo -e "  ${BLUE}•${NC} Status:        ${GREEN}sudo systemctl status midimind${NC}"
     echo -e "  ${BLUE}•${NC} Logs:          ${GREEN}sudo journalctl -u midimind -f${NC}"
     echo ""
-    
-    if [ "$INSTALL_FRONTEND" = false ]; then
-        echo -e "${YELLOW}⚠️  Interface web non installée${NC}"
-        echo -e "   Utilisez l'API WebSocket directement ou installez un client custom"
-        echo -e "   Documentation API: /opt/midimind/docs/api.md"
-        echo ""
-    fi
+    echo -e "  ${BLUE}•${NC} Nginx status:  ${GREEN}sudo systemctl status nginx${NC}"
+    echo -e "  ${BLUE}•${NC} Nginx logs:    ${GREEN}tail -f /var/log/nginx/midimind_error.log${NC}"
+    echo ""
     
     echo -e "${YELLOW}⚠️  Important:${NC}"
     echo -e "  ${RED}•${NC} Redémarrez le système: ${GREEN}sudo reboot${NC}"
@@ -863,16 +692,25 @@ main() {
     
     # Initialisation log
     echo "==================================" > "$LOG_FILE"
-    echo "MidiMind Installation v4.1.0 - $(date)" >> "$LOG_FILE"
+    echo "MidiMind Installation v4.1.1 - $(date)" >> "$LOG_FILE"
     echo "==================================" >> "$LOG_FILE"
     log "Installation démarrée: $(date)"
-    
-    # Menu de sélection
-    show_install_menu
     
     # Détection et vérifications
     detect_system
     check_prerequisites
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}Installation complète (Backend + Frontend + Nginx)${NC}"
+    echo -e "${CYAN}Cela peut prendre 10-15 minutes...${NC}"
+    echo ""
+    
+    read -p "$(echo -e ${GREEN}Continuer? [O/n]: ${NC})" response
+    if [[ "$response" =~ ^[Nn]$ ]]; then
+        echo ""
+        echo -e "${RED}Installation annulée.${NC}"
+        exit 0
+    fi
     
     # Installation étape par étape
     echo ""
@@ -911,5 +749,5 @@ main() {
 main 2>&1 | tee -a "$LOG_FILE"
 
 # ============================================================================
-# FIN DU FICHIER install.sh v4.1.0 - OPTIMISÉE
+# FIN DU FICHIER install.sh v4.1.1 - SIMPLIFIÉE
 # ============================================================================
