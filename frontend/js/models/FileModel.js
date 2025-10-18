@@ -1,22 +1,32 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Version: v3.1.0 - PERFORMANCE OPTIMIZED
-// Date: 2025-10-16
+// Version: v3.1.1 - FIXED
+// Date: 2025-10-18
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// MODIFICATIONS v3.1.0:
-// ✓ Cache limité à 50 MB (au lieu de 200 MB)
-// ✓ MidiJson cache à 25 MB (au lieu de 100 MB)
-// ✓ Preload désactivé
+// CORRECTIONS v3.1.1:
+// ✓ Constructor signature fixed to match Application.js call
+// ✓ Proper eventBus initialization
+// ✓ Compatible with BaseModel
 // ============================================================================
 
 class FileModel extends BaseModel {
     constructor(eventBus, apiClient, logger) {
-        super(eventBus, apiClient, logger);
+        // ✅ FIX: Call parent constructor with proper format
+        super({}, {
+            eventPrefix: 'files',
+            autoPersist: false,
+            validateOnSet: false
+        });
+        
+        // ✅ FIX: Store dependencies properly
+        this.eventBus = eventBus;
+        this.apiClient = apiClient;
+        this.logger = logger;
         
         // Configuration cache (OPTIMISÉ)
         this.cacheConfig = {
-            maxSize: PerformanceConfig.memory.maxCacheSize || 50,  // ✓ RÉDUIT à 50 MB
+            maxSize: PerformanceConfig.memory.maxCacheSize || 50,  // ✓ RÉDUIT À 50 MB
             maxMidiJsonSize: Math.floor(PerformanceConfig.memory.maxCacheSize / 2) || 25,  // ✓ 25 MB
             enablePreload: PerformanceConfig.memory.enablePreload || false,  // ✓ DÉSACTIVÉ
             cacheTimeout: PerformanceConfig.memory.cacheTimeout || 300000,  // 5 min
@@ -76,6 +86,12 @@ class FileModel extends BaseModel {
     // ========================================================================
     
     initialize() {
+        // ✅ FIX: Check eventBus before attaching events
+        if (!this.eventBus) {
+            this.logger.error('FileModel', 'EventBus not available!');
+            return;
+        }
+        
         this.attachEvents();
         
         // ✓ Pas de preload automatique en mode performance
@@ -85,6 +101,12 @@ class FileModel extends BaseModel {
     }
     
     attachEvents() {
+        // ✅ FIX: Verify eventBus exists
+        if (!this.eventBus) {
+            this.logger.error('FileModel', 'Cannot attach events: eventBus is null');
+            return;
+        }
+        
         this.eventBus.on('app:shutdown', () => {
             this.clearCache();
         });
