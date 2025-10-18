@@ -1,13 +1,11 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.1.3 - PERFORMANCE OPTIMIZED - CORRECTED
+Version: v3.1.3 - PERFORMANCE OPTIMIZED - FINAL FIX
 Date: 2025-10-18
 ============================================================================ 
-CORRECTIONS:
-✓ Chemins corrigés selon structure réelle
-✓ Fichiers inexistants supprimés
-✓ Ordre de chargement optimisé
-✓ Notifications.js ajouté (manquant critique)
+CORRECTIONS FINALES:
+✓ Dossier "service" → "services" corrigé
+✓ Tous les chemins vérifiés
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -150,27 +148,24 @@ CORRECTIONS:
     <script src="js/config/AppConfig.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 4: COMMUNICATION BACKEND (chemins corrigés)
+         ÉTAPE 4: COMMUNICATION BACKEND (✅ CORRIGÉ: services/)
          ======================================================================== -->
-    <script src="js/service/BackendService.js"></script>
+    <script src="js/services/BackendService.js"></script>
     <script src="js/utils/ApiClient.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 5: UTILITAIRES AVANCÉS (chemins corrigés)
+         ÉTAPE 5: UTILITAIRES AVANCÉS
          ======================================================================== -->
     <script src="js/monitoring/PerformanceMonitor.js"></script>
     <script src="js/ui/NotificationManager.js"></script>
     <script src="js/utils/RoutingManager.js"></script>
-    
-    <!-- SUPPRIMÉ: StateManager.js (n'existe pas - c'est StateModel.js) -->
-    <!-- SUPPRIMÉ: CacheManager.js (n'existe pas) -->
 
     <!-- ========================================================================
-         ÉTAPE 6: SERVICES
+         ÉTAPE 6: SERVICES (✅ CORRIGÉ: services/)
          ======================================================================== -->
-    <script src="js/service/StorageService.js"></script>
-    <script src="js/service/FileService.js"></script>
-    <script src="js/service/MidiService.js"></script>
+    <script src="js/services/StorageService.js"></script>
+    <script src="js/services/FileService.js"></script>
+    <script src="js/services/MidiService.js"></script>
 
     <!-- ========================================================================
          ÉTAPE 7: CLASSES DE BASE (CRITIQUE - avant héritage)
@@ -193,14 +188,14 @@ CORRECTIONS:
     <script src="js/models/LoopModel.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 9: ÉDITEUR - CORE (chemins corrigés)
+         ÉTAPE 9: ÉDITEUR - CORE
          ======================================================================== -->
     <script src="js/editor/core/CoordinateSystem.js"></script>
     <script src="js/editor/core/Viewport.js"></script>
     <script src="js/editor/core/RenderEngine.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 10: ÉDITEUR - RENDERERS (chemins corrigés)
+         ÉTAPE 10: ÉDITEUR - RENDERERS
          ======================================================================== -->
     <script src="js/editor/renderers/GridRenderer.js"></script>
     <script src="js/editor/renderers/TimelineRenderer.js"></script>
@@ -209,13 +204,11 @@ CORRECTIONS:
     <script src="js/editor/renderers/CCRenderer.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 11: ÉDITEUR - INTERACTION (chemins corrigés)
+         ÉTAPE 11: ÉDITEUR - INTERACTION
          ======================================================================== -->
     <script src="js/editor/interaction/SelectionManager.js"></script>
     <script src="js/editor/interaction/DragHandler.js"></script>
     <script src="js/editor/interaction/EditorMode.js"></script>
-    
-    <!-- SUPPRIMÉ: EditingTools.js (n'existe pas dans structure) -->
 
     <!-- ========================================================================
          ÉTAPE 12: ÉDITEUR - UTILS
