@@ -1,41 +1,9 @@
-100%] Linking CXX executable bin/midimind
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::parseMetaEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&)':
-MidiFileWriter.cpp:(.text+0xa0c): multiple definition of `midiMind::MidiFileReader::parseMetaEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0xa0c): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::parseSysExEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&, unsigned char)':
-MidiFileWriter.cpp:(.text+0x1368): multiple definition of `midiMind::MidiFileReader::parseSysExEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&, unsigned char)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1368): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::parseMidiChannelEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&, unsigned char)':
-MidiFileWriter.cpp:(.text+0x1480): multiple definition of `midiMind::MidiFileReader::parseMidiChannelEvent(unsigned char const*, unsigned long&, unsigned long, midiMind::MidiEvent&, unsigned char)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1480): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::readVariableLength(unsigned char const*, unsigned long&)':
-MidiFileWriter.cpp:(.text+0x1a64): multiple definition of `midiMind::MidiFileReader::readVariableLength(unsigned char const*, unsigned long&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1a64): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::readUint32BE(unsigned char const*, unsigned long)':
-MidiFileWriter.cpp:(.text+0x1aa0): multiple definition of `midiMind::MidiFileReader::readUint32BE(unsigned char const*, unsigned long)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1aa0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::readUint16BE(unsigned char const*, unsigned long)':
-MidiFileWriter.cpp:(.text+0x1ac8): multiple definition of `midiMind::MidiFileReader::readUint16BE(unsigned char const*, unsigned long)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1ac8): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::getDataBytesCount(unsigned char)':
-MidiFileWriter.cpp:(.text+0x1ae0): multiple definition of `midiMind::MidiFileReader::getDataBytesCount(unsigned char)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1ae0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::calculateDuration(midiMind::MidiFile&)':
-MidiFileWriter.cpp:(.text+0x1b50): multiple definition of `midiMind::MidiFileReader::calculateDuration(midiMind::MidiFile&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1b50): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::extractMetadata(midiMind::MidiFile&)':
-MidiFileWriter.cpp:(.text+0x1c28): multiple definition of `midiMind::MidiFileReader::extractMetadata(midiMind::MidiFile&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1c28): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::validate(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)':
-MidiFileWriter.cpp:(.text+0x1d60): multiple definition of `midiMind::MidiFileReader::validate(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1d60): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::MidiFileReader()':
-MidiFileWriter.cpp:(.text+0x1fc0): multiple definition of `midiMind::MidiFileReader::MidiFileReader()'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1fc0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::MidiFileReader()':
-MidiFileWriter.cpp:(.text+0x1fc0): multiple definition of `midiMind::MidiFileReader::MidiFileReader()'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x1fc0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::parseTrackEvents(unsigned char const*, unsigned long&, unsigned long)':
-MidiFileWriter.cpp:(.text+0x20d0): multiple definition of `midiMind::MidiFileReader::parseTrackEvents(unsigned char const*, unsigned long&, unsigned long)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x20d0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::parseTrackFromBuffer(unsigned char const*, unsigned long, unsigned int)':
-MidiFileWriter.cpp:(.text+0x29e0): multiple definition of `midiMind::MidiFileReader::parseTrackFromBuffer(unsigned char const*, unsigned long, unsigned int)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x29e0): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::readFromBuffer(unsigned char const*, unsigned long)':
-MidiFileWriter.cpp:(.text+0x2c68): multiple definition of `midiMind::MidiFileReader::readFromBuffer(unsigned char const*, unsigned long)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x2c68): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFileReader::readFromFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)':
-MidiFileWriter.cpp:(.text+0x5100): multiple definition of `midiMind::MidiFileReader::readFromFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x5100): first defined here
-/usr/bin/ld: CMakeFiles/midimind.dir/src/midi/file/MidiFileWriter.cpp.o: in function `midiMind::MidiFile::toJson[abi:cxx11]() const':
-MidiFileWriter.cpp:(.text+0x5f90): multiple definition of `midiMind::MidiFile::toJson[abi:cxx11]() const'; CMakeFiles/midimind.dir/src/midi/file/MidiFileReader.cpp.o:MidiFileReader.cpp:(.text+0x5f90): first defined here
+[100%] Linking CXX executable bin/midimind
 /usr/bin/ld: CMakeFiles/midimind.dir/src/main.cpp.o: in function `main':
 main.cpp:(.text.startup+0x2b4): undefined reference to `midiMind::Application::isRunning() const'
 collect2: error: ld returned 1 exit status
 make[2]: *** [CMakeFiles/midimind.dir/build.make:551: bin/midimind] Error 1
 make[1]: *** [CMakeFiles/Makefile2:87: CMakeFiles/midimind.dir/all] Error 2
 make: *** [Makefile:136: all] Error 2
+✓ Compilation terminée
+✗ ERREUR: Binaire non généré: /home/pi/midiMind/backend/build/bin/midimind
