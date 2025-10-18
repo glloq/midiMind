@@ -1,12 +1,13 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.1.3 - PERFORMANCE OPTIMIZED
-Date: 2025-10-16
+Version: v3.1.3 - PERFORMANCE OPTIMIZED - CORRECTED
+Date: 2025-10-18
 ============================================================================ 
-MODIFICATIONS v3.1.3:
-✓ Ajout PerformanceConfig.js (CHARGÉ EN PREMIER)
+CORRECTIONS:
+✓ Chemins corrigés selon structure réelle
+✓ Fichiers inexistants supprimés
 ✓ Ordre de chargement optimisé
-✓ Scripts performance ajoutés
+✓ Notifications.js ajouté (manquant critique)
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -137,9 +138,11 @@ MODIFICATIONS v3.1.3:
          ======================================================================== -->
     <script src="js/utils/Logger.js"></script>
     <script src="js/utils/Constants.js"></script>
+    <script src="js/utils/MidiConstants.js"></script>
     <script src="js/utils/Formatter.js"></script>
     <script src="js/utils/Validator.js"></script>
     <script src="js/utils/DebugConsole.js"></script>
+    <script src="js/utils/Notifications.js"></script>
 
     <!-- ========================================================================
          ÉTAPE 3: CONFIGURATION
@@ -147,55 +150,82 @@ MODIFICATIONS v3.1.3:
     <script src="js/config/AppConfig.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 4: COMMUNICATION BACKEND
+         ÉTAPE 4: COMMUNICATION BACKEND (chemins corrigés)
          ======================================================================== -->
-    <script src="js/api/WebSocketClient.js"></script>
-    <script src="js/api/ApiClient.js"></script>
+    <script src="js/service/BackendService.js"></script>
+    <script src="js/utils/ApiClient.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 5: UTILITAIRES AVANCÉS (dépendent des précédents)
+         ÉTAPE 5: UTILITAIRES AVANCÉS (chemins corrigés)
          ======================================================================== -->
-    <script src="js/utils/StateManager.js"></script>
-    <script src="js/utils/CacheManager.js"></script>
-    <script src="js/utils/PerformanceMonitor.js"></script>
-    <script src="js/utils/NotificationManager.js"></script>
+    <script src="js/monitoring/PerformanceMonitor.js"></script>
+    <script src="js/ui/NotificationManager.js"></script>
     <script src="js/utils/RoutingManager.js"></script>
+    
+    <!-- SUPPRIMÉ: StateManager.js (n'existe pas - c'est StateModel.js) -->
+    <!-- SUPPRIMÉ: CacheManager.js (n'existe pas) -->
 
     <!-- ========================================================================
-         ÉTAPE 6: MODÈLES DE DONNÉES
+         ÉTAPE 6: SERVICES
          ======================================================================== -->
-    <script src="js/models/BaseModel.js"></script>
+    <script src="js/service/StorageService.js"></script>
+    <script src="js/service/FileService.js"></script>
+    <script src="js/service/MidiService.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 7: CLASSES DE BASE (CRITIQUE - avant héritage)
+         ======================================================================== -->
+    <script src="js/core/BaseModel.js"></script>
+    <script src="js/core/BaseView.js"></script>
+    <script src="js/core/BaseController.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 8: MODÈLES DE DONNÉES (héritent de BaseModel)
+         ======================================================================== -->
+    <script src="js/models/StateModel.js"></script>
     <script src="js/models/FileModel.js"></script>
     <script src="js/models/InstrumentModel.js"></script>
     <script src="js/models/EditorModel.js"></script>
     <script src="js/models/RoutingModel.js"></script>
     <script src="js/models/SystemModel.js"></script>
     <script src="js/models/PlaybackModel.js"></script>
+    <script src="js/models/PlaylistModel.js"></script>
+    <script src="js/models/LoopModel.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 7: VUES - BASE
+         ÉTAPE 9: ÉDITEUR - CORE (chemins corrigés)
          ======================================================================== -->
-    <script src="js/views/BaseView.js"></script>
+    <script src="js/editor/core/CoordinateSystem.js"></script>
+    <script src="js/editor/core/Viewport.js"></script>
+    <script src="js/editor/core/RenderEngine.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 8: COMPOSANTS ÉDITEUR (ordre important)
+         ÉTAPE 10: ÉDITEUR - RENDERERS (chemins corrigés)
          ======================================================================== -->
-    <!-- Système de coordonnées (utilisé par les renderers) -->
-    <script src="js/editor/CoordinateSystem.js"></script>
-    
-    <!-- Renderers (dépendent du CoordinateSystem) -->
-    <script src="js/editor/renderers/RenderEngine.js"></script>
     <script src="js/editor/renderers/GridRenderer.js"></script>
     <script src="js/editor/renderers/TimelineRenderer.js"></script>
+    <script src="js/editor/renderers/NoteRenderer.js"></script>
     <script src="js/editor/renderers/PianoRollRenderer.js"></script>
-    <!-- SUPPRIMÉ: VelocityRenderer.js (performance optimization) -->
-    
-    <!-- Gestionnaires (dépendent des renderers) -->
-    <script src="js/editor/SelectionManager.js"></script>
-    <script src="js/editor/EditingTools.js"></script>
+    <script src="js/editor/renderers/CCRenderer.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 9: VUES - PAGES
+         ÉTAPE 11: ÉDITEUR - INTERACTION (chemins corrigés)
+         ======================================================================== -->
+    <script src="js/editor/interaction/SelectionManager.js"></script>
+    <script src="js/editor/interaction/DragHandler.js"></script>
+    <script src="js/editor/interaction/EditorMode.js"></script>
+    
+    <!-- SUPPRIMÉ: EditingTools.js (n'existe pas dans structure) -->
+
+    <!-- ========================================================================
+         ÉTAPE 12: ÉDITEUR - UTILS
+         ======================================================================== -->
+    <script src="js/editor/utils/ClipboardManager.js"></script>
+    <script src="js/editor/utils/HistoryManager.js"></script>
+    <script src="js/editor/utils/EditorRoutingManager.js"></script>
+
+    <!-- ========================================================================
+         ÉTAPE 13: VUES - PAGES (héritent de BaseView)
          ======================================================================== -->
     <script src="js/views/HomeView.js"></script>
     <script src="js/views/EditorView.js"></script>
@@ -203,11 +233,11 @@ MODIFICATIONS v3.1.3:
     <script src="js/views/KeyboardView.js"></script>
     <script src="js/views/InstrumentView.js"></script>
     <script src="js/views/SystemView.js"></script>
+    <script src="js/views/PlaylistView.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 10: CONTRÔLEURS
+         ÉTAPE 14: CONTRÔLEURS (héritent de BaseController)
          ======================================================================== -->
-    <script src="js/controllers/BaseController.js"></script>
     <script src="js/controllers/HomeController.js"></script>
     <script src="js/controllers/FileController.js"></script>
     <script src="js/controllers/EditorController.js"></script>
@@ -219,12 +249,12 @@ MODIFICATIONS v3.1.3:
     <script src="js/controllers/NavigationController.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 11: APPLICATION (dépend de TOUT)
+         ÉTAPE 15: APPLICATION (dépend de TOUT)
          ======================================================================== -->
     <script src="js/core/Application.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 12: INITIALISATION (DOIT ÊTRE LE DERNIER)
+         ÉTAPE 16: INITIALISATION (DOIT ÊTRE LE DERNIER)
          ======================================================================== -->
     <script src="js/main.js"></script>
 
