@@ -37,8 +37,8 @@ const PerformanceConfig = {
     // ========================================================================
     editor: {
         maxUndoLevels: 10,                  // Historique limité
-        showVelocityEditor: false,          // Désactivé par défaut
-        enableVelocityGraph: false,         // Pas de graphique vélocité
+        showVelocityEditor: false,          // SUPPRIMÉ COMPLÈTEMENT
+        enableVelocityGraph: false,         // SUPPRIMÉ COMPLÈTEMENT
         snapToGrid: true,                   // Forcer snap
         quantizeResolution: 480,            // 1 beat minimum
         renderBatchSize: 100,               // Notes par batch
@@ -51,7 +51,7 @@ const PerformanceConfig = {
     routing: {
         allowComplexRouting: false,         // 1→1 uniquement
         maxRoutes: 16,                      // Limité aux 16 canaux MIDI
-        enableAutoRouting: false,           // Pas de routing auto
+        enableAutoRouting: true,            // Auto-assign round-robin
         enableCompatibilityScoring: false,  // Pas de calcul compatibilité
         maxPresets: 5,                      // Limiter presets
         enableConflictResolution: false     // Pas de résolution conflits
@@ -61,14 +61,17 @@ const PerformanceConfig = {
     // KEYBOARD PERFORMANCE
     // ========================================================================
     keyboard: {
-        mode: 'monitor',                    // 'monitor' ou 'full' (default: monitor)
-        enableRecording: false,             // Pas d'enregistrement temps réel
-        enablePlayback: true,               // Permettre lecture notes
+        mode: 'monitor',                    // 'monitor' = affichage + playback
+        enableRecording: false,             // SUPPRIMÉ - Pas d'enregistrement
+        enableLoopRecorder: false,          // SUPPRIMÉ - Pas de loops
+        enablePlayback: true,               // Permettre lecture notes (midi.send)
         showNoteNames: true,                // Afficher noms notes
         highlightActiveNotes: true,         // Surligner notes actives
+        showIncomingNotes: false,           // DÉSACTIVÉ - Pas d'affichage notes entrantes
         maxVisibleKeys: 88,                 // 88 touches piano
         enableVelocitySensitivity: true,    // Sensibilité vélocité
-        debounceDelay: 50                   // ms anti-rebond
+        debounceDelay: 50,                  // ms anti-rebond
+        defaultNoteDuration: 500            // ms durée note par défaut (si besoin)
     },
 
     // ========================================================================
@@ -92,7 +95,7 @@ const PerformanceConfig = {
         enableTooltips: true,               // Garder tooltips
         tooltipDelay: 500,                  // ms avant affichage
         enableHoverEffects: false,          // Pas d'effets hover
-        enableNotifications: true,          // Garder notifications
+        enableNotifications: true,          // GARDER notifications
         notificationDuration: 3000          // 3 secondes
     },
 
@@ -112,12 +115,12 @@ const PerformanceConfig = {
     // FEATURE FLAGS
     // ========================================================================
     features: {
-        enableLoopRecorder: true,           // Garder loop recorder
+        enableLoopRecorder: false,          // SUPPRIMÉ - Pas de loop recorder
         enablePlaylistManagement: true,     // Garder playlists
         enableMIDIExport: true,             // Garder export MIDI
         enableThemeSwitch: false,           // Pas de switch thème
         enableAdvancedRouting: false,       // Pas de routing avancé
-        enableRealTimeRecording: false      // Pas d'enregistrement temps réel
+        enableRealTimeRecording: false      // SUPPRIMÉ - Pas d'enregistrement
     }
 };
 
