@@ -2,13 +2,13 @@
 // Fichier: frontend/js/core/Application.js
 // Version: v3.2 - COMPLETE
 // Date: 2025-10-08
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI
+// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // Description:
 //   Classe principale de l'application - Chef d'orchestre
 //   Initialise et coordonne tous les composants (models, views, controllers)
 //
-// Responsabilités:
+// ResponsabilitÃ©s:
 //   - Initialisation de tous les composants dans le bon ordre
 //   - Gestion du cycle de vie de l'application
 //   - Coordination des services
@@ -18,7 +18,7 @@
 
 class Application {
     constructor() {
-        // État de l'application
+        // Ã‰tat de l'application
         this.state = {
             initialized: false,
             ready: false,
@@ -40,7 +40,7 @@ class Application {
             file: null
         };
         
-        // Modèles
+        // ModÃ¨les
         this.models = {
             file: null,
             playlist: null,
@@ -62,7 +62,7 @@ class Application {
             editor: null
         };
         
-        // Contrôleurs
+        // ContrÃ´leurs
         this.controllers = {
             navigation: null,
             file: null,
@@ -86,7 +86,7 @@ class Application {
             enableDebugConsole: true
         };
         
-        // Référence globale
+        // RÃ©fÃ©rence globale
         window.app = this;
     }
     
@@ -95,47 +95,47 @@ class Application {
     // ========================================================================
     
     /**
-     * Initialise l'application complète
+     * Initialise l'application complÃ¨te
      */
     async init() {
-        console.log('🚀 Initializing midiMind v3.0...');
+        console.log('ðŸš€ Initializing midiMind v3.0...');
         
         try {
-            // Étape 1: Fondations
+            // Ã‰tape 1: Fondations
             await this.initFoundations();
             
-            // Étape 2: Services
+            // Ã‰tape 2: Services
             await this.initServices();
             
-            // Étape 3: Modèles
+            // Ã‰tape 3: ModÃ¨les
             await this.initModels();
             
-            // Étape 4: Vues
+            // Ã‰tape 4: Vues
             await this.initViews();
             
-            // Étape 5: Contrôleurs
+            // Ã‰tape 5: ContrÃ´leurs
             await this.initControllers();
             
-            // Étape 6: Navigation
+            // Ã‰tape 6: Navigation
             await this.initNavigation();
             
-            // Étape 7: Connexion backend
+            // Ã‰tape 7: Connexion backend
             await this.connectBackend();
             
-            // Étape 8: Finalisation
+            // Ã‰tape 8: Finalisation
             await this.finalize();
             
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('✅ midiMind initialized successfully');
-            this.logger.info('Application', '✅ Application ready');
+            console.log('âœ… midiMind initialized successfully');
+            this.logger.info('Application', 'âœ… Application ready');
             
-            // Émettre événement ready
+            // Ã‰mettre Ã©vÃ©nement ready
             this.eventBus.emit('app:ready');
             
         } catch (error) {
-            console.error('❌ Failed to initialize application:', error);
+            console.error('âŒ Failed to initialize application:', error);
             this.logger.error('Application', 'Initialization failed:', error);
             this.handleInitError(error);
         }
@@ -145,9 +145,9 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('📦 Initializing foundations...');
+        console.log('ðŸ“¦ Initializing foundations...');
         
-        // EventBus (déjà instancié globalement)
+        // EventBus (dÃ©jÃ  instanciÃ© globalement)
         this.eventBus = window.eventBus || new EventBus();
         window.eventBus = this.eventBus;
         
@@ -168,14 +168,14 @@ class Application {
         this.notifications = new Notifications(this.eventBus);
         window.notifications = this.notifications;
         
-        this.logger.info('Application', '✓ Foundations initialized');
+        this.logger.info('Application', 'âœ“ Foundations initialized');
     }
     
     /**
      * Initialise les services
      */
     async initServices() {
-        console.log('🔧 Initializing services...');
+        console.log('ðŸ”§ Initializing services...');
         
         // BackendService
         this.services.backend = new BackendService(
@@ -210,7 +210,7 @@ class Application {
             window.fileService = this.services.file;
         }
         
-		// Créer ApiClient
+		// CrÃ©er ApiClient
 		this.apiClient = new ApiClient({
 			baseURL: this.config.api?.baseURL || 'http://localhost:8080/api',
 			timeout: this.config.api?.timeout || 10000,
@@ -223,7 +223,7 @@ class Application {
 			debug: this.config.debug || false
 		});
 
-		// Ajouter intercepteur d'authentification si nécessaire
+		// Ajouter intercepteur d'authentification si nÃ©cessaire
 		this.apiClient.addRequestInterceptor((config) => {
 			const token = localStorage.getItem('auth_token');
 			if (token) {
@@ -235,14 +235,14 @@ class Application {
 		// Rendre accessible globalement
 		window.apiClient = this.apiClient;
 
-        this.logger.info('Application', '✓ Services initialized');
+        this.logger.info('Application', 'âœ“ Services initialized');
     }
     
     /**
-     * Initialise les modèles
+     * Initialise les modÃ¨les
      */
     async initModels() {
-        console.log('📊 Initializing models...');
+        console.log('ðŸ“Š Initializing models...');
         
         // FileModel
         this.models.file = new FileModel(
@@ -308,14 +308,14 @@ class Application {
         );
         window.routingModel = this.models.routing;
         
-        this.logger.info('Application', '✓ Models initialized');
+        this.logger.info('Application', 'âœ“ Models initialized');
     }
     
     /**
      * Initialise les vues
      */
     async initViews() {
-        console.log('🎨 Initializing views...');
+        console.log('ðŸŽ¨ Initializing views...');
         
         // HomeView
         const homeContainer = document.getElementById('home');
@@ -357,23 +357,23 @@ class Application {
 		if (editorContainer && typeof EditorView !== 'undefined') {
 			this.views.editor = new EditorView('editor', this.eventBus);
 			window.editorView = this.views.editor;
-			console.log('✅ EditorView v3.6.0 initialized');
+			console.log('âœ… EditorView v3.6.0 initialized');
 		} else {
-			console.error('❌ EditorView: container or class not found');
+			console.error('âŒ EditorView: container or class not found');
 			if (!editorContainer) console.error('  - Container #editor missing');
 			if (typeof EditorView === 'undefined') console.error('  - EditorView class not loaded');
 		}
         
-        this.logger.info('Application', '✓ Views initialized');
+        this.logger.info('Application', 'âœ“ Views initialized');
     }
     
     /**
-     * Initialise les contrôleurs
+     * Initialise les contrÃ´leurs
      */
     async initControllers() {
-        console.log('🎮 Initializing controllers...');
+        console.log('ðŸŽ® Initializing controllers...');
         
-        // GlobalPlaybackController (CRITIQUE - doit être premier)
+        // GlobalPlaybackController (CRITIQUE - doit Ãªtre premier)
         if (typeof GlobalPlaybackController !== 'undefined') {
             this.controllers.globalPlayback = new GlobalPlaybackController(
                 this.eventBus,
@@ -428,15 +428,15 @@ class Application {
 			);
 			window.editorController = this.controllers.editor;
 			
-			// CRITIQUE: Injecter le modèle dans la vue
+			// CRITIQUE: Injecter le modÃ¨le dans la vue
 			if (this.views.editor && this.models.editor) {
 				this.views.editor.setModel(this.models.editor);
-				console.log('✅ EditorModel injected into EditorView');
+				console.log('âœ… EditorModel injected into EditorView');
 			}
 			
-			console.log('✅ EditorController initialized');
+			console.log('âœ… EditorController initialized');
 		} else {
-			console.error('❌ EditorController not loaded');
+			console.error('âŒ EditorController not loaded');
 		}
         // RoutingController
         if (typeof RoutingController !== 'undefined') {
@@ -462,7 +462,7 @@ class Application {
             window.homeController = this.controllers.home;
         }
         
-        // Autres contrôleurs...
+        // Autres contrÃ´leurs...
         if (typeof InstrumentController !== 'undefined') {
             this.controllers.instrument = new InstrumentController(
                 this.eventBus,
@@ -485,16 +485,16 @@ class Application {
             window.systemController = this.controllers.system;
         }
         
-        this.logger.info('Application', '✓ Controllers initialized');
+        this.logger.info('Application', 'âœ“ Controllers initialized');
     }
     
     /**
      * Initialise la navigation
      */
     async initNavigation() {
-        console.log('🧭 Initializing navigation...');
+        console.log('ðŸ§­ Initializing navigation...');
         
-        // Gérer les changements de hash
+        // GÃ©rer les changements de hash
         window.addEventListener('hashchange', () => {
             this.handleNavigation();
         });
@@ -502,14 +502,14 @@ class Application {
         // Navigation initiale
         this.handleNavigation();
         
-        this.logger.info('Application', '✓ Navigation initialized');
+        this.logger.info('Application', 'âœ“ Navigation initialized');
     }
     
     /**
      * Connexion au backend
      */
     async connectBackend() {
-        console.log('🔌 Connecting to backend...');
+        console.log('ðŸ”Œ Connecting to backend...');
         
         if (!this.services.backend) {
             this.logger.warn('Application', 'BackendService not available');
@@ -517,14 +517,15 @@ class Application {
         }
         
         try {
-            await this.services.backend.connect();
+            // ✅ CORRECTION : Passer l'URL configurée au BackendService
+            await this.services.backend.connect(this.config.backendUrl);
             this.state.backendConnected = true;
-            this.logger.info('Application', '✓ Backend connected');
+            this.logger.info('Application', 'âœ“ Backend connected');
             
         } catch (error) {
             this.logger.error('Application', 'Backend connection failed:', error);
             
-            // Continuer même si connexion échoue
+            // Continuer mÃªme si connexion Ã©choue
             if (this.config.autoReconnect) {
                 this.scheduleReconnect();
             }
@@ -535,18 +536,18 @@ class Application {
      * Finalisation de l'initialisation
      */
     async finalize() {
-        console.log('🎯 Finalizing initialization...');
+        console.log('ðŸŽ¯ Finalizing initialization...');
         
         // Attacher gestionnaires d'erreurs globaux
         this.attachErrorHandlers();
         
-        // Attacher événements application
+        // Attacher Ã©vÃ©nements application
         this.attachAppEvents();
         
         // Rendre l'interface visible
         this.showInterface();
         
-        this.logger.info('Application', '✓ Initialization finalized');
+        this.logger.info('Application', 'âœ“ Initialization finalized');
     }
     
     // ========================================================================
@@ -562,16 +563,16 @@ class Application {
         // Masquer toutes les pages
         this.hideAllPages();
         
-        // Afficher la page demandée
+        // Afficher la page demandÃ©e
         const pageElement = document.getElementById(page);
         if (pageElement) {
             pageElement.style.display = 'block';
             this.state.currentPage = page;
             
-            // Émettre événement de navigation
+            // Ã‰mettre Ã©vÃ©nement de navigation
             this.eventBus.emit('navigation:changed', { page, hash });
             
-            // Initialiser le contrôleur de la page si nécessaire
+            // Initialiser le contrÃ´leur de la page si nÃ©cessaire
             this.initPageController(page);
         } else {
             this.logger.warn('Application', `Page not found: ${page}`);
@@ -590,7 +591,7 @@ class Application {
     }
     
     initPageController(page) {
-        // Initialiser les contrôleurs spécifiques aux pages
+        // Initialiser les contrÃ´leurs spÃ©cifiques aux pages
         switch (page) {
             case 'home':
                 if (this.controllers.home && typeof this.controllers.home.init === 'function') {
@@ -611,13 +612,13 @@ class Application {
     // ========================================================================
     
     attachErrorHandlers() {
-        // Erreurs JavaScript non capturées
+        // Erreurs JavaScript non capturÃ©es
         window.addEventListener('error', (event) => {
             this.logger.error('Application', 'Uncaught error:', event.error);
             this.handleError(event.error);
         });
         
-        // Promesses rejetées non capturées
+        // Promesses rejetÃ©es non capturÃ©es
         window.addEventListener('unhandledrejection', (event) => {
             this.logger.error('Application', 'Unhandled rejection:', event.reason);
             this.handleError(event.reason);
@@ -633,61 +634,61 @@ class Application {
             );
         }
         
-        // Logger détaillé
+        // Logger dÃ©taillÃ©
         this.logger.error('Application', 'Error occurred:', {
             message: error.message,
             stack: error.stack
         });
         
-        // Émettre événement erreur
+        // Ã‰mettre Ã©vÃ©nement erreur
         this.eventBus.emit('app:error', { error });
     }
     
 /**
- * Gère les erreurs d'initialisation
+ * GÃ¨re les erreurs d'initialisation
  * CORRECTION v3.0.2: Plus robuste
  */
 handleInitError(error) {
     this.logger.error('Application', 'Initialization error:', error);
     
-    // Afficher erreur à l'utilisateur
+    // Afficher erreur Ã  l'utilisateur
     const errorDiv = document.createElement('div');
     errorDiv.id = 'init-error';
     errorDiv.className = 'init-error';
     errorDiv.innerHTML = `
         <div class="error-content">
-            <h2>âŒ Erreur d'initialisation</h2>
+            <h2>Ã¢Å’ Erreur d'initialisation</h2>
             <p class="error-message">${error.message}</p>
             
             <div class="error-details">
-                <h3>Détails techniques:</h3>
+                <h3>DÃ©tails techniques:</h3>
                 <pre>${error.stack || 'No stack trace'}</pre>
             </div>
             
             <div class="error-actions">
                 <button onclick="location.reload()" class="btn-reload">
-                    🔄 Recharger l'application
+                    ðŸ”„ Recharger l'application
                 </button>
                 <button onclick="document.getElementById('init-error').querySelector('.error-details').style.display = 
                     document.getElementById('init-error').querySelector('.error-details').style.display === 'none' ? 'block' : 'none'"
                     class="btn-details">
-                    ℹ️ Afficher/Masquer détails
+                    â„¹ï¸ Afficher/Masquer dÃ©tails
                 </button>
             </div>
             
             <div class="error-help">
                 <h3>Que faire ?</h3>
                 <ul>
-                    <li>Vérifiez que le backend est démarré</li>
-                    <li>Vérifiez la console navigateur (F12)</li>
+                    <li>VÃ©rifiez que le backend est dÃ©marrÃ©</li>
+                    <li>VÃ©rifiez la console navigateur (F12)</li>
                     <li>Essayez de recharger la page</li>
-                    <li>Contactez le support si le problème persiste</li>
+                    <li>Contactez le support si le problÃ¨me persiste</li>
                 </ul>
             </div>
         </div>
     `;
     
-    // Masquer détails par défaut
+    // Masquer dÃ©tails par dÃ©faut
     errorDiv.querySelector('.error-details').style.display = 'none';
     
     // Remplacer loader par erreur
@@ -698,22 +699,22 @@ handleInitError(error) {
     
     document.body.appendChild(errorDiv);
     
-    // Log dans console également
-    console.error('🚨 Initialization failed:', error);
+    // Log dans console Ã©galement
+    console.error('ðŸš¨ Initialization failed:', error);
 }
     
     // ========================================================================
-    // ÉVÉNEMENTS APPLICATION
+    // Ã‰VÃ‰NEMENTS APPLICATION
     // ========================================================================
     
     attachAppEvents() {
-        // Événement backend connecté
+        // Ã‰vÃ©nement backend connectÃ©
         this.eventBus.on('backend:connected', () => {
             this.state.backendConnected = true;
             this.logger.info('Application', 'Backend connected');
         });
         
-        // Événement backend déconnecté
+        // Ã‰vÃ©nement backend dÃ©connectÃ©
         this.eventBus.on('backend:disconnected', () => {
             this.state.backendConnected = false;
             this.logger.warn('Application', 'Backend disconnected');
@@ -723,7 +724,7 @@ handleInitError(error) {
             }
         });
         
-        // Événement shutdown
+        // Ã‰vÃ©nement shutdown
         this.eventBus.on('app:shutdown', () => {
             this.shutdown();
         });
@@ -749,7 +750,7 @@ handleInitError(error) {
     // ========================================================================
     
     showInterface() {
-        // Masquer l'écran de chargement
+        // Masquer l'Ã©cran de chargement
         const loader = document.getElementById('loader');
         if (loader) {
             loader.style.display = 'none';
@@ -768,36 +769,36 @@ handleInitError(error) {
     // ========================================================================
     
     async shutdown() {
-        this.logger.info('Application', '🛑 Shutting down...');
+        this.logger.info('Application', 'ðŸ›‘ Shutting down...');
         
         this.state.ready = false;
         
-        // Arrêter auto-reconnect
+        // ArrÃªter auto-reconnect
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
         
-        // Déconnecter backend
+        // DÃ©connecter backend
         if (this.services.backend) {
             await this.services.backend.disconnect();
         }
         
-        // Nettoyer les contrôleurs
+        // Nettoyer les contrÃ´leurs
         Object.values(this.controllers).forEach(controller => {
             if (controller && typeof controller.destroy === 'function') {
                 controller.destroy();
             }
         });
         
-        // Nettoyer les modèles
+        // Nettoyer les modÃ¨les
         Object.values(this.models).forEach(model => {
             if (model && typeof model.destroy === 'function') {
                 model.destroy();
             }
         });
         
-        this.logger.info('Application', '✓ Application shut down');
+        this.logger.info('Application', 'âœ“ Application shut down');
     }
     
     // ========================================================================
@@ -827,7 +828,7 @@ handleInitError(error) {
 
 
 /**
- * Détruit l'application et libère toutes les ressources
+ * DÃ©truit l'application et libÃ¨re toutes les ressources
  */
 destroy() {
     if (this.state.destroyed) {
@@ -838,36 +839,36 @@ destroy() {
     this.logger.info('Application', 'Destroying application...');
     
     try {
-        // 1. Déconnecter backend
+        // 1. DÃ©connecter backend
         if (this.services.backend) {
             this.services.backend.disconnect();
         }
         
-        // 2. Détruire contrôleurs (ordre inverse de création)
+        // 2. DÃ©truire contrÃ´leurs (ordre inverse de crÃ©ation)
         this.destroyControllers();
         
-        // 3. Détruire vues
+        // 3. DÃ©truire vues
         this.destroyViews();
         
-        // 4. Détruire modèles
+        // 4. DÃ©truire modÃ¨les
         this.destroyModels();
         
-        // 5. Détruire services
+        // 5. DÃ©truire services
         this.destroyServices();
         
-        // 6. Détruire EventBus en dernier
+        // 6. DÃ©truire EventBus en dernier
         if (this.eventBus) {
             this.eventBus.destroy();
         }
         
-        // 7. Nettoyer références globales
+        // 7. Nettoyer rÃ©fÃ©rences globales
         this.cleanupGlobalReferences();
         
-        // 8. Marquer comme détruit
+        // 8. Marquer comme dÃ©truit
         this.state.destroyed = true;
         this.state.ready = false;
         
-        this.logger.info('Application', '✓ Application destroyed');
+        this.logger.info('Application', 'âœ“ Application destroyed');
         
     } catch (error) {
         this.logger.error('Application', 'Error during destruction:', error);
@@ -876,7 +877,7 @@ destroy() {
 }
 
 /**
- * Détruit tous les contrôleurs
+ * DÃ©truit tous les contrÃ´leurs
  * @private
  */
 destroyControllers() {
@@ -900,7 +901,7 @@ destroyControllers() {
         if (this.controllers[name] && typeof this.controllers[name].destroy === 'function') {
             try {
                 this.controllers[name].destroy();
-                this.logger.debug('Application', `✓ ${name} controller destroyed`);
+                this.logger.debug('Application', `âœ“ ${name} controller destroyed`);
             } catch (error) {
                 this.logger.error('Application', `Failed to destroy ${name} controller:`, error);
             }
@@ -911,7 +912,7 @@ destroyControllers() {
 }
 
 /**
- * Détruit toutes les vues
+ * DÃ©truit toutes les vues
  * @private
  */
 destroyViews() {
@@ -931,7 +932,7 @@ destroyViews() {
         if (this.views[name] && typeof this.views[name].destroy === 'function') {
             try {
                 this.views[name].destroy();
-                this.logger.debug('Application', `✓ ${name} view destroyed`);
+                this.logger.debug('Application', `âœ“ ${name} view destroyed`);
             } catch (error) {
                 this.logger.error('Application', `Failed to destroy ${name} view:`, error);
             }
@@ -942,7 +943,7 @@ destroyViews() {
 }
 
 /**
- * Détruit tous les modèles
+ * DÃ©truit tous les modÃ¨les
  * @private
  */
 destroyModels() {
@@ -962,7 +963,7 @@ destroyModels() {
         if (this.models[name] && typeof this.models[name].destroy === 'function') {
             try {
                 this.models[name].destroy();
-                this.logger.debug('Application', `✓ ${name} model destroyed`);
+                this.logger.debug('Application', `âœ“ ${name} model destroyed`);
             } catch (error) {
                 this.logger.error('Application', `Failed to destroy ${name} model:`, error);
             }
@@ -973,7 +974,7 @@ destroyModels() {
 }
 
 /**
- * Détruit tous les services
+ * DÃ©truit tous les services
  * @private
  */
 destroyServices() {
@@ -990,7 +991,7 @@ destroyServices() {
         if (this.services[name] && typeof this.services[name].destroy === 'function') {
             try {
                 this.services[name].destroy();
-                this.logger.debug('Application', `✓ ${name} service destroyed`);
+                this.logger.debug('Application', `âœ“ ${name} service destroyed`);
             } catch (error) {
                 this.logger.error('Application', `Failed to destroy ${name} service:`, error);
             }
@@ -1001,7 +1002,7 @@ destroyServices() {
 }
 
 /**
- * Nettoie les références globales
+ * Nettoie les rÃ©fÃ©rences globales
  * @private
  */
 cleanupGlobalReferences() {
@@ -1050,11 +1051,11 @@ cleanupGlobalReferences() {
         }
     });
     
-    this.logger.info('Application', '✓ Global references cleaned');
+    this.logger.info('Application', 'âœ“ Global references cleaned');
 }
 
 /**
- * Redémarre l'application
+ * RedÃ©marre l'application
  * (destroy + init)
  */
 async restart() {
@@ -1067,7 +1068,7 @@ async restart() {
     
     await this.init();
     
-    this.logger.info('Application', '✓ Application restarted');
+    this.logger.info('Application', 'âœ“ Application restarted');
 }
 
 
