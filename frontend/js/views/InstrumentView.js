@@ -39,14 +39,14 @@ class InstrumentView extends BaseView {
         // Logger safe - MUST be initialized before initialize() is called
         this.logger = window.Logger || console;
         
-        // Now that all properties are set, do initial render
-        this.initialize();
-        
         this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
     }
     
-    // Override initialize to ensure it happens after all properties are set
+    // Override initialize to prevent BaseView from calling render before properties are set
     initialize() {
+        // Don't call super.initialize() - it would call render() with autoRender
+        // Properties are already initialized in constructor
+        // Just do the initial render now that everything is ready
         if (this.container) {
             this.render();
         }
@@ -58,13 +58,17 @@ class InstrumentView extends BaseView {
     
     render(data = {}) {
         if (!this.container) {
-            this.logger.warning('InstrumentView', 'Container not found');
+            if (this.logger) {
+                this.logger.warning('InstrumentView', 'Container not found');
+            }
             return;
         }
         
         // Safety check: ensure displayConfig exists
         if (!this.displayConfig) {
-            this.logger.warning('InstrumentView', 'displayConfig not initialized yet, skipping render');
+            if (this.logger) {
+                this.logger.warning('InstrumentView', 'displayConfig not initialized yet, skipping render');
+            }
             return;
         }
         
