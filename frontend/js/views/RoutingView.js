@@ -30,8 +30,16 @@ class RoutingView extends BaseView {
         // Logger initialization
         this.logger = window.Logger || console;
         
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
         if (this.logger && this.logger.info) {
             this.logger.info('RoutingView', '✓ RoutingView initialized (simple mode)');
+        }
+        
+        // Now that all properties are set, do initial render
+        if (this.container) {
+            this.render();
         }
     }
     
@@ -56,9 +64,9 @@ class RoutingView extends BaseView {
     
     // Override initialize to prevent BaseView auto-render before properties are ready
     initialize() {
-        // Don't call super.initialize() which would trigger autoRender
-        // Just do the initial render now that everything is ready
-        if (this.container) {
+        // This is called by BaseView constructor before our properties are set
+        // Only render if we've finished our own constructor
+        if (this._fullyInitialized && this.container) {
             this.render();
         }
     }
@@ -488,11 +496,15 @@ class RoutingView extends BaseView {
     // ========================================================================
     
     updateStats() {
+        // Safety checks for uninitialized properties
+        if (!this.channels) this.channels = [];
+        if (!this.instruments) this.instruments = [];
+        
         const activeChannels = this.routingMatrix ? 
             this.routingMatrix.getActiveChannels().length : 
             0;
         
-        const connectedInstruments = this.instruments.filter(i => i.connected).length;
+        const connectedInstruments = this.instruments.filter(i => i && i.connected).length;
         
         const activeRoutes = this.routingMatrix ? 
             this.routingMatrix.getRoutes().length : 
