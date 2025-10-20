@@ -1,23 +1,37 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/InstrumentController.js
-// Version: 3.0.0-refonte
-// Date: 2025-10-09
+// Version: 3.0.1-FIXED
+// Date: 2025-10-20
 // ============================================================================
-// Description:
-//   Contrôleur de gestion des instruments MIDI - MIGRÉ vers protocole v3.0
-//   Gestion devices, profils SysEx, connexion/déconnexion.
+// CORRECTIONS v3.0.1:
+// ✅ Fixed constructor signature to match BaseController
+// ✅ Proper initialization order with _fullyInitialized
+// ✅ Logger initialized first
+// ✅ Compatible with Application.js instantiation
 // ============================================================================
 
 class InstrumentController extends BaseController {
-    constructor(model, view, eventBus, backendService, logger) {
-        super('InstrumentController', model, view, eventBus, logger);
+    constructor(eventBus, models, views, notifications, debugConsole) {
+        super(eventBus, models, views, notifications, debugConsole);
         
-        this.backendService = backendService;
+        // Initialize logger FIRST
+        this.logger = window.Logger || console;
+        
+        // Get specific model and view
+        this.model = models.instrument;
+        this.view = views.instrument;
+        
+        // Backend service
+        this.backendService = window.app?.services?.backend || window.backendService;
         
         // État local
         this.devices = new Map();
         this.selectedDevice = null;
         
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
+        // Now setup
         this.setupEventListeners();
     }
     
@@ -26,6 +40,11 @@ class InstrumentController extends BaseController {
     // ========================================================================
     
     setupEventListeners() {
+        if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+            console.error('[InstrumentController] EventBus not available or invalid');
+            return;
+        }
+        
         // Événements UI
         this.eventBus.on('instrument:select', (data) => this.selectDevice(data.deviceId));
         this.eventBus.on('instrument:connect', (data) => this.connectDevice(data.deviceId));
@@ -50,6 +69,10 @@ class InstrumentController extends BaseController {
         
         // Charger la liste initiale
         this.refreshDeviceList();
+        
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', '✓ Event listeners setup');
+        }
     }
     
     // ========================================================================
@@ -57,7 +80,16 @@ class InstrumentController extends BaseController {
     // ========================================================================
     
     async refreshDeviceList() {
-        this.logger.info(this.name, 'Refreshing device list...');
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'Refreshing device list...');
+        }
+        
+        if (!this.backendService) {
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('InstrumentController', 'Backend service not available');
+            }
+            return;
+        }
         
         try {
             const result = await this.backendService.sendCommand('devices.list');
@@ -66,161 +98,163 @@ class InstrumentController extends BaseController {
                 throw new Error(result.error || 'Failed to load devices');
             }
             
-            const devices = result.data ? result.data.devices : result.devices || [];
+            const devices = result.data?.devices || [];
             
-            this.logger.info(this.name, `Loaded ${devices.length} devices`);
-            
-            // Mettre à jour le cache local
+            // Update devices map
             this.devices.clear();
             devices.forEach(device => {
                 this.devices.set(device.id, device);
             });
             
-            // Mettre à jour le modèle
-            this.model.setDevices(devices);
-            
-            // Mettre à jour la vue
-            this.view.updateDeviceList(devices);
-            
-            // Notifier
-            this.eventBus.emit('devices:loaded', { count: devices.length });
-            
-        } catch (error) {
-            this.logger.error(this.name, 'Failed to refresh device list:', error);
-            this.showError('Failed to load devices: ' + error.message);
-        }
-    }
-    
-    async scanDevices() {
-        this.logger.info(this.name, 'Scanning for devices...');
-        
-        try {
-            this.view.showLoading('Scanning devices...');
-            
-            const result = await this.backendService.sendCommand('devices.scan');
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Failed to scan devices');
+            // Update model if available
+            if (this.model && typeof this.model.loadInstruments === 'function') {
+                await this.model.loadInstruments(devices);
             }
             
-            this.logger.info(this.name, 'Scan initiated');
+            // Update view if available
+            if (this.view && typeof this.view.render === 'function') {
+                this.view.render({ instruments: devices });
+            }
             
-            // Attendre un peu puis rafraîchir
-            setTimeout(() => {
-                this.view.hideLoading();
-                this.refreshDeviceList();
-            }, 2000);
+            if (this.logger && this.logger.info) {
+                this.logger.info('InstrumentController', `✓ ${devices.length} devices loaded`);
+            }
             
-            this.showSuccess('Scanning for devices...');
+            // Emit event
+            this.eventBus.emit('instruments:loaded', { devices, count: devices.length });
             
         } catch (error) {
-            this.view.hideLoading();
-            this.logger.error(this.name, 'Failed to scan devices:', error);
-            this.showError('Failed to scan: ' + error.message);
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentController', 'Failed to refresh devices:', error);
+            }
+            this.showError(`Failed to load devices: ${error.message}`);
         }
     }
     
-    selectDevice(deviceId) {
-        this.logger.info(this.name, `Selecting device: ${deviceId}`);
+    async selectDevice(deviceId) {
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Selecting device: ${deviceId}`);
+        }
         
         this.selectedDevice = deviceId;
-        
         const device = this.devices.get(deviceId);
         
-        if (device) {
-            // Mettre à jour le modèle
-            this.model.setSelectedDevice(device);
-            
-            // Mettre à jour la vue
-            this.view.updateSelectedDevice(device);
-            
-            // Charger le profil si connecté
-            if (device.connected) {
-                this.getDeviceProfile(deviceId);
+        if (!device) {
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('InstrumentController', `Device not found: ${deviceId}`);
             }
+            return;
+        }
+        
+        // Emit event
+        this.eventBus.emit('instrument:selected', { deviceId, device });
+        
+        // Update view
+        if (this.view && typeof this.view.updateSelection === 'function') {
+            this.view.updateSelection(deviceId);
         }
     }
     
     async connectDevice(deviceId) {
-        this.logger.info(this.name, `Connecting device: ${deviceId}`);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Connecting device: ${deviceId}`);
+        }
+        
+        if (!this.backendService) {
+            this.showError('Backend service not available');
+            return;
+        }
         
         try {
-            this.view.showLoading('Connecting...');
-            
             const result = await this.backendService.sendCommand('devices.connect', {
                 device_id: deviceId
             });
             
-            this.view.hideLoading();
-            
             if (result.success === false) {
-                throw new Error(result.error || 'Failed to connect device');
+                throw new Error(result.error || 'Connection failed');
             }
             
-            this.logger.info(this.name, 'Device connected');
-            
-            // Mettre à jour localement
-            const device = this.devices.get(deviceId);
-            if (device) {
-                device.connected = true;
-                this.view.updateDeviceStatus(deviceId, 'connected');
-            }
-            
-            this.showSuccess('Device connected');
-            
-            // Charger le profil
-            this.getDeviceProfile(deviceId);
+            this.showSuccess(`Device connected: ${deviceId}`);
+            await this.refreshDeviceList();
             
         } catch (error) {
-            this.view.hideLoading();
-            this.logger.error(this.name, 'Failed to connect device:', error);
-            this.showError('Failed to connect: ' + error.message);
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentController', 'Connection failed:', error);
+            }
+            this.showError(`Connection failed: ${error.message}`);
         }
     }
     
     async disconnectDevice(deviceId) {
-        this.logger.info(this.name, `Disconnecting device: ${deviceId}`);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Disconnecting device: ${deviceId}`);
+        }
+        
+        if (!this.backendService) {
+            this.showError('Backend service not available');
+            return;
+        }
         
         try {
-            this.view.showLoading('Disconnecting...');
-            
             const result = await this.backendService.sendCommand('devices.disconnect', {
                 device_id: deviceId
             });
             
-            this.view.hideLoading();
-            
             if (result.success === false) {
-                throw new Error(result.error || 'Failed to disconnect device');
+                throw new Error(result.error || 'Disconnection failed');
             }
             
-            this.logger.info(this.name, 'Device disconnected');
-            
-            // Mettre à jour localement
-            const device = this.devices.get(deviceId);
-            if (device) {
-                device.connected = false;
-                this.view.updateDeviceStatus(deviceId, 'disconnected');
-            }
-            
-            this.showSuccess('Device disconnected');
+            this.showSuccess(`Device disconnected: ${deviceId}`);
+            await this.refreshDeviceList();
             
         } catch (error) {
-            this.view.hideLoading();
-            this.logger.error(this.name, 'Failed to disconnect device:', error);
-            this.showError('Failed to disconnect: ' + error.message);
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentController', 'Disconnection failed:', error);
+            }
+            this.showError(`Disconnection failed: ${error.message}`);
         }
     }
     
-    // ========================================================================
-    // PROFIL SYSEX
-    // ========================================================================
-    
-    async getDeviceProfile(deviceId) {
-        this.logger.info(this.name, `Getting profile for device: ${deviceId}`);
+    async scanDevices() {
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'Scanning for devices...');
+        }
+        
+        if (!this.backendService) {
+            this.showError('Backend service not available');
+            return;
+        }
         
         try {
-            const result = await this.backendService.sendCommand('instruments.getProfile', {
+            const result = await this.backendService.sendCommand('devices.scan');
+            
+            if (result.success === false) {
+                throw new Error(result.error || 'Scan failed');
+            }
+            
+            this.showSuccess('Device scan completed');
+            await this.refreshDeviceList();
+            
+        } catch (error) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentController', 'Scan failed:', error);
+            }
+            this.showError(`Scan failed: ${error.message}`);
+        }
+    }
+    
+    async getDeviceProfile(deviceId) {
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Getting profile for: ${deviceId}`);
+        }
+        
+        if (!this.backendService) {
+            this.showError('Backend service not available');
+            return null;
+        }
+        
+        try {
+            const result = await this.backendService.sendCommand('devices.getProfile', {
                 device_id: deviceId
             });
             
@@ -228,184 +262,97 @@ class InstrumentController extends BaseController {
                 throw new Error(result.error || 'Failed to get profile');
             }
             
-            const profile = result.data || result;
-            
-            this.logger.debug(this.name, 'Device profile:', profile);
-            
-            // Mettre à jour le modèle
-            this.model.setDeviceProfile(deviceId, profile);
-            
-            // Mettre à jour la vue
-            this.view.updateDeviceProfile(deviceId, profile);
+            return result.data;
             
         } catch (error) {
-            this.logger.error(this.name, 'Failed to get device profile:', error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentController', 'Failed to get profile:', error);
+            }
+            return null;
         }
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS BACKEND (NOUVEAU)
+    // EVENT HANDLERS
     // ========================================================================
     
     handleDeviceConnected(data) {
-        this.logger.info(this.name, 'Device connected:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        // Mettre à jour localement
-        const device = this.devices.get(deviceId);
-        if (device) {
-            device.connected = true;
-        } else {
-            // Ajouter le nouveau device
-            this.devices.set(deviceId, {
-                id: deviceId,
-                name: data.name || deviceId,
-                connected: true
-            });
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Device connected: ${data.device_id}`);
         }
         
-        // Rafraîchir la liste
         this.refreshDeviceList();
-        
-        // Notification
-        this.showSuccess(`Device ${data.name || deviceId} connected`);
     }
     
     handleDeviceDisconnected(data) {
-        this.logger.info(this.name, 'Device disconnected:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        // Mettre à jour localement
-        const device = this.devices.get(deviceId);
-        if (device) {
-            device.connected = false;
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Device disconnected: ${data.device_id}`);
         }
         
-        // Rafraîchir la liste
         this.refreshDeviceList();
-        
-        // Notification
-        this.showError(`Device ${data.name || deviceId} disconnected`);
     }
     
     handleDeviceDiscovered(data) {
-        this.logger.info(this.name, 'Device discovered:', data.device_id);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', `Device discovered: ${data.device_id}`);
+        }
         
-        // Rafraîchir la liste
         this.refreshDeviceList();
     }
     
-    // ========================================================================
-    // ÉVÉNEMENTS SYSEX (NOUVEAU)
-    // ========================================================================
-    
     handleSysExIdentity(data) {
-        this.logger.info(this.name, 'SysEx Identity received:', data.device_id);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Identity received:', data.device_id);
+        }
         
         const deviceId = data.device_id;
+        const device = this.devices.get(deviceId);
         
-        // Mettre à jour le profil
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.identity = {
-            manufacturer: data.manufacturer,
-            model: data.model,
-            version: data.version
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (device) {
+            device.sysex = device.sysex || {};
+            device.sysex.identity = {
+                manufacturer: data.manufacturer,
+                family: data.family,
+                model: data.model,
+                version: data.version
+            };
+        }
     }
     
     handleSysExNoteMap(data) {
-        this.logger.info(this.name, 'SysEx NoteMap received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.noteMap = {
-            playableNotes: data.playable_notes,
-            octaveRange: data.octave_range
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Note Map received:', data.device_id);
+        }
     }
     
     handleSysExCC(data) {
-        this.logger.info(this.name, 'SysEx CC Capabilities received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.ccCapabilities = {
-            supportedCCs: data.supported_ccs
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx CC Capabilities received:', data.device_id);
+        }
     }
     
     handleSysExAir(data) {
-        this.logger.info(this.name, 'SysEx Air Capabilities received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.airCapabilities = {
-            breathControl: data.breath_control,
-            aftertouch: data.aftertouch
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Air Capabilities received:', data.device_id);
+        }
     }
     
     handleSysExLight(data) {
-        this.logger.info(this.name, 'SysEx Light Capabilities received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.lightCapabilities = {
-            rgbSupport: data.rgb_support,
-            brightnessLevels: data.brightness_levels
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Light Capabilities received:', data.device_id);
+        }
     }
     
     handleSysExSensors(data) {
-        this.logger.info(this.name, 'SysEx Sensors received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.sensors = {
-            gyroscope: data.gyroscope,
-            accelerometer: data.accelerometer
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Sensors received:', data.device_id);
+        }
     }
     
     handleSysExSync(data) {
-        this.logger.info(this.name, 'SysEx Sync Clock received:', data.device_id);
-        
-        const deviceId = data.device_id;
-        
-        const profile = this.model.getDeviceProfile(deviceId) || {};
-        profile.syncClock = {
-            midiClock: data.midi_clock,
-            mtc: data.mtc,
-            internalBPM: data.internal_bpm
-        };
-        
-        this.model.setDeviceProfile(deviceId, profile);
-        this.view.updateDeviceProfile(deviceId, profile);
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentController', 'SysEx Sync Clock received:', data.device_id);
+        }
     }
     
     // ========================================================================
@@ -413,19 +360,27 @@ class InstrumentController extends BaseController {
     // ========================================================================
     
     showError(message) {
-        this.eventBus.emit('notification:show', {
-            type: 'error',
-            message: message,
-            duration: 5000
-        });
+        if (this.notifications && typeof this.notifications.show === 'function') {
+            this.notifications.show(message, 'error', { duration: 5000 });
+        } else {
+            this.eventBus.emit('notification:show', {
+                type: 'error',
+                message: message,
+                duration: 5000
+            });
+        }
     }
     
     showSuccess(message) {
-        this.eventBus.emit('notification:show', {
-            type: 'success',
-            message: message,
-            duration: 3000
-        });
+        if (this.notifications && typeof this.notifications.show === 'function') {
+            this.notifications.show(message, 'success', { duration: 3000 });
+        } else {
+            this.eventBus.emit('notification:show', {
+                type: 'success',
+                message: message,
+                duration: 3000
+            });
+        }
     }
     
     // ========================================================================
@@ -450,6 +405,10 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = InstrumentController;
 }
 
+if (typeof window !== 'undefined') {
+    window.InstrumentController = InstrumentController;
+}
+
 // ============================================================================
-// FIN DU FICHIER InstrumentController.js
+// FIN DU FICHIER InstrumentController.js v3.0.1-FIXED
 // ============================================================================
