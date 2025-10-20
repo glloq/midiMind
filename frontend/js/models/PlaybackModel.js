@@ -62,7 +62,7 @@ class PlaybackModel extends BaseModel {
         
         this.logger.info('PlaybackModel', '✓ Model initialized with interpolation support');
         
-        this.setupPlaybackConfig();
+        //this.setupPlaybackConfig();
     }
     
     // ========================================================================
