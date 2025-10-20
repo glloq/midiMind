@@ -8,7 +8,9 @@
 
 class InstrumentView extends BaseView {
     constructor(containerId, eventBus) {
-        super(containerId, eventBus);
+        // IMPORTANT: Initialize properties BEFORE calling super()
+        // BaseView's constructor calls initialize() which calls render()
+        // So these properties must exist before super() is called
         
         // État local
         this.localState = {
@@ -23,6 +25,9 @@ class InstrumentView extends BaseView {
             showMetrics: true,
             showCapabilities: true
         };
+        
+        // Now call super() after properties are initialized
+        super(containerId, eventBus);
         
         // Couleurs de connexion
         this.connectionColors = {
