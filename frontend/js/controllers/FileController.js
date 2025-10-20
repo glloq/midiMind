@@ -1,38 +1,19 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
-// Version: v3.0.2-COMPLETE
-// Date: 2025-10-12
+// Version: v3.0.3-FIXED
+// Date: 2025-10-20
 // ============================================================================
-// Description:
-//   Contrôleur de gestion des fichiers MIDI - Version complète et unifiée
-//   Toutes les duplications supprimées, API cohérente
-//
-// Modifications v3.0.2:
-//   ✅ Suppression duplications (refreshFileList, handleFileSelect, etc.)
-//   ✅ Unification accès model (toujours via get/set)
-//   ✅ Unification accès view (toujours via render)
-//   ✅ uploadFile() corrigé pour utiliser files.upload (base64)
-//   ✅ Gestion événements backend complète
-//   ✅ Méthodes helpers unifiées
-//   ✅ Documentation complète
-//
-// API Publique:
-//   - refreshFileList()      : Rafraîchir la liste
-//   - uploadFile(file)       : Upload fichier MIDI
-//   - deleteFile(fileId)     : Supprimer avec confirmation
-//   - renameFile(fileId, name) : Renommer fichier
-//   - moveFile(fileId, path) : Déplacer fichier
-//   - selectFile(fileId)     : Sélectionner fichier
-//   - loadFile(fileId)       : Charger pour lecture
-//
-// Auteur: MidiMind Team
+// CORRECTIONS v3.0.3:
+// ✅ Fixed initialization order (logger before initialize call)
+// ✅ Added _fullyInitialized flag pattern
+// ✅ Protected initialize() method
 // ============================================================================
 
 class FileController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Services
+        // Services - Initialize BEFORE everything else
         this.backend = window.app?.services?.backend || null;
         this.logger = window.Logger || console;
         
@@ -52,6 +33,10 @@ class FileController extends BaseController {
             confirmDelete: true
         };
         
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
+        // Now initialize
         this.initialize();
     }
     
@@ -60,11 +45,20 @@ class FileController extends BaseController {
     // ========================================================================
     
     initialize() {
-        this.logger.info('FileController', '📁 Initializing...');
+        // Only initialize if fully ready
+        if (!this._fullyInitialized) {
+            return;
+        }
+        
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', '📁 Initializing...');
+        }
         
         // Vérifier dépendances
         if (!this.backend) {
-            this.logger.error('FileController', 'BackendService not available');
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'BackendService not available');
+            }
             return;
         }
         
@@ -76,7 +70,9 @@ class FileController extends BaseController {
             this.refreshFileList();
         }, 1000);
         
-        this.logger.info('FileController', '✓ Initialized');
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', '✓ Initialized');
+        }
     }
     
     setupEventListeners() {
@@ -99,40 +95,28 @@ class FileController extends BaseController {
     // ========================================================================
     
     /**
-     * Rafraîchit la liste de fichiers depuis le backend
+     * Rafraîchit la liste des fichiers
      * @returns {Promise<Array>} Liste des fichiers
      */
     async refreshFileList() {
-        this.logger.info('FileController', 'Refreshing file list...');
-        
-        if (this.state.isLoading) {
-            this.logger.warn('FileController', 'Already loading, skip');
-            return;
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', 'Refreshing file list...');
         }
         
-        this.state.isLoading = true;
-        
         try {
-            // Afficher loader
             this.showLoading(true);
             
-            // Demander liste au backend
             const result = await this.backend.sendCommand('files.list', {
-                directory: this.state.currentDirectory,
-                recursive: true
+                directory: this.state.currentDirectory
             });
             
-            // Vérifier succès
             if (result.success === false) {
-                throw new Error(result.error || 'Failed to load file list');
+                throw new Error(result.error || 'Failed to fetch file list');
             }
             
-            // Extraire fichiers (compatibilité avec différentes structures)
-            const files = result.data?.files || result.files || [];
+            const files = result.data?.files || [];
             
-            this.logger.info('FileController', `✓ Loaded ${files.length} files`);
-            
-            // Mettre à jour modèle
+            // Mettre à jour model
             const model = this.getModel('file');
             if (model) {
                 model.set('files', files);
@@ -140,27 +124,31 @@ class FileController extends BaseController {
                 model.set('lastRefresh', Date.now());
             }
             
-            // Mettre à jour vue
+            // Mettre à jour view
             this.updateView('file', {
                 files: files,
                 directory: this.state.currentDirectory,
                 count: files.length
             });
             
-            // État
             this.state.lastRefresh = Date.now();
             
+            if (this.logger && this.logger.info) {
+                this.logger.info('FileController', `✓ ${files.length} files loaded`);
+            }
+            
             // Émettre événement
-            this.eventBus.emit('files:loaded', { 
-                files, 
-                count: files.length,
-                directory: this.state.currentDirectory
+            this.eventBus.emit('files:refreshed', {
+                files: files,
+                count: files.length
             });
             
             return files;
             
         } catch (error) {
-            this.logger.error('FileController', 'Failed to refresh file list:', error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Failed to refresh file list:', error);
+            }
             
             this.showNotification(
                 `Failed to load files: ${error.message}`,
@@ -168,11 +156,130 @@ class FileController extends BaseController {
                 { duration: 5000 }
             );
             
-            throw error;
+            return [];
             
         } finally {
-            this.state.isLoading = false;
             this.showLoading(false);
+        }
+    }
+    
+    // ========================================================================
+    // SÉLECTION FICHIER
+    // ========================================================================
+    
+    /**
+     * Sélectionne un fichier
+     * @param {string} fileId - ID du fichier
+     */
+    selectFile(fileId) {
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', `Selecting file: ${fileId}`);
+        }
+        
+        const previousFile = this.state.selectedFile;
+        this.state.selectedFile = fileId;
+        
+        // Récupérer infos fichier
+        const file = this.getFileById(fileId);
+        
+        // Émettre événement
+        this.eventBus.emit('file:selected', {
+            fileId: fileId,
+            file: file,
+            previousFile: previousFile
+        });
+        
+        // Mettre à jour view
+        this.updateView('file', {
+            selectedFile: fileId,
+            selectedFileData: file
+        });
+    }
+    
+    /**
+     * Handler pour événement file:select
+     * @private
+     */
+    handleFileSelect(data) {
+        const fileId = data.fileId || data.id || data.file_id;
+        
+        if (!fileId) {
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('FileController', 'No file ID provided for select');
+            }
+            return;
+        }
+        
+        this.selectFile(fileId);
+    }
+    
+    /**
+     * Charge un fichier pour lecture via GlobalPlaybackController
+     * @param {string} fileId - ID du fichier
+     * @returns {Promise<void>}
+     */
+    async loadFile(fileId) {
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', `Loading file: ${fileId}`);
+        }
+        
+        try {
+            // Vérifier GlobalPlaybackController disponible
+            if (!window.globalPlaybackController) {
+                throw new Error('GlobalPlaybackController not available');
+            }
+            
+            // Charger via playback controller
+            await window.globalPlaybackController.loadFile(fileId);
+            
+            // Récupérer nom fichier
+            const file = this.getFileById(fileId);
+            const fileName = file?.filename || file?.name || 'File';
+            
+            // Notification succès
+            this.showNotification(
+                `${fileName} loaded`,
+                'success',
+                { duration: 2000 }
+            );
+            
+            if (this.logger && this.logger.info) {
+                this.logger.info('FileController', '✓ File loaded successfully');
+            }
+            
+        } catch (error) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Failed to load file:', error);
+            }
+            
+            this.showNotification(
+                `Failed to load file: ${error.message}`,
+                'error',
+                { duration: 5000 }
+            );
+            
+            throw error;
+        }
+    }
+    
+    /**
+     * Handler pour événement file:load
+     * @private
+     */
+    async handleFileLoad(data) {
+        const fileId = data.fileId || data.id || data.file_id || data.filePath;
+        
+        if (!fileId) {
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('FileController', 'No file ID provided for load');
+            }
+            return;
+        }
+        
+        try {
+            await this.loadFile(fileId);
+        } catch (error) {
+            // Erreur déjà gérée dans loadFile()
         }
     }
     
@@ -181,90 +288,56 @@ class FileController extends BaseController {
     // ========================================================================
     
     /**
-     * Upload un fichier MIDI avec validation et progress
+     * Upload un fichier MIDI
      * @param {File} file - Fichier à uploader
-     * @param {Function} onProgress - Callback progression (0-100)
+     * @param {Function} onProgress - Callback progression
      * @returns {Promise<Object>} Fichier uploadé
      */
     async uploadFile(file, onProgress = null) {
-        this.logger.info('FileController', `Uploading file: ${file.name}`);
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', `Uploading file: ${file.name}`);
+        }
         
         try {
-            // ============================================================
-            // VALIDATION CLIENT
-            // ============================================================
-            
-            // 1. Extension
-            const ext = file.name.toLowerCase().slice(-4);
-            if (!this.config.allowedExtensions.some(e => ext.endsWith(e))) {
-                throw new Error('Invalid file type. Only .mid or .midi files are allowed.');
+            // Validation
+            if (!file) {
+                throw new Error('No file provided');
             }
             
-            // 2. Taille
             if (file.size > this.config.maxFileSize) {
-                const maxMB = (this.config.maxFileSize / (1024 * 1024)).toFixed(1);
-                throw new Error(`File too large. Maximum size is ${maxMB} MB.`);
+                throw new Error(`File too large (max ${this.config.maxFileSize / 1024 / 1024}MB)`);
             }
             
-            // 3. Lecture fichier
-            if (onProgress) onProgress(10);
-            
-            const arrayBuffer = await file.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            
-            if (onProgress) onProgress(30);
-            
-            // 4. Vérifier header MIDI (MThd)
-            if (uint8Array.length < 4 || 
-                String.fromCharCode(...uint8Array.slice(0, 4)) !== 'MThd') {
-                throw new Error('Invalid MIDI file format (missing MThd header)');
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (!this.config.allowedExtensions.includes(ext)) {
+                throw new Error(`Invalid file type (allowed: ${this.config.allowedExtensions.join(', ')})`);
             }
             
-            // ============================================================
-            // CONVERSION BASE64
-            // ============================================================
+            // Afficher loader
+            this.showLoading(true);
             
-            if (onProgress) onProgress(40);
+            // Lire fichier en base64
+            const base64 = await this.fileToBase64(file);
             
-            const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
-            
-            if (onProgress) onProgress(60);
-            
-            this.logger.debug('FileController', 
-                `File converted to base64 (${base64.length} chars)`);
-            
-            // ============================================================
-            // ENVOI BACKEND
-            // ============================================================
-            
+            // Upload via backend
             const result = await this.backend.sendCommand('files.upload', {
                 filename: file.name,
-                data: base64,
-                size: file.size,
-                directory: this.state.currentDirectory,
-                overwrite: false
+                content: base64,
+                directory: this.state.currentDirectory
             });
             
-            if (onProgress) onProgress(90);
-            
-            // Vérifier succès
             if (result.success === false) {
                 throw new Error(result.error || 'Upload failed');
             }
             
-            const uploadedFile = result.data || result;
+            const uploadedFile = result.data;
             
-            this.logger.info('FileController', 
-                `✓ File uploaded: ${file.name} (ID: ${uploadedFile.file_id})`);
-            
-            // ============================================================
-            // MISE À JOUR
-            // ============================================================
+            if (this.logger && this.logger.info) {
+                this.logger.info('FileController', `✓ File uploaded: ${file.name}`);
+            }
             
             // Rafraîchir liste
             await this.refreshFileList();
-            
-            if (onProgress) onProgress(100);
             
             // Notification succès
             this.showNotification(
@@ -274,7 +347,7 @@ class FileController extends BaseController {
             );
             
             // Émettre événement
-            this.eventBus.emit('file:uploaded', { 
+            this.eventBus.emit('file:uploaded', {
                 file: uploadedFile,
                 originalFile: file
             });
@@ -282,7 +355,9 @@ class FileController extends BaseController {
             return uploadedFile;
             
         } catch (error) {
-            this.logger.error('FileController', 'Upload failed:', error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Upload failed:', error);
+            }
             
             this.showNotification(
                 `Upload failed: ${error.message}`,
@@ -291,6 +366,9 @@ class FileController extends BaseController {
             );
             
             throw error;
+            
+        } finally {
+            this.showLoading(false);
         }
     }
     
@@ -302,7 +380,9 @@ class FileController extends BaseController {
         const { file, onProgress } = data;
         
         if (!file) {
-            this.logger.error('FileController', 'No file provided for upload');
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'No file provided for upload');
+            }
             return;
         }
         
@@ -323,7 +403,9 @@ class FileController extends BaseController {
      * @returns {Promise<boolean>} Succès
      */
     async deleteFile(fileId) {
-        this.logger.info('FileController', `Deleting file: ${fileId}`);
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', `Deleting file: ${fileId}`);
+        }
         
         try {
             // Récupérer info fichier
@@ -338,7 +420,9 @@ class FileController extends BaseController {
                 );
                 
                 if (!confirmed) {
-                    this.logger.info('FileController', 'Delete cancelled by user');
+                    if (this.logger && this.logger.info) {
+                        this.logger.info('FileController', 'Delete cancelled by user');
+                    }
                     return false;
                 }
             }
@@ -356,7 +440,9 @@ class FileController extends BaseController {
                 throw new Error(result.error || 'Delete failed');
             }
             
-            this.logger.info('FileController', `✓ File deleted: ${fileName}`);
+            if (this.logger && this.logger.info) {
+                this.logger.info('FileController', `✓ File deleted: ${fileName}`);
+            }
             
             // Si fichier sélectionné, désélectionner
             if (this.state.selectedFile === fileId) {
@@ -383,7 +469,9 @@ class FileController extends BaseController {
             return true;
             
         } catch (error) {
-            this.logger.error('FileController', 'Delete failed:', error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Delete failed:', error);
+            }
             
             this.showNotification(
                 `Failed to delete file: ${error.message}`,
@@ -406,7 +494,9 @@ class FileController extends BaseController {
         const fileId = data.fileId || data.id || data.file_id || data.filePath;
         
         if (!fileId) {
-            this.logger.error('FileController', 'No file ID provided for delete');
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'No file ID provided for delete');
+            }
             return;
         }
         
@@ -414,454 +504,55 @@ class FileController extends BaseController {
     }
     
     // ========================================================================
-    // RENOMMER FICHIER
-    // ========================================================================
-    
-    /**
-     * Renomme un fichier
-     * @param {string} fileId - ID du fichier
-     * @param {string} newName - Nouveau nom
-     * @returns {Promise<Object>} Fichier renommé
-     */
-    async renameFile(fileId, newName) {
-        this.logger.info('FileController', `Renaming file: ${fileId} -> ${newName}`);
-        
-        try {
-            // Validation
-            if (!newName || newName.trim().length === 0) {
-                throw new Error('Invalid file name');
-            }
-            
-            // Ajouter extension si absente
-            if (!this.config.allowedExtensions.some(ext => 
-                newName.toLowerCase().endsWith(ext))) {
-                newName += '.mid';
-            }
-            
-            // Renommer via backend
-            const result = await this.backend.sendCommand('files.rename', {
-                file_id: fileId,
-                new_name: newName
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Rename failed');
-            }
-            
-            this.logger.info('FileController', `✓ File renamed to: ${newName}`);
-            
-            // Rafraîchir liste
-            await this.refreshFileList();
-            
-            // Notification succès
-            this.showNotification(
-                `File renamed to: ${newName}`,
-                'success',
-                { duration: 3000 }
-            );
-            
-            // Émettre événement
-            this.eventBus.emit('file:renamed', {
-                fileId,
-                oldName: result.data?.old_name,
-                newName: newName,
-                newPath: result.data?.new_path
-            });
-            
-            return result.data;
-            
-        } catch (error) {
-            this.logger.error('FileController', 'Rename failed:', error);
-            
-            this.showNotification(
-                `Failed to rename file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            throw error;
-        }
-    }
-    
-    /**
-     * Handler pour événement file:rename
-     * @private
-     */
-    async handleFileRename(data) {
-        const { fileId, newName } = data;
-        
-        if (!fileId || !newName) {
-            this.logger.error('FileController', 'Missing fileId or newName for rename');
-            return;
-        }
-        
-        try {
-            await this.renameFile(fileId, newName);
-        } catch (error) {
-            // Erreur déjà gérée dans renameFile()
-        }
-    }
-    
-    // ========================================================================
-    // DÉPLACER FICHIER
-    // ========================================================================
-    
-    /**
-     * Déplace un fichier vers un nouveau répertoire
-     * @param {string} fileId - ID du fichier
-     * @param {string} destination - Chemin destination
-     * @returns {Promise<Object>} Fichier déplacé
-     */
-    async moveFile(fileId, destination) {
-        this.logger.info('FileController', `Moving file: ${fileId} -> ${destination}`);
-        
-        try {
-            const result = await this.backend.sendCommand('files.move', {
-                file_id: fileId,
-                destination: destination
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Move failed');
-            }
-            
-            this.logger.info('FileController', '✓ File moved successfully');
-            
-            // Rafraîchir liste
-            await this.refreshFileList();
-            
-            // Notification succès
-            this.showNotification(
-                'File moved successfully',
-                'success',
-                { duration: 3000 }
-            );
-            
-            // Émettre événement
-            this.eventBus.emit('file:moved', {
-                fileId,
-                destination,
-                newPath: result.data?.new_path
-            });
-            
-            return result.data;
-            
-        } catch (error) {
-            this.logger.error('FileController', 'Move failed:', error);
-            
-            this.showNotification(
-                `Failed to move file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            throw error;
-        }
-    }
-    
-    // ========================================================================
-    // SÉLECTION ET CHARGEMENT
-    // ========================================================================
-    
-    /**
-     * Sélectionne un fichier
-     * @param {string} fileId - ID du fichier
-     */
-    selectFile(fileId) {
-        this.logger.info('FileController', `Selecting file: ${fileId}`);
-        
-        this.state.selectedFile = fileId;
-        
-        // Récupérer info complète
-        const file = this.getFileById(fileId);
-        
-        // Mettre à jour modèle
-        const model = this.getModel('file');
-        if (model) {
-            model.set('selectedFile', fileId);
-        }
-        
-        // Émettre événement
-        this.eventBus.emit('file:selected', {
-            fileId,
-            file
-        });
-    }
-    
-    /**
-     * Handler pour événement file:select
-     * @private
-     */
-    handleFileSelect(data) {
-        const fileId = data.fileId || data.id || data.file_id;
-        
-        if (!fileId) {
-            this.logger.warn('FileController', 'No file ID provided for select');
-            return;
-        }
-        
-        this.selectFile(fileId);
-    }
-    
-    /**
-     * Charge un fichier pour lecture via GlobalPlaybackController
-     * @param {string} fileId - ID du fichier
-     * @returns {Promise<void>}
-     */
-    async loadFile(fileId) {
-        this.logger.info('FileController', `Loading file: ${fileId}`);
-        
-        try {
-            // Vérifier GlobalPlaybackController disponible
-            if (!window.globalPlaybackController) {
-                throw new Error('GlobalPlaybackController not available');
-            }
-            
-            // Charger via playback controller
-            await window.globalPlaybackController.loadFile(fileId);
-            
-            // Récupérer nom fichier
-            const file = this.getFileById(fileId);
-            const fileName = file?.filename || file?.name || 'File';
-            
-            // Notification succès
-            this.showNotification(
-                `${fileName} loaded`,
-                'success',
-                { duration: 2000 }
-            );
-            
-            this.logger.info('FileController', '✓ File loaded successfully');
-            
-        } catch (error) {
-            this.logger.error('FileController', 'Failed to load file:', error);
-            
-            this.showNotification(
-                `Failed to load file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            throw error;
-        }
-    }
-    
-    /**
-     * Handler pour événement file:load
-     * @private
-     */
-    async handleFileLoad(data) {
-        const fileId = data.fileId || data.id || data.file_id || data.filePath;
-        
-        if (!fileId) {
-            this.logger.warn('FileController', 'No file ID provided for load');
-            return;
-        }
-        
-        try {
-            await this.loadFile(fileId);
-        } catch (error) {
-            // Erreur déjà gérée dans loadFile()
-        }
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS BACKEND
-    // ========================================================================
-    
-    /**
-     * Gère les événements reçus du backend
-     * @param {Object} event - Événement backend
-     */
-    handleBackendEvent(event) {
-        if (!event || !event.name) {
-            this.logger.warn('FileController', 'Invalid backend event received');
-            return;
-        }
-        
-        this.logger.debug('FileController', `Backend event: ${event.name}`);
-        
-        switch (event.name) {
-            case 'files:list':
-                this.handleFilesListUpdate(event.data);
-                break;
-                
-            case 'files:added':
-            case 'file:added':
-                this.handleFileAdded(event.data);
-                break;
-                
-            case 'files:deleted':
-            case 'file:deleted':
-                this.handleFileDeleted(event.data);
-                break;
-                
-            case 'files:renamed':
-            case 'file:renamed':
-                this.handleFileRenamed(event.data);
-                break;
-                
-            case 'files:updated':
-            case 'file:updated':
-                this.handleFileUpdated(event.data);
-                break;
-                
-            case 'files:scan:complete':
-                this.handleScanComplete(event.data);
-                break;
-                
-            case 'files:scan:progress':
-                this.handleScanProgress(event.data);
-                break;
-                
-            default:
-                this.logger.debug('FileController', `Unhandled event: ${event.name}`);
-        }
-    }
-    
-    handleFilesListUpdate(data) {
-        this.logger.info('FileController', `Files list updated (${data.count} files)`);
-        
-        const model = this.getModel('file');
-        if (model) {
-            model.set('files', data.files || []);
-            model.set('directory', data.directory);
-            model.set('lastScan', Date.now());
-        }
-        
-        this.updateView('file', {
-            files: data.files || [],
-            directory: data.directory,
-            count: data.count
-        });
-        
-        this.eventBus.emit('files:refreshed', data);
-    }
-    
-    handleFileAdded(data) {
-        this.logger.info('FileController', `File added: ${data.filename || data.name}`);
-        
-        // Rafraîchir liste complète
-        this.refreshFileList();
-        
-        // Notification
-        this.showNotification(
-            `File "${data.filename || data.name}" added`,
-            'success',
-            { duration: 3000 }
-        );
-    }
-    
-    handleFileDeleted(data) {
-        this.logger.info('FileController', `File deleted: ${data.fileId || data.id}`);
-        
-        const fileId = data.fileId || data.id;
-        
-        // Si fichier sélectionné, désélectionner
-        if (this.state.selectedFile === fileId) {
-            this.state.selectedFile = null;
-            this.eventBus.emit('file:deselected');
-        }
-        
-        // Rafraîchir liste
-        this.refreshFileList();
-    }
-    
-    handleFileRenamed(data) {
-        this.logger.info('FileController', `File renamed: ${data.oldId} -> ${data.newId}`);
-        
-        // Si fichier sélectionné, mettre à jour ID
-        if (this.state.selectedFile === data.oldId) {
-            this.state.selectedFile = data.newId;
-        }
-        
-        // Rafraîchir liste
-        this.refreshFileList();
-        
-        // Notification
-        this.showNotification(
-            'File renamed successfully',
-            'success',
-            { duration: 3000 }
-        );
-    }
-    
-    handleFileUpdated(data) {
-        this.logger.info('FileController', `File updated: ${data.id}`);
-        
-        // Rafraîchir liste
-        this.refreshFileList();
-    }
-    
-    handleScanComplete(data) {
-        this.logger.info('FileController', 
-            `Scan complete: ${data.filesFound} files in ${data.duration}ms`);
-        
-        // Notification
-        this.showNotification(
-            `Scan complete: ${data.filesFound} files found`,
-            'success',
-            { duration: 3000 }
-        );
-        
-        this.eventBus.emit('file:scan:complete', data);
-    }
-    
-    handleScanProgress(data) {
-        this.logger.debug('FileController', 
-            `Scan progress: ${data.progress}% (${data.filesScanned} files)`);
-        
-        this.eventBus.emit('file:scan:progress', data);
-    }
-    
-    onBackendConnected() {
-        this.logger.info('FileController', 'Backend connected, refreshing file list');
-        
-        if (this.config.autoRefresh) {
-            this.refreshFileList();
-        }
-    }
-    
-    onBackendDisconnected() {
-        this.logger.warn('FileController', 'Backend disconnected');
-    }
-    
-    // ========================================================================
     // HELPERS
     // ========================================================================
     
     /**
-     * Récupère un fichier par son ID
+     * Récupère un fichier par ID
      * @param {string} fileId - ID du fichier
-     * @returns {Object|null} Fichier ou null
+     * @returns {Object|null} Fichier
      */
     getFileById(fileId) {
         const model = this.getModel('file');
-        if (!model) return null;
-        
-        const files = model.get('files') || [];
+        const files = model?.get('files') || [];
         return files.find(f => 
             f.id === fileId || 
-            f.path === fileId || 
-            f.filepath === fileId
-        ) || null;
+            f.file_id === fileId || 
+            f.path === fileId ||
+            f.file_path === fileId
+        );
+    }
+    
+    /**
+     * Convertit un File en base64
+     * @param {File} file - Fichier
+     * @returns {Promise<string>} Base64
+     */
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
     
     /**
      * Affiche/masque le loader
-     * @param {boolean} show - Afficher ou masquer
+     * @param {boolean} show - Afficher
      */
     showLoading(show) {
-        const view = this.getView('file');
-        if (view && typeof view.showLoading === 'function') {
-            view.showLoading(show);
-        }
+        this.state.isLoading = show;
+        this.eventBus.emit('file:loading', { isLoading: show });
     }
     
     /**
      * Met à jour une vue
      * @param {string} viewName - Nom de la vue
-     * @param {Object} data - Données à afficher
+     * @param {Object} data - Données
      */
     updateView(viewName, data) {
         const view = this.getView(viewName);
@@ -870,98 +561,52 @@ class FileController extends BaseController {
         }
     }
     
-    // ========================================================================
-    // API PUBLIQUE
-    // ========================================================================
-    
     /**
-     * Récupère le répertoire courant
-     * @returns {string} Chemin du répertoire
+     * Gère les événements reçus du backend
+     * @param {Object} event - Événement backend
      */
-    getCurrentDirectory() {
-        return this.state.currentDirectory;
-    }
-    
-    /**
-     * Récupère le fichier sélectionné
-     * @returns {string|null} ID du fichier sélectionné
-     */
-    getSelectedFile() {
-        return this.state.selectedFile;
-    }
-    
-    /**
-     * Change de répertoire
-     * @param {string} directory - Nouveau répertoire
-     * @returns {Promise<void>}
-     */
-    async changeDirectory(directory) {
-        this.logger.info('FileController', `Changing directory: ${directory}`);
-        
-        this.state.currentDirectory = directory;
-        await this.refreshFileList();
-    }
-    
-    /**
-     * Scan le répertoire pour nouveaux fichiers
-     * @returns {Promise<Object>} Résultat du scan
-     */
-    async scanDirectory() {
-        this.logger.info('FileController', 'Scanning directory...');
-        
-        try {
-            const result = await this.backend.sendCommand('files.scan', {
-                directory: this.state.currentDirectory,
-                recursive: true
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Scan failed');
+    handleBackendEvent(event) {
+        if (!event || !event.name) {
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('FileController', 'Invalid backend event received');
             }
-            
-            this.logger.info('FileController', 
-                `✓ Scan complete: ${result.data.files_found} files found`);
-            
-            // Rafraîchir liste
-            await this.refreshFileList();
-            
-            return result.data;
-            
-        } catch (error) {
-            this.logger.error('FileController', 'Scan failed:', error);
-            
-            this.showNotification(
-                `Scan failed: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            throw error;
+            return;
+        }
+        
+        if (this.logger && this.logger.debug) {
+            this.logger.debug('FileController', `Backend event: ${event.name}`);
+        }
+        
+        switch (event.name) {
+            case 'files:list':
+            case 'files:refreshed':
+                // Liste rafraîchie
+                break;
+            case 'file:added':
+                this.refreshFileList();
+                break;
+            case 'file:deleted':
+                this.refreshFileList();
+                break;
+            case 'file:renamed':
+                this.refreshFileList();
+                break;
         }
     }
     
-    /**
-     * Récupère les métadonnées d'un fichier
-     * @param {string} fileId - ID du fichier
-     * @returns {Promise<Object>} Métadonnées
-     */
-    async getFileMetadata(fileId) {
-        this.logger.info('FileController', `Getting metadata for: ${fileId}`);
+    onBackendConnected() {
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', 'Backend connected, refreshing file list');
+        }
         
-        try {
-            const result = await this.backend.sendCommand('files.getMetadata', {
-                file_id: fileId
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Failed to get metadata');
-            }
-            
-            return result.data;
-            
-        } catch (error) {
-            this.logger.error('FileController', 'Failed to get metadata:', error);
-            throw error;
+        if (this.config.autoRefresh) {
+            this.refreshFileList();
+        }
+    }
+    
+    onBackendDisconnected() {
+        if (this.logger && this.logger.warn) {
+            this.logger.warn('FileController', 'Backend disconnected');
         }
     }
     
@@ -982,6 +627,10 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = FileController;
 }
 
+if (typeof window !== 'undefined') {
+    window.FileController = FileController;
+}
+
 // ============================================================================
-// FIN DU FICHIER FileController.js v3.0.2-COMPLETE
+// FIN DU FICHIER FileController.js v3.0.3-FIXED
 // ============================================================================

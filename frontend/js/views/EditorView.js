@@ -128,7 +128,10 @@ class EditorView extends BaseView {
             canvas: []
         };
         
-        // Initialisation
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
+        // Now initialize after all properties are set
         this.initialize();
     }
     
@@ -141,13 +144,16 @@ class EditorView extends BaseView {
      * Override de BaseView.initialize()
      */
     initialize() {
-        super.initialize();
-        
-        this.bindCustomEvents();
-        
-        // Exposer globalement pour compatibilité
-        if (typeof window !== 'undefined') {
-            window.editorView = this;
+        // Only call super.initialize if we're fully initialized
+        // (BaseView constructor calls initialize, but properties aren't ready yet)
+        if (this._fullyInitialized) {
+            super.initialize();
+            
+            this.bindCustomEvents();
+            
+            // Exposer globalement pour compatibilité
+            if (typeof window !== 'undefined') {
+                window.editorView = this;
         }
         
         this.logDebug('EditorView v3.6.0 initialized');
