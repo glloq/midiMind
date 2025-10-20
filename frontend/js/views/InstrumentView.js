@@ -1,16 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v3.0.7 - BALANCED (More features, works perfectly)
-// Date: 2025-10-19
+// Version: v3.0.8 - FIXED (Initialization order corrected)
+// Date: 2025-10-20
 // ============================================================================
 // VERSION ÉQUILIBRÉE - Features utiles sans complexité excessive
+// FIX: Proper initialization order to prevent undefined displayConfig error
 // ============================================================================
 
 class InstrumentView extends BaseView {
     constructor(containerId, eventBus) {
-        // IMPORTANT: Initialize properties BEFORE calling super()
-        // BaseView's constructor calls initialize() which calls render()
-        // So these properties must exist before super() is called
+        super(containerId, eventBus);
+        
+        // Configure to prevent auto-render during construction
+        this.config.autoRender = false;
         
         // État local
         this.localState = {
@@ -26,9 +28,6 @@ class InstrumentView extends BaseView {
             showCapabilities: true
         };
         
-        // Now call super() after properties are initialized
-        super(containerId, eventBus);
-        
         // Couleurs de connexion
         this.connectionColors = {
             'usb': '#3498db',
@@ -41,6 +40,16 @@ class InstrumentView extends BaseView {
         this.logger = window.Logger || console;
         
         this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
+        
+        // Now that all properties are set, do initial render
+        this.initialize();
+    }
+    
+    // Override initialize to ensure it happens after all properties are set
+    initialize() {
+        if (this.container) {
+            this.render();
+        }
     }
     
     // ========================================================================
@@ -50,6 +59,12 @@ class InstrumentView extends BaseView {
     render(data = {}) {
         if (!this.container) {
             this.logger.warn('InstrumentView', 'Container not found');
+            return;
+        }
+        
+        // Safety check: ensure displayConfig exists
+        if (!this.displayConfig) {
+            this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
             return;
         }
         
@@ -216,87 +231,81 @@ class InstrumentView extends BaseView {
                             <strong>ID:</strong> <code>${this.escapeHtml(instrument.id)}</code>
                         </div>` : ''
                     }
-                    ${instrument.ports ? 
+                    ${instrument.port ? 
                         `<div class="info-item">
-                            <strong>Ports:</strong> 
-                            In: ${instrument.ports.input || 0}, 
-                            Out: ${instrument.ports.output || 0}
+                            <strong>Port:</strong> ${this.escapeHtml(instrument.port)}
                         </div>` : ''
                     }
                 </div>
                 
-                <!-- Capacités -->
-                ${this.displayConfig.showCapabilities ? this.renderCapabilities(instrument) : ''}
+                <!-- Capabilities -->
+                ${this.renderCapabilities(instrument)}
                 
-                <!-- Métriques -->
-                ${this.displayConfig.showMetrics && instrument.connected ? 
-                    this.renderMetrics(instrument) : ''
-                }
+                <!-- Metrics -->
+                ${this.renderMetrics(instrument)}
                 
             </div>
         `;
     }
     
     // ========================================================================
-    // RENDU CAPACITÉS
+    // RENDU CAPABILITIES
     // ========================================================================
     
     renderCapabilities(instrument) {
-        const capabilities = [];
-        
-        if (instrument.midiChannels) {
-            capabilities.push(`🎛️ ${instrument.midiChannels} channels`);
-        }
-        
-        if (instrument.sysexCapable) {
-            capabilities.push('💾 SysEx');
-        }
-        
-        if (instrument.velocitySensitive) {
-            capabilities.push('🎹 Velocity');
-        }
-        
-        if (instrument.aftertouch) {
-            capabilities.push('👆 Aftertouch');
-        }
-        
-        if (capabilities.length === 0) {
+        if (!this.displayConfig.showCapabilities || !instrument.capabilities) {
             return '';
         }
         
+        const caps = instrument.capabilities;
+        
         return `
             <div class="capabilities">
-                <strong>Capabilities:</strong>
-                <div class="capability-badges">
-                    ${capabilities.map(cap => `<span class="badge">${cap}</span>`).join('')}
+                <h4>Capabilities</h4>
+                <div class="capability-tags">
+                    ${caps.input ? '<span class="cap-tag">📥 Input</span>' : ''}
+                    ${caps.output ? '<span class="cap-tag">📤 Output</span>' : ''}
+                    ${caps.clock ? '<span class="cap-tag">🕐 Clock</span>' : ''}
+                    ${caps.program ? '<span class="cap-tag">🎛️ Program</span>' : ''}
                 </div>
             </div>
         `;
     }
     
     // ========================================================================
-    // RENDU MÉTRIQUES
+    // RENDU METRICS
     // ========================================================================
     
     renderMetrics(instrument) {
-        if (!instrument.latency && !instrument.messagesReceived) {
+        if (!this.displayConfig.showMetrics || !instrument.metrics) {
             return '';
         }
         
+        const metrics = instrument.metrics;
+        
         return `
             <div class="metrics">
-                ${instrument.latency ? 
-                    `<div class="metric-item">
-                        <span class="metric-label">⚡ Latency:</span>
-                        <span class="metric-value">${instrument.latency.toFixed(1)} ms</span>
-                    </div>` : ''
-                }
-                ${instrument.messagesReceived ? 
-                    `<div class="metric-item">
-                        <span class="metric-label">📨 Messages:</span>
-                        <span class="metric-value">${instrument.messagesReceived}</span>
-                    </div>` : ''
-                }
+                <h4>Metrics</h4>
+                <div class="metric-grid">
+                    ${metrics.notesReceived !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Notes Received:</span>
+                            <span class="metric-value">${metrics.notesReceived}</span>
+                        </div>` : ''
+                    }
+                    ${metrics.notesSent !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Notes Sent:</span>
+                            <span class="metric-value">${metrics.notesSent}</span>
+                        </div>` : ''
+                    }
+                    ${metrics.latency !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Latency:</span>
+                            <span class="metric-value">${metrics.latency}ms</span>
+                        </div>` : ''
+                    }
+                </div>
             </div>
         `;
     }
@@ -308,20 +317,19 @@ class InstrumentView extends BaseView {
     renderCardFooter(instrument) {
         return `
             <div class="card-footer">
-                ${instrument.connected ?
-                    `<button class="btn btn-small btn-danger disconnect-btn" 
-                             data-id="${instrument.id}">
-                        Disconnect
-                    </button>` :
-                    `<button class="btn btn-small btn-primary connect-btn" 
-                             data-id="${instrument.id}">
-                        Connect
+                ${instrument.connected ? 
+                    `<button class="btn btn-sm btn-danger disconnect-btn" 
+                            data-id="${instrument.id}">
+                        🔌 Disconnect
+                    </button>` : 
+                    `<button class="btn btn-sm btn-success connect-btn" 
+                            data-id="${instrument.id}">
+                        🔌 Connect
                     </button>`
                 }
-                
-                ${instrument.connected && instrument.sysexCapable ?
-                    `<button class="btn btn-small btn-secondary config-btn" 
-                             data-id="${instrument.id}">
+                ${instrument.connected ? 
+                    `<button class="btn btn-sm btn-secondary config-btn" 
+                            data-id="${instrument.id}">
                         ⚙️ Configure
                     </button>` : ''
                 }
