@@ -95,7 +95,7 @@ class HomeController extends BaseController {
         // Vérifier dépendances
         if (!this.backend) {
             this.logDebug('error', 'BackendService not available');
-            this.showError('Backend service not available');
+            this.showNotification('Backend service not available');
         }
         
         // Initialiser la vue
@@ -299,7 +299,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Load initial data failed', error);
-            this.showError('Failed to load initial data');
+            this.showNotification('Failed to load initial data');
         }
     }
     
@@ -410,7 +410,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Load file failed', error);
-            this.showError(`Failed to load file`);
+            this.showNotification(`Failed to load file`);
         }
     }
     
@@ -431,7 +431,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Refresh files failed', error);
-            this.showError('Failed to refresh files');
+            this.showNotification('Failed to refresh files');
         }
     }
     
@@ -483,7 +483,7 @@ class HomeController extends BaseController {
             }
             catch (error) {
                 this.handleError('Upload file failed', error);
-                this.showError(`Upload failed`);
+                this.showNotification(`Upload failed`);
             }
         };
         
@@ -536,7 +536,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Play failed', error);
-            this.showError('Playback error');
+            this.showNotification('Playback error');
         }
     }
     
@@ -776,7 +776,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Assign instrument failed', error);
-            this.showError('Failed to assign instrument');
+            this.showNotification('Failed to assign instrument');
         }
     }
     
@@ -816,7 +816,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Auto-route failed', error);
-            this.showError('Auto-routing failed');
+            this.showNotification('Auto-routing failed');
         }
     }
     
@@ -859,7 +859,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Save preset failed', error);
-            this.showError('Failed to save preset');
+            this.showNotification('Failed to save preset');
         }
     }
     
@@ -894,7 +894,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Load preset failed', error);
-            this.showError('Failed to load preset');
+            this.showNotification('Failed to load preset');
         }
     }
     
@@ -988,14 +988,14 @@ class HomeController extends BaseController {
         // Vérifier que ModalController est disponible
         if (!window.app || !window.app.modalController) {
             this.logDebug('error', 'ModalController not available');
-            this.showError('Modal system not initialized');
+            this.showNotification('Modal system not initialized');
             return;
         }
         
         // Vérifier que PlaylistController est disponible
         if (!this.playlistController) {
             this.logDebug('error', 'PlaylistController not available');
-            this.showError('Playlist system not initialized');
+            this.showNotification('Playlist system not initialized');
             return;
         }
         
@@ -1018,7 +1018,7 @@ class HomeController extends BaseController {
         const modalController = window.app?.modalController;
         
         if (!modalController) {
-            this.showError('Modal system not available');
+            this.showNotification('Modal system not available');
             return;
         }
         
@@ -1036,14 +1036,14 @@ class HomeController extends BaseController {
         const modalController = window.app?.modalController;
         
         if (!modalController || !this.playlistController) {
-            this.showError('Controllers not available');
+            this.showNotification('Controllers not available');
             return;
         }
         
         const currentPlaylist = this.playlistController.state?.currentPlaylist;
         
         if (!currentPlaylist) {
-            this.showError('No playlist selected');
+            this.showNotification('No playlist selected');
             return;
         }
         
@@ -1062,12 +1062,12 @@ class HomeController extends BaseController {
         const modalController = window.app?.modalController;
         
         if (!modalController) {
-            this.showError('Modal system not available');
+            this.showNotification('Modal system not available');
             return;
         }
         
         if (!playlistId) {
-            this.showError('Invalid playlist ID');
+            this.showNotification('Invalid playlist ID');
             return;
         }
         
@@ -1084,12 +1084,12 @@ class HomeController extends BaseController {
         this.logDebug('home', `Delete playlist: ${playlistId}`);
         
         if (!this.playlistController) {
-            this.showError('PlaylistController not available');
+            this.showNotification('PlaylistController not available');
             return;
         }
         
         if (!playlistId) {
-            this.showError('Invalid playlist ID');
+            this.showNotification('Invalid playlist ID');
             return;
         }
         
@@ -1099,7 +1099,7 @@ class HomeController extends BaseController {
             const playlist = playlistModel?.getPlaylist?.(playlistId);
             
             if (!playlist) {
-                this.showError('Playlist not found');
+                this.showNotification('Playlist not found');
                 return;
             }
             
@@ -1121,13 +1121,13 @@ class HomeController extends BaseController {
                 if (success) {
                     this.showSuccess(`Playlist "${playlist.name}" supprimée`);
                 } else {
-                    this.showError('Échec de la suppression');
+                    this.showNotification('Échec de la suppression');
                 }
             }
         }
         catch (error) {
             this.handleError('Delete playlist failed', error);
-            this.showError('Erreur lors de la suppression');
+            this.showNotification('Erreur lors de la suppression');
         }
     }
     
@@ -1139,12 +1139,12 @@ class HomeController extends BaseController {
         this.logDebug('home', `Load playlist into player: ${playlistId}`);
         
         if (!this.playlistController) {
-            this.showError('PlaylistController not available');
+            this.showNotification('PlaylistController not available');
             return;
         }
         
         if (!playlistId) {
-            this.showError('Invalid playlist ID');
+            this.showNotification('Invalid playlist ID');
             return;
         }
         
@@ -1157,7 +1157,7 @@ class HomeController extends BaseController {
             }
             
             if (!playlist) {
-                this.showError('Failed to load playlist');
+                this.showNotification('Failed to load playlist');
                 return;
             }
             
@@ -1179,7 +1179,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Load playlist into player failed', error);
-            this.showError('Erreur lors du chargement');
+            this.showNotification('Erreur lors du chargement');
         }
     }
     
@@ -1191,7 +1191,7 @@ class HomeController extends BaseController {
         this.logDebug('home', `Quick add to playlist: ${fileId}`);
         
         if (!this.playlistController) {
-            this.showError('PlaylistController not available');
+            this.showNotification('PlaylistController not available');
             return;
         }
         
@@ -1224,7 +1224,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Quick add to playlist failed', error);
-            this.showError('Erreur lors de l\'ajout');
+            this.showNotification('Erreur lors de l\'ajout');
         }
     }
     
@@ -1236,7 +1236,7 @@ class HomeController extends BaseController {
         this.logDebug('home', `Create new playlist with file: ${fileId}`);
         
         if (!this.playlistController) {
-            this.showError('PlaylistController not available');
+            this.showNotification('PlaylistController not available');
             return;
         }
         
@@ -1265,7 +1265,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Create playlist with file failed', error);
-            this.showError('Erreur lors de la création');
+            this.showNotification('Erreur lors de la création');
         }
     }
     

@@ -13,10 +13,33 @@ class SystemView extends BaseView {
     constructor(eventBus) {
         super('system-page', eventBus);
         
+        // Initialize logger first
+        this.logger = window.Logger || console;
+        
         // État de la vue
         this.calibrationInProgress = false;
         this.statsUpdateInterval = null;
         this.currentTheme = 'light';
+        
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
+        // Log initialization
+        if (this.logger && this.logger.info) {
+            this.logger.info('SystemView', '✓ SystemView initialized');
+        }
+    }
+    
+    // Override initialize to prevent premature calls
+    initialize() {
+        if (!this._fullyInitialized) {
+            return;
+        }
+        
+        // Call parent initialize if needed
+        if (super.initialize) {
+            super.initialize();
+        }
     }
 
     /**

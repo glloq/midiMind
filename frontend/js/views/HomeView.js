@@ -5,15 +5,36 @@
 
 class HomeView {
     constructor(container) {
-        this.container = container;
+        // Resolve container properly
+        if (typeof container === 'string') {
+            this.container = document.getElementById(container) || document.querySelector(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
+        } else {
+            this.container = null;
+        }
+        
+        // Log if container not found
+        if (!this.container) {
+            console.error('[HomeView] Container not found:', container);
+        }
+        
         this.visualizer = null;
         this.currentFile = null;
+        this.logger = window.Logger || console;
     }
 
     /**
      * Initialise la vue
      */
     init() {
+        if (!this.container) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('HomeView', 'Cannot initialize: container not found');
+            }
+            return;
+        }
+        
         this.render();
         this.attachEvents();
     }
@@ -22,6 +43,13 @@ class HomeView {
      * Construit le layout de la page d'accueil
      */
     render() {
+        if (!this.container) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('HomeView', 'Cannot render: container not found');
+            }
+            return;
+        }
+		
         this.container.innerHTML = `
             <div class="home-container">
                 <!-- Barre de contrôle supérieure -->
@@ -391,6 +419,11 @@ attachDOMEvents() {
  * Change de tab
  */
 switchTab(tabName) {
+    if (!this.container) {
+        console.warn('[HomeView] Cannot switch tab: container not found');
+        return;
+    }
+    
     // Désactiver tous les tabs
     this.container.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -453,6 +486,10 @@ switchTab(tabName) {
  * Met à jour la position de lecture
  */
 updatePlaybackPosition(position, duration) {
+    if (!this.container) {
+        return;
+    }
+    
     const progress = duration > 0 ? (position / duration) * 100 : 0;
     
     // Mise à jour barre de progression

@@ -69,7 +69,7 @@ class PlaybackController extends BaseController {
         // Vérifier dépendances
         if (!this.backend) {
             this.logDebug('error', 'BackendService not available');
-            this.showError('Backend service not available');
+            this.showNotification('Backend service not available');
             return;
         }
         
@@ -265,7 +265,7 @@ class PlaybackController extends BaseController {
         }
         catch (error) {
             this.handleError('Play failed', error);
-            this.showError('Failed to start playback');
+            this.showNotification('Failed to start playback');
         }
     }
     
@@ -308,7 +308,7 @@ class PlaybackController extends BaseController {
         }
         catch (error) {
             this.handleError('Pause failed', error);
-            this.showError('Failed to pause playback');
+            this.showNotification('Failed to pause playback');
         }
     }
     
@@ -348,7 +348,7 @@ class PlaybackController extends BaseController {
         }
         catch (error) {
             this.handleError('Stop failed', error);
-            this.showError('Failed to stop playback');
+            this.showNotification('Failed to stop playback');
         }
     }
     
