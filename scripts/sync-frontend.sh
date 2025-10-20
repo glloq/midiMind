@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Chemins
-REPO_DIR="$HOME/pi/midiMind"
+REPO_DIR="$HOME/midiMind"
 FRONTEND_SRC="$REPO_DIR/frontend"
 WWW_DEST="/var/www/midimind"
 BACKUP_DIR="$HOME/backups/midimind"

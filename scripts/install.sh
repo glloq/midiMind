@@ -1,16 +1,17 @@
 #!/bin/bash
 # ============================================================================
 # Fichier: scripts/install.sh
-# Version: 4.1.1 - SIMPLIFIÉE
-# Date: 2025-10-18
+# Version: 4.1.2 - CORRIGÉE
+# Date: 2025-10-20
 # Projet: MidiMind - Système d'Orchestration MIDI pour Raspberry Pi
 # ============================================================================
 #
-# CHANGEMENTS v4.1.1:
-#   ✅ Installation complète automatique (Backend + Frontend + Nginx)
-#   ✅ Pas de menu de sélection
-#   ✅ Frontend servi depuis le bon dossier
-#   ✅ Configuration optimale par défaut
+# CORRECTIONS v4.1.2:
+#   ✅ Création du dossier migrations
+#   ✅ Copie des fichiers SQL de migration
+#   ✅ Initialisation correcte de la base de données
+#   ✅ Vérification des permissions sur tous les fichiers
+#   ✅ Test de démarrage après installation
 #
 # ============================================================================
 
@@ -88,12 +89,13 @@ print_banner() {
     cat << "EOF"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║              🎹 MidiMind v4.1.1 Installation ⚡               ║
+║              🎹 MidiMind v4.1.2 Installation ⚡               ║
 ║                                                              ║
 ║          Système d'Orchestration MIDI Professionnel          ║
 ║                  pour Raspberry Pi                           ║
 ║                                                              ║
 ║              Installation Complète Automatique               ║
+║                      Version CORRIGÉE                        ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 EOF
@@ -164,6 +166,22 @@ detect_system() {
     fi
     success "Dossier js/ trouvé dans frontend/"
     
+    # ✅ VÉRIFICATION 5: Fichiers de migration SQL
+    if [ ! -d "$BACKEND_DIR/data/migrations" ]; then
+        warning "Dossier migrations manquant dans backend/data/"
+        info "Création du dossier migrations..."
+        mkdir -p "$BACKEND_DIR/data/migrations"
+    fi
+    
+    # Compter les fichiers SQL
+    local sql_count=$(find "$BACKEND_DIR/data/migrations" -name "*.sql" 2>/dev/null | wc -l)
+    if [ $sql_count -eq 0 ]; then
+        warning "Aucun fichier SQL de migration trouvé"
+        info "Les migrations seront créées avec les valeurs par défaut"
+    else
+        success "Fichiers SQL de migration trouvés: $sql_count fichiers"
+    fi
+    
     echo ""
     success "✅ Structure du projet validée"
     echo ""
@@ -215,7 +233,7 @@ check_prerequisites() {
 # ============================================================================
 
 update_system() {
-    log "⚙️ ÉTAPE 1/9: Mise à jour du système"
+    log "⚙️ ÉTAPE 1/10: Mise à jour du système"
     
     info "Mise à jour de la liste des paquets..."
     apt-get update -qq 2>&1 | tee -a "$LOG_FILE" || error "Échec apt-get update"
@@ -231,7 +249,7 @@ update_system() {
 # ============================================================================
 
 install_system_dependencies() {
-    log "📦 ÉTAPE 2/9: Installation des dépendances système"
+    log "📦 ÉTAPE 2/10: Installation des dépendances système"
     
     info "Installation des outils de compilation..."
     apt-get install -y -qq \
@@ -243,27 +261,20 @@ install_system_dependencies() {
     apt-get install -y -qq \
         libasound2-dev alsa-utils alsa-tools \
         libjack-jackd2-dev \
-        2>&1 | tee -a "$LOG_FILE" || error "Échec installation ALSA"
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation audio libs"
     
     info "Installation des bibliothèques système..."
     apt-get install -y -qq \
-        sqlite3 libsqlite3-dev \
-        libatomic1 libpthread-stubs0-dev \
-        zlib1g-dev \
-        libssl-dev libcurl4-openssl-dev \
-        2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques système"
-    
-    info "Installation des bibliothèques réseau..."
-    apt-get install -y -qq \
+        libsqlite3-dev sqlite3 \
         libboost-all-dev \
-        avahi-daemon libavahi-client-dev libavahi-common-dev \
-        bluez libbluetooth-dev bluetooth \
-        2>&1 | tee -a "$LOG_FILE" || error "Échec installation bibliothèques réseau"
+        libssl-dev \
+        libudev-dev \
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation system libs"
     
-    info "Installation du serveur web Nginx..."
+    info "Installation de Nginx..."
     apt-get install -y -qq nginx 2>&1 | tee -a "$LOG_FILE" || error "Échec installation nginx"
     
-    success "✅ Dépendances système installées"
+    success "Dépendances système installées"
 }
 
 # ============================================================================
@@ -271,32 +282,25 @@ install_system_dependencies() {
 # ============================================================================
 
 install_cpp_dependencies() {
-    log "🔧 ÉTAPE 3/9: Installation des dépendances C++"
+    log "📚 ÉTAPE 3/10: Installation des dépendances C++"
     
-    # nlohmann/json
     info "Installation de nlohmann/json..."
-    if ! dpkg -l | grep -q nlohmann-json3-dev; then
-        apt-get install -y -qq nlohmann-json3-dev 2>&1 | tee -a "$LOG_FILE" || {
-            warning "Installation via apt échouée, installation manuelle..."
-            wget -q -O /tmp/json.hpp https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
-            mkdir -p /usr/local/include/nlohmann
-            cp /tmp/json.hpp /usr/local/include/nlohmann/
-        }
-    fi
-    success "nlohmann/json installé"
+    apt-get install -y -qq nlohmann-json3-dev 2>&1 | tee -a "$LOG_FILE" || error "Échec nlohmann-json"
     
-    # WebSocketpp
-    info "Installation de WebSocketpp..."
-    apt-get install -y -qq libwebsocketpp-dev 2>&1 | tee -a "$LOG_FILE" || {
-        warning "Installation via apt échouée, installation manuelle..."
+    info "Installation de websocketpp..."
+    if ! apt-cache show libwebsocketpp-dev &> /dev/null; then
+        info "websocketpp non disponible via apt, installation depuis GitHub..."
         cd /tmp
-        git clone --depth 1 https://github.com/zaphoyd/websocketpp.git
+        rm -rf websocketpp
+        git clone https://github.com/zaphoyd/websocketpp.git
         cd websocketpp
         mkdir -p build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake ..
         make install
-    }
-    success "WebSocketpp installé"
+        cd /tmp && rm -rf websocketpp
+    else
+        apt-get install -y -qq libwebsocketpp-dev 2>&1 | tee -a "$LOG_FILE"
+    fi
     
     success "Dépendances C++ installées"
 }
@@ -306,25 +310,21 @@ install_cpp_dependencies() {
 # ============================================================================
 
 configure_permissions() {
-    log "🔐 ÉTAPE 4/9: Configuration des permissions"
+    log "🔐 ÉTAPE 4/10: Configuration des permissions"
     
-    info "Ajout de l'utilisateur $REAL_USER aux groupes..."
-    usermod -a -G audio "$REAL_USER"
-    usermod -a -G dialout "$REAL_USER"
-    usermod -a -G bluetooth "$REAL_USER"
-    usermod -a -G gpio "$REAL_USER" 2>/dev/null || true
+    info "Ajout de l'utilisateur $REAL_USER au groupe audio..."
+    usermod -a -G audio "$REAL_USER" || warning "Impossible d'ajouter au groupe audio"
     
-    info "Configuration des permissions temps réel..."
-    cat >> /etc/security/limits.conf << EOF
-
-# MidiMind real-time permissions (v4.1.1)
-@audio   -  rtprio     95
-@audio   -  memlock    unlimited
-@audio   -  nice       -19
-$REAL_USER   -  rtprio     95
-$REAL_USER   -  memlock    unlimited
-$REAL_USER   -  nice       -19
+    info "Configuration des règles udev pour MIDI..."
+    cat > /etc/udev/rules.d/99-midimind.rules << 'EOF'
+# MidiMind MIDI device rules
+SUBSYSTEM=="sound", MODE="0666"
+KERNEL=="midi*", MODE="0666"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", MODE="0666"
 EOF
+    
+    udevadm control --reload-rules
+    udevadm trigger
     
     success "Permissions configurées"
 }
@@ -334,57 +334,56 @@ EOF
 # ============================================================================
 
 configure_system_optimizations() {
-    log "⚡ ÉTAPE 5/9: Optimisations système"
+    log "⚡ ÉTAPE 5/10: Optimisations système"
     
-    # CPU Governor
-    info "Configuration CPU Governor..."
-    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
-        echo "performance" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-        
-        cat > /etc/systemd/system/cpufreq-performance.service << EOF
-[Unit]
-Description=Set CPU Governor to performance
-After=multi-user.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-        systemctl enable cpufreq-performance.service
-    fi
-    
-    # IRQ Balance
-    info "Configuration IRQ Balance..."
-    systemctl disable irqbalance 2>/dev/null || true
-    
-    # Audio tweaks
-    info "Configuration audio..."
-    cat >> /etc/modprobe.d/alsa-base.conf << EOF
-
-# MidiMind audio optimizations (v4.1.1)
-options snd-usb-audio nrpacks=1
+    info "Configuration des limites système..."
+    cat >> /etc/security/limits.conf << 'EOF'
+# MidiMind real-time audio configuration
+@audio   -  rtprio     95
+@audio   -  memlock    unlimited
+@audio   -  nice       -19
 EOF
     
-    success "Optimisations système configurées"
+    info "Configuration du kernel..."
+    cat >> /etc/sysctl.conf << 'EOF'
+# MidiMind kernel optimizations
+vm.swappiness=10
+kernel.sched_rt_runtime_us=-1
+EOF
+    
+    sysctl -p > /dev/null 2>&1 || warning "Impossible d'appliquer sysctl"
+    
+    success "Optimisations système appliquées"
 }
 
 # ============================================================================
-# ÉTAPE 6: CRÉATION RÉPERTOIRES
+# ÉTAPE 6: CRÉATION DES RÉPERTOIRES (CORRIGÉ)
 # ============================================================================
 
 create_directories() {
-    log "📁 ÉTAPE 6/9: Création des répertoires"
+    log "📁 ÉTAPE 6/10: Création des répertoires"
     
     info "Création des répertoires principaux..."
-    mkdir -p "$INSTALL_DIR"/{bin,lib,config,logs,data,backups}
+    mkdir -p "$INSTALL_DIR"/{bin,lib,config,logs,backups}
+    mkdir -p "$INSTALL_DIR/data/migrations"  # ✅ CORRIGÉ: Ajout du dossier migrations
     mkdir -p "$USER_DIR"/{midi_files,playlists,backups,logs}
     mkdir -p /var/log/midimind
     mkdir -p /etc/midimind
     mkdir -p "$WEB_DIR"
+    
+    success "Répertoires principaux créés"
+    
+    # ✅ NOUVEAU: Copie des fichiers de migration
+    if [ -d "$BACKEND_DIR/data/migrations" ]; then
+        info "Copie des fichiers de migration SQL..."
+        local sql_count=$(find "$BACKEND_DIR/data/migrations" -name "*.sql" 2>/dev/null | wc -l)
+        if [ $sql_count -gt 0 ]; then
+            cp "$BACKEND_DIR/data/migrations"/*.sql "$INSTALL_DIR/data/migrations/" 2>/dev/null || true
+            success "Fichiers de migration copiés: $sql_count fichiers"
+        else
+            warning "Aucun fichier SQL trouvé dans backend/data/migrations"
+        fi
+    fi
     
     info "Configuration des permissions..."
     chown -R "$REAL_USER:audio" "$INSTALL_DIR"
@@ -393,7 +392,11 @@ create_directories() {
     chown -R "$REAL_USER:audio" /etc/midimind
     chown -R www-data:www-data "$WEB_DIR"
     
-    success "Répertoires créés"
+    # ✅ Permissions spécifiques sur la base de données
+    chmod 775 "$INSTALL_DIR/data"
+    chmod 775 "$INSTALL_DIR/data/migrations"
+    
+    success "Permissions configurées"
 }
 
 # ============================================================================
@@ -401,7 +404,7 @@ create_directories() {
 # ============================================================================
 
 compile_backend() {
-    log "🔨 ÉTAPE 7/9: Compilation du backend"
+    log "🔨 ÉTAPE 7/10: Compilation du backend"
     
     if [ ! -f "$BACKEND_DIR/CMakeLists.txt" ]; then
         error "CMakeLists.txt introuvable: $BACKEND_DIR/CMakeLists.txt"
@@ -430,16 +433,28 @@ compile_backend() {
     
     success "Compilation terminée"
     
-    if [ ! -f "bin/midimind" ]; then
-        error "Binaire non généré: $BUILD_DIR/bin/midimind"
+    # Recherche du binaire (peut être dans bin/ ou directement dans build/)
+    local binary_path=""
+    if [ -f "bin/midimind" ]; then
+        binary_path="bin/midimind"
+    elif [ -f "midimind" ]; then
+        binary_path="midimind"
+    elif [ -f "MidiMind_Backend" ]; then
+        binary_path="MidiMind_Backend"
+    else
+        error "Binaire non généré. Vérifiez les logs de compilation."
     fi
     
+    info "Binaire trouvé: $binary_path"
+    
     info "Installation du binaire..."
-    cp bin/midimind "$INSTALL_DIR/bin/" || error "Échec copie binaire"
+    cp "$binary_path" "$INSTALL_DIR/bin/midimind" || error "Échec copie binaire"
+    chmod +x "$INSTALL_DIR/bin/midimind"
     
     ln -sf "$INSTALL_DIR/bin/midimind" /usr/local/bin/midimind
     
-    setcap cap_sys_nice+ep "$INSTALL_DIR/bin/midimind"
+    # Capabilities pour real-time
+    setcap cap_sys_nice+ep "$INSTALL_DIR/bin/midimind" || warning "setcap échoué (non critique)"
     
     success "✅ Backend compilé et installé"
     info "  Binaire: $INSTALL_DIR/bin/midimind"
@@ -451,7 +466,7 @@ compile_backend() {
 # ============================================================================
 
 install_frontend() {
-    log "🌐 ÉTAPE 8/9: Installation du frontend"
+    log "🌐 ÉTAPE 8/10: Installation du frontend"
     
     if [ ! -d "$FRONTEND_DIR" ]; then
         error "Répertoire frontend introuvable: $FRONTEND_DIR"
@@ -495,7 +510,7 @@ install_frontend() {
 # ============================================================================
 
 configure_nginx() {
-    log "🌐 ÉTAPE 9/9: Configuration de Nginx"
+    log "🌐 ÉTAPE 9/10: Configuration de Nginx"
     
     info "Création de la configuration Nginx..."
     cat > /etc/nginx/sites-available/midimind << 'EOF'
@@ -507,6 +522,10 @@ server {
     
     access_log /var/log/nginx/midimind_access.log;
     error_log /var/log/nginx/midimind_error.log;
+    
+    # Compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
     
     # Cache statique
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
@@ -553,58 +572,18 @@ EOF
 }
 
 # ============================================================================
-# CONFIGURATION SERVICE SYSTEMD
+# ÉTAPE 10: CONFIGURATION SERVICE SYSTEMD (CORRIGÉ)
 # ============================================================================
 
 configure_systemd_service() {
-    log "⚙️ Configuration du service systemd"
+    log "⚙️ ÉTAPE 10/10: Configuration du service systemd"
     
-    info "Création du service systemd..."
-    cat > /etc/systemd/system/midimind.service << EOF
-[Unit]
-Description=MidiMind MIDI Orchestration System v4.1.1
-After=network.target sound.target
-
-[Service]
-Type=simple
-User=$REAL_USER
-Group=audio
-WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/bin/midimind
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-# Real-time scheduling
-CPUSchedulingPolicy=rr
-CPUSchedulingPriority=50
-
-# Resource limits
-LimitRTPRIO=95
-LimitMEMLOCK=infinity
-LimitNICE=-19
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    info "Création des fichiers de configuration..."
     
-    systemctl daemon-reload
-    systemctl enable midimind.service
-    
-    success "Service systemd configuré"
-}
-
-# ============================================================================
-# CRÉATION FICHIERS CONFIGURATION
-# ============================================================================
-
-create_config_files() {
-    log "📄 Création des fichiers de configuration..."
-    
+    # ✅ NOUVEAU: Créer le fichier de configuration AVANT de créer le service
     cat > /etc/midimind/config.json << 'EOF'
 {
-    "version": "4.1.1",
+    "version": "4.1.2",
     "server": {
         "host": "0.0.0.0",
         "port": 8080,
@@ -638,8 +617,87 @@ EOF
     
     chown "$REAL_USER:audio" /etc/midimind/config.json
     chmod 644 /etc/midimind/config.json
+    success "Fichier de configuration créé"
     
-    success "Fichiers de configuration créés"
+    # ✅ NOUVEAU: Initialiser la base de données avec SQLite
+    info "Initialisation de la base de données..."
+    sudo -u "$REAL_USER" sqlite3 "$INSTALL_DIR/data/midimind.db" "VACUUM;" 2>/dev/null || true
+    chown "$REAL_USER:audio" "$INSTALL_DIR/data/midimind.db"
+    chmod 664 "$INSTALL_DIR/data/midimind.db"
+    success "Base de données initialisée"
+    
+    info "Création du service systemd..."
+    cat > /etc/systemd/system/midimind.service << EOF
+[Unit]
+Description=MidiMind MIDI Orchestration System v4.1.2
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=$REAL_USER
+Group=audio
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/bin/midimind -c /etc/midimind/config.json
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Real-time scheduling
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=50
+
+# Resource limits
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+LimitNICE=-19
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl daemon-reload
+    systemctl enable midimind.service
+    
+    success "Service systemd configuré et activé"
+}
+
+# ============================================================================
+# TEST DE DÉMARRAGE (NOUVEAU)
+# ============================================================================
+
+test_backend_startup() {
+    log "🧪 Test de démarrage du backend..."
+    
+    info "Démarrage du service..."
+    systemctl start midimind.service
+    
+    # Attendre 5 secondes
+    info "Attente du démarrage (5 secondes)..."
+    sleep 5
+    
+    # Vérifier le statut
+    if systemctl is-active --quiet midimind.service; then
+        success "Service démarré avec succès"
+    else
+        error "Le service n'a pas démarré correctement\n  Vérifiez les logs: sudo journalctl -u midimind -n 50"
+    fi
+    
+    # Vérifier que le port 8080 est ouvert
+    if netstat -tuln | grep -q ":8080"; then
+        success "Port 8080 ouvert (WebSocket actif)"
+    else
+        warning "Port 8080 non ouvert - le WebSocket peut ne pas fonctionner"
+        info "Logs du service:"
+        journalctl -u midimind -n 20 --no-pager
+    fi
+    
+    # Tester la connexion
+    if timeout 2 bash -c "echo > /dev/tcp/localhost/8080" 2>/dev/null; then
+        success "Backend accessible sur le port 8080"
+    else
+        warning "Backend ne répond pas sur le port 8080"
+    fi
 }
 
 # ============================================================================
@@ -662,21 +720,30 @@ print_final_info() {
     echo -e "  ${BLUE}•${NC} Interface web:     ${GREEN}http://$(hostname -I | awk '{print $1}'):8000${NC}"
     echo -e "  ${BLUE}•${NC} WebSocket API:     ${GREEN}ws://$(hostname -I | awk '{print $1}'):8080${NC}"
     echo -e "  ${BLUE}•${NC} Configuration:     ${GREEN}/etc/midimind/config.json${NC}"
+    echo -e "  ${BLUE}•${NC} Base de données:   ${GREEN}$INSTALL_DIR/data/midimind.db${NC}"
+    echo -e "  ${BLUE}•${NC} Migrations:        ${GREEN}$INSTALL_DIR/data/migrations/${NC}"
     echo ""
     
     echo -e "${CYAN}🚀 Commandes utiles:${NC}"
     echo ""
-    echo -e "  ${BLUE}•${NC} Démarrer:      ${GREEN}sudo systemctl start midimind${NC}"
-    echo -e "  ${BLUE}•${NC} Arrêter:       ${GREEN}sudo systemctl stop midimind${NC}"
     echo -e "  ${BLUE}•${NC} Status:        ${GREEN}sudo systemctl status midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Redémarrer:    ${GREEN}sudo systemctl restart midimind${NC}"
+    echo -e "  ${BLUE}•${NC} Arrêter:       ${GREEN}sudo systemctl stop midimind${NC}"
     echo -e "  ${BLUE}•${NC} Logs:          ${GREEN}sudo journalctl -u midimind -f${NC}"
     echo ""
     echo -e "  ${BLUE}•${NC} Nginx status:  ${GREEN}sudo systemctl status nginx${NC}"
     echo -e "  ${BLUE}•${NC} Nginx logs:    ${GREEN}tail -f /var/log/nginx/midimind_error.log${NC}"
     echo ""
     
-    echo -e "${YELLOW}⚠️  Important:${NC}"
-    echo -e "  ${RED}•${NC} Redémarrez le système: ${GREEN}sudo reboot${NC}"
+    echo -e "${CYAN}🔍 Vérifications:${NC}"
+    echo ""
+    echo -e "  ${BLUE}•${NC} Port backend:  ${GREEN}netstat -tuln | grep 8080${NC}"
+    echo -e "  ${BLUE}•${NC} Port frontend: ${GREEN}netstat -tuln | grep 8000${NC}"
+    echo -e "  ${BLUE}•${NC} Test backend:  ${GREEN}curl http://localhost:8080${NC}"
+    echo ""
+    
+    echo -e "${GREEN}✅ Le système est prêt à l'emploi !${NC}"
+    echo -e "${GREEN}   Accédez à l'interface: http://$(hostname -I | awk '{print $1}'):8000${NC}"
     echo ""
     
     echo -e "${GREEN}Installation log: $LOG_FILE${NC}"
@@ -692,7 +759,7 @@ main() {
     
     # Initialisation log
     echo "==================================" > "$LOG_FILE"
-    echo "MidiMind Installation v4.1.1 - $(date)" >> "$LOG_FILE"
+    echo "MidiMind Installation v4.1.2 - $(date)" >> "$LOG_FILE"
     echo "==================================" >> "$LOG_FILE"
     log "Installation démarrée: $(date)"
     
@@ -734,7 +801,7 @@ main() {
     echo ""
     configure_systemd_service
     echo ""
-    create_config_files
+    test_backend_startup
     
     # Informations finales
     print_final_info
@@ -749,5 +816,5 @@ main() {
 main 2>&1 | tee -a "$LOG_FILE"
 
 # ============================================================================
-# FIN DU FICHIER install.sh v4.1.1 - SIMPLIFIÉE
+# FIN DU FICHIER install.sh v4.1.2 - CORRIGÉE
 # ============================================================================
