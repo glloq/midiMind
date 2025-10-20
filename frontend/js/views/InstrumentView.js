@@ -58,13 +58,13 @@ class InstrumentView extends BaseView {
     
     render(data = {}) {
         if (!this.container) {
-            this.logger.warn('InstrumentView', 'Container not found');
+            this.logger.warning('InstrumentView', 'Container not found');
             return;
         }
         
         // Safety check: ensure displayConfig exists
         if (!this.displayConfig) {
-            this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
+            this.logger.warning('InstrumentView', 'displayConfig not initialized yet, skipping render');
             return;
         }
         
