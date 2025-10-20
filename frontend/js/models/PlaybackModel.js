@@ -68,7 +68,7 @@ class PlaybackModel extends BaseModel {
     // ========================================================================
     // CONFIGURATION - ✅ COMPLÉTÉ
     // ========================================================================
-    
+    /*
     setupPlaybackConfig() {
         // Écouter les changements d'état
         this.watch('state', (newState, oldState) => {
@@ -102,7 +102,7 @@ class PlaybackModel extends BaseModel {
             }
         });
     }
-    
+    */
     // ========================================================================
     // SYNCHRONISATION BACKEND - ✅ COMPLÉTÉ
     // ========================================================================
