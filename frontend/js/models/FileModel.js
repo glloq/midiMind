@@ -1,516 +1,247 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Version: v3.1.1 - FIXED
-// Date: 2025-10-18
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Version: v3.0.6 - MINIMAL (Constructor fixed + basic functions only)
+// Date: 2025-10-19
 // ============================================================================
-// CORRECTIONS v3.1.1:
-// ✓ Constructor signature fixed to match Application.js call
-// ✓ Proper eventBus initialization
-// ✓ Compatible with BaseModel
+// SIMPLIFICATION: Seulement les fonctions de base
+// - Lister fichiers
+// - Charger un fichier
+// - Supprimer un fichier
+// - Pas de cache complexe
+// - Pas de favoris/tags
 // ============================================================================
 
 class FileModel extends BaseModel {
     constructor(eventBus, backend, logger) {
+        // ✅ FIX: Correct super() call
         super({}, {
             persistKey: 'filemodel',
             eventPrefix: 'file',
             autoPersist: true
         });
         
+        // ✅ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // Configuration cache (OPTIMISÉ)
-        this.cacheConfig = {
-            maxSize: PerformanceConfig.memory.maxCacheSize || 50,  // ✓ RÉDUIT À 50 MB
-            maxMidiJsonSize: Math.floor(PerformanceConfig.memory.maxCacheSize / 2) || 25,  // ✓ 25 MB
-            enablePreload: PerformanceConfig.memory.enablePreload || false,  // ✓ DÉSACTIVÉ
-            cacheTimeout: PerformanceConfig.memory.cacheTimeout || 300000,  // 5 min
-            aggressiveGC: PerformanceConfig.memory.aggressiveGC || true
-        };
-        
-        // Données
+        // ✅ FIX: Initialize data directly
         this.data = {
             files: [],
-            currentFile: null,
-            selectedFileId: null,
-            directories: [],
-            searchResults: []
+            currentPath: '/midi',
+            selectedFile: null,
+            recentFiles: []
         };
         
-        // État
-        this.state = {
-            isLoading: false,
-            lastScan: null,
-            scanInProgress: false,
-            totalFiles: 0,
-            loadedFiles: 0,
-            sortBy: 'name',  // 'name', 'date', 'size'
-            sortOrder: 'asc',  // 'asc', 'desc'
-            filter: {
-                search: '',
-                type: 'all',  // 'all', 'midi', 'json'
-                minSize: 0,
-                maxSize: Infinity
-            }
-        };
-        
-        // Cache (OPTIMISÉ)
-        this.cache = {
-            midiJsonCache: new Map(),  // fileId -> jsonmidi
-            metadataCache: new Map(),  // fileId -> metadata
-            currentCacheSize: 0,  // en bytes
-            currentMidiJsonSize: 0
-        };
-        
-        // Statistiques
-        this.stats = {
-            scansPerformed: 0,
-            filesLoaded: 0,
-            cacheHits: 0,
-            cacheMisses: 0,
-            cacheEvictions: 0
-        };
-        
-        this.logger.info('FileModel', '✓ Model initialized (performance mode)');
-        
-        this.initialize();
+        this.logger.info('FileModel', '✓ Model initialized (minimal version)');
     }
     
     // ========================================================================
-    // INITIALISATION
+    // GESTION FICHIERS - BASE
     // ========================================================================
     
-    initialize() {
-        // ✅ FIX: Check eventBus before attaching events
-        if (!this.eventBus) {
-            this.logger.error('FileModel', 'EventBus not available!');
-            return;
-        }
-        
-        this.attachEvents();
-        
-        // ✓ Pas de preload automatique en mode performance
-        if (!this.cacheConfig.enablePreload) {
-            this.logger.info('FileModel', 'Preload disabled (performance mode)');
-        }
-    }
-    
-    attachEvents() {
-        // ✅ FIX: Verify eventBus exists
-        if (!this.eventBus) {
-            this.logger.error('FileModel', 'Cannot attach events: eventBus is null');
-            return;
-        }
-        
-        this.eventBus.on('app:shutdown', () => {
-            this.clearCache();
-        });
-        
-        // Garbage collection agressive si activée
-        if (this.cacheConfig.aggressiveGC) {
-            setInterval(() => {
-                this.performGarbageCollection();
-            }, 60000);  // Toutes les minutes
-        }
-    }
-    
-    // ========================================================================
-    // SCAN FICHIERS
-    // ========================================================================
-    
-    async scan(directory = null) {
-        if (this.state.scanInProgress) {
-            this.logger.warn('FileModel', 'Scan already in progress');
-            return false;
-        }
-        
-        this.state.scanInProgress = true;
-        this.state.isLoading = true;
-        
-        this.eventBus.emit('files:scan-started', { directory });
+    /**
+     * Récupère la liste des fichiers
+     */
+    async refreshFileList(path = null) {
+        const targetPath = path || this.get('currentPath');
         
         try {
-            const response = await this.apiClient.sendCommand('files.scan', {
-                directory: directory
+            this.logger.info('FileModel', `Refreshing file list: ${targetPath}`);
+            
+            const response = await this.backend.sendCommand('files.list', {
+                path: targetPath
             });
             
-            if (response.success && response.files) {
-                this.data.files = response.files;
-                this.state.totalFiles = response.files.length;
-                this.state.lastScan = Date.now();
-                this.stats.scansPerformed++;
+            if (response.success) {
+                const files = response.data.files || [];
                 
-                this.logger.info('FileModel', `✓ Scan complete: ${response.files.length} files`);
+                this.set('files', files);
+                this.set('currentPath', targetPath);
                 
-                this.eventBus.emit('files:scan-complete', {
-                    files: response.files,
-                    count: response.files.length
+                this.eventBus.emit('file:list-refreshed', {
+                    files,
+                    path: targetPath
+                });
+                
+                return files;
+            }
+            
+            throw new Error(response.error || 'Failed to refresh file list');
+            
+        } catch (error) {
+            this.logger.error('FileModel', `Refresh failed: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Charge un fichier MIDI
+     */
+    async loadFile(fileId) {
+        try {
+            this.logger.info('FileModel', `Loading file: ${fileId}`);
+            
+            const response = await this.backend.sendCommand('files.load', {
+                file_id: fileId
+            });
+            
+            if (response.success) {
+                const fileData = response.data;
+                
+                this.set('selectedFile', fileData);
+                this.addToRecent(fileId);
+                
+                this.eventBus.emit('file:loaded', {
+                    fileId,
+                    data: fileData
+                });
+                
+                return fileData;
+            }
+            
+            throw new Error(response.error || 'Failed to load file');
+            
+        } catch (error) {
+            this.logger.error('FileModel', `Load failed: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Supprime un fichier
+     */
+    async deleteFile(fileId) {
+        try {
+            this.logger.info('FileModel', `Deleting file: ${fileId}`);
+            
+            const response = await this.backend.sendCommand('files.delete', {
+                file_id: fileId
+            });
+            
+            if (response.success) {
+                // Mettre à jour la liste locale
+                const files = this.get('files').filter(f => f.id !== fileId);
+                this.set('files', files);
+                
+                // Retirer des récents
+                this.removeFromRecent(fileId);
+                
+                this.eventBus.emit('file:deleted', { fileId });
+                
+                return true;
+            }
+            
+            throw new Error(response.error || 'Failed to delete file');
+            
+        } catch (error) {
+            this.logger.error('FileModel', `Delete failed: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Renomme un fichier
+     */
+    async renameFile(fileId, newName) {
+        try {
+            this.logger.info('FileModel', `Renaming file ${fileId} to ${newName}`);
+            
+            const response = await this.backend.sendCommand('files.rename', {
+                file_id: fileId,
+                new_name: newName
+            });
+            
+            if (response.success) {
+                // Mettre à jour localement
+                const files = this.get('files');
+                const file = files.find(f => f.id === fileId);
+                
+                if (file) {
+                    file.name = newName;
+                    this.set('files', files);
+                }
+                
+                this.eventBus.emit('file:renamed', {
+                    fileId,
+                    newName
                 });
                 
                 return true;
-            } else {
-                this.logger.error('FileModel', `Scan failed: ${response.error}`);
-                this.eventBus.emit('files:scan-error', { error: response.error });
-                return false;
             }
+            
+            throw new Error(response.error || 'Failed to rename file');
             
         } catch (error) {
-            this.logger.error('FileModel', `Scan error: ${error.message}`);
-            this.eventBus.emit('files:scan-error', { error: error.message });
-            return false;
-            
-        } finally {
-            this.state.scanInProgress = false;
-            this.state.isLoading = false;
+            this.logger.error('FileModel', `Rename failed: ${error.message}`);
+            throw error;
         }
     }
     
     // ========================================================================
-    // SÉLECTION FICHIER
+    // FICHIERS RÉCENTS - SIMPLE
     // ========================================================================
     
-    selectFile(fileId) {
-        const file = this.data.files.find(f => f.id === fileId);
+    addToRecent(fileId) {
+        let recent = this.get('recentFiles');
         
-        if (!file) {
-            this.logger.warn('FileModel', `File not found: ${fileId}`);
-            return false;
+        // Retirer si déjà présent
+        recent = recent.filter(id => id !== fileId);
+        
+        // Ajouter en tête
+        recent.unshift(fileId);
+        
+        // Limiter à 10
+        if (recent.length > 10) {
+            recent = recent.slice(0, 10);
         }
         
-        this.data.selectedFileId = fileId;
-        this.data.currentFile = file;
-        
-        this.eventBus.emit('files:file-selected', { file });
-        
-        return true;
+        this.set('recentFiles', recent);
     }
     
-    getSelectedFile() {
-        return this.data.currentFile;
+    removeFromRecent(fileId) {
+        const recent = this.get('recentFiles').filter(id => id !== fileId);
+        this.set('recentFiles', recent);
     }
     
-    // ========================================================================
-    // CHARGEMENT FICHIER AVEC CACHE (OPTIMISÉ)
-    // ========================================================================
+    getRecentFiles() {
+        const recentIds = this.get('recentFiles');
+        const files = this.get('files');
+        
+        return recentIds
+            .map(id => files.find(f => f.id === id))
+            .filter(f => f !== undefined);
+    }
     
-    async loadFile(fileId) {
-        // Vérifier le cache d'abord
-        if (this.cache.midiJsonCache.has(fileId)) {
-            this.stats.cacheHits++;
-            this.logger.debug('FileModel', `Cache hit for file: ${fileId}`);
-            
-            const cachedData = this.cache.midiJsonCache.get(fileId);
-            
-            this.eventBus.emit('files:file-loaded', {
-                fileId,
-                jsonmidi: cachedData.jsonmidi,
-                fromCache: true
-            });
-            
-            return cachedData.jsonmidi;
-        }
-        
-        // Cache miss - charger depuis backend
-        this.stats.cacheMisses++;
-        this.logger.debug('FileModel', `Cache miss for file: ${fileId}`);
-        
-        try {
-            this.state.isLoading = true;
-            
-            const response = await this.apiClient.sendCommand('files.load', {
-                file_id: fileId
-            });
-            
-            if (response.success && response.jsonmidi) {
-                const jsonmidi = response.jsonmidi;
-                
-                // Calculer taille approximative
-                const dataSize = this.estimateSize(jsonmidi);
-                
-                // Vérifier si on peut mettre en cache
-                if (dataSize < this.cacheConfig.maxMidiJsonSize * 1024 * 1024) {
-                    this.addToCache(fileId, jsonmidi, dataSize);
-                } else {
-                    this.logger.warn('FileModel', `File too large for cache: ${dataSize / 1024 / 1024} MB`);
-                }
-                
-                this.stats.filesLoaded++;
-                
-                this.eventBus.emit('files:file-loaded', {
-                    fileId,
-                    jsonmidi,
-                    fromCache: false
-                });
-                
-                return jsonmidi;
-                
-            } else {
-                this.logger.error('FileModel', `Load failed: ${response.error}`);
-                this.eventBus.emit('files:load-error', { 
-                    fileId, 
-                    error: response.error 
-                });
-                return null;
-            }
-            
-        } catch (error) {
-            this.logger.error('FileModel', `Load error: ${error.message}`);
-            this.eventBus.emit('files:load-error', { 
-                fileId, 
-                error: error.message 
-            });
-            return null;
-            
-        } finally {
-            this.state.isLoading = false;
-        }
+    clearRecent() {
+        this.set('recentFiles', []);
+        this.logger.info('FileModel', 'Recent files cleared');
     }
     
     // ========================================================================
-    // GESTION CACHE (OPTIMISÉ)
+    // UTILITAIRES
     // ========================================================================
     
-    addToCache(fileId, jsonmidi, size) {
-        // Vérifier si on dépasse la limite
-        while (this.cache.currentMidiJsonSize + size > this.cacheConfig.maxMidiJsonSize * 1024 * 1024) {
-            this.evictOldestCacheEntry();
-        }
-        
-        this.cache.midiJsonCache.set(fileId, {
-            jsonmidi: jsonmidi,
-            size: size,
-            timestamp: Date.now()
-        });
-        
-        this.cache.currentMidiJsonSize += size;
-        
-        this.logger.debug('FileModel', `Added to cache: ${fileId} (${size / 1024} KB) - Total: ${this.cache.currentMidiJsonSize / 1024 / 1024} MB`);
-    }
-    
-    evictOldestCacheEntry() {
-        if (this.cache.midiJsonCache.size === 0) return;
-        
-        // Trouver l'entrée la plus ancienne
-        let oldestKey = null;
-        let oldestTime = Infinity;
-        
-        for (const [key, value] of this.cache.midiJsonCache.entries()) {
-            if (value.timestamp < oldestTime) {
-                oldestTime = value.timestamp;
-                oldestKey = key;
-            }
-        }
-        
-        if (oldestKey) {
-            const entry = this.cache.midiJsonCache.get(oldestKey);
-            this.cache.currentMidiJsonSize -= entry.size;
-            this.cache.midiJsonCache.delete(oldestKey);
-            this.stats.cacheEvictions++;
-            
-            this.logger.debug('FileModel', `Evicted from cache: ${oldestKey}`);
-        }
-    }
-    
-    clearCache() {
-        this.cache.midiJsonCache.clear();
-        this.cache.metadataCache.clear();
-        this.cache.currentCacheSize = 0;
-        this.cache.currentMidiJsonSize = 0;
-        
-        this.logger.info('FileModel', '✓ Cache cleared');
-    }
-    
-    performGarbageCollection() {
-        const timeout = this.cacheConfig.cacheTimeout;
-        const now = Date.now();
-        let evicted = 0;
-        
-        for (const [key, value] of this.cache.midiJsonCache.entries()) {
-            if (now - value.timestamp > timeout) {
-                this.cache.currentMidiJsonSize -= value.size;
-                this.cache.midiJsonCache.delete(key);
-                evicted++;
-            }
-        }
-        
-        if (evicted > 0) {
-            this.logger.debug('FileModel', `GC: evicted ${evicted} expired entries`);
-        }
-    }
-    
-    estimateSize(obj) {
-        // Estimation approximative de la taille en bytes
-        const json = JSON.stringify(obj);
-        return new Blob([json]).size;
-    }
-    
-    // ========================================================================
-    // MÉTADONNÉES
-    // ========================================================================
-    
-    async getMetadata(fileId) {
-        // Vérifier cache
-        if (this.cache.metadataCache.has(fileId)) {
-            return this.cache.metadataCache.get(fileId);
-        }
-        
-        try {
-            const response = await this.apiClient.sendCommand('files.getMetadata', {
-                file_id: fileId
-            });
-            
-            if (response.success && response.metadata) {
-                // Mettre en cache
-                this.cache.metadataCache.set(fileId, response.metadata);
-                return response.metadata;
-            }
-            
-            return null;
-            
-        } catch (error) {
-            this.logger.error('FileModel', `Metadata error: ${error.message}`);
-            return null;
-        }
-    }
-    
-    // ========================================================================
-    // RECHERCHE & FILTRAGE
-    // ========================================================================
-    
-    search(query) {
-        if (!query || query.trim() === '') {
-            this.data.searchResults = [];
-            this.eventBus.emit('files:search-cleared');
-            return;
-        }
-        
-        const lowerQuery = query.toLowerCase();
-        
-        this.data.searchResults = this.data.files.filter(file => {
-            return file.name.toLowerCase().includes(lowerQuery) ||
-                   (file.path && file.path.toLowerCase().includes(lowerQuery));
-        });
-        
-        this.eventBus.emit('files:search-results', {
-            query,
-            results: this.data.searchResults,
-            count: this.data.searchResults.length
-        });
-    }
-    
-    filter(filterConfig) {
-        this.state.filter = { ...this.state.filter, ...filterConfig };
-        this.applyFilter();
-    }
-    
-    applyFilter() {
-        let filtered = [...this.data.files];
-        
-        // Filtre par type
-        if (this.state.filter.type !== 'all') {
-            filtered = filtered.filter(f => f.type === this.state.filter.type);
-        }
-        
-        // Filtre par taille
-        filtered = filtered.filter(f => 
-            f.size >= this.state.filter.minSize &&
-            f.size <= this.state.filter.maxSize
-        );
-        
-        // Filtre par recherche
-        if (this.state.filter.search) {
-            const query = this.state.filter.search.toLowerCase();
-            filtered = filtered.filter(f => 
-                f.name.toLowerCase().includes(query)
-            );
-        }
-        
-        this.data.searchResults = filtered;
-        
-        this.eventBus.emit('files:filtered', {
-            results: filtered,
-            count: filtered.length
-        });
-    }
-    
-    // ========================================================================
-    // TRI
-    // ========================================================================
-    
-    sort(sortBy, sortOrder) {
-        this.state.sortBy = sortBy;
-        this.state.sortOrder = sortOrder;
-        
-        this.data.files.sort((a, b) => {
-            let comparison = 0;
-            
-            switch (sortBy) {
-                case 'name':
-                    comparison = a.name.localeCompare(b.name);
-                    break;
-                case 'date':
-                    comparison = (a.modified || 0) - (b.modified || 0);
-                    break;
-                case 'size':
-                    comparison = (a.size || 0) - (b.size || 0);
-                    break;
-            }
-            
-            return sortOrder === 'asc' ? comparison : -comparison;
-        });
-        
-        this.eventBus.emit('files:sorted', { sortBy, sortOrder });
-    }
-    
-    // ========================================================================
-    // GETTERS
-    // ========================================================================
-    
-    getAllFiles() {
-        return this.data.files;
-    }
-    
-    getFilteredFiles() {
-        return this.data.searchResults.length > 0 
-            ? this.data.searchResults 
-            : this.data.files;
+    getFilesInCurrentPath() {
+        return this.get('files');
     }
     
     getFileById(fileId) {
-        return this.data.files.find(f => f.id === fileId);
+        return this.get('files').find(f => f.id === fileId) || null;
     }
     
-    getState() {
-        return {
-            ...this.state,
-            cacheSize: this.cache.currentMidiJsonSize,
-            cachedFiles: this.cache.midiJsonCache.size
-        };
-    }
-    
-    getStats() {
-        return {
-            ...this.stats,
-            cacheSize: this.cache.currentMidiJsonSize,
-            cachedFiles: this.cache.midiJsonCache.size,
-            cacheHitRate: this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses) || 0
-        };
-    }
-    
-    // ========================================================================
-    // DESTRUCTION
-    // ========================================================================
-    
-    destroy() {
-        this.logger.info('FileModel', 'Destroying...');
+    selectFile(fileId) {
+        const file = this.getFileById(fileId);
         
-        this.clearCache();
-        this.data.files = [];
-        
-        this.logger.info('FileModel', '✓ Destroyed');
+        if (file) {
+            this.set('selectedFile', file);
+            this.eventBus.emit('file:selected', { file });
+        }
+    }
+    
+    deselectFile() {
+        this.set('selectedFile', null);
+        this.eventBus.emit('file:deselected');
     }
 }
 
