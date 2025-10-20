@@ -27,7 +27,31 @@ class RoutingView extends BaseView {
         this.routes = [];
         this.presets = [];
         
-        this.logDebug('routing', '✓ RoutingView initialized (simple mode)');
+        // Logger initialization
+        this.logger = window.Logger || console;
+        
+        if (this.logger && this.logger.info) {
+            this.logger.info('RoutingView', '✓ RoutingView initialized (simple mode)');
+        }
+    }
+    
+    // Safe logging helper
+    logDebug(category, message, level = 'debug') {
+        if (!this.logger) {
+            console.log(`[${category}] ${message}`);
+            return;
+        }
+        
+        // Map level to logger method
+        const logMethod = level === 'warn' ? 'warn' : 
+                         level === 'error' ? 'error' : 
+                         level === 'info' ? 'info' : 'debug';
+        
+        if (typeof this.logger[logMethod] === 'function') {
+            this.logger[logMethod](category, message);
+        } else {
+            console.log(`[${category}] ${message}`);
+        }
     }
     
     // Override initialize to prevent BaseView auto-render before properties are ready
