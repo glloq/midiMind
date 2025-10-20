@@ -30,11 +30,15 @@
 
 class PlaybackModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'playbackmodel',
+            eventPrefix: 'playback',
+            autoPersist: false
+        });
         
-        // Dépendances
-        this.backend = backend;
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Initialiser les données via BaseModel
         this.initialize({

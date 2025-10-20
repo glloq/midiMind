@@ -11,8 +11,16 @@
 // ============================================================================
 
 class EditorModel extends BaseModel {
-    constructor(eventBus, apiClient, logger) {
-        super(eventBus, apiClient, logger);
+    constructor(eventBus, backend, logger) {
+        super({}, {
+            persistKey: 'editormodel',
+            eventPrefix: 'editor',
+            autoPersist: false
+        });
+        
+        this.eventBus = eventBus;
+        this.logger = logger;
+        this.backend = backend;
         
         // Configuration avec PerformanceConfig
         this.config = {

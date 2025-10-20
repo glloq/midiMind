@@ -20,11 +20,15 @@
 
 class InstrumentModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'instrumentmodel',
+            eventPrefix: 'instrument',
+            autoPersist: false
+        });
         
-        // Dépendances
-        this.backend = backend;
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Cache des instruments
         this.instruments = new Map();

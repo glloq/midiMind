@@ -19,11 +19,15 @@
 
 class LoopModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'loopmodel',
+            eventPrefix: 'loop',
+            autoPersist: true
+        });
         
-        // Dépendances
-        this.backend = backend;
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Loops stockés
         this.loops = new Map();

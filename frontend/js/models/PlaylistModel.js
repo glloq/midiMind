@@ -20,11 +20,16 @@
 
 class PlaylistModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'playlistmodel',
+            eventPrefix: 'playlist',
+            autoPersist: true
+        });
         
-        // Dépendances
-        this.backend = backend;
+        // ✅ CRITICAL: Assign immediately after super()
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Initialiser
         this.initialize({

@@ -31,11 +31,15 @@
 
 class SystemModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'systemmodel',
+            eventPrefix: 'system',
+            autoPersist: true
+        });
         
-        // Dépendances
-        this.backend = backend;
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Initialiser les données via BaseModel
         this.initialize({

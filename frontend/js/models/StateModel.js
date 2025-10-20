@@ -30,11 +30,15 @@
 
 class StateModel extends BaseModel {
     constructor(eventBus) {
-        super(eventBus);
+        super({}, {
+            persistKey: 'statemodel',
+            eventPrefix: 'state',
+            autoPersist: true,
+            autoValidate: true,
+            persistOnChange: true
+        });
         
-        // Configuration du modèle
-        this.config.autoValidate = true;
-        this.config.persistOnChange = true;
+        this.eventBus = eventBus;
         
         // État initial de l'application avec valeurs par défaut
         this.initialize({

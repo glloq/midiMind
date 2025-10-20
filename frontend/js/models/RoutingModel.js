@@ -20,11 +20,15 @@
 
 class RoutingModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        super(eventBus, logger);
+        super({}, {
+            persistKey: 'routingmodel',
+            eventPrefix: 'routing',
+            autoPersist: true
+        });
         
-        // Dépendances
-        this.backend = backend;
+        this.eventBus = eventBus;
         this.logger = logger;
+        this.backend = backend;
         
         // Initialiser avec 16 canaux MIDI
         this.initialize({

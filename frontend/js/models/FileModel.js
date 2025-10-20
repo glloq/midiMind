@@ -11,18 +11,16 @@
 // ============================================================================
 
 class FileModel extends BaseModel {
-    constructor(eventBus, apiClient, logger) {
-        // ✅ FIX: Call parent constructor with proper format
+    constructor(eventBus, backend, logger) {
         super({}, {
-            eventPrefix: 'files',
-            autoPersist: false,
-            validateOnSet: false
+            persistKey: 'filemodel',
+            eventPrefix: 'file',
+            autoPersist: true
         });
         
-        // ✅ FIX: Store dependencies properly
         this.eventBus = eventBus;
-        this.apiClient = apiClient;
         this.logger = logger;
+        this.backend = backend;
         
         // Configuration cache (OPTIMISÉ)
         this.cacheConfig = {
