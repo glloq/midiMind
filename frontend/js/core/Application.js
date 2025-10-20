@@ -79,7 +79,7 @@ class Application {
         
         // Configuration
         this.config = {
-            backendUrl: 'ws://localhost:8765',
+            backendUrl: 'ws://localhost:8080',  // ✅ Corrigé : API sur port 8080
             autoReconnect: true,
             reconnectInterval: 5000,
             logLevel: 'debug',
