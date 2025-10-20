@@ -30,6 +30,15 @@ class RoutingView extends BaseView {
         this.logDebug('routing', '✓ RoutingView initialized (simple mode)');
     }
     
+    // Override initialize to prevent BaseView auto-render before properties are ready
+    initialize() {
+        // Don't call super.initialize() which would trigger autoRender
+        // Just do the initial render now that everything is ready
+        if (this.container) {
+            this.render();
+        }
+    }
+    
     // ========================================================================
     // RENDERING PRINCIPAL
     // ========================================================================
@@ -175,6 +184,21 @@ class RoutingView extends BaseView {
         
         if (!matrixContainer) {
             this.logDebug('routing', 'Matrix container not found', 'warn');
+            return;
+        }
+        
+        // Check if RoutingMatrix class is available
+        if (typeof RoutingMatrix === 'undefined' || !window.RoutingMatrix) {
+            this.logDebug('routing', 'RoutingMatrix class not loaded - showing fallback', 'warn');
+            matrixContainer.innerHTML = `
+                <div class="info-banner warning">
+                    ⚠️ RoutingMatrix component not loaded. Please ensure RoutingMatrix.js is included.
+                </div>
+                <div class="routing-list-fallback">
+                    <h4>Routing Configuration</h4>
+                    <p>The routing matrix component is not available. Please check your script loading order.</p>
+                </div>
+            `;
             return;
         }
         
