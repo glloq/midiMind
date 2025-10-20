@@ -154,9 +154,10 @@ class EditorView extends BaseView {
             // Exposer globalement pour compatibilité
             if (typeof window !== 'undefined') {
                 window.editorView = this;
+            }
+            
+            this.logDebug('EditorView v3.6.0 initialized');
         }
-        
-        this.logDebug('EditorView v3.6.0 initialized');
     }
     
     /**
