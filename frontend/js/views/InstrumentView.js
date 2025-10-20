@@ -36,13 +36,13 @@ class InstrumentView extends BaseView {
             'virtual': '#95a5a6'
         };
         
-        // Logger safe
+        // Logger safe - MUST be initialized before initialize() is called
         this.logger = window.Logger || console;
-        
-        this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
         
         // Now that all properties are set, do initial render
         this.initialize();
+        
+        this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
     }
     
     // Override initialize to ensure it happens after all properties are set
