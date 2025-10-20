@@ -25,6 +25,9 @@ class RoutingController extends BaseController {
         // Référence au backend (sera injectée par Application)
         this.backend = null;
         
+        // Logger - Initialize FIRST
+        this.logger = window.Logger || console;
+        
         // État local
         this.localState = {
             isInitialized: false,
@@ -47,7 +50,27 @@ class RoutingController extends BaseController {
         // Composants UI
         this.routingMatrix = null;
         
+        // Mark as fully initialized
+        this._fullyInitialized = true;
+        
+        // Now initialize
         this.initialize();
+    }
+    
+    // Safe logging helper
+    logDebug(category, message, data = null) {
+        if (!this.logger) {
+            console.log(`[${category}] ${message}`, data || '');
+            return;
+        }
+        
+        if (typeof this.logger.debug === 'function') {
+            this.logger.debug(category, message, data);
+        } else if (typeof this.logger.info === 'function') {
+            this.logger.info(category, message, data);
+        } else {
+            console.log(`[${category}] ${message}`, data || '');
+        }
     }
     
     // ========================================================================
@@ -55,6 +78,11 @@ class RoutingController extends BaseController {
     // ========================================================================
     
     initialize() {
+        // Only initialize if fully ready
+        if (!this._fullyInitialized) {
+            return;
+        }
+        
         this.logDebug('routing', '🔀 Initializing RoutingController v3.0.3');
         
         // Créer le modèle s'il n'existe pas
