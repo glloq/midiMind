@@ -290,8 +290,17 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        std::string dbPath = Config::instance().getString("database.path", 
-                                                          "/var/lib/midimind/database.db");
+        // Initialize PathManager first
+        if (!pathManager_) {
+            Logger::info("Application", "  Creating PathManager...");
+            pathManager_ = std::make_shared<PathManager>();
+            std::string rootPath = Config::instance().getString("storage.root", 
+                                                                "/opt/midimind");
+            pathManager_->setBasePath(rootPath);
+            Logger::info("Application", "  ✓ PathManager ready (root: " + rootPath + ")");
+        }
+        
+        std::string dbPath = pathManager_->getDatabasePath();
         
         Logger::info("Application", "  Connecting to database: " + dbPath);
         
@@ -304,10 +313,11 @@ bool Application::initializeDatabase() {
         
         Logger::info("Application", "  ✓ Database connected");
         
-        // Run migrations
+        // Run migrations using PathManager
         Logger::info("Application", "  Running migrations...");
-        std::string migrationDir = "../../data/migrations";  // ou votre chemin
-		if (!database_->runMigrations(migrationDir)) {
+        std::string migrationDir = pathManager_->getMigrationsPath();
+        
+        if (!database_->runMigrations(migrationDir)) {
             Logger::error("Application", "  Migrations failed");
             return false;
         }
@@ -335,8 +345,8 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  ✓ Settings ready");
         
         Logger::info("Application", "  Creating FileManager...");
-        std::string rootPath = Config::instance().getString("storage.root", 
-                                                            "/var/lib/midimind");
+        // Use PathManager instead of hardcoded path
+        std::string rootPath = pathManager_->getBasePath();
         fileManager_ = std::make_shared<FileManager>(rootPath);
         
         if (!fileManager_->initializeDirectories()) {
