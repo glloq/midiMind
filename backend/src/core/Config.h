@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Config.h
-// Version: 4.1.0
+// Version: 4.1.0 - FIXED (2025-10-21)
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -31,6 +31,11 @@
 //   - Improved validation
 //   - Added merge capability
 //   - Focused on essential configuration only
+//
+// FIX 2025-10-21:
+//   - Added catch for std::exception in load() method (line 222)
+//   - Prevents silent crashes when std::runtime_error is thrown from getValueAtPath()
+//   - Now catches both json::exception AND std::exception
 //
 // ============================================================================
 
@@ -216,6 +221,11 @@ public:
             
         } catch (const json::exception& e) {
             Logger::error("Config", "JSON parse error: " + std::string(e.what()));
+            Logger::warning("Config", "Using default configuration");
+            loadDefaults();
+            return false;
+        } catch (const std::exception& e) {
+            Logger::error("Config", "Error loading config: " + std::string(e.what()));
             Logger::warning("Config", "Using default configuration");
             loadDefaults();
             return false;

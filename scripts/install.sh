@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================================================
 # Fichier: scripts/install.sh
-# Version: 4.1.2 - CORRIGÉE
-# Date: 2025-10-20
+# Version: 4.1.2 - FIX3 (Config API)
+# Date: 2025-10-21
 # Projet: MidiMind - Système d'Orchestration MIDI pour Raspberry Pi
 # ============================================================================
 #
@@ -12,6 +12,11 @@
 #   ✅ Initialisation correcte de la base de données
 #   ✅ Vérification des permissions sur tous les fichiers
 #   ✅ Test de démarrage après installation
+#
+# FIX v4.1.2-3 (2025-10-21):
+#   ✅ config.json: "server" → "api" (ligne 587)
+#   ✅ config.json: Structure complète (6 sections)
+#   ✅ config.json: Compatibilité avec Config.h v4.1.0
 #
 # ============================================================================
 
@@ -583,33 +588,50 @@ configure_systemd_service() {
     # ✅ NOUVEAU: Créer le fichier de configuration AVANT de créer le service
     cat > /etc/midimind/config.json << 'EOF'
 {
-    "version": "4.1.2",
-    "server": {
-        "host": "0.0.0.0",
+    "application": {
+        "version": "4.1.2",
+        "name": "MidiMind",
+        "data_dir": "/opt/midimind/data",
+        "log_dir": "/var/log/midimind"
+    },
+    "api": {
         "port": 8080,
-        "max_connections": 10
-    },
-    "database": {
-        "path": "/opt/midimind/data/midimind.db",
-        "backup_interval": 3600
-    },
-    "storage": {
-        "root": "/opt/midimind",
-        "max_file_size": 10485760
+        "host": "0.0.0.0",
+        "max_connections": 10,
+        "timeout_ms": 30000
     },
     "midi": {
         "buffer_size": 256,
+        "sample_rate": 44100,
+        "max_devices": 32,
+        "alsa_client_name": "MidiMind",
         "hot_plug_scan_interval": 2000,
         "default_device": "auto"
     },
-    "latency": {
+    "timing": {
+        "latency_compensation": true,
+        "auto_calibration": true,
+        "calibration_duration_ms": 5000,
+        "calibration_iterations": 100,
+        "max_jitter_ms": 5.0,
         "default_compensation": 0,
         "enable_instrument_compensation": true
     },
+    "storage": {
+        "database_path": "/opt/midimind/data/midimind.db",
+        "auto_backup": true,
+        "backup_interval_hours": 24,
+        "max_backups": 7,
+        "root": "/opt/midimind",
+        "max_file_size": 10485760
+    },
     "logging": {
-        "level": "INFO",
+        "level": "info",
+        "file_enabled": true,
+        "console_enabled": true,
+        "max_file_size_mb": 10,
+        "max_files": 5,
         "file": "/var/log/midimind/backend.log",
-        "max_size": 10485760,
         "rotation": 5
     }
 }
