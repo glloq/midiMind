@@ -281,6 +281,11 @@ install_system_dependencies() {
         libjack-jackd2-dev \
         2>&1 | tee -a "$LOG_FILE" || error "Échec installation audio libs"
     
+    info "Installation de WebSocketpp..."
+    apt-get install -y -qq \
+        libwebsocketpp-dev \
+        2>&1 | tee -a "$LOG_FILE" || error "Échec installation websocketpp"
+    
     # ✅ VÉRIFICATION ALSA UTILS
     if command -v aconnect &> /dev/null; then
         success "ALSA Utils installé (aconnect, amidi disponibles)"
@@ -505,7 +510,9 @@ compile_backend() {
     
     info "Compilation en cours (5-10 minutes sur Raspberry Pi)..."
     info "Utilisation de $NPROC cœurs..."
-    make -j$NPROC 2>&1 | tee -a "$LOG_FILE" || error "Échec compilation"
+    if ! make -j$NPROC 2>&1 | tee -a "$LOG_FILE"; then
+        error "Échec compilation\n  Vérifiez les logs: cat /var/log/midimind_install.log | tail -100"
+    fi
     
     success "Backend compilé avec succès"
     
