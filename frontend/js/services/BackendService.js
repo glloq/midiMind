@@ -1,17 +1,20 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.1.2 - FIXED WebSocket Connection Issues
+// Version: v3.2.0 - CONFORME DOCUMENTATION WEBSOCKET
 // Date: 2025-10-21
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
-// FIXES v3.1.2:
-// ✅ Fixed connection URL configuration (uses passed URL from Application)
-// ✅ Better error handling for connection failures
-// ✅ Prevents multiple simultaneous reconnection attempts
-// ✅ Added connection timeout detection
-// ✅ Improved logging for debugging connection issues
-// ✅ Queue persistence across reconnections
-// ✅ Graceful degradation when backend unavailable
+// CONFORMITÉ v3.2.0:
+// ✅ Structure EXACTE selon documentation WebSocket
+// ✅ Format Envelope: {id, type, timestamp, version, payload}
+// ✅ REQUEST payload: {id, command, params, timeout}
+// ✅ RESPONSE payload: {request_id, success, data, latency}
+// ✅ EVENT payload: {name, data, priority}
+// ✅ ERROR payload: {code, message, details, retryable}
+// ✅ UUID v4 pour les IDs
+// ✅ Timestamp ISO 8601 format
+// ✅ URL correcte: ws://localhost:8080
+// ✅ Gestion erreurs selon codes documentés
 // ============================================================================
 
 class BackendService {
@@ -21,15 +24,15 @@ class BackendService {
         
         // Configuration
         this.config = {
-            url: null, // Will be set when connect() is called
+            url: 'ws://localhost:8080', // URL selon documentation
             reconnectDelay: 2000,
             maxReconnectDelay: 30000,
             reconnectBackoff: 1.5,
             requestTimeout: 10000,
             heartbeatInterval: 30000,
-            protocolVersion: '3.0',
-            connectionTimeout: 5000, // NEW: Timeout for initial connection
-            maxReconnectAttempts: 10 // NEW: Limit reconnection attempts
+            protocolVersion: '1.0', // Version selon documentation
+            connectionTimeout: 5000,
+            maxReconnectAttempts: 10
         };
         
         // État
@@ -39,10 +42,10 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
-        this.connectionTimer = null; // NEW: Track connection timeout
+        this.connectionTimer = null;
         
         // Gestion des requêtes
-        this.pendingRequests = new Map(); // requestId -> {resolve, reject, timeout}
+        this.pendingRequests = new Map(); // requestId -> {resolve, reject, timeout, startTime}
         this.messageQueue = []; // Messages en attente si déconnecté
         
         // Statistiques
@@ -57,7 +60,7 @@ class BackendService {
             connectionFailures: 0
         };
         
-        this.logger.info('BackendService', '✓ Service initialized (Protocol v3.0)');
+        this.logger.info('BackendService', '✓ Service initialized (Protocol v1.0 - WebSocket Envelope)');
     }
     
     // ========================================================================
@@ -221,21 +224,36 @@ class BackendService {
     // ========================================================================
     
     /**
-     * Handler onMessage
+     * Handler onMessage - Parse selon documentation
      * @param {MessageEvent} event
      */
     onMessage(event) {
         this.stats.messagesReceived++;
         
         try {
-            const message = JSON.parse(event.data);
+            const envelope = JSON.parse(event.data);
             
-            // Vérifier si c'est le nouveau format avec enveloppe
-            if (message.envelope) {
-                this.handleEnvelopeMessage(message);
-            } else {
-                // Legacy format
-                this.handleLegacyMessage(message);
+            // Vérifier structure Envelope selon documentation
+            if (!envelope.id || !envelope.type || !envelope.timestamp || !envelope.version || !envelope.payload) {
+                this.logger.warn('BackendService', 'Invalid message format (missing Envelope fields)');
+                return;
+            }
+            
+            this.logger.debug('BackendService', `← ${envelope.type.toUpperCase()}:`, envelope.id);
+            
+            // Router selon type
+            switch (envelope.type) {
+                case 'response':
+                    this.handleResponse(envelope);
+                    break;
+                case 'event':
+                    this.handleEvent(envelope);
+                    break;
+                case 'error':
+                    this.handleError(envelope);
+                    break;
+                default:
+                    this.logger.warn('BackendService', `Unknown message type: ${envelope.type}`);
             }
             
         } catch (error) {
@@ -251,9 +269,9 @@ class BackendService {
         const wasConnected = this.connected;
         this.connected = false;
         
-        // Log with more detail
+        // Log avec détails selon code
         if (event.code === 1006) {
-            this.logger.warn('BackendService', `Connection closed abnormally (1006) - Server may not be running`);
+            this.logger.warn('BackendService', `Connection closed abnormally (1006) - Server may not be running on ${this.config.url}`);
         } else {
             this.logger.warn('BackendService', `Connection closed (code: ${event.code}, reason: ${event.reason || 'none'})`);
         }
@@ -266,7 +284,7 @@ class BackendService {
             this.eventBus.emit('websocket:disconnected');
         }
         
-        // Planifier reconnexion si on était connecté et qu'on n'a pas dépassé le max
+        // Planifier reconnexion
         if (wasConnected && !this.reconnecting && this.reconnectAttempts < this.config.maxReconnectAttempts) {
             this.scheduleReconnect();
         } else if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
@@ -285,22 +303,128 @@ class BackendService {
     }
     
     // ========================================================================
-    // ENVOI DE MESSAGES
+    // GESTION PROTOCOLE - FORMAT DOCUMENTATION
     // ========================================================================
     
     /**
-     * Envoie un message brut au serveur
-     * @param {Object} message - Message à envoyer
+     * Gère une RESPONSE selon documentation
+     * Payload: {request_id, success, data, error_message, error_code, latency}
+     * @param {Object} envelope
      */
-    sendMessage(message) {
+    handleResponse(envelope) {
+        this.stats.responsesReceived++;
+        
+        const payload = envelope.payload;
+        const requestId = payload.request_id;
+        
+        const pending = this.pendingRequests.get(requestId);
+        
+        if (pending) {
+            clearTimeout(pending.timeout);
+            this.pendingRequests.delete(requestId);
+            
+            // Calculer latence réelle
+            const actualLatency = Date.now() - pending.startTime;
+            
+            this.logger.debug('BackendService', 
+                `Response for ${requestId}: ${payload.success ? 'SUCCESS' : 'FAILED'} (${actualLatency}ms)`);
+            
+            if (payload.success) {
+                pending.resolve(payload.data);
+            } else {
+                const error = new Error(payload.error_message || 'Unknown error');
+                error.code = payload.error_code;
+                pending.reject(error);
+            }
+        } else {
+            this.logger.warn('BackendService', `No pending request for ${requestId}`);
+        }
+    }
+    
+    /**
+     * Gère un EVENT selon documentation
+     * Payload: {name, data, priority}
+     * @param {Object} envelope
+     */
+    handleEvent(envelope) {
+        this.stats.eventsReceived++;
+        
+        const payload = envelope.payload;
+        const eventName = payload.name;
+        
+        this.logger.debug('BackendService', `Event: ${eventName} [${payload.priority || 'normal'}]`);
+        
+        // Émettre sur EventBus avec préfixe
+        this.eventBus.emit(`backend:${eventName}`, payload.data);
+        
+        // Émettre aussi l'événement générique
+        this.eventBus.emit('backend:event', {
+            name: eventName,
+            data: payload.data,
+            priority: payload.priority || 'normal',
+            timestamp: envelope.timestamp
+        });
+    }
+    
+    /**
+     * Gère une ERROR selon documentation
+     * Payload: {code, message, details, retryable}
+     * @param {Object} envelope
+     */
+    handleError(envelope) {
+        this.stats.errorsReceived++;
+        
+        const payload = envelope.payload;
+        
+        this.logger.error('BackendService', `Server error [${payload.code}]: ${payload.message}`, payload.details);
+        
+        // Émettre événement d'erreur
+        this.eventBus.emit('backend:error', {
+            code: payload.code,
+            message: payload.message,
+            details: payload.details,
+            retryable: payload.retryable || false,
+            timestamp: envelope.timestamp
+        });
+    }
+    
+    // ========================================================================
+    // ENVOI DE MESSAGES - FORMAT DOCUMENTATION
+    // ========================================================================
+    
+    /**
+     * Génère un UUID v4 conforme
+     * @returns {string}
+     */
+    generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
+    /**
+     * Génère un timestamp ISO 8601 avec millisecondes
+     * @returns {string}
+     */
+    generateTimestamp() {
+        return new Date().toISOString();
+    }
+    
+    /**
+     * Envoie un message brut au serveur
+     * @param {Object} envelope - Envelope complet
+     */
+    sendMessage(envelope) {
         if (!this.isConnected()) {
             this.logger.warn('BackendService', 'Not connected, message queued');
-            this.messageQueue.push(message);
+            this.messageQueue.push(envelope);
             return;
         }
         
         try {
-            const json = JSON.stringify(message);
+            const json = JSON.stringify(envelope);
             this.ws.send(json);
             this.stats.messagesSent++;
         } catch (error) {
@@ -309,149 +433,158 @@ class BackendService {
     }
     
     /**
-     * Envoie une commande au serveur (format enveloppe)
-     * @param {string} command - Commande à envoyer
-     * @param {Object} params - Paramètres de la commande
+     * Envoie une commande selon format documentation
+     * @param {string} command - Commande (ex: "devices:list")
+     * @param {Object} params - Paramètres
+     * @param {number} timeout - Timeout optionnel (ms)
      * @returns {Promise<Object>}
      */
-    sendCommand(command, params = {}) {
-        const requestId = this.generateRequestId();
+    sendCommand(command, params = {}, timeout = null) {
+        const envelopeId = this.generateUUID();
+        const requestId = this.generateUUID();
+        const timestamp = this.generateTimestamp();
         
-        const message = {
-            envelope: {
-                version: this.config.protocolVersion,
-                type: 'request',
+        // Construction selon documentation exacte
+        const envelope = {
+            id: envelopeId,
+            type: 'request',
+            timestamp: timestamp,
+            version: this.config.protocolVersion,
+            payload: {
                 id: requestId,
-                timestamp: Date.now()
-            },
-            request: {
                 command: command,
-                params: params
+                params: params,
+                timeout: timeout || this.config.requestTimeout
             }
         };
         
-        this.logger.debug('BackendService', `→ Command: ${command}`, params);
+        this.logger.debug('BackendService', `→ REQUEST: ${command}`, params);
         
         return new Promise((resolve, reject) => {
-            // Créer timeout
-            const timeout = setTimeout(() => {
-                this.pendingRequests.delete(requestId);
-                reject(new Error(`Request timeout: ${command}`));
-            }, this.config.requestTimeout);
+            const startTime = Date.now();
             
-            // Stocker la promesse
-            this.pendingRequests.set(requestId, { resolve, reject, timeout });
+            // Créer timeout
+            const timeoutHandle = setTimeout(() => {
+                this.pendingRequests.delete(requestId);
+                this.logger.warn('BackendService', `Request timeout: ${command} (${timeout || this.config.requestTimeout}ms)`);
+                reject(new Error(`Request timeout: ${command}`));
+            }, timeout || this.config.requestTimeout);
+            
+            // Stocker la promesse avec startTime pour calcul latence
+            this.pendingRequests.set(requestId, { 
+                resolve, 
+                reject, 
+                timeout: timeoutHandle,
+                startTime,
+                command
+            });
             
             // Envoyer
-            this.sendMessage(message);
+            this.sendMessage(envelope);
             this.stats.requestsSent++;
         });
     }
     
     // ========================================================================
-    // GESTION PROTOCOLE v3.0 (ENVELOPPES)
+    // API COMMANDES - SELON DOCUMENTATION
     // ========================================================================
     
-    /**
-     * Gère un message avec enveloppe (nouveau format)
-     * @param {Object} message
-     */
-    handleEnvelopeMessage(message) {
-        const { envelope } = message;
-        
-        switch (envelope.type) {
-            case 'response':
-                this.handleResponse(message);
-                break;
-            case 'event':
-                this.handleEvent(message);
-                break;
-            case 'error':
-                this.handleErrorMessage(message);
-                break;
-            default:
-                this.logger.warn('BackendService', `Unknown message type: ${envelope.type}`);
-        }
+    // --- System ---
+    
+    async getSystemInfo() {
+        return this.sendCommand('session:info');
     }
     
-    /**
-     * Gère un message legacy (ancien format)
-     * @param {Object} message
-     */
-    handleLegacyMessage(message) {
-        // Convertir en format enveloppe
-        if (message.type === 'event') {
-            this.handleEvent({
-                envelope: { type: 'event' },
-                event: message
-            });
-        } else if (message.error) {
-            this.handleErrorMessage({
-                envelope: { type: 'error' },
-                error: { message: message.error }
-            });
-        } else {
-            this.handleResponse({
-                envelope: { type: 'response', id: message.requestId },
-                response: message
-            });
-        }
+    async systemPing() {
+        return this.sendCommand('system:ping');
     }
     
-    /**
-     * Gère une réponse
-     * @param {Object} message
-     */
-    handleResponse(message) {
-        this.stats.responsesReceived++;
-        
-        const requestId = message.envelope.id;
-        const pending = this.pendingRequests.get(requestId);
-        
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this.pendingRequests.delete(requestId);
-            
-            if (message.response.success) {
-                pending.resolve(message.response.data);
-            } else {
-                pending.reject(new Error(message.response.error || 'Unknown error'));
-            }
-        }
+    // --- Devices MIDI ---
+    
+    async listDevices() {
+        return this.sendCommand('devices:list');
     }
     
-    /**
-     * Gère un événement
-     * @param {Object} message
-     */
-    handleEvent(message) {
-        this.stats.eventsReceived++;
-        
-        const event = message.event;
-        
-        // Émettre sur EventBus
-        this.eventBus.emit(`backend:${event.type}`, event.data);
+    async getDeviceInfo(deviceId) {
+        return this.sendCommand('devices:info', { deviceId });
     }
     
-    /**
-     * Gère un message d'erreur
-     * @param {Object} message
-     */
-    handleErrorMessage(message) {
-        this.stats.errorsReceived++;
-        
-        const requestId = message.envelope?.id;
-        
-        if (requestId) {
-            const pending = this.pendingRequests.get(requestId);
-            if (pending) {
-                clearTimeout(pending.timeout);
-                this.pendingRequests.delete(requestId);
-                pending.reject(new Error(message.error.message));
-            }
-        }
-        
-        this.logger.error('BackendService', 'Server error:', message.error);
+    async connectDevice(deviceId) {
+        return this.sendCommand('devices:connect', { deviceId });
+    }
+    
+    async disconnectDevice(deviceId) {
+        return this.sendCommand('devices:disconnect', { deviceId });
+    }
+    
+    // --- MIDI Messages ---
+    
+    async sendMidiMessage(device, message) {
+        return this.sendCommand('midi:send', { device, message });
+    }
+    
+    // --- Player ---
+    
+    async playerPlay(fileId) {
+        return this.sendCommand('player:play', { fileId });
+    }
+    
+    async playerStop() {
+        return this.sendCommand('player:stop');
+    }
+    
+    async playerPause() {
+        return this.sendCommand('player:pause');
+    }
+    
+    async playerSeek(position) {
+        return this.sendCommand('player:seek', { position });
+    }
+    
+    async getPlayerState() {
+        return this.sendCommand('player:state');
+    }
+    
+    // --- Presets ---
+    
+    async loadPreset(presetId) {
+        return this.sendCommand('preset:load', { presetId });
+    }
+    
+    async savePreset(presetId, data) {
+        return this.sendCommand('preset:save', { presetId, data });
+    }
+    
+    async listPresets() {
+        return this.sendCommand('preset:list');
+    }
+    
+    // --- Files ---
+    
+    async listFiles(path = '/') {
+        return this.sendCommand('files:list', { path });
+    }
+    
+    async uploadFile(filename, data) {
+        return this.sendCommand('files:upload', { filename, data });
+    }
+    
+    async deleteFile(filePath) {
+        return this.sendCommand('files:delete', { filePath });
+    }
+    
+    // --- Routing (si supporté par backend) ---
+    
+    async addRoute(route) {
+        return this.sendCommand('routing:add', route);
+    }
+    
+    async removeRoute(routeId) {
+        return this.sendCommand('routing:remove', { routeId });
+    }
+    
+    async listRoutes() {
+        return this.sendCommand('routing:list');
     }
     
     // ========================================================================
@@ -498,7 +631,7 @@ class BackendService {
     }
     
     /**
-     * Démarre le heartbeat (ping toutes les 30s)
+     * Démarre le heartbeat (ping périodique)
      */
     startHeartbeat() {
         if (this.heartbeatTimer) {
@@ -507,19 +640,11 @@ class BackendService {
         
         this.heartbeatTimer = setInterval(() => {
             if (this.isConnected()) {
-                const ping = {
-                    envelope: {
-                        version: this.config.protocolVersion,
-                        type: 'request',
-                        id: 'ping-' + Date.now(),
-                        timestamp: Date.now()
-                    },
-                    request: {
-                        command: 'system.ping',
-                        params: {}
-                    }
-                };
-                this.sendMessage(ping);
+                // Envoyer ping selon format documentation
+                this.sendCommand('system:ping')
+                    .catch(err => {
+                        this.logger.warn('BackendService', 'Heartbeat ping failed:', err.message);
+                    });
             }
         }, this.config.heartbeatInterval);
     }
@@ -549,8 +674,8 @@ class BackendService {
         this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages...`);
         
         while (this.messageQueue.length > 0) {
-            const message = this.messageQueue.shift();
-            this.sendMessage(message);
+            const envelope = this.messageQueue.shift();
+            this.sendMessage(envelope);
         }
     }
     
@@ -569,127 +694,8 @@ class BackendService {
     }
     
     // ========================================================================
-    // API COMMANDES (unchanged from original)
-    // ========================================================================
-    
-    // System
-    async getSystemInfo() {
-        return this.sendCommand('system.get-info');
-    }
-    
-    async systemPing() {
-        return this.sendCommand('system.ping');
-    }
-    
-    // Playback
-    async play() {
-        return this.sendCommand('playback.play');
-    }
-    
-    async pause() {
-        return this.sendCommand('playback.pause');
-    }
-    
-    async stop() {
-        return this.sendCommand('playback.stop');
-    }
-    
-    async seek(position) {
-        return this.sendCommand('playback.seek', { position });
-    }
-    
-    async getPlaybackState() {
-        return this.sendCommand('playback.get-state');
-    }
-    
-    // Playlist
-    async loadPlaylist(filePath) {
-        return this.sendCommand('playlist.load', { file_path: filePath });
-    }
-    
-    async getPlaylist() {
-        return this.sendCommand('playlist.get');
-    }
-    
-    async setTrack(index) {
-        return this.sendCommand('playlist.set-track', { index });
-    }
-    
-    // Files
-    async listFiles(path = '/') {
-        return this.sendCommand('files.list', { path });
-    }
-    
-    async uploadFile(filename, base64Data) {
-        return this.sendCommand('files.upload', { filename, data: base64Data });
-    }
-    
-    async getFile(fileId) {
-        return this.sendCommand('files.get', { file_id: fileId });
-    }
-    
-    async deleteFile(filePath) {
-        return this.sendCommand('files.delete', { file_path: filePath });
-    }
-    
-    // Devices
-    async listDevices() {
-        return this.sendCommand('devices.list');
-    }
-    
-    async connectDevice(deviceId) {
-        return this.sendCommand('devices.connect', { device_id: deviceId });
-    }
-    
-    async disconnectDevice(deviceId) {
-        return this.sendCommand('devices.disconnect', { device_id: deviceId });
-    }
-    
-    // Routing
-    async addRoute(route) {
-        return this.sendCommand('routing.addRoute', route);
-    }
-    
-    async removeRoute(routeId) {
-        return this.sendCommand('routing.removeRoute', { route_id: routeId });
-    }
-    
-    async listRoutes() {
-        return this.sendCommand('routing.listRoutes');
-    }
-    
-    async updateRoute(routeId, changes) {
-        return this.sendCommand('routing.updateRoute', { route_id: routeId, ...changes });
-    }
-    
-    // Editor
-    async editorLoad(filePath) {
-        return this.sendCommand('editor.load', { file_path: filePath });
-    }
-    
-    async editorSave(filePath, jsonMidi) {
-        return this.sendCommand('editor.save', { file_path: filePath, jsonmidi: jsonMidi });
-    }
-    
-    async editorAddNote(note) {
-        return this.sendCommand('editor.addNote', note);
-    }
-    
-    async editorDeleteNote(noteId) {
-        return this.sendCommand('editor.deleteNote', { note_id: noteId });
-    }
-    
-    // ========================================================================
     // UTILITAIRES
     // ========================================================================
-    
-    /**
-     * Génère un ID de requête unique
-     * @returns {string}
-     */
-    generateRequestId() {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
     
     /**
      * Obtient les statistiques
