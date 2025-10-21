@@ -284,7 +284,7 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        std::string dbPath = Config::instance().getString("database.path", 
+        std::string dbPath = Config::instance().getString("storage.database_path", 
                                                           "/var/lib/midimind/database.db");
         
         Logger::info("Application", "  Connecting to database: " + dbPath);

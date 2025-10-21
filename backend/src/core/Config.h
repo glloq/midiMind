@@ -100,7 +100,7 @@ const char* DEFAULT_CONFIG_JSON = R"({
         "max_backups": 7
     },
     "logging": {
-        "level": "info",
+        "level": "debug",
         "file_enabled": true,
         "console_enabled": true,
         "max_file_size_mb": 10,
@@ -197,24 +197,32 @@ public:
         
         try {
             // Parse JSON
+            Logger::debug("Config", "Step 1: Parsing JSON...");
             json fileConfig;
             file >> fileConfig;
             file.close();
+            Logger::debug("Config", "✓ JSON parsed OK");
             
             // Load defaults first
+            Logger::debug("Config", "Step 2: Loading defaults...");
             loadDefaults();
+            Logger::debug("Config", "✓ Defaults loaded OK");
             
             // Merge file config with defaults (file config takes precedence)
+            Logger::debug("Config", "Step 3: Merging configurations...");
             mergeJson(config_, fileConfig);
+            Logger::debug("Config", "✓ Merge OK");
             
             configPath_ = filepath;
             
             // Validate configuration
+            Logger::debug("Config", "Step 4: Validating...");
             if (!validate()) {
                 Logger::warning("Config", "Configuration validation failed, using defaults");
                 loadDefaults();
                 return false;
             }
+            Logger::debug("Config", "✓ Validation OK");
             
             Logger::info("Config", "✓ Configuration loaded successfully");
             return true;
