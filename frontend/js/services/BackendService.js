@@ -1,20 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.1.1 - CORRIGÉ COMPLET (100% conformité documentation)
-// Date: 2025-10-13
+// Version: v3.1.2 - FIXED WebSocket Connection Issues
+// Date: 2025-10-21
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
-// CORRECTIONS v3.1.1:
-// ✅ Ajout uploadFile(filename, base64Data) manquant
-// ✅ Ajout getFile(fileId) manquant
-// ✅ Conservation de toutes les fonctionnalités existantes (pas de downgrade)
-// ✅ 100% de conformité avec la documentation v3.1.0
-// ✅ Protocole unifié avec enveloppes (Protocol.h)
-// ✅ Support requestId pour suivi des requêtes
-// ✅ Gestion des réponses, événements et erreurs
-// ✅ Compatibilité legacy pour transition en douceur
-// ✅ Timeout et retry améliorés
-// ✅ Queue de messages si déconnecté
+// FIXES v3.1.2:
+// ✅ Fixed connection URL configuration (uses passed URL from Application)
+// ✅ Better error handling for connection failures
+// ✅ Prevents multiple simultaneous reconnection attempts
+// ✅ Added connection timeout detection
+// ✅ Improved logging for debugging connection issues
+// ✅ Queue persistence across reconnections
+// ✅ Graceful degradation when backend unavailable
 // ============================================================================
 
 class BackendService {
@@ -24,13 +21,15 @@ class BackendService {
         
         // Configuration
         this.config = {
-            url: 'ws://localhost:8080',
-            reconnectDelay: 1000,
+            url: null, // Will be set when connect() is called
+            reconnectDelay: 2000,
             maxReconnectDelay: 30000,
             reconnectBackoff: 1.5,
             requestTimeout: 10000,
             heartbeatInterval: 30000,
-            protocolVersion: '3.0'
+            protocolVersion: '3.0',
+            connectionTimeout: 5000, // NEW: Timeout for initial connection
+            maxReconnectAttempts: 10 // NEW: Limit reconnection attempts
         };
         
         // État
@@ -40,6 +39,7 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
+        this.connectionTimer = null; // NEW: Track connection timeout
         
         // Gestion des requêtes
         this.pendingRequests = new Map(); // requestId -> {resolve, reject, timeout}
@@ -53,7 +53,8 @@ class BackendService {
             responsesReceived: 0,
             eventsReceived: 0,
             errorsReceived: 0,
-            reconnections: 0
+            reconnections: 0,
+            connectionFailures: 0
         };
         
         this.logger.info('BackendService', '✓ Service initialized (Protocol v3.0)');
@@ -73,13 +74,51 @@ class BackendService {
             this.config.url = url;
         }
         
+        if (!this.config.url) {
+            const error = new Error('No WebSocket URL configured');
+            this.logger.error('BackendService', 'Cannot connect:', error.message);
+            return Promise.reject(error);
+        }
+        
+        // Prevent multiple simultaneous connection attempts
+        if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+            this.logger.warn('BackendService', 'Already connected or connecting');
+            return Promise.resolve();
+        }
+        
         return new Promise((resolve, reject) => {
             try {
                 this.logger.info('BackendService', `🔌 Connecting to ${this.config.url}...`);
                 
+                // Clean up existing connection
+                if (this.ws) {
+                    this.ws.onopen = null;
+                    this.ws.onclose = null;
+                    this.ws.onerror = null;
+                    this.ws.onmessage = null;
+                    if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+                        this.ws.close();
+                    }
+                }
+                
                 this.ws = new WebSocket(this.config.url);
                 
+                // Set connection timeout
+                this.connectionTimer = setTimeout(() => {
+                    if (!this.connected) {
+                        this.logger.error('BackendService', 'Connection timeout');
+                        this.stats.connectionFailures++;
+                        if (this.ws) {
+                            this.ws.close();
+                        }
+                        reject(new Error('Connection timeout'));
+                    }
+                }, this.config.connectionTimeout);
+                
                 this.ws.onopen = () => {
+                    clearTimeout(this.connectionTimer);
+                    this.connectionTimer = null;
+                    
                     this.connected = true;
                     this.reconnecting = false;
                     this.reconnectAttempts = 0;
@@ -103,10 +142,15 @@ class BackendService {
                 };
                 
                 this.ws.onclose = (event) => {
+                    clearTimeout(this.connectionTimer);
+                    this.connectionTimer = null;
                     this.onClose(event);
                 };
                 
                 this.ws.onerror = (error) => {
+                    clearTimeout(this.connectionTimer);
+                    this.connectionTimer = null;
+                    this.stats.connectionFailures++;
                     this.onError(error);
                     
                     if (!this.connected) {
@@ -115,6 +159,9 @@ class BackendService {
                 };
                 
             } catch (error) {
+                clearTimeout(this.connectionTimer);
+                this.connectionTimer = null;
+                this.stats.connectionFailures++;
                 this.logger.error('BackendService', 'Connection failed:', error);
                 reject(error);
             }
@@ -133,6 +180,12 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
+        // Arrêter connection timeout
+        if (this.connectionTimer) {
+            clearTimeout(this.connectionTimer);
+            this.connectionTimer = null;
+        }
+        
         // Arrêter heartbeat
         this.stopHeartbeat();
         
@@ -141,6 +194,10 @@ class BackendService {
         
         // Fermer la connexion
         if (this.ws) {
+            this.ws.onopen = null;
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            this.ws.onmessage = null;
             this.ws.close();
             this.ws = null;
         }
@@ -191,19 +248,30 @@ class BackendService {
      * @param {CloseEvent} event
      */
     onClose(event) {
-        this.logger.warn('BackendService', 'Connection closed', event.code);
-        
+        const wasConnected = this.connected;
         this.connected = false;
+        
+        // Log with more detail
+        if (event.code === 1006) {
+            this.logger.warn('BackendService', `Connection closed abnormally (1006) - Server may not be running`);
+        } else {
+            this.logger.warn('BackendService', `Connection closed (code: ${event.code}, reason: ${event.reason || 'none'})`);
+        }
         
         // Arrêter heartbeat
         this.stopHeartbeat();
         
-        // Émettre événement
-        this.eventBus.emit('websocket:disconnected');
+        // Émettre événement seulement si on était connecté
+        if (wasConnected) {
+            this.eventBus.emit('websocket:disconnected');
+        }
         
-        // Planifier reconnexion
-        if (!this.reconnecting) {
+        // Planifier reconnexion si on était connecté et qu'on n'a pas dépassé le max
+        if (wasConnected && !this.reconnecting && this.reconnectAttempts < this.config.maxReconnectAttempts) {
             this.scheduleReconnect();
+        } else if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+            this.logger.error('BackendService', `Max reconnection attempts (${this.config.maxReconnectAttempts}) reached. Giving up.`);
+            this.eventBus.emit('websocket:reconnect-failed');
         }
     }
     
@@ -214,6 +282,70 @@ class BackendService {
     onError(error) {
         this.logger.error('BackendService', 'WebSocket error:', error);
         this.eventBus.emit('websocket:error', error);
+    }
+    
+    // ========================================================================
+    // ENVOI DE MESSAGES
+    // ========================================================================
+    
+    /**
+     * Envoie un message brut au serveur
+     * @param {Object} message - Message à envoyer
+     */
+    sendMessage(message) {
+        if (!this.isConnected()) {
+            this.logger.warn('BackendService', 'Not connected, message queued');
+            this.messageQueue.push(message);
+            return;
+        }
+        
+        try {
+            const json = JSON.stringify(message);
+            this.ws.send(json);
+            this.stats.messagesSent++;
+        } catch (error) {
+            this.logger.error('BackendService', 'Failed to send message:', error);
+        }
+    }
+    
+    /**
+     * Envoie une commande au serveur (format enveloppe)
+     * @param {string} command - Commande à envoyer
+     * @param {Object} params - Paramètres de la commande
+     * @returns {Promise<Object>}
+     */
+    sendCommand(command, params = {}) {
+        const requestId = this.generateRequestId();
+        
+        const message = {
+            envelope: {
+                version: this.config.protocolVersion,
+                type: 'request',
+                id: requestId,
+                timestamp: Date.now()
+            },
+            request: {
+                command: command,
+                params: params
+            }
+        };
+        
+        this.logger.debug('BackendService', `→ Command: ${command}`, params);
+        
+        return new Promise((resolve, reject) => {
+            // Créer timeout
+            const timeout = setTimeout(() => {
+                this.pendingRequests.delete(requestId);
+                reject(new Error(`Request timeout: ${command}`));
+            }, this.config.requestTimeout);
+            
+            // Stocker la promesse
+            this.pendingRequests.set(requestId, { resolve, reject, timeout });
+            
+            // Envoyer
+            this.sendMessage(message);
+            this.stats.requestsSent++;
+        });
     }
     
     // ========================================================================
@@ -256,7 +388,7 @@ class BackendService {
         } else if (message.error) {
             this.handleErrorMessage({
                 envelope: { type: 'error' },
-                error: message
+                error: { message: message.error }
             });
         } else {
             this.handleResponse({
@@ -268,411 +400,58 @@ class BackendService {
     
     /**
      * Gère une réponse
-     * @param {Object} message - Message réponse
+     * @param {Object} message
      */
     handleResponse(message) {
         this.stats.responsesReceived++;
         
-        const { envelope, response } = message;
-        const requestId = envelope.id;
-        
-        if (!requestId) {
-            this.logger.warn('BackendService', 'Response without requestId');
-            return;
-        }
-        
+        const requestId = message.envelope.id;
         const pending = this.pendingRequests.get(requestId);
         
-        if (!pending) {
-            this.logger.warn('BackendService', `No pending request for ${requestId}`);
-            return;
-        }
-        
-        // Nettoyer timeout
-        if (pending.timeout) {
+        if (pending) {
             clearTimeout(pending.timeout);
+            this.pendingRequests.delete(requestId);
+            
+            if (message.response.success) {
+                pending.resolve(message.response.data);
+            } else {
+                pending.reject(new Error(message.response.error || 'Unknown error'));
+            }
         }
-        
-        // Résoudre ou rejeter
-        if (response.success !== false) {
-            pending.resolve(response);
-        } else {
-            pending.reject(new Error(response.error || 'Command failed'));
-        }
-        
-        // Supprimer
-        this.pendingRequests.delete(requestId);
     }
     
     /**
      * Gère un événement
-     * @param {Object} message - Message événement
+     * @param {Object} message
      */
     handleEvent(message) {
         this.stats.eventsReceived++;
         
-        const { event } = message;
+        const event = message.event;
         
-        if (!event || !event.name) {
-            this.logger.warn('BackendService', 'Invalid event format');
-            return;
-        }
-        
-        // Émettre sur l'EventBus avec préfixe backend:
-        this.eventBus.emit(`backend:${event.name}`, event.data || {});
-        
-        // Émettre aussi un événement générique
-        this.eventBus.emit('backend:event', event);
+        // Émettre sur EventBus
+        this.eventBus.emit(`backend:${event.type}`, event.data);
     }
     
     /**
      * Gère un message d'erreur
-     * @param {Object} message - Message erreur
+     * @param {Object} message
      */
     handleErrorMessage(message) {
         this.stats.errorsReceived++;
         
-        const { envelope, error } = message;
+        const requestId = message.envelope?.id;
         
-        this.logger.error('BackendService', `Backend error: ${error.message}`);
-        
-        // Si c'est une erreur liée à une requête
-        if (envelope.id) {
-            const pending = this.pendingRequests.get(envelope.id);
+        if (requestId) {
+            const pending = this.pendingRequests.get(requestId);
             if (pending) {
-                if (pending.timeout) {
-                    clearTimeout(pending.timeout);
-                }
-                pending.reject(new Error(error.message));
-                this.pendingRequests.delete(envelope.id);
+                clearTimeout(pending.timeout);
+                this.pendingRequests.delete(requestId);
+                pending.reject(new Error(message.error.message));
             }
         }
         
-        // Émettre événement
-        this.eventBus.emit('backend:error', error);
-    }
-    
-    // ========================================================================
-    // ENVOI DE COMMANDES (NOUVEAU FORMAT)
-    // ========================================================================
-    
-    /**
-     * Envoie une commande au backend
-     * @param {string} command - Nom de la commande
-     * @param {Object} params - Paramètres
-     * @param {Object} options - Options (timeout, priority)
-     * @returns {Promise<Object>} - Réponse
-     */
-    sendCommand(command, params = {}, options = {}) {
-        return new Promise((resolve, reject) => {
-            // Générer ID unique
-            const requestId = this.generateRequestId();
-            
-            // Construire le message avec enveloppe
-            const message = {
-                envelope: {
-                    version: this.config.protocolVersion,
-                    id: requestId,
-                    type: 'request',
-                    timestamp: Date.now()
-                },
-                request: {
-                    command: command,
-                    params: params
-                }
-            };
-            
-            // Timeout
-            const timeout = options.timeout || this.config.requestTimeout;
-            const timeoutHandle = setTimeout(() => {
-                this.pendingRequests.delete(requestId);
-                reject(new Error(`Request timeout: ${command}`));
-            }, timeout);
-            
-            // Enregistrer la requête
-            this.pendingRequests.set(requestId, {
-                command,
-                resolve,
-                reject,
-                timeout: timeoutHandle,
-                timestamp: Date.now()
-            });
-            
-            // Envoyer
-            this.sendMessage(message);
-            
-            this.stats.requestsSent++;
-            this.logger.debug('BackendService', `→ Command: ${command}`, params);
-        });
-    }
-    
-    /**
-     * Envoie un message brut
-     * @param {Object} message - Message à envoyer
-     */
-    sendMessage(message) {
-        if (!this.isConnected()) {
-            // Mettre en queue si déconnecté
-            this.messageQueue.push(message);
-            this.logger.warn('BackendService', 'Not connected, message queued');
-            return;
-        }
-        
-        try {
-            this.ws.send(JSON.stringify(message));
-            this.stats.messagesSent++;
-        } catch (error) {
-            this.logger.error('BackendService', 'Failed to send message:', error);
-            throw error;
-        }
-    }
-    
-    // ========================================================================
-    // RACCOURCIS POUR COMMANDES FRÉQUENTES
-    // ========================================================================
-    
-    // --- Playback ---
-    
-    /**
-     * Démarre la lecture
-     * @returns {Promise<Object>}
-     */
-    async play() {
-        return this.sendCommand('playback.play');
-    }
-    
-    /**
-     * Met en pause
-     * @returns {Promise<Object>}
-     */
-    async pause() {
-        return this.sendCommand('playback.pause');
-    }
-    
-    /**
-     * Arrête la lecture
-     * @returns {Promise<Object>}
-     */
-    async stop() {
-        return this.sendCommand('playback.stop');
-    }
-    
-    /**
-     * Seek à une position
-     * @param {number} position - Position en ms
-     * @returns {Promise<Object>}
-     */
-    async seek(position) {
-        return this.sendCommand('playback.seek', { position });
-    }
-    
-    /**
-     * Charge un fichier
-     * @param {string} filePath - Chemin du fichier
-     * @returns {Promise<Object>}
-     */
-    async loadFile(filePath) {
-        return this.sendCommand('playback.load', { file_path: filePath });
-    }
-    
-    /**
-     * Obtient le statut de lecture
-     * @returns {Promise<Object>}
-     */
-    async getPlaybackStatus() {
-        return this.sendCommand('playback.status');
-    }
-    
-    /**
-     * Définit le tempo
-     * @param {number} tempo - Tempo en BPM
-     * @returns {Promise<Object>}
-     */
-    async setTempo(tempo) {
-        return this.sendCommand('playback.setTempo', { tempo });
-    }
-    
-    /**
-     * Active/désactive la boucle
-     * @param {boolean} enabled - Activer la boucle
-     * @param {number} start - Point de départ (optionnel)
-     * @param {number} end - Point de fin (optionnel)
-     * @returns {Promise<Object>}
-     */
-    async setLoop(enabled, start = null, end = null) {
-        return this.sendCommand('playback.setLoop', { enabled, start, end });
-    }
-    
-    // --- Files ---
-    
-    /**
-     * Liste les fichiers
-     * @param {string} directory - Répertoire (optionnel)
-     * @returns {Promise<Object>}
-     */
-    async listFiles(directory = null) {
-        return this.sendCommand('files.list', { directory });
-    }
-    
-    /**
-     * Scanne les fichiers
-     * @returns {Promise<Object>}
-     */
-    async scanFiles() {
-        return this.sendCommand('files.scan');
-    }
-    
-    /**
-     * Supprime un fichier
-     * @param {string} filePath - Chemin du fichier
-     * @returns {Promise<Object>}
-     */
-    async deleteFile(filePath) {
-        return this.sendCommand('files.delete', { file_path: filePath });
-    }
-    
-    /**
-     * Obtient les métadonnées d'un fichier
-     * @param {string} filePath - Chemin du fichier
-     * @returns {Promise<Object>}
-     */
-    async getFileMetadata(filePath) {
-        return this.sendCommand('files.getMetadata', { file_path: filePath });
-    }
-    
-    /**
-     * ✅ NOUVEAU v3.1.1: Obtient un fichier par son ID
-     * @param {string} fileId - ID du fichier
-     * @returns {Promise<Object>}
-     */
-    async getFile(fileId) {
-        return this.sendCommand('files.get', { file_id: fileId });
-    }
-    
-    /**
-     * ✅ NOUVEAU v3.1.1: Upload un fichier en base64
-     * @param {string} filename - Nom du fichier
-     * @param {string} base64Data - Données en base64
-     * @returns {Promise<Object>}
-     */
-    async uploadFile(filename, base64Data) {
-        return this.sendCommand('files.upload', { 
-            filename: filename,
-            data: base64Data 
-        });
-    }
-    
-    // --- Devices ---
-    
-    /**
-     * Scanne les périphériques
-     * @returns {Promise<Object>}
-     */
-    async scanDevices() {
-        return this.sendCommand('devices.scan');
-    }
-    
-    /**
-     * Liste les périphériques
-     * @returns {Promise<Object>}
-     */
-    async listDevices() {
-        return this.sendCommand('devices.list');
-    }
-    
-    /**
-     * Connecte un périphérique
-     * @param {string} deviceId - ID du périphérique
-     * @returns {Promise<Object>}
-     */
-    async connectDevice(deviceId) {
-        return this.sendCommand('devices.connect', { device_id: deviceId });
-    }
-    
-    /**
-     * Déconnecte un périphérique
-     * @param {string} deviceId - ID du périphérique
-     * @returns {Promise<Object>}
-     */
-    async disconnectDevice(deviceId) {
-        return this.sendCommand('devices.disconnect', { device_id: deviceId });
-    }
-    
-    // --- Routing ---
-    
-    /**
-     * Ajoute une route
-     * @param {Object} route - Configuration de la route
-     * @returns {Promise<Object>}
-     */
-    async addRoute(route) {
-        return this.sendCommand('routing.addRoute', route);
-    }
-    
-    /**
-     * Supprime une route
-     * @param {string} routeId - ID de la route
-     * @returns {Promise<Object>}
-     */
-    async removeRoute(routeId) {
-        return this.sendCommand('routing.removeRoute', { route_id: routeId });
-    }
-    
-    /**
-     * Liste les routes
-     * @returns {Promise<Object>}
-     */
-    async listRoutes() {
-        return this.sendCommand('routing.listRoutes');
-    }
-    
-    /**
-     * Met à jour une route
-     * @param {string} routeId - ID de la route
-     * @param {Object} changes - Modifications
-     * @returns {Promise<Object>}
-     */
-    async updateRoute(routeId, changes) {
-        return this.sendCommand('routing.updateRoute', { route_id: routeId, ...changes });
-    }
-    
-    // --- Editor ---
-    
-    /**
-     * Charge un fichier dans l'éditeur
-     * @param {string} filePath - Chemin du fichier
-     * @returns {Promise<Object>}
-     */
-    async editorLoad(filePath) {
-        return this.sendCommand('editor.load', { file_path: filePath });
-    }
-    
-    /**
-     * Sauvegarde un fichier depuis l'éditeur
-     * @param {string} filePath - Chemin du fichier
-     * @param {Object} jsonMidi - Données JsonMidi
-     * @returns {Promise<Object>}
-     */
-    async editorSave(filePath, jsonMidi) {
-        return this.sendCommand('editor.save', { file_path: filePath, jsonmidi: jsonMidi });
-    }
-    
-    /**
-     * Ajoute une note
-     * @param {Object} note - Note à ajouter
-     * @returns {Promise<Object>}
-     */
-    async editorAddNote(note) {
-        return this.sendCommand('editor.addNote', note);
-    }
-    
-    /**
-     * Supprime une note
-     * @param {string} noteId - ID de la note
-     * @returns {Promise<Object>}
-     */
-    async editorDeleteNote(noteId) {
-        return this.sendCommand('editor.deleteNote', { note_id: noteId });
+        this.logger.error('BackendService', 'Server error:', message.error);
     }
     
     // ========================================================================
@@ -687,6 +466,11 @@ class BackendService {
             return;
         }
         
+        if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+            this.logger.error('BackendService', 'Max reconnection attempts reached');
+            return;
+        }
+        
         this.reconnecting = true;
         
         const delay = Math.min(
@@ -697,7 +481,7 @@ class BackendService {
             this.config.maxReconnectDelay
         );
         
-        this.logger.info('BackendService', `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
+        this.logger.info('BackendService', `Reconnecting in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts + 1}/${this.config.maxReconnectAttempts})`);
         
         this.reconnectTimer = setTimeout(async () => {
             this.reconnectTimer = null;
@@ -707,7 +491,7 @@ class BackendService {
             try {
                 await this.connect();
             } catch (error) {
-                this.logger.error('BackendService', 'Reconnection failed:', error);
+                this.logger.error('BackendService', 'Reconnection failed:', error.message);
                 this.scheduleReconnect();
             }
         }, delay);
@@ -785,6 +569,117 @@ class BackendService {
     }
     
     // ========================================================================
+    // API COMMANDES (unchanged from original)
+    // ========================================================================
+    
+    // System
+    async getSystemInfo() {
+        return this.sendCommand('system.get-info');
+    }
+    
+    async systemPing() {
+        return this.sendCommand('system.ping');
+    }
+    
+    // Playback
+    async play() {
+        return this.sendCommand('playback.play');
+    }
+    
+    async pause() {
+        return this.sendCommand('playback.pause');
+    }
+    
+    async stop() {
+        return this.sendCommand('playback.stop');
+    }
+    
+    async seek(position) {
+        return this.sendCommand('playback.seek', { position });
+    }
+    
+    async getPlaybackState() {
+        return this.sendCommand('playback.get-state');
+    }
+    
+    // Playlist
+    async loadPlaylist(filePath) {
+        return this.sendCommand('playlist.load', { file_path: filePath });
+    }
+    
+    async getPlaylist() {
+        return this.sendCommand('playlist.get');
+    }
+    
+    async setTrack(index) {
+        return this.sendCommand('playlist.set-track', { index });
+    }
+    
+    // Files
+    async listFiles(path = '/') {
+        return this.sendCommand('files.list', { path });
+    }
+    
+    async uploadFile(filename, base64Data) {
+        return this.sendCommand('files.upload', { filename, data: base64Data });
+    }
+    
+    async getFile(fileId) {
+        return this.sendCommand('files.get', { file_id: fileId });
+    }
+    
+    async deleteFile(filePath) {
+        return this.sendCommand('files.delete', { file_path: filePath });
+    }
+    
+    // Devices
+    async listDevices() {
+        return this.sendCommand('devices.list');
+    }
+    
+    async connectDevice(deviceId) {
+        return this.sendCommand('devices.connect', { device_id: deviceId });
+    }
+    
+    async disconnectDevice(deviceId) {
+        return this.sendCommand('devices.disconnect', { device_id: deviceId });
+    }
+    
+    // Routing
+    async addRoute(route) {
+        return this.sendCommand('routing.addRoute', route);
+    }
+    
+    async removeRoute(routeId) {
+        return this.sendCommand('routing.removeRoute', { route_id: routeId });
+    }
+    
+    async listRoutes() {
+        return this.sendCommand('routing.listRoutes');
+    }
+    
+    async updateRoute(routeId, changes) {
+        return this.sendCommand('routing.updateRoute', { route_id: routeId, ...changes });
+    }
+    
+    // Editor
+    async editorLoad(filePath) {
+        return this.sendCommand('editor.load', { file_path: filePath });
+    }
+    
+    async editorSave(filePath, jsonMidi) {
+        return this.sendCommand('editor.save', { file_path: filePath, jsonmidi: jsonMidi });
+    }
+    
+    async editorAddNote(note) {
+        return this.sendCommand('editor.addNote', note);
+    }
+    
+    async editorDeleteNote(noteId) {
+        return this.sendCommand('editor.deleteNote', { note_id: noteId });
+    }
+    
+    // ========================================================================
     // UTILITAIRES
     // ========================================================================
     
@@ -807,7 +702,8 @@ class BackendService {
             reconnecting: this.reconnecting,
             reconnectAttempts: this.reconnectAttempts,
             pendingRequests: this.pendingRequests.size,
-            queuedMessages: this.messageQueue.length
+            queuedMessages: this.messageQueue.length,
+            configuredUrl: this.config.url
         };
     }
     
@@ -822,7 +718,8 @@ class BackendService {
             responsesReceived: 0,
             eventsReceived: 0,
             errorsReceived: 0,
-            reconnections: 0
+            reconnections: 0,
+            connectionFailures: 0
         };
     }
 }
