@@ -1,33 +1,19 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.1.0 (Simplified - Manual Latency Only)
+// Version: 4.1.3-final - AVEC PATHMANAGER INITIALISÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Implementation of the main application class.
-//   Manages complete lifecycle with 7-phase initialization.
+// Changes v4.1.3-final:
+//   ✅ ADDED: Explicit PathManager::initialize() in Phase 1
+//   ✅ FIXED: Use PathManager for migrations directory
+//   ✅ REMOVED: Hardcoded relative path "../../data/migrations"
 //
-//   SIMPLIFICATION v4.1.0:
-//   - Removed CalibrationEngine (auto-calibration wizard)
-//   - Kept LatencyCompensator (manual compensation only)
-//   - Added InstrumentDatabase integration
-//
-// Dependencies:
-//   - All core components (Logger, Config, Database, etc.)
-//   - All MIDI components (DeviceManager, Router, Player)
-//   - All API components (ApiServer, CommandHandler)
-//   - Timing: LatencyCompensator only (no CalibrationEngine)
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Removed NetworkManager (WiFi/BT for v4.2.0)
-//   - Removed CalibrationEngine (manual latency only)
-//   - Added LatencyCompensator with InstrumentDatabase
-//   - Simplified initialization (7 phases)
-//   - Enhanced error handling
+// Changes v4.1.3:
+//   ✅ FIXED: Added MessageEnvelope.h include
+//   ✅ FIXED: Actually start API server in start() method
+//   ✅ FIXED: Synchronized version to 4.1.3
+//   ✅ REMOVED: Unused pathManager_ initialization
 //
 // ============================================================================
 
@@ -49,6 +35,7 @@
 #include "../midi/player/MidiPlayer.h"
 #include "../api/ApiServer.h"
 #include "../api/CommandHandler.h"
+#include "../api/MessageEnvelope.h"
 
 #include <iostream>
 #include <csignal>
@@ -88,8 +75,8 @@ void signalHandler(int signal) {
         g_shutdownRequested = true;
     } else {
         Logger::critical("Signal", "Third signal received. Immediate exit!");
-		std::exit(1);    
-	}
+        std::exit(1);    
+    }
 }
 
 // ============================================================================
@@ -188,7 +175,7 @@ bool Application::initialize(const std::string& configPath) {
     
     Logger::info("Application", "");
     Logger::info("Application", "╔═══════════════════════════════════════╗");
-    Logger::info("Application", "║   MidiMind v4.1.0 Initialization     ║");
+    Logger::info("Application", "║   MidiMind v4.1.3 Initialization     ║");
     Logger::info("Application", "╚═══════════════════════════════════════╝");
     Logger::info("Application", "");
     Logger::info("Application", "Protocol version: " + getProtocolVersion());
@@ -277,6 +264,12 @@ bool Application::initializeConfiguration(const std::string& configPath) {
         }
         
         Logger::info("Application", "  ✓ Configuration loaded");
+        
+        // Initialize PathManager directory structure
+        Logger::info("Application", "  Initializing PathManager...");
+        PathManager::instance().initialize();
+        Logger::info("Application", "  ✓ PathManager initialized");
+        
         Logger::info("Application", "");
         return true;
         
@@ -305,10 +298,12 @@ bool Application::initializeDatabase() {
         
         Logger::info("Application", "  ✓ Database connected");
         
-        // Run migrations
+        // Run migrations - USE PATHMANAGER
         Logger::info("Application", "  Running migrations...");
-        std::string migrationDir = "../../data/migrations";  // ou votre chemin
-		if (!database_->runMigrations(migrationDir)) {
+        std::string migrationDir = PathManager::instance().getMigrationsPath();
+        Logger::info("Application", "  Migrations directory: " + migrationDir);
+        
+        if (!database_->runMigrations(migrationDir)) {
             Logger::error("Application", "  Migrations failed");
             return false;
         }
@@ -428,10 +423,10 @@ bool Application::initializeApi() {
         
         // Pass latencyCompensator and instrumentDatabase to CommandHandler
         commandHandler_ = std::make_shared<CommandHandler>(
-			deviceManager_,
-			router_,
-			player_,
-			fileManager_ 
+            deviceManager_,
+            router_,
+            player_,
+            fileManager_ 
         );
         
         Logger::info("Application", "  ✓ CommandHandler ready");
@@ -441,7 +436,6 @@ bool Application::initializeApi() {
         Logger::info("Application", "  Creating ApiServer...");
         
         int port = Config::instance().getInt("api.port", 8080);
-        std::string host = Config::instance().getString("api.host", "0.0.0.0");
         
         apiServer_ = std::make_shared<ApiServer>();
         
@@ -452,7 +446,6 @@ bool Application::initializeApi() {
         
         Logger::info("Application", "  ✓ ApiServer ready");
         Logger::info("Application", "    - Port: " + std::to_string(port));
-        Logger::info("Application", "    - Host: " + host);
         
         Logger::info("Application", "");
         return true;
@@ -512,11 +505,16 @@ bool Application::start() {
         // Start API server
         Logger::info("Application", "Starting API server...");
         
-        Logger::info("Application", "✓ API server started");
+        int port = Config::instance().getInt("api.port", 8080);
+        
+        // ApiServer::start() returns void and throws on error
+        apiServer_->start(port);
+        
+        Logger::info("Application", "✓ API server started on port " + std::to_string(port));
         
         // Start monitoring threads
         Logger::info("Application", "Starting monitoring threads...");
-		startMonitoringThreads();
+        startMonitoringThreads();
         Logger::info("Application", "✓ Monitoring threads started");
         
         running_ = true;
@@ -657,7 +655,7 @@ void Application::broadcastStatus() {
         }}
     };
     auto event = MessageEnvelope::createEvent("system:status", status);
-apiServer_->broadcast(event);
+    apiServer_->broadcast(event);
 }
 
 // ============================================================================
@@ -677,7 +675,7 @@ void Application::setupSignalHandlers() {
 
 
 std::string Application::getVersion() const {
-    return "4.1.0";
+    return "4.1.3";
 }
 
 std::string Application::getProtocolVersion() const {
@@ -699,5 +697,5 @@ int Application::getUptime() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Application.cpp
+// END OF FILE Application.cpp v4.1.3-final
 // ============================================================================

@@ -1,8 +1,14 @@
 // ============================================================================
 // File: backend/src/core/Application.h
-// Version: 4.1.2 - CORRIGÉ API SERVER
+// Version: 4.1.3 - CORRIGÉ SYNCHRONISATION
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.1.3:
+//   ✅ SYNCHRONIZED: Version with Application.cpp
+//   ✅ REMOVED: apiPort_ and apiHost_ (unused, read from Config)
+//   ✅ REMOVED: pathManager_ (unused in implementation)
+//   ✅ CLARIFIED: database_ is raw pointer to singleton
 //
 // Changes v4.1.2:
 //   ✅ ADDED: apiPort_ member to store API server port
@@ -34,7 +40,6 @@ namespace midiMind {
 class Database;
 class Settings;
 class FileManager;
-class PathManager;
 class InstrumentDatabase;
 class LatencyCompensator;
 class MidiDeviceManager;
@@ -115,16 +120,16 @@ public:
     // COMPONENT ACCESS
     // ========================================================================
     
-	Database* getDatabase() { return database_; }
+    Database* getDatabase() { return database_; }
     std::shared_ptr<Settings>& getSettings() { return settings_; }
-	std::shared_ptr<FileManager>& getFileManager() { return fileManager_; }
-	std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
-	std::shared_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
-	std::shared_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
-	std::shared_ptr<MidiRouter>& getRouter() { return router_; }
-	std::shared_ptr<MidiPlayer>& getPlayer() { return player_; }
-	std::shared_ptr<ApiServer>& getApiServer() { return apiServer_; }
-	std::shared_ptr<EventBus>& getEventBus() { return eventBus_; }
+    std::shared_ptr<FileManager>& getFileManager() { return fileManager_; }
+    std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
+    std::shared_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
+    std::shared_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
+    std::shared_ptr<MidiRouter>& getRouter() { return router_; }
+    std::shared_ptr<MidiPlayer>& getPlayer() { return player_; }
+    std::shared_ptr<ApiServer>& getApiServer() { return apiServer_; }
+    std::shared_ptr<EventBus>& getEventBus() { return eventBus_; }
     
     // ========================================================================
     // STATUS
@@ -209,10 +214,9 @@ private:
     std::thread statusBroadcastThread_;
     
     // Core components
-    Database* database_; 
+    Database* database_;  // Raw pointer to Database singleton (global lifetime)
     std::shared_ptr<Settings> settings_;
     std::shared_ptr<FileManager> fileManager_;
-    std::shared_ptr<PathManager> pathManager_;
     std::shared_ptr<InstrumentDatabase> instrumentDatabase_;
     std::shared_ptr<EventBus> eventBus_;
     
@@ -227,14 +231,10 @@ private:
     // API components
     std::shared_ptr<ApiServer> apiServer_;
     std::shared_ptr<CommandHandler> commandHandler_;
-    
-    // ✅✅✅ AJOUTÉ v4.1.2: API server configuration
-    int apiPort_ = 8080;
-    std::string apiHost_ = "0.0.0.0";
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Application.h
+// END OF FILE Application.h v4.1.3
 // ============================================================================
