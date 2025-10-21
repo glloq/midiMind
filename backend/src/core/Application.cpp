@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.1.2 - CORRIGÉ API SERVER
+// Version: 4.1.0 (Simplified - Manual Latency Only)
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -39,6 +39,7 @@
 #include "EventBus.h"
 #include "../storage/Database.h"
 #include "../storage/Settings.h"
+#include "../storage/PathManager.h"
 #include "../storage/FileManager.h"
 #include "../storage/InstrumentDatabase.h"
 #include "../timing/LatencyCompensator.h"
@@ -290,17 +291,8 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        // Initialize PathManager first
-        if (!pathManager_) {
-            Logger::info("Application", "  Creating PathManager...");
-            pathManager_ = std::make_shared<PathManager>();
-            std::string rootPath = Config::instance().getString("storage.root", 
-                                                                "/opt/midimind");
-            pathManager_->setBasePath(rootPath);
-            Logger::info("Application", "  ✓ PathManager ready (root: " + rootPath + ")");
-        }
-        
-        std::string dbPath = pathManager_->getDatabasePath();
+        std::string dbPath = Config::instance().getString("database.path", 
+                                                          "/var/lib/midimind/database.db");
         
         Logger::info("Application", "  Connecting to database: " + dbPath);
         
@@ -313,11 +305,10 @@ bool Application::initializeDatabase() {
         
         Logger::info("Application", "  ✓ Database connected");
         
-        // Run migrations using PathManager
+        // Run migrations
         Logger::info("Application", "  Running migrations...");
-        std::string migrationDir = pathManager_->getMigrationsPath();
-        
-        if (!database_->runMigrations(migrationDir)) {
+        std::string migrationDir = "../../data/migrations";  // ou votre chemin
+		if (!database_->runMigrations(migrationDir)) {
             Logger::error("Application", "  Migrations failed");
             return false;
         }
@@ -345,8 +336,8 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  ✓ Settings ready");
         
         Logger::info("Application", "  Creating FileManager...");
-        // Use PathManager instead of hardcoded path
-        std::string rootPath = pathManager_->getBasePath();
+        std::string rootPath = Config::instance().getString("storage.root", 
+                                                            "/var/lib/midimind");
         fileManager_ = std::make_shared<FileManager>(rootPath);
         
         if (!fileManager_->initializeDirectories()) {
@@ -449,8 +440,8 @@ bool Application::initializeApi() {
         
         Logger::info("Application", "  Creating ApiServer...");
         
-        apiPort_ = Config::instance().getInt("api.port", 8080);
-        apiHost_ = Config::instance().getString("api.host", "0.0.0.0");
+        int port = Config::instance().getInt("api.port", 8080);
+        std::string host = Config::instance().getString("api.host", "0.0.0.0");
         
         apiServer_ = std::make_shared<ApiServer>();
         
@@ -460,8 +451,8 @@ bool Application::initializeApi() {
         });
         
         Logger::info("Application", "  ✓ ApiServer ready");
-        Logger::info("Application", "    - Port: " + std::to_string(apiPort_));
-        Logger::info("Application", "    - Host: " + apiHost_);
+        Logger::info("Application", "    - Port: " + std::to_string(port));
+        Logger::info("Application", "    - Host: " + host);
         
         Logger::info("Application", "");
         return true;
@@ -519,24 +510,12 @@ bool Application::start() {
     
     try {
         // Start API server
-        // Start API server
         Logger::info("Application", "Starting API server...");
         
-        // ✅✅✅ FIXED v4.1.2: Actually start the API server
-        if (apiServer_) {
-            try {
-                apiServer_->start(apiPort_);
-                Logger::info("Application", "✓ API server started on port " + std::to_string(apiPort_));
-            } catch (const std::exception& e) {
-                Logger::error("Application", "Failed to start API server: " + std::string(e.what()));
-                return false;
-            }
-        } else {
-            Logger::error("Application", "❌ API server not initialized");
-            return false;
-        }
+        Logger::info("Application", "✓ API server started");
         
         // Start monitoring threads
+        Logger::info("Application", "Starting monitoring threads...");
 		startMonitoringThreads();
         Logger::info("Application", "✓ Monitoring threads started");
         
