@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.1.0 (Simplified - Manual Latency Only)
+// Version: 4.1.2 - CORRIGÉ API SERVER
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -439,8 +439,8 @@ bool Application::initializeApi() {
         
         Logger::info("Application", "  Creating ApiServer...");
         
-        int port = Config::instance().getInt("api.port", 8080);
-        std::string host = Config::instance().getString("api.host", "0.0.0.0");
+        apiPort_ = Config::instance().getInt("api.port", 8080);
+        apiHost_ = Config::instance().getString("api.host", "0.0.0.0");
         
         apiServer_ = std::make_shared<ApiServer>();
         
@@ -450,8 +450,8 @@ bool Application::initializeApi() {
         });
         
         Logger::info("Application", "  ✓ ApiServer ready");
-        Logger::info("Application", "    - Port: " + std::to_string(port));
-        Logger::info("Application", "    - Host: " + host);
+        Logger::info("Application", "    - Port: " + std::to_string(apiPort_));
+        Logger::info("Application", "    - Host: " + apiHost_);
         
         Logger::info("Application", "");
         return true;
@@ -509,12 +509,24 @@ bool Application::start() {
     
     try {
         // Start API server
+        // Start API server
         Logger::info("Application", "Starting API server...");
         
-        Logger::info("Application", "✓ API server started");
+        // ✅✅✅ FIXED v4.1.2: Actually start the API server
+        if (apiServer_) {
+            try {
+                apiServer_->start(apiPort_);
+                Logger::info("Application", "✓ API server started on port " + std::to_string(apiPort_));
+            } catch (const std::exception& e) {
+                Logger::error("Application", "Failed to start API server: " + std::string(e.what()));
+                return false;
+            }
+        } else {
+            Logger::error("Application", "❌ API server not initialized");
+            return false;
+        }
         
         // Start monitoring threads
-        Logger::info("Application", "Starting monitoring threads...");
 		startMonitoringThreads();
         Logger::info("Application", "✓ Monitoring threads started");
         

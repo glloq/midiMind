@@ -1,10 +1,12 @@
 // ============================================================================
 // File: backend/src/core/Application.h
-// Version: 4.1.1 - CORRIGÉ COMPLET
+// Version: 4.1.2 - CORRIGÉ API SERVER
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.1:
+// Changes v4.1.2:
+//   ✅ ADDED: apiPort_ member to store API server port
+//   ✅ ADDED: apiHost_ member to store API server host
 //   - Fixed member variable names to match .cpp
 //   - Fixed pointer types (make_shared instead of shared_ptr)
 //   - Added missing thread variable
@@ -225,6 +227,10 @@ private:
     // API components
     std::shared_ptr<ApiServer> apiServer_;
     std::shared_ptr<CommandHandler> commandHandler_;
+    
+    // ✅✅✅ AJOUTÉ v4.1.2: API server configuration
+    int apiPort_ = 8080;
+    std::string apiHost_ = "0.0.0.0";
 };
 
 } // namespace midiMind
