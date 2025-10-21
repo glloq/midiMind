@@ -1,14 +1,12 @@
 // ============================================================================
 // File: backend/src/api/MessageEnvelope.cpp
-// Version: 4.1.2 - CORRIGÉ
+// Version: 4.1.3 - FORMAT PLAT UNIQUE
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.2:
-//   - Fixed response_ assignment (use emplace instead of make_unique)
-//   - Removed timeout parameter from createRequest
-//   - Removed retryable and source parameters from factory methods
-//   - Match header signatures exactly
+// Changes v4.1.3:
+//   - Format unique plat: {id, type, timestamp, version, payload}
+//   - Suppression du format nested legacy
 //
 // ============================================================================
 
@@ -175,7 +173,7 @@ bool MessageEnvelope::hasError() const {
 }
 
 // ============================================================================
-// SERIALIZATION
+// SERIALIZATION - FORMAT PLAT UNIQUE
 // ============================================================================
 
 std::optional<MessageEnvelope> MessageEnvelope::fromJson(const json& j) {
@@ -185,40 +183,37 @@ std::optional<MessageEnvelope> MessageEnvelope::fromJson(const json& j) {
             return std::nullopt;
         }
         
-        if (!j.contains("envelope")) {
-            Logger::error("MessageEnvelope", "Missing envelope field");
+        // Format plat: {id, type, timestamp, version, payload}
+        if (!j.contains("id") || !j.contains("type") || !j.contains("payload")) {
+            Logger::error("MessageEnvelope", "Invalid message format (missing Envelope fields)");
             return std::nullopt;
         }
         
         MessageEnvelope msg;
         
-        // Parse envelope
-        msg.envelope_ = protocol::Envelope::fromJson(j["envelope"]);
+        msg.envelope_.id = j.value("id", "");
+        msg.envelope_.type = protocol::stringToMessageType(j.value("type", "request"));
+        msg.envelope_.timestamp = j.value("timestamp", "");
+        msg.envelope_.version = j.value("version", "1.0");
+        
+        const json& payload = j["payload"];
         
         // Parse payload based on type
         switch (msg.envelope_.type) {
             case protocol::MessageType::REQUEST:
-                if (j.contains("request")) {
-                    msg.request_ = protocol::Request::fromJson(j["request"]);
-                }
+                msg.request_ = protocol::Request::fromJson(payload);
                 break;
                 
             case protocol::MessageType::RESPONSE:
-                if (j.contains("response")) {
-                    msg.response_ = protocol::Response::fromJson(j["response"]);
-                }
+                msg.response_ = protocol::Response::fromJson(payload);
                 break;
                 
             case protocol::MessageType::EVENT:
-                if (j.contains("event")) {
-                    msg.event_ = protocol::Event::fromJson(j["event"]);
-                }
+                msg.event_ = protocol::Event::fromJson(payload);
                 break;
                 
             case protocol::MessageType::ERROR:
-                if (j.contains("error")) {
-                    msg.error_ = protocol::Error::fromJson(j["error"]);
-                }
+                msg.error_ = protocol::Error::fromJson(payload);
                 break;
         }
         
@@ -246,32 +241,35 @@ std::optional<MessageEnvelope> MessageEnvelope::fromString(const std::string& st
 json MessageEnvelope::toJson() const {
     json j;
     
-    // Add envelope
-    j["envelope"] = envelope_.toJson();
+    // Format plat: {id, type, timestamp, version, payload}
+    j["id"] = envelope_.id;
+    j["type"] = protocol::messageTypeToString(envelope_.type);
+    j["timestamp"] = envelope_.timestamp;
+    j["version"] = envelope_.version;
     
     // Add payload based on type
     switch (envelope_.type) {
         case protocol::MessageType::REQUEST:
             if (request_.has_value()) {
-                j["request"] = request_->toJson();
+                j["payload"] = request_->toJson();
             }
             break;
             
         case protocol::MessageType::RESPONSE:
             if (response_.has_value()) {
-                j["response"] = response_->toJson();
+                j["payload"] = response_->toJson();
             }
             break;
             
         case protocol::MessageType::EVENT:
             if (event_.has_value()) {
-                j["event"] = event_->toJson();
+                j["payload"] = event_->toJson();
             }
             break;
             
         case protocol::MessageType::ERROR:
             if (error_.has_value()) {
-                j["error"] = error_->toJson();
+                j["payload"] = error_->toJson();
             }
             break;
     }
@@ -386,5 +384,5 @@ std::vector<std::string> MessageEnvelope::getValidationErrors() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE MessageEnvelope.cpp v4.1.2
+// END OF FILE MessageEnvelope.cpp v4.1.3
 // ============================================================================

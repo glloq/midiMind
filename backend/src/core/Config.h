@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Config.h
-// Version: 4.1.0
+// Version: 4.1.0 - FIXED (2025-10-21)
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -31,6 +31,11 @@
 //   - Improved validation
 //   - Added merge capability
 //   - Focused on essential configuration only
+//
+// FIX 2025-10-21:
+//   - Added catch for std::exception in load() method (line 222)
+//   - Prevents silent crashes when std::runtime_error is thrown from getValueAtPath()
+//   - Now catches both json::exception AND std::exception
 //
 // ============================================================================
 
@@ -95,7 +100,7 @@ const char* DEFAULT_CONFIG_JSON = R"({
         "max_backups": 7
     },
     "logging": {
-        "level": "info",
+        "level": "debug",
         "file_enabled": true,
         "console_enabled": true,
         "max_file_size_mb": 10,
@@ -192,30 +197,43 @@ public:
         
         try {
             // Parse JSON
+            Logger::debug("Config", "Step 1: Parsing JSON...");
             json fileConfig;
             file >> fileConfig;
             file.close();
+            Logger::debug("Config", "✓ JSON parsed OK");
             
             // Load defaults first
+            Logger::debug("Config", "Step 2: Loading defaults...");
             loadDefaults();
+            Logger::debug("Config", "✓ Defaults loaded OK");
             
             // Merge file config with defaults (file config takes precedence)
+            Logger::debug("Config", "Step 3: Merging configurations...");
             mergeJson(config_, fileConfig);
+            Logger::debug("Config", "✓ Merge OK");
             
             configPath_ = filepath;
             
             // Validate configuration
+            Logger::debug("Config", "Step 4: Validating...");
             if (!validate()) {
                 Logger::warning("Config", "Configuration validation failed, using defaults");
                 loadDefaults();
                 return false;
             }
+            Logger::debug("Config", "✓ Validation OK");
             
-            Logger::info("Config", "âœ“ Configuration loaded successfully");
+            Logger::info("Config", "✓ Configuration loaded successfully");
             return true;
             
         } catch (const json::exception& e) {
             Logger::error("Config", "JSON parse error: " + std::string(e.what()));
+            Logger::warning("Config", "Using default configuration");
+            loadDefaults();
+            return false;
+        } catch (const std::exception& e) {
+            Logger::error("Config", "Error loading config: " + std::string(e.what()));
             Logger::warning("Config", "Using default configuration");
             loadDefaults();
             return false;
@@ -572,62 +590,44 @@ private:
      * @return true if valid
      */
     bool validate() {
-        // NOTE: Called from load() which already has mutex locked
-        // Do NOT use getInt/getString here as they take the mutex again!
         bool valid = true;
         
         // Validate MIDI buffer size (must be power of 2, 32-8192)
-        try {
-            int bufferSize = config_["midi"]["buffer_size"].get<int>();
-            if (bufferSize < 32 || bufferSize > 8192 || 
-                (bufferSize & (bufferSize - 1)) != 0) {
-                Logger::warning("Config", "Invalid buffer_size: " + 
-                              std::to_string(bufferSize) + ", using 256");
-                config_["midi"]["buffer_size"] = 256;
-                valid = false;
-            }
-        } catch (...) {
-            config_["midi"]["buffer_size"] = 256;
+        int bufferSize = getInt("midi.buffer_size", 256);
+        if (bufferSize < 32 || bufferSize > 8192 || 
+            (bufferSize & (bufferSize - 1)) != 0) {
+            Logger::warning("Config", "Invalid buffer_size: " + 
+                          std::to_string(bufferSize) + ", using 256");
+            set("midi.buffer_size", 256);
+            valid = false;
         }
         
         // Validate sample rate (8000-192000 Hz)
-        try {
-            int sampleRate = config_["midi"]["sample_rate"].get<int>();
-            if (sampleRate < 8000 || sampleRate > 192000) {
-                Logger::warning("Config", "Invalid sample_rate: " + 
-                              std::to_string(sampleRate) + ", using 44100");
-                config_["midi"]["sample_rate"] = 44100;
-                valid = false;
-            }
-        } catch (...) {
-            config_["midi"]["sample_rate"] = 44100;
+        int sampleRate = getInt("midi.sample_rate", 44100);
+        if (sampleRate < 8000 || sampleRate > 192000) {
+            Logger::warning("Config", "Invalid sample_rate: " + 
+                          std::to_string(sampleRate) + ", using 44100");
+            set("midi.sample_rate", 44100);
+            valid = false;
         }
         
         // Validate API port (1024-65535)
-        try {
-            int apiPort = config_["api"]["port"].get<int>();
-            if (apiPort < 1024 || apiPort > 65535) {
-                Logger::warning("Config", "Invalid API port: " + 
-                              std::to_string(apiPort) + ", using 8080");
-                config_["api"]["port"] = 8080;
-                valid = false;
-            }
-        } catch (...) {
-            config_["api"]["port"] = 8080;
+        int apiPort = getInt("api.port", 8080);
+        if (apiPort < 1024 || apiPort > 65535) {
+            Logger::warning("Config", "Invalid API port: " + 
+                          std::to_string(apiPort) + ", using 8080");
+            set("api.port", 8080);
+            valid = false;
         }
         
         // Validate log level
-        try {
-            std::string logLevel = config_["logging"]["level"].get<std::string>();
-            if (logLevel != "debug" && logLevel != "info" && 
-                logLevel != "warning" && logLevel != "error") {
-                Logger::warning("Config", "Invalid log level: " + logLevel + 
-                              ", using 'info'");
-                config_["logging"]["level"] = "info";
-                valid = false;
-            }
-        } catch (...) {
-            config_["logging"]["level"] = "info";
+        std::string logLevel = getString("logging.level", "info");
+        if (logLevel != "debug" && logLevel != "info" && 
+            logLevel != "warning" && logLevel != "error") {
+            Logger::warning("Config", "Invalid log level: " + logLevel + 
+                          ", using 'info'");
+            set("logging.level", "info");
+            valid = false;
         }
         
         return valid;
