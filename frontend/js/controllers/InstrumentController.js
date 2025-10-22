@@ -4,10 +4,10 @@
 // Date: 2025-10-20
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ Fixed constructor signature to match BaseController
-// ✅ Proper initialization order with _fullyInitialized
-// ✅ Logger initialized first
-// ✅ Compatible with Application.js instantiation
+// âœ… Fixed constructor signature to match BaseController
+// âœ… Proper initialization order with _fullyInitialized
+// âœ… Logger initialized first
+// âœ… Compatible with Application.js instantiation
 // ============================================================================
 
 class InstrumentController extends BaseController {
@@ -15,7 +15,7 @@ class InstrumentController extends BaseController {
         super(eventBus, models, views, notifications, debugConsole);
         
         // Initialize logger FIRST
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         
         // Get specific model and view
         this.model = models.instrument;
@@ -24,7 +24,7 @@ class InstrumentController extends BaseController {
         // Backend service
         this.backendService = window.app?.services?.backend || window.backendService;
         
-        // État local
+        // Ã‰tat local
         this.devices = new Map();
         this.selectedDevice = null;
         
@@ -45,7 +45,7 @@ class InstrumentController extends BaseController {
             return;
         }
         
-        // Événements UI
+        // Ã‰vÃ©nements UI
         this.eventBus.on('instrument:select', (data) => this.selectDevice(data.deviceId));
         this.eventBus.on('instrument:connect', (data) => this.connectDevice(data.deviceId));
         this.eventBus.on('instrument:disconnect', (data) => this.disconnectDevice(data.deviceId));
@@ -53,12 +53,12 @@ class InstrumentController extends BaseController {
         this.eventBus.on('instrument:refresh', () => this.refreshDeviceList());
         this.eventBus.on('instrument:getProfile', (data) => this.getDeviceProfile(data.deviceId));
         
-        // Événements backend (NOUVEAU PROTOCOLE)
+        // Ã‰vÃ©nements backend (NOUVEAU PROTOCOLE)
         this.eventBus.on('device:connected', (data) => this.handleDeviceConnected(data));
         this.eventBus.on('device:disconnected', (data) => this.handleDeviceDisconnected(data));
         this.eventBus.on('device:discovered', (data) => this.handleDeviceDiscovered(data));
         
-        // Événements SysEx
+        // Ã‰vÃ©nements SysEx
         this.eventBus.on('sysex:identity', (data) => this.handleSysExIdentity(data));
         this.eventBus.on('sysex:notemap', (data) => this.handleSysExNoteMap(data));
         this.eventBus.on('sysex:cc_capabilities', (data) => this.handleSysExCC(data));
@@ -71,7 +71,7 @@ class InstrumentController extends BaseController {
         this.refreshDeviceList();
         
         if (this.logger && this.logger.info) {
-            this.logger.info('InstrumentController', '✓ Event listeners setup');
+            this.logger.info('InstrumentController', 'âœ“ Event listeners setup');
         }
     }
     
@@ -117,7 +117,7 @@ class InstrumentController extends BaseController {
             }
             
             if (this.logger && this.logger.info) {
-                this.logger.info('InstrumentController', `✓ ${devices.length} devices loaded`);
+                this.logger.info('InstrumentController', `âœ“ ${devices.length} devices loaded`);
             }
             
             // Emit event
