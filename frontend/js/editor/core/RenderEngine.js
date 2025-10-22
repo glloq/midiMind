@@ -2,28 +2,42 @@
 // Fichier: frontend/js/editor/renderers/RenderEngine.js
 // Version: v3.1.0 - PERFORMANCE OPTIMIZED
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// ✓ FPS limité à 10 (au lieu de 60)
-// ✓ Anti-aliasing désactivé
-// ✓ Animations désactivées
-// ✓ Rendering optimisé (batch processing)
+// âœ“ FPS limitÃ© Ã  10 (au lieu de 60)
+// âœ“ Anti-aliasing dÃ©sactivÃ©
+// âœ“ Animations dÃ©sactivÃ©es
+// âœ“ Rendering optimisÃ© (batch processing)
 // ============================================================================
 
 class RenderEngine {
     constructor(container, eventBus, debugConsole) {
         this.container = container;
-        this.eventBus = eventBus;
+        
+        // EventBus avec fallback - CORRECTION v3.1.0
+        if (eventBus) {
+            this.eventBus = eventBus;
+        } else if (window.EventBus && typeof window.EventBus === 'function') {
+            // window.EventBus est la classe, il faut l'instancier
+            this.eventBus = new window.EventBus();
+        } else if (window.eventBus) {
+            // Peut-être qu'il y a une instance globale
+            this.eventBus = window.eventBus;
+        } else {
+            // Dummy EventBus si aucun disponible
+            this.eventBus = { on: () => {}, off: () => {}, emit: () => {} };
+        }
+        
         this.debugConsole = debugConsole;
         
-        // Configuration (OPTIMISÉ)
+        // Configuration (OPTIMISÃ‰)
         this.config = {
-            targetFPS: PerformanceConfig.rendering.targetFPS || 10,  // ✓ RÉDUIT à 10 fps
-            enableAntiAliasing: PerformanceConfig.rendering.enableAntiAliasing || false,  // ✓ DÉSACTIVÉ
+            targetFPS: PerformanceConfig.rendering.targetFPS || 10,  // âœ“ RÃ‰DUIT Ã  10 fps
+            enableAntiAliasing: PerformanceConfig.rendering.enableAntiAliasing || false,  // âœ“ DÃ‰SACTIVÃ‰
             maxVisibleNotes: PerformanceConfig.rendering.maxVisibleNotes || 500,
             updateInterval: PerformanceConfig.rendering.updateInterval || 100,
-            enableAnimations: PerformanceConfig.rendering.enableAnimations || false,  // ✓ DÉSACTIVÉ
+            enableAnimations: PerformanceConfig.rendering.enableAnimations || false,  // âœ“ DÃ‰SACTIVÃ‰
             renderBatchSize: PerformanceConfig.editor.renderBatchSize || 100
         };
         
@@ -32,17 +46,17 @@ class RenderEngine {
         this.ctx = null;
         this.width = 0;
         this.height = 0;
-        this.dpr = 1;  // Device Pixel Ratio (fixe à 1 pour performance)
+        this.dpr = 1;  // Device Pixel Ratio (fixe Ã  1 pour performance)
         
         // Animation loop
         this.animationFrameId = null;
         this.isRendering = false;
         this.lastFrameTime = 0;
-        this.frameInterval = 1000 / this.config.targetFPS;  // ✓ ~100ms entre frames
+        this.frameInterval = 1000 / this.config.targetFPS;  // âœ“ ~100ms entre frames
         this.frameCount = 0;
         this.fps = 0;
         
-        // État
+        // Ã‰tat
         this.needsRedraw = true;
         this.viewport = {
             startTime: 0,
@@ -61,7 +75,7 @@ class RenderEngine {
             pianoRoll: null
         };
         
-        // Données à rendre
+        // DonnÃ©es Ã  rendre
         this.data = {
             notes: [],
             selection: new Set(),
@@ -76,7 +90,7 @@ class RenderEngine {
             totalFrames: 0
         };
         
-        this.logDebug('render', '✓ RenderEngine initialized (performance mode)');
+        this.logDebug('render', 'âœ“ RenderEngine initialized (performance mode)');
         
         this.init();
     }
@@ -94,7 +108,7 @@ class RenderEngine {
     }
     
     createCanvas() {
-        // Récupérer ou créer canvas
+        // RÃ©cupÃ©rer ou crÃ©er canvas
         this.canvas = this.container.querySelector('canvas');
         
         if (!this.canvas) {
@@ -112,11 +126,11 @@ class RenderEngine {
             desynchronized: true  // Meilleure perf pour animations
         });
         
-        // ✓ DÉSACTIVER ANTI-ALIASING pour performance
+        // âœ“ DÃ‰SACTIVER ANTI-ALIASING pour performance
         if (!this.config.enableAntiAliasing) {
             this.ctx.imageSmoothingEnabled = false;
             
-            // Compatibilité navigateurs
+            // CompatibilitÃ© navigateurs
             if (this.ctx.webkitImageSmoothingEnabled !== undefined) {
                 this.ctx.webkitImageSmoothingEnabled = false;
             }
@@ -127,7 +141,7 @@ class RenderEngine {
                 this.ctx.msImageSmoothingEnabled = false;
             }
             
-            this.logDebug('render', '✓ Anti-aliasing disabled');
+            this.logDebug('render', 'âœ“ Anti-aliasing disabled');
         }
     }
     
@@ -135,7 +149,7 @@ class RenderEngine {
         // Taille du container
         const rect = this.container.getBoundingClientRect();
         
-        // ✓ Fixer DPR à 1 pour éviter suréchantillonnage
+        // âœ“ Fixer DPR Ã  1 pour Ã©viter surÃ©chantillonnage
         this.dpr = 1;
         
         this.width = rect.width;
@@ -163,6 +177,11 @@ class RenderEngine {
             this.resize();
         });
         
+        // Vérifier que eventBus existe avant d'attacher des événements
+        if (!this.eventBus || !this.eventBus.on) {
+            return; // Pas d'eventBus disponible
+        }
+        
         // Redraw sur demande
         this.eventBus.on('render:redraw', () => {
             this.needsRedraw = true;
@@ -186,7 +205,7 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // ANIMATION LOOP (OPTIMISÉ)
+    // ANIMATION LOOP (OPTIMISÃ‰)
     // ========================================================================
     
     start() {
@@ -219,12 +238,12 @@ class RenderEngine {
         const now = performance.now();
         const elapsed = now - this.lastFrameTime;
         
-        // ✓ LIMITER FPS en sautant des frames
+        // âœ“ LIMITER FPS en sautant des frames
         if (elapsed >= this.frameInterval) {
             // Enregistrer frame time
             const frameStart = now;
             
-            // Render si nécessaire
+            // Render si nÃ©cessaire
             if (this.needsRedraw) {
                 this.render();
                 this.needsRedraw = false;
@@ -238,7 +257,7 @@ class RenderEngine {
             // FPS actuel
             this.fps = 1000 / elapsed;
             
-            // Frame droppée si trop lent
+            // Frame droppÃ©e si trop lent
             if (this.perfStats.renderTime > this.frameInterval) {
                 this.perfStats.droppedFrames++;
             }
@@ -287,13 +306,13 @@ class RenderEngine {
     
     renderNotes() {
         if (this.renderers.pianoRoll) {
-            // ✓ LIMITER nombre de notes visibles
+            // âœ“ LIMITER nombre de notes visibles
             const visibleNotes = this.getVisibleNotes();
             const limitedNotes = visibleNotes.slice(0, this.config.maxVisibleNotes);
             
             if (visibleNotes.length > this.config.maxVisibleNotes) {
                 this.logDebug('render', 
-                    `⚠️ ${visibleNotes.length} notes (showing ${this.config.maxVisibleNotes})`, 
+                    `âš ï¸ ${visibleNotes.length} notes (showing ${this.config.maxVisibleNotes})`, 
                     'warn'
                 );
             }
@@ -319,7 +338,7 @@ class RenderEngine {
     }
     
     renderOverlay() {
-        // Debug info si activé
+        // Debug info si activÃ©
         if (PerformanceConfig.debug.enableFPSCounter) {
             this.renderDebugInfo();
         }
@@ -341,7 +360,7 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // DONNÉES
+    // DONNÃ‰ES
     // ========================================================================
     
     setNotes(notes) {
@@ -384,7 +403,7 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // COORDONNÉES
+    // COORDONNÃ‰ES
     // ========================================================================
     
     timeToX(time) {
@@ -457,7 +476,7 @@ class RenderEngine {
         this.canvas = null;
         this.ctx = null;
         
-        this.logDebug('render', '✓ RenderEngine destroyed');
+        this.logDebug('render', 'âœ“ RenderEngine destroyed');
     }
 }
 
