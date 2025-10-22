@@ -702,8 +702,10 @@ class PianoRollView extends BaseCanvasView {
         return `${names[midiNote % 12]}${octave}`;
     }
 }
-
-// Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PianoRollView;
+}
+
+if (typeof window !== 'undefined') {
+    window.PianoRollView = PianoRollView;  // ← AJOUTÉ
 }

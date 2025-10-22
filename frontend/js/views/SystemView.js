@@ -634,4 +634,16 @@ buildBackendStatus(backendData = {}) {
         </div>
     `;
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SystemView;
+}
+
+if (typeof window !== 'undefined') {
+    window.SystemView = SystemView;  // ← AJOUTÉ
+}
 }

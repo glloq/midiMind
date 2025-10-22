@@ -161,7 +161,10 @@ class BaseCanvasView {
     }
 }
 
-// Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = BaseCanvasView;
+}
+
+if (typeof window !== 'undefined') {
+    window.BaseCanvasView = BaseCanvasView;  // ← AJOUTÉ
 }

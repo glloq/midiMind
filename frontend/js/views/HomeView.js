@@ -1116,7 +1116,14 @@ buildFileInfo(file) {
     }
 }
 
-// Export
+// ============================================================================
+// EXPORT
+// ============================================================================
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = HomeView;
+}
+
+if (typeof window !== 'undefined') {
+    window.HomeView = HomeView;  // ← AJOUTÉ
 }

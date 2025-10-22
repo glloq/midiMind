@@ -526,7 +526,10 @@ class RoutingMatrixView {
     }
 }
 
-// Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = RoutingMatrixView;
+}
+
+if (typeof window !== 'undefined') {
+    window.RoutingMatrixView = RoutingMatrixView;  // ← AJOUTÉ
 }

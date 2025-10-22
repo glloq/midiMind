@@ -683,7 +683,10 @@ class CCEditorView {
     }
 }
 
-// Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CCEditorView;
+}
+
+if (typeof window !== 'undefined') {
+    window.CCEditorView = CCEditorView;  // ← AJOUTÉ
 }
