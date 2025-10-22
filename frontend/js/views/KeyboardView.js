@@ -36,7 +36,13 @@ class KeyboardView extends BaseView {
         this.whiteKeyHeight = 120;
         this.blackKeyHeight = 80;
         
-        this.logDebug('keyboard', 'âœ“ KeyboardView initialized (monitor mode)');
+        // Logger
+        this.logger = window.logger || console;
+        
+        if (this.logger && this.logger.debug) {
+            this.logger.debug('KeyboardView', 'Initialized (monitor mode)');
+        }
+        
     }
     
     // ========================================================================
@@ -254,7 +260,7 @@ class KeyboardView extends BaseView {
         this.canvas = this.container.querySelector('#keyboard-canvas');
         
         if (!this.canvas) {
-            this.logDebug('keyboard', 'Canvas not found', 'error');
+            // this.logDebug('keyboard', 'Canvas not found', 'error');
             return;
         }
         
@@ -282,7 +288,7 @@ class KeyboardView extends BaseView {
         this.canvas.width = rect.width;
         this.canvas.height = this.whiteKeyHeight + 40;  // +40 pour labels
         
-        this.logDebug('keyboard', `Canvas resized: ${this.canvas.width}x${this.canvas.height}`);
+        // this.logDebug('keyboard', `Canvas resized: ${this.canvas.width}x${this.canvas.height}`);
     }
     
     attachCanvasListeners() {
