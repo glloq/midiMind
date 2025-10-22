@@ -1,14 +1,15 @@
 #!/bin/bash
 # ============================================================================
 # Script: sync-frontend.sh
-# Version: v1.1 - FIXED GIT PERMISSIONS
+# Version: v1.2 - COMPLETE GIT PERMISSIONS FIX
 # Description: Synchronise le frontend depuis le repo vers www après git pull
 # Usage: ./sync-frontend.sh
 # ============================================================================
-# CORRECTIONS v1.1:
-# ✅ Ajout de la vérification et correction des permissions Git
-# ✅ Fix du problème "insufficient permission for adding an object"
-# ✅ Détection automatique des problèmes de permissions
+# CORRECTIONS v1.2:
+# ✅ Réparation COMPLÈTE de toutes les permissions Git
+# ✅ Fix de FETCH_HEAD, ORIG_HEAD, HEAD, etc.
+# ✅ Réparation récursive de tout le dossier .git
+# ✅ Option de réparation forcée au début
 # ============================================================================
 
 # Couleurs pour les messages
@@ -16,6 +17,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Chemins
@@ -31,8 +33,8 @@ BACKUP_DIR="$HOME/backups/midimind"
 print_header() {
     echo -e "${BLUE}"
     echo "╔════════════════════════════════════════════════════════╗"
-    echo "║         MidiMind Frontend Sync Script v1.1            ║"
-    echo "║              (Fixed Git Permissions)                  ║"
+    echo "║         MidiMind Frontend Sync Script v1.2            ║"
+    echo "║          (Complete Git Permissions Fix)              ║"
     echo "╚════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -51,6 +53,10 @@ print_error() {
 
 print_warning() {
     echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
 }
 
 check_directories() {
@@ -76,8 +82,8 @@ check_directories() {
     print_success "All directories OK"
 }
 
-fix_git_permissions() {
-    print_step "Checking Git repository permissions..."
+fix_git_permissions_complete() {
+    print_step "Performing COMPLETE Git permissions repair..."
     
     cd "$REPO_DIR" || exit 1
     
@@ -87,52 +93,97 @@ fix_git_permissions() {
         exit 1
     fi
     
-    # Vérifier les permissions actuelles
-    GIT_OWNER=$(stat -c '%U' .git 2>/dev/null || stat -f '%Su' .git 2>/dev/null)
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${MAGENTA}    RÉPARATION COMPLÈTE DES PERMISSIONS GIT${NC}"
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
     CURRENT_USER=$(whoami)
     
-    if [ "$GIT_OWNER" != "$CURRENT_USER" ]; then
-        print_warning "Git directory owned by '$GIT_OWNER', current user is '$CURRENT_USER'"
-        print_step "Fixing git permissions..."
-        
-        # Corriger les permissions de tout le dépôt
-        sudo chown -R $CURRENT_USER:$CURRENT_USER "$REPO_DIR/.git"
-        
-        # Permissions spécifiques pour les objets Git
-        if [ -d ".git/objects" ]; then
-            sudo chmod -R u+rwX .git/objects
-        fi
-        
-        # Permissions pour les refs
-        if [ -d ".git/refs" ]; then
-            sudo chmod -R u+rwX .git/refs
-        fi
-        
-        # Permissions pour les hooks
-        if [ -d ".git/hooks" ]; then
-            sudo chmod -R u+rwX .git/hooks
-        fi
-        
-        # Fichiers de configuration
-        sudo chmod u+rw .git/config .git/HEAD 2>/dev/null
-        
-        print_success "Git permissions fixed"
-    else
-        print_success "Git permissions OK"
+    # 1. Réparer TOUT le dossier .git récursivement
+    print_info "Fixing ownership of entire .git directory..."
+    sudo chown -R $CURRENT_USER:$CURRENT_USER .git/
+    
+    # 2. Réparer les permissions des dossiers
+    print_info "Fixing directory permissions..."
+    sudo find .git -type d -exec chmod 755 {} \;
+    
+    # 3. Réparer les permissions des fichiers
+    print_info "Fixing file permissions..."
+    sudo find .git -type f -exec chmod 644 {} \;
+    
+    # 4. Fichiers spécifiques qui doivent être exécutables
+    print_info "Setting executable permissions for hooks..."
+    if [ -d ".git/hooks" ]; then
+        sudo chmod -R 755 .git/hooks/
     fi
     
-    # Vérifier l'état du dépôt
-    if ! git status &>/dev/null; then
-        print_error "Git repository is corrupted"
-        print_step "Attempting to repair..."
-        git fsck --full 2>&1 | grep -v "^Checking"
+    # 5. Réparer spécifiquement les fichiers de contrôle Git critiques
+    print_info "Fixing critical Git control files..."
+    CRITICAL_FILES=(
+        ".git/HEAD"
+        ".git/FETCH_HEAD"
+        ".git/ORIG_HEAD"
+        ".git/config"
+        ".git/description"
+        ".git/index"
+        ".git/packed-refs"
+    )
+    
+    for file in "${CRITICAL_FILES[@]}"; do
+        if [ -f "$file" ]; then
+            sudo chown $CURRENT_USER:$CURRENT_USER "$file"
+            sudo chmod 644 "$file"
+            echo "    ✓ Fixed: $file"
+        fi
+    done
+    
+    # 6. Réparer les dossiers critiques
+    print_info "Fixing critical Git directories..."
+    CRITICAL_DIRS=(
+        ".git/objects"
+        ".git/refs"
+        ".git/refs/heads"
+        ".git/refs/remotes"
+        ".git/refs/tags"
+        ".git/logs"
+        ".git/logs/refs"
+        ".git/info"
+        ".git/hooks"
+    )
+    
+    for dir in "${CRITICAL_DIRS[@]}"; do
+        if [ -d "$dir" ]; then
+            sudo chown -R $CURRENT_USER:$CURRENT_USER "$dir"
+            sudo chmod -R u+rwX "$dir"
+            echo "    ✓ Fixed: $dir"
+        fi
+    done
+    
+    # 7. Nettoyer les locks s'ils existent
+    print_info "Removing stale lock files..."
+    sudo rm -f .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock 2>/dev/null
+    
+    # 8. Vérifier l'état final
+    print_step "Verifying Git repository state..."
+    
+    if git status &>/dev/null; then
+        print_success "Git repository is healthy"
+    else
+        print_warning "Git repository may have issues, attempting repair..."
+        git fsck --full 2>&1 | grep -E "(error|warning)" || true
         
         if ! git status &>/dev/null; then
             print_error "Unable to repair git repository"
-            print_warning "You may need to re-clone the repository"
+            print_info "You may need to:"
+            echo "  1. Run: cd $REPO_DIR && git reset --hard HEAD"
+            echo "  2. Or re-clone the repository"
             exit 1
         fi
     fi
+    
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    print_success "Git permissions completely repaired"
+    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
 create_backup() {
@@ -147,7 +198,7 @@ create_backup() {
         cp -r "$WWW_DEST/js" "$BACKUP_PATH"
         print_success "Backup created: $BACKUP_PATH"
     else
-        print_step "No existing files to backup"
+        print_info "No existing files to backup"
     fi
 }
 
@@ -163,21 +214,44 @@ git_pull() {
     echo -e "${BLUE}Current branch: $CURRENT_BRANCH${NC}"
     
     # Vérifier s'il y a des changements locaux
-    if ! git diff-index --quiet HEAD --; then
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
         print_warning "Local changes detected"
+        
+        # Lister les fichiers modifiés
+        echo -e "${BLUE}Modified files:${NC}"
+        git status --short
+        
         print_step "Stashing local changes..."
-        git stash push -m "Auto-stash before sync $(date +%Y%m%d_%H%M%S)"
+        if git stash push -m "Auto-stash before sync $(date +%Y%m%d_%H%M%S)"; then
+            print_success "Local changes stashed"
+        else
+            print_error "Failed to stash changes"
+            print_info "Attempting to continue anyway..."
+        fi
     fi
     
     # Pull avec retry
     PULL_SUCCESS=0
     for i in {1..3}; do
-        if git pull origin "$CURRENT_BRANCH"; then
+        echo -e "${BLUE}Pull attempt $i/3...${NC}"
+        
+        if git pull origin "$CURRENT_BRANCH" 2>&1; then
             PULL_SUCCESS=1
             break
         else
             print_warning "Pull attempt $i failed"
+            
             if [ $i -lt 3 ]; then
+                print_step "Checking permissions again..."
+                
+                # Vérifier si c'est un problème de permissions
+                if [ ! -w ".git/FETCH_HEAD" ] 2>/dev/null; then
+                    print_warning "FETCH_HEAD permission issue detected"
+                    print_step "Attempting emergency repair..."
+                    sudo chown $USER:$USER .git/FETCH_HEAD 2>/dev/null
+                    sudo chmod 644 .git/FETCH_HEAD 2>/dev/null
+                fi
+                
                 print_step "Retrying in 2 seconds..."
                 sleep 2
             fi
@@ -186,11 +260,28 @@ git_pull() {
     
     if [ $PULL_SUCCESS -eq 0 ]; then
         print_error "Git pull failed after 3 attempts"
-        print_step "Checking for network issues..."
+        print_step "Diagnostics:"
         
-        if ! ping -c 1 github.com &>/dev/null; then
+        # Diagnostic détaillé
+        echo -e "${BLUE}Git status:${NC}"
+        git status || true
+        
+        echo -e "${BLUE}Git remote:${NC}"
+        git remote -v || true
+        
+        echo -e "${BLUE}Network test:${NC}"
+        if ping -c 1 github.com &>/dev/null; then
+            print_success "Network connection OK"
+        else
             print_error "Cannot reach github.com - check your internet connection"
         fi
+        
+        # Proposer une solution
+        echo ""
+        print_info "Possible solutions:"
+        echo "  1. Run: cd $REPO_DIR && git reset --hard HEAD"
+        echo "  2. Run: cd $REPO_DIR && git fetch origin && git reset --hard origin/$CURRENT_BRANCH"
+        echo "  3. Re-run this script"
         
         exit 1
     fi
@@ -202,8 +293,10 @@ git_pull() {
     git log --oneline -3 --color=always
     
     # Afficher les fichiers modifiés
-    echo -e "${BLUE}Modified files:${NC}"
-    git diff --name-status HEAD@{1} HEAD 2>/dev/null | head -n 10
+    if git diff --name-status HEAD@{1} HEAD &>/dev/null; then
+        echo -e "${BLUE}Modified files in this pull:${NC}"
+        git diff --name-status HEAD@{1} HEAD | head -n 10
+    fi
 }
 
 sync_files() {
@@ -214,35 +307,44 @@ sync_files() {
     sudo mkdir -p "$WWW_DEST/css"
     sudo mkdir -p "$WWW_DEST/styles"
     
+    # Compteur de fichiers synchronisés
+    SYNC_COUNT=0
+    
     # Synchroniser les fichiers JS
     echo "  → Syncing core files..."
     if [ -d "$FRONTEND_SRC/js/core" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/core/" "$WWW_DEST/js/core/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/core/" "$WWW_DEST/js/core/" | grep -v "/$" | wc -l
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/core" -type f | wc -l)))
     fi
     
     echo "  → Syncing models..."
     if [ -d "$FRONTEND_SRC/js/models" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/models/" "$WWW_DEST/js/models/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/models/" "$WWW_DEST/js/models/" > /dev/null
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/models" -type f | wc -l)))
     fi
     
     echo "  → Syncing views..."
     if [ -d "$FRONTEND_SRC/js/views" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/views/" "$WWW_DEST/js/views/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/views/" "$WWW_DEST/js/views/" > /dev/null
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/views" -type f | wc -l)))
     fi
     
     echo "  → Syncing controllers..."
     if [ -d "$FRONTEND_SRC/js/controllers" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/controllers/" "$WWW_DEST/js/controllers/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/controllers/" "$WWW_DEST/js/controllers/" > /dev/null
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/controllers" -type f | wc -l)))
     fi
     
     echo "  → Syncing utils..."
     if [ -d "$FRONTEND_SRC/js/utils" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/utils/" "$WWW_DEST/js/utils/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/utils/" "$WWW_DEST/js/utils/" > /dev/null
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/utils" -type f | wc -l)))
     fi
     
     echo "  → Syncing services..."
     if [ -d "$FRONTEND_SRC/js/services" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/services/" "$WWW_DEST/js/services/"
+        sudo rsync -av --delete "$FRONTEND_SRC/js/services/" "$WWW_DEST/js/services/" > /dev/null
+        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/services" -type f | wc -l)))
     fi
     
     # Synchroniser index.html et main.js
@@ -259,21 +361,21 @@ sync_files() {
     # Synchroniser CSS depuis les deux emplacements possibles
     if [ -d "$FRONTEND_SRC/css" ]; then
         echo "  → Syncing CSS files (from css/)..."
-        sudo rsync -av --delete "$FRONTEND_SRC/css/" "$WWW_DEST/css/"
+        sudo rsync -av --delete "$FRONTEND_SRC/css/" "$WWW_DEST/css/" > /dev/null
     fi
     
     if [ -d "$FRONTEND_SRC/styles" ]; then
         echo "  → Syncing CSS files (from styles/)..."
-        sudo rsync -av --delete "$FRONTEND_SRC/styles/" "$WWW_DEST/styles/"
+        sudo rsync -av --delete "$FRONTEND_SRC/styles/" "$WWW_DEST/styles/" > /dev/null
     fi
     
     # Synchroniser assets si présent
     if [ -d "$FRONTEND_SRC/assets" ]; then
         echo "  → Syncing assets..."
-        sudo rsync -av --delete "$FRONTEND_SRC/assets/" "$WWW_DEST/assets/"
+        sudo rsync -av --delete "$FRONTEND_SRC/assets/" "$WWW_DEST/assets/" > /dev/null
     fi
     
-    print_success "Files synchronized"
+    print_success "Files synchronized ($SYNC_COUNT files)"
 }
 
 set_permissions() {
@@ -347,7 +449,7 @@ verify_sync() {
     
     if [ $MISSING_FILES -gt 0 ]; then
         print_warning "$MISSING_FILES essential file(s) missing"
-        print_step "Please check the synchronization manually"
+        print_info "Please check the synchronization manually"
     else
         print_success "All essential files present"
     fi
@@ -374,12 +476,12 @@ main() {
     
     # Étapes
     check_directories
-    fix_git_permissions      # 🔧 NOUVEAU: Corriger les permissions Git
+    fix_git_permissions_complete    # 🔧 RÉPARATION COMPLÈTE
     create_backup
     git_pull
     sync_files
     set_permissions
-    verify_sync              # 🔧 NOUVEAU: Vérifier la synchronisation
+    verify_sync
     clean_old_backups
     show_summary
 }
