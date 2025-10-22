@@ -289,7 +289,7 @@ class HomeView {
         const canvas = document.getElementById('visualizerCanvas');
         
         if (canvas) {
-            this.visualizer = new LiveVisualizer(canvas, {
+            this.visualizer = new MidiVisualizer(canvas, {
                 previewTime: 2000,
                 showVelocity: true,
                 showCC: false,

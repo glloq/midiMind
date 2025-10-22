@@ -624,5 +624,17 @@ class PlaybackController extends BaseController {
 }
 
 // ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PlaybackController;
+}
+
+if (typeof window !== 'undefined') {
+    window.PlaybackController = PlaybackController;
+}
+
+// ============================================================================
 // FIN DU FICHIER PlaybackController.js v3.2.0
 // ============================================================================

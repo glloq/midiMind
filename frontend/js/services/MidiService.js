@@ -471,3 +471,15 @@ class MidiService {
         };
     }
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MidiService;
+}
+
+if (typeof window !== 'undefined') {
+    window.MidiService = MidiService;
+}

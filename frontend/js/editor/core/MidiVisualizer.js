@@ -1,27 +1,27 @@
 // ============================================================================
 // Fichier: frontend/js/editor/core/MidiVisualizer.js
-// Projet: MidiMind v3.2.1 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.2.1 (Complétée selon audit 2025-10-14)
+// Projet: MidiMind v3.2.1 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.2.1 (ComplÃ©tÃ©e selon audit 2025-10-14)
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Classe principale orchestrant tous les composants de l'éditeur MIDI.
-//   Coordonne renderers, interaction, viewport, et gestion données.
+//   Classe principale orchestrant tous les composants de l'Ã©diteur MIDI.
+//   Coordonne renderers, interaction, viewport, et gestion donnÃ©es.
 //
-// Fonctionnalités:
-//   - Orchestration complète éditeur
+// FonctionnalitÃ©s:
+//   - Orchestration complÃ¨te Ã©diteur
 //   - Gestion modes (Edit, Playback, Notation)
 //   - Coordination renderers
-//   - Gestion événements
+//   - Gestion Ã©vÃ©nements
 //   - Statistiques performance
 //   - Historique undo/redo
 //
 // Corrections v3.2.1:
-//   ✅ updateStats() - Calcul complet stats (noteCount, duration, channels)
-//   ✅ updateFPS() - Calcul FPS temps réel
-//   ✅ destroy() - Nettoyage complet ressources
-//   ✅ handleResize() - Gestion resize robuste
-//   ✅ onViewChanged() - Callback viewport complet
+//   âœ… updateStats() - Calcul complet stats (noteCount, duration, channels)
+//   âœ… updateFPS() - Calcul FPS temps rÃ©el
+//   âœ… destroy() - Nettoyage complet ressources
+//   âœ… handleResize() - Gestion resize robuste
+//   âœ… onViewChanged() - Callback viewport complet
 //
 // Architecture:
 //   MidiVisualizer (classe orchestrateur)
@@ -36,10 +36,10 @@ class MidiVisualizer {
     constructor(canvas, config = {}) {
         this.canvas = canvas;
         
-        // Données MIDI
+        // DonnÃ©es MIDI
         this.midiData = null;
         
-        // Systèmes de base
+        // SystÃ¨mes de base
         this.coordSystem = new CoordinateSystem(config.coordSystem);
         this.viewport = new Viewport(canvas, this.coordSystem);
         this.renderEngine = new RenderEngine(canvas, config.rendering);
@@ -115,20 +115,20 @@ class MidiVisualizer {
         // Lier le visualizer au renderEngine
         this.renderEngine.setVisualizer(this);
         
-        // Créer les modes
+        // CrÃ©er les modes
         this.modes.edit = new EditorMode(this);
         this.modes.playback = new PlaybackMode(this);
         
-        // Activer le mode par défaut
+        // Activer le mode par dÃ©faut
         this.setMode(this.state.mode);
         
         // Configurer le viewport
         this.viewport.onViewChanged = (view) => this.onViewChanged(view);
         
-        // Démarrer la boucle de rendu
+        // DÃ©marrer la boucle de rendu
         this.renderEngine.startRenderLoop(() => this.render());
         
-        // Gérer le resize avec ResizeObserver si disponible
+        // GÃ©rer le resize avec ResizeObserver si disponible
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver(() => this.handleResize());
             this.resizeObserver.observe(this.canvas.parentElement);
@@ -144,19 +144,19 @@ class MidiVisualizer {
     }
 
     // ========================================================================
-    // CHARGEMENT DONNÉES
+    // CHARGEMENT DONNÃ‰ES
     // ========================================================================
 
     /**
-     * Charge des données MIDI
-     * @param {Object} midiJson - Données MIDI au format JSON
+     * Charge des donnÃ©es MIDI
+     * @param {Object} midiJson - DonnÃ©es MIDI au format JSON
      */
     loadMidiData(midiJson) {
         console.log('[MidiVisualizer] Loading MIDI data...');
         
         this.midiData = midiJson;
         
-        // Mettre à jour les stats
+        // Mettre Ã  jour les stats
         this.updateStats();
         
         // Fit to content
@@ -167,7 +167,7 @@ class MidiVisualizer {
             }
         }
         
-        // Rafraîchir
+        // RafraÃ®chir
         this.renderEngine.requestRedraw();
         
         this.emit('data:loaded', { midiData: midiJson });
@@ -180,7 +180,7 @@ class MidiVisualizer {
     }
 
     /**
-     * Efface les données
+     * Efface les donnÃ©es
      */
     clearData() {
         this.midiData = null;
@@ -208,7 +208,7 @@ class MidiVisualizer {
             return;
         }
         
-        // Désactiver le mode actuel
+        // DÃ©sactiver le mode actuel
         if (this.state.mode && this.modes[this.state.mode]) {
             this.modes[this.state.mode].deactivate();
         }
@@ -245,7 +245,7 @@ class MidiVisualizer {
         
         this.state.tool = tool;
         
-        // Transmettre au mode d'édition
+        // Transmettre au mode d'Ã©dition
         if (this.modes.edit && this.modes.edit.setTool) {
             this.modes.edit.setTool(tool);
         }
@@ -295,7 +295,7 @@ class MidiVisualizer {
             this.renderPlayhead();
         }
         
-        // Mettre à jour FPS
+        // Mettre Ã  jour FPS
         this.updateFPS();
     }
 
@@ -333,13 +333,13 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * Met à jour la position de lecture
+     * Met Ã  jour la position de lecture
      * @param {number} timeMs - Temps en millisecondes
      */
     updatePlayhead(timeMs) {
         this.playhead = timeMs;
         
-        // Auto-scroll si activé
+        // Auto-scroll si activÃ©
         if (this.config.autoScroll) {
             this.viewport.followPlayhead(timeMs);
         }
@@ -348,7 +348,7 @@ class MidiVisualizer {
     }
 
     /**
-     * Démarre la lecture
+     * DÃ©marre la lecture
      */
     play() {
         this.state.playing = true;
@@ -364,7 +364,7 @@ class MidiVisualizer {
     }
 
     /**
-     * Arrête la lecture
+     * ArrÃªte la lecture
      */
     stop() {
         this.state.playing = false;
@@ -374,7 +374,7 @@ class MidiVisualizer {
     }
 
     /**
-     * Définit les notes actives (pendant playback)
+     * DÃ©finit les notes actives (pendant playback)
      * @param {Array} notes - Notes actives
      */
     setActiveNotes(notes) {
@@ -383,17 +383,17 @@ class MidiVisualizer {
     }
 
     // ========================================================================
-    // ÉDITION NOTES
+    // Ã‰DITION NOTES
     // ========================================================================
 
     /**
      * Ajoute une note
-     * @param {Object} note - Note à ajouter
+     * @param {Object} note - Note Ã  ajouter
      */
     addNote(note) {
         if (!this.midiData) return;
         
-        // Générer ID si absent
+        // GÃ©nÃ©rer ID si absent
         if (!note.id) {
             note.id = this.generateNoteId();
         }
@@ -442,7 +442,7 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * ✅ COMPLET: Met à jour les statistiques
+     * âœ… COMPLET: Met Ã  jour les statistiques
      */
     updateStats() {
         if (!this.midiData || !this.midiData.timeline) {
@@ -456,7 +456,7 @@ class MidiVisualizer {
         const notes = this.midiData.timeline.filter(e => e.type === 'noteOn');
         this.stats.noteCount = notes.length;
         
-        // Calculer durée totale
+        // Calculer durÃ©e totale
         let maxTime = 0;
         notes.forEach(note => {
             const endTime = note.time + (note.duration || 0);
@@ -475,17 +475,17 @@ class MidiVisualizer {
         });
         this.stats.channels = channels.size;
         
-        // Émettre événement
+        // Ã‰mettre Ã©vÃ©nement
         this.emit('stats:updated', { stats: this.getStats() });
     }
 
     /**
-     * ✅ COMPLET: Met à jour le FPS
+     * âœ… COMPLET: Met Ã  jour le FPS
      */
     updateFPS() {
         const now = performance.now();
         
-        // Incrémenter compteur frames
+        // IncrÃ©menter compteur frames
         this.stats.frameCount++;
         
         // Calculer FPS toutes les secondes
@@ -527,7 +527,7 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * ✅ AMÉLIORÉ: Gère le resize du canvas
+     * âœ… AMÃ‰LIORÃ‰: GÃ¨re le resize du canvas
      */
     handleResize() {
         if (!this.canvas.parentElement) return;
@@ -535,7 +535,7 @@ class MidiVisualizer {
         const container = this.canvas.parentElement;
         const rect = container.getBoundingClientRect();
         
-        // Vérifier si changement réel
+        // VÃ©rifier si changement rÃ©el
         if (rect.width === this.viewport.width && rect.height === this.viewport.height) {
             return;
         }
@@ -557,14 +557,14 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * ✅ COMPLET: Callback changement viewport
+     * âœ… COMPLET: Callback changement viewport
      * @param {Object} view - Informations viewport
      */
     onViewChanged(view) {
-        // Mettre à jour config auto-scroll
+        // Mettre Ã  jour config auto-scroll
         this.viewport.setAutoScroll(this.config.autoScroll);
         
-        // Émettre événement
+        // Ã‰mettre Ã©vÃ©nement
         this.emit('viewport:changed', view);
         
         // Redraw si pas en animation
@@ -578,9 +578,9 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * Émet un événement
-     * @param {string} event - Nom événement
-     * @param {*} data - Données
+     * Ã‰met un Ã©vÃ©nement
+     * @param {string} event - Nom Ã©vÃ©nement
+     * @param {*} data - DonnÃ©es
      */
     emit(event, data) {
         const listeners = this.listeners.get(event);
@@ -590,8 +590,8 @@ class MidiVisualizer {
     }
 
     /**
-     * Écoute un événement
-     * @param {string} event - Nom événement
+     * Ã‰coute un Ã©vÃ©nement
+     * @param {string} event - Nom Ã©vÃ©nement
      * @param {Function} callback - Callback
      */
     on(event, callback) {
@@ -602,8 +602,8 @@ class MidiVisualizer {
     }
 
     /**
-     * Retire un écouteur
-     * @param {string} event - Nom événement
+     * Retire un Ã©couteur
+     * @param {string} event - Nom Ã©vÃ©nement
      * @param {Function} callback - Callback
      */
     off(event, callback) {
@@ -621,7 +621,7 @@ class MidiVisualizer {
     // ========================================================================
 
     /**
-     * Génère un ID unique pour une note
+     * GÃ©nÃ¨re un ID unique pour une note
      * @returns {string}
      */
     generateNoteId() {
@@ -629,15 +629,15 @@ class MidiVisualizer {
     }
 
     /**
-     * ✅ COMPLET: Nettoie les ressources
+     * âœ… COMPLET: Nettoie les ressources
      */
     destroy() {
         console.log('[MidiVisualizer] Destroying...');
         
-        // Arrêter la boucle de rendu
+        // ArrÃªter la boucle de rendu
         this.renderEngine.stopRenderLoop();
         
-        // Désactiver les modes
+        // DÃ©sactiver les modes
         Object.values(this.modes).forEach(mode => {
             if (mode && mode.deactivate) {
                 mode.deactivate();
@@ -658,7 +658,7 @@ class MidiVisualizer {
         // Nettoyer event listeners
         this.listeners.clear();
         
-        // Nettoyer références
+        // Nettoyer rÃ©fÃ©rences
         this.midiData = null;
         this.activeNotes = [];
         
@@ -672,4 +672,7 @@ class MidiVisualizer {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MidiVisualizer;
+}-e 
+if (typeof window !== 'undefined') {
+    window.MidiVisualizer = MidiVisualizer;
 }

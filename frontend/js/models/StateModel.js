@@ -720,3 +720,14 @@ class StateModel extends BaseModel {
         return Promise.resolve();
     }
 }
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = StateModel;
+}
+
+if (typeof window !== 'undefined') {
+    window.StateModel = StateModel;
+}

@@ -801,3 +801,14 @@ class PianoRollController extends BaseController {
         this.refreshDisplay();
     }
 }
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PianoRollController;
+}
+
+if (typeof window !== 'undefined') {
+    window.PianoRollController = PianoRollController;
+}

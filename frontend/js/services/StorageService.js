@@ -592,3 +592,15 @@ class StorageService {
         };
     }
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = StorageService;
+}
+
+if (typeof window !== 'undefined') {
+    window.StorageService = StorageService;
+}

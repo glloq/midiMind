@@ -782,3 +782,15 @@ ${error.stack ? '\n' + error.stack : ''}
         window.removeEventListener('popstate', this.popstateHandler);
     }
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = NavigationController;
+}
+
+if (typeof window !== 'undefined') {
+    window.NavigationController = NavigationController;
+}

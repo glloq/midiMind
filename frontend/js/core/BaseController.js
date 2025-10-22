@@ -673,3 +673,15 @@ shouldCleanCache() {
         return `${this.constructor.name.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BaseController;
+}
+
+if (typeof window !== 'undefined') {
+    window.BaseController = BaseController;
+}

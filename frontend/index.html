@@ -4,18 +4,18 @@ Version: v3.3.2 - CHEMINS CORRECTS FINAUX
 Date: 2025-10-22
 ============================================================================ 
 CORRECTIONS v3.3.2:
-✅ CSS: styles/ (PAS css/) ← CORRIGÉ !
-✅ JS: js/ avec sous-dossiers
-✅ PlaylistController ajouté
-✅ GlobalPlaybackController ajouté
-✅ Tous les CSS nécessaires
+âœ… CSS: styles/ (PAS css/) â† CORRIGÃ‰ !
+âœ… JS: js/ avec sous-dossiers
+âœ… PlaylistController ajoutÃ©
+âœ… GlobalPlaybackController ajoutÃ©
+âœ… Tous les CSS nÃ©cessaires
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI Mind - Système d'Orchestration MIDI v3.1</title>
+    <title>MIDI Mind - SystÃ¨me d'Orchestration MIDI v3.1</title>
     
     <!-- ========================================================================
          STYLES CSS - Structure: styles/*.css (PAS css/)
@@ -54,7 +54,7 @@ CORRECTIONS v3.3.2:
             <div class="header-content">
                 <div class="header-left">
                     <h1 class="app-title">
-                        <span class="app-icon">🎹</span>
+                        <span class="app-icon">ðŸŽ¹</span>
                         MIDI Mind
                         <span class="app-version">v3.1</span>
                     </h1>
@@ -62,35 +62,35 @@ CORRECTIONS v3.3.2:
                 
                 <nav class="main-nav">
                     <a href="#home" class="nav-item active" data-page="home">
-                        <span class="nav-icon">🏠</span>
+                        <span class="nav-icon">ðŸ </span>
                         <span class="nav-label">Accueil</span>
                     </a>
                     <a href="#editor" class="nav-item" data-page="editor">
-                        <span class="nav-icon">✏️</span>
-                        <span class="nav-label">Éditeur</span>
+                        <span class="nav-icon">âœï¸</span>
+                        <span class="nav-label">Ã‰diteur</span>
                     </a>
                     <a href="#routing" class="nav-item" data-page="routing">
-                        <span class="nav-icon">🔀</span>
+                        <span class="nav-icon">ðŸ”€</span>
                         <span class="nav-label">Routage</span>
                     </a>
                     <a href="#keyboard" class="nav-item" data-page="keyboard">
-                        <span class="nav-icon">🎹</span>
+                        <span class="nav-icon">ðŸŽ¹</span>
                         <span class="nav-label">Clavier</span>
                     </a>
                     <a href="#instruments" class="nav-item" data-page="instruments">
-                        <span class="nav-icon">🎸</span>
+                        <span class="nav-icon">ðŸŽ¸</span>
                         <span class="nav-label">Instruments</span>
                     </a>
                     <a href="#system" class="nav-item" data-page="system">
-                        <span class="nav-icon">⚙️</span>
-                        <span class="nav-label">Système</span>
+                        <span class="nav-icon">âš™ï¸</span>
+                        <span class="nav-label">SystÃ¨me</span>
                     </a>
                 </nav>
                 
                 <div class="header-right">
                     <div id="connection-status" class="connection-status">
                         <span class="status-dot"></span>
-                        <span class="status-text">Déconnecté</span>
+                        <span class="status-text">DÃ©connectÃ©</span>
                     </div>
                 </div>
             </div>
@@ -100,7 +100,7 @@ CORRECTIONS v3.3.2:
              MAIN CONTENT
              ======================================================================== -->
         <main class="app-main">
-            <!-- Pages chargées dynamiquement -->
+            <!-- Pages chargÃ©es dynamiquement -->
             <div id="home" class="page active"></div>
             <div id="editor" class="page"></div>
             <div id="routing" class="page"></div>
@@ -149,17 +149,17 @@ CORRECTIONS v3.3.2:
          ======================================================================== -->
     
     <!-- ========================================================================
-         ÉTAPE 0: CONFIGURATION PERFORMANCE (DOIT ÊTRE CHARGÉ EN PREMIER !)
+         Ã‰TAPE 0: CONFIGURATION PERFORMANCE (DOIT ÃŠTRE CHARGÃ‰ EN PREMIER !)
          ======================================================================== -->
     <script src="js/config/PerformanceConfig.js"></script>
     
     <!-- ========================================================================
-         ÉTAPE 1: FONDATIONS - EventBus (utilisé par TOUT le reste)
+         Ã‰TAPE 1: FONDATIONS - EventBus (utilisÃ© par TOUT le reste)
          ======================================================================== -->
     <script src="js/core/EventBus.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 2: UTILITAIRES DE BASE (pas de dépendances)
+         Ã‰TAPE 2: UTILITAIRES DE BASE (pas de dÃ©pendances)
          ======================================================================== -->
     <script src="js/utils/Logger.js"></script>
     <script src="js/utils/Constants.js"></script>
@@ -170,39 +170,39 @@ CORRECTIONS v3.3.2:
     <script src="js/utils/Notifications.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 3: CONFIGURATION
+         Ã‰TAPE 3: CONFIGURATION
          ======================================================================== -->
     <script src="js/config/AppConfig.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 4: COMMUNICATION BACKEND
+         Ã‰TAPE 4: COMMUNICATION BACKEND
          ======================================================================== -->
     <script src="js/services/BackendService.js"></script>
     <script src="js/utils/ApiClient.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 5: UTILITAIRES AVANCÉS
+         Ã‰TAPE 5: UTILITAIRES AVANCÃ‰S
          ======================================================================== -->
     <script src="js/monitoring/PerformanceMonitor.js"></script>
     <script src="js/ui/NotificationManager.js"></script>
     <script src="js/utils/RoutingManager.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 6: SERVICES
+         Ã‰TAPE 6: SERVICES
          ======================================================================== -->
     <script src="js/services/StorageService.js"></script>
     <script src="js/services/FileService.js"></script>
     <script src="js/services/MidiService.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 7: CLASSES DE BASE (CRITIQUE - avant héritage)
+         Ã‰TAPE 7: CLASSES DE BASE (CRITIQUE - avant hÃ©ritage)
          ======================================================================== -->
     <script src="js/core/BaseModel.js"></script>
     <script src="js/core/BaseView.js"></script>
     <script src="js/core/BaseController.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 8: MODÈLES DE DONNÉES (héritent de BaseModel)
+         Ã‰TAPE 8: MODÃˆLES DE DONNÃ‰ES (hÃ©ritent de BaseModel)
          ======================================================================== -->
     <script src="js/models/StateModel.js"></script>
     <script src="js/models/FileModel.js"></script>
@@ -215,19 +215,19 @@ CORRECTIONS v3.3.2:
     <script src="js/models/LoopModel.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 9: ÉDITEUR - CORE
+         Ã‰TAPE 9: Ã‰DITEUR - CORE
          ======================================================================== -->
     <script src="js/editor/core/CoordinateSystem.js"></script>
     <script src="js/editor/core/Viewport.js"></script>
     <script src="js/editor/core/RenderEngine.js"></script>
     
     <!-- ========================================================================
-         NOTE: RoutingMatrix.js sera chargé dynamiquement si nécessaire
+         NOTE: RoutingMatrix.js sera chargÃ© dynamiquement si nÃ©cessaire
          Voir README_V2.md pour les instructions d'installation
          ======================================================================== -->
     
     <!-- ========================================================================
-         ÉTAPE 10: ÉDITEUR - RENDERERS
+         Ã‰TAPE 10: Ã‰DITEUR - RENDERERS
          ======================================================================== -->
     <script src="js/editor/renderers/GridRenderer.js"></script>
     <script src="js/editor/renderers/TimelineRenderer.js"></script>
@@ -236,21 +236,26 @@ CORRECTIONS v3.3.2:
     <script src="js/editor/renderers/CCRenderer.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 11: ÉDITEUR - INTERACTION
+         Ã‰TAPE 11: Ã‰DITEUR - INTERACTION
          ======================================================================== -->
     <script src="js/editor/interaction/SelectionManager.js"></script>
     <script src="js/editor/interaction/DragHandler.js"></script>
     <script src="js/editor/interaction/EditorMode.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 12: ÉDITEUR - UTILS
+         Ã‰TAPE 12: Ã‰DITEUR - UTILS
          ======================================================================== -->
     <script src="js/editor/utils/ClipboardManager.js"></script>
     <script src="js/editor/utils/HistoryManager.js"></script>
     <script src="js/editor/utils/EditorRoutingManager.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 13: VUES - PAGES (héritent de BaseView)
+         ETAPE 12.5: VISUALISEUR MIDI
+         ======================================================================== -->
+    <script src="js/utils/MidiVisualizer.js"></script>
+
+    <!-- ========================================================================
+         Ã‰TAPE 13: VUES - PAGES (hÃ©ritent de BaseView)
          ======================================================================== -->
     <script src="js/views/HomeView.js"></script>
     <script src="js/views/EditorView.js"></script>
@@ -262,7 +267,7 @@ CORRECTIONS v3.3.2:
     <script src="js/views/FileView.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 14: CONTRÔLEURS (héritent de BaseController)
+         Ã‰TAPE 14: CONTRÃ”LEURS (hÃ©ritent de BaseController)
          ======================================================================== -->
     <script src="js/controllers/HomeController.js"></script>
     <script src="js/controllers/FileController.js"></script>
@@ -277,12 +282,12 @@ CORRECTIONS v3.3.2:
     <script src="js/controllers/NavigationController.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 15: APPLICATION (dépend de TOUT)
+         Ã‰TAPE 15: APPLICATION (dÃ©pend de TOUT)
          ======================================================================== -->
     <script src="js/core/Application.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 16: INITIALISATION (DOIT ÊTRE LE DERNIER)
+         Ã‰TAPE 16: INITIALISATION (DOIT ÃŠTRE LE DERNIER)
          ======================================================================== -->
     <script src="js/main.js"></script>
 
