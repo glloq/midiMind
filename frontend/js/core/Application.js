@@ -308,7 +308,7 @@ class Application {
         
         // HomeView - Conteneur 'home'
 		if (window.HomeView) {
-			this.views.home = new HomeView('home');
+			this.views.home = new HomeView('home', this.eventBus);
 			if (typeof this.views.home.init === 'function') {
 				this.views.home.init();
 			}
