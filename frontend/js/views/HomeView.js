@@ -2,34 +2,34 @@
 // Fichier: frontend/js/views/HomeView.js
 // Version: v3.2 - FINAL OPTIMIZED
 // Date: 2025-10-22
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI
 // ============================================================================
 // CORRECTIONS v3.2:
-// âœ… Constructeur corrigÃ©: accepte eventBus comme 2Ã¨me paramÃ¨tre (optionnel)
-// âœ… EventBus initialisÃ© avec fallback sur window.EventBus
-// âœ… Logging d'initialisation ajoutÃ©
-// âœ… Compatible avec Application.js (qui passe 2 paramÃ¨tres)
-// âœ… RÃ©trocompatible (1 seul paramÃ¨tre fonctionne toujours)
-// âœ… Encodage UTF-8 propre, fins de ligne Unix LF
+// Ã¢Å“â€¦ Constructeur corrigÃƒÂ©: accepte eventBus comme 2ÃƒÂ¨me paramÃƒÂ¨tre (optionnel)
+// Ã¢Å“â€¦ EventBus initialisÃƒÂ© avec fallback sur window.EventBus
+// Ã¢Å“â€¦ Logging d'initialisation ajoutÃƒÂ©
+// Ã¢Å“â€¦ Compatible avec Application.js (qui passe 2 paramÃƒÂ¨tres)
+// Ã¢Å“â€¦ RÃƒÂ©trocompatible (1 seul paramÃƒÂ¨tre fonctionne toujours)
+// Ã¢Å“â€¦ Encodage UTF-8 propre, fins de ligne Unix LF
 // ============================================================================
 // Description:
 //   Vue de la page d'accueil avec player et visualizer live.
-//   Affiche les contrÃ´les de lecture, la sÃ©lection de fichiers,
-//   le routing rapide et la visualisation MIDI en temps rÃ©el.
+//   Affiche les contrÃƒÂ´les de lecture, la sÃƒÂ©lection de fichiers,
+//   le routing rapide et la visualisation MIDI en temps rÃƒÂ©el.
 //
-// FonctionnalitÃ©s:
-//   - Player avec contrÃ´les Play/Pause/Stop
+// FonctionnalitÃƒÂ©s:
+//   - Player avec contrÃƒÂ´les Play/Pause/Stop
 //   - Timeline interactive
-//   - SÃ©lection de fichiers MIDI
+//   - SÃƒÂ©lection de fichiers MIDI
 //   - Gestion de playlist
 //   - Routing rapide
-//   - Visualiseur MIDI temps rÃ©el
-//   - ContrÃ´le du tempo
+//   - Visualiseur MIDI temps rÃƒÂ©el
+//   - ContrÃƒÂ´le du tempo
 //
 // Architecture:
 //   - Utilise eventBus pour communication inter-composants
-//   - S'intÃ¨gre avec MidiVisualizer pour visualisation
-//   - Compatible avec le systÃ¨me de routing
+//   - S'intÃƒÂ¨gre avec MidiVisualizer pour visualisation
+//   - Compatible avec le systÃƒÂ¨me de routing
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -56,7 +56,18 @@ class HomeView {
         }
         
         // EventBus (use global if not provided)
-        this.eventBus = eventBus || window.EventBus || null;
+        // Si eventBus n'est pas fourni, créer une nouvelle instance ou utiliser celle globale
+        if (eventBus) {
+            this.eventBus = eventBus;
+        } else if (window.EventBus && typeof window.EventBus === 'function') {
+            // window.EventBus est la classe, il faut l'instancier
+            this.eventBus = new window.EventBus();
+        } else if (window.eventBus) {
+            // Peut-être qu'il y a une instance globale
+            this.eventBus = window.eventBus;
+        } else {
+            this.eventBus = null;
+        }
         
         this.visualizer = null;
         this.currentFile = null;
@@ -96,29 +107,29 @@ class HomeView {
 		
         this.container.innerHTML = `
             <div class="home-container">
-                <!-- Barre de contrÃƒÆ’Ã‚Â´le supÃƒÆ’Ã‚Â©rieure -->
+                <!-- Barre de contrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´le supÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rieure -->
                 <div class="top-bar">
                     <div class="file-info">
-                        <span class="file-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ</span>
+                        <span class="file-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Âµ</span>
                         <span class="file-name" id="currentFileName">No file loaded</span>
                         <span class="file-duration" id="fileDuration">--:--</span>
                     </div>
                     
                     <div class="playback-controls">
                         <button class="btn-control" id="btnPrevious" title="Previous">
-                            ÃƒÂ¢Ã‚ÂÃ‚Â®ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â®ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                         <button class="btn-control btn-play" id="btnPlay" title="Play">
-                            ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                         <button class="btn-control" id="btnPause" title="Pause" style="display: none;">
-                            ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                         <button class="btn-control" id="btnStop" title="Stop">
-                            ÃƒÂ¢Ã‚ÂÃ‚Â¹ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                         <button class="btn-control" id="btnNext" title="Next">
-                            ÃƒÂ¢Ã‚ÂÃ‚Â­ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â­ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                     </div>
                     
@@ -130,10 +141,10 @@ class HomeView {
                     
                     <div class="top-bar-actions">
                         <button class="btn-secondary" onclick="homeController.openEditor()" title="Open Editor">
-                            ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â Editor
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Editor
                         </button>
                         <button class="btn-secondary" onclick="homeController.openSettings()" title="Settings">
-                            ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â
+                            ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                         </button>
                     </div>
                 </div>
@@ -153,7 +164,7 @@ class HomeView {
 
                 <!-- Layout principal -->
                 <div class="home-layout">
-                    <!-- Section gauche - SÃƒÆ’Ã‚Â©lection et Routing (25%) -->
+                    <!-- Section gauche - SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lection et Routing (25%) -->
                     <aside class="left-panel">
                         <div class="panel-section file-section">
                             <h3>File Selection</h3>
@@ -162,10 +173,10 @@ class HomeView {
                                     <option value="">-- Select a file --</option>
                                 </select>
                                 <button class="btn-icon" onclick="homeController.refreshFiles()" title="Refresh">
-                                    ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Å¾
+                                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾
                                 </button>
                                 <button class="btn-icon" onclick="homeController.uploadFile()" title="Upload">
-                                    ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â
+                                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â
                                 </button>
                             </div>
                             
@@ -173,7 +184,7 @@ class HomeView {
                                 <div class="section-header">
                                     <span>Playlist</span>
                                     <button class="btn-icon" onclick="homeController.managePlaylist()">
-                                        ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹
+                                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹
                                     </button>
                                 </div>
                                 <div class="playlist-info" id="playlistInfo">
@@ -186,15 +197,15 @@ class HomeView {
                             <div class="section-header">
                                 <h3>Quick Routing</h3>
                                 <button class="btn-small" onclick="homeController.autoRoute()">
-                                    ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¯ Auto
+                                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¯ Auto
                                 </button>
                                 <button class="btn-small" onclick="homeController.clearRouting()">
-                                    ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â Clear
+                                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Clear
                                 </button>
                             </div>
                             
                             <div class="routing-grid" id="routingGrid">
-                                <!-- GÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©rÃƒÆ’Ã‚Â© dynamiquement -->
+                                <!-- GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© dynamiquement -->
                             </div>
                             
                             <div class="routing-presets">
@@ -203,12 +214,12 @@ class HomeView {
                                     <option value="">-- Select preset --</option>
                                 </select>
                                 <button class="btn-icon" onclick="homeController.saveRoutingPreset()" title="Save preset">
-                                    ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â¾
+                                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¾
                                 </button>
                             </div>
                             
                             <div class="routing-stats" id="routingStats">
-                                <!-- Statistiques de compatibilitÃƒÆ’Ã‚Â© -->
+                                <!-- Statistiques de compatibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© -->
                             </div>
                         </div>
                     </aside>
@@ -224,7 +235,7 @@ class HomeView {
                             </div>
                             
                             <div class="channel-filter-toggles" id="channelToggles">
-                                <!-- Toggles par canal gÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©rÃƒÆ’Ã‚Â©s dynamiquement -->
+                                <!-- Toggles par canal gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s dynamiquement -->
                             </div>
                             
                             <div class="visualizer-view-options">
@@ -249,22 +260,22 @@ class HomeView {
                             <!-- Overlay pour informations -->
                             <div class="visualizer-overlay">
                                 <div class="note-preview" id="notePreview">
-                                    <!-- Notes ÃƒÆ’Ã‚Â  venir dans les prochaines secondes -->
+                                    <!-- Notes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  venir dans les prochaines secondes -->
                                 </div>
                                 
                                 <div class="cc-monitor" id="ccMonitor" style="display: none;">
-                                    <!-- Valeurs CC en temps rÃƒÆ’Ã‚Â©el -->
+                                    <!-- Valeurs CC en temps rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©el -->
                                 </div>
                                 
                                 <div class="channel-activity" id="channelActivity">
-                                    <!-- Indicateurs d'activitÃƒÆ’Ã‚Â© par canal -->
+                                    <!-- Indicateurs d'activitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© par canal -->
                                 </div>
                             </div>
                             
                             <!-- Message quand pas de fichier -->
                             <div class="empty-visualizer" id="emptyVisualizer">
                                 <div class="empty-state-large">
-                                    <span class="icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹</span>
+                                    <span class="icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹</span>
                                     <h2>No MIDI file loaded</h2>
                                     <p>Select a file from the left panel to start</p>
                                     <button class="btn-primary" onclick="homeController.selectFirstFile()">
@@ -299,10 +310,10 @@ class HomeView {
     }
 
     /**
-     * Attache les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Attache les ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements
      */
     attachEvents() {
-        // ContrÃƒÆ’Ã‚Â´les de lecture
+        // ContrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´les de lecture
         document.getElementById('btnPlay')?.addEventListener('click', () => {
             homeController.play();
         });
@@ -323,7 +334,7 @@ class HomeView {
             homeController.next();
         });
 
-        // SÃƒÆ’Ã‚Â©lection de fichier
+        // SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lection de fichier
         document.getElementById('fileSelect')?.addEventListener('change', (e) => {
             homeController.loadFile(e.target.value);
         });
@@ -382,7 +393,7 @@ class HomeView {
 
 
 /**
- * Attache les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM
+ * Attache les ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements DOM
  */
 attachDOMEvents() {
     // Player controls
@@ -468,7 +479,7 @@ switchTab(tabName) {
         return;
     }
     
-    // DÃƒÆ’Ã‚Â©sactiver tous les tabs
+    // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sactiver tous les tabs
     this.container.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
@@ -477,7 +488,7 @@ switchTab(tabName) {
         content.classList.remove('active');
     });
     
-    // Activer le tab sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©
+    // Activer le tab sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
     this.container.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
     this.container.querySelector(`[data-tab-content="${tabName}"]`)?.classList.add('active');
 }
@@ -487,7 +498,7 @@ switchTab(tabName) {
 
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour la liste des fichiers
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la liste des fichiers
      */
     updateFileList(files) {
         const select = document.getElementById('fileSelect');
@@ -505,7 +516,7 @@ switchTab(tabName) {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour les informations du fichier courant
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les informations du fichier courant
      */
     updateCurrentFile(file) {
         this.currentFile = file;
@@ -527,7 +538,7 @@ switchTab(tabName) {
         }
     }
 /**
- * Met ÃƒÆ’Ã‚Â  jour la position de lecture
+ * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la position de lecture
  */
 updatePlaybackPosition(position, duration) {
     if (!this.container) {
@@ -536,14 +547,14 @@ updatePlaybackPosition(position, duration) {
     
     const progress = duration > 0 ? (position / duration) * 100 : 0;
     
-    // Mise ÃƒÆ’Ã‚Â  jour barre de progression
+    // Mise ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour barre de progression
     const fill = this.container.querySelector('.progress-fill');
     const handle = this.container.querySelector('.progress-handle');
     
     if (fill) fill.style.width = `${progress}%`;
     if (handle) handle.style.left = `${progress}%`;
     
-    // Mise ÃƒÆ’Ã‚Â  jour temps
+    // Mise ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour temps
     const currentTimeEl = this.container.querySelector('.current-time');
     if (currentTimeEl) {
         currentTimeEl.textContent = Formatter.formatDuration(position);
@@ -551,31 +562,31 @@ updatePlaybackPosition(position, duration) {
 }
 
 /**
- * Met ÃƒÆ’Ã‚Â  jour l'ÃƒÆ’Ã‚Â©tat de lecture
+ * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de lecture
  */
 updatePlaybackState(isPlaying) {
     const playPauseBtn = this.container.querySelector('.btn-play-pause .icon');
     const status = this.container.querySelector('.player-status');
     
     if (playPauseBtn) {
-        playPauseBtn.textContent = isPlaying ? 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â' : 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â';
+        playPauseBtn.textContent = isPlaying ? 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â' : 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â';
     }
     
     if (status) {
         status.className = `player-status ${isPlaying ? 'playing' : 'paused'}`;
-        status.textContent = isPlaying ? 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â Lecture' : 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â Pause';
+        status.textContent = isPlaying ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Lecture' : 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Pause';
     }
 }
 
 /**
- * Met ÃƒÆ’Ã‚Â  jour le fichier courant
+ * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour le fichier courant
  */
 updateCurrentFile(file) {
     const fileName = this.container.querySelector('.file-name');
     const fileInfo = this.container.querySelector('.file-metadata');
     
     if (fileName) {
-        fileName.textContent = file ? file.name : 'Aucun fichier sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©';
+        fileName.textContent = file ? file.name : 'Aucun fichier sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©';
     }
     
     if (fileInfo && file) {
@@ -583,7 +594,7 @@ updateCurrentFile(file) {
     }
 }
     /**
-     * Met ÃƒÆ’Ã‚Â  jour la grille de routing
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la grille de routing
      */
     updateRoutingGrid(channels, instruments) {
         const grid = document.getElementById('routingGrid');
@@ -621,7 +632,7 @@ updateCurrentFile(file) {
     }
 
     /**
-     * Obtient le badge de compatibilitÃƒÆ’Ã‚Â©
+     * Obtient le badge de compatibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
      */
     getCompatibilityBadge(compatibility) {
         if (!compatibility) {
@@ -631,18 +642,18 @@ updateCurrentFile(file) {
         const percent = compatibility.percentage;
         
         if (percent === 100) {
-            return '<span class="badge badge-success" title="Perfect compatibility">ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦</span>';
+            return '<span class="badge badge-success" title="Perfect compatibility">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>';
         } else if (percent >= 80) {
-            return `<span class="badge badge-warning" title="${percent}% compatible">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â</span>`;
+            return `<span class="badge badge-warning" title="${percent}% compatible">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>`;
         } else if (percent >= 50) {
-            return `<span class="badge badge-warning" title="${percent}% compatible">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â</span>`;
+            return `<span class="badge badge-warning" title="${percent}% compatible">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>`;
         } else {
-            return `<span class="badge badge-error" title="${percent}% compatible">ÃƒÂ¢Ã‚ÂÃ…â€™</span>`;
+            return `<span class="badge badge-error" title="${percent}% compatible">ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€¦Ã¢â‚¬â„¢</span>`;
         }
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour les statistiques de routing
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les statistiques de routing
      */
     updateRoutingStats(stats) {
         const container = document.getElementById('routingStats');
@@ -675,7 +686,7 @@ updateCurrentFile(file) {
             </div>
         `;
     }
-// frontend/js/views/HomeView.js - MÃƒÆ’Ã‚Â©thode buildTemplate()
+// frontend/js/views/HomeView.js - MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode buildTemplate()
 
 /**
  * Construit le template HTML de la page d'accueil
@@ -705,21 +716,21 @@ buildTemplate(data = {}) {
  * Section Player principal
  */
 buildPlayerSection(file, isPlaying, position, duration) {
-    const fileName = file ? file.name : 'Aucun fichier sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©';
+    const fileName = file ? file.name : 'Aucun fichier sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©';
     const fileInfo = file ? this.buildFileInfo(file) : '';
     const progress = duration > 0 ? (position / duration) * 100 : 0;
     
     return `
         <section class="player-section">
             <div class="player-header">
-                <h2>ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ Lecteur MIDI</h2>
+                <h2>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Âµ Lecteur MIDI</h2>
                 <div class="player-status ${isPlaying ? 'playing' : 'paused'}">
-                    ${isPlaying ? 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â Lecture' : 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â Pause'}
+                    ${isPlaying ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Lecture' : 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Pause'}
                 </div>
             </div>
             
             <div class="current-file-display">
-                <div class="file-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹</div>
+                <div class="file-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹</div>
                 <div class="file-details">
                     <div class="file-name">${fileName}</div>
                     ${fileInfo}
@@ -739,29 +750,29 @@ buildPlayerSection(file, isPlaying, position, duration) {
                 </div>
                 
                 <div class="control-buttons">
-                    <button class="btn-control" data-view-action="previous" title="PrÃƒÆ’Ã‚Â©cÃƒÆ’Ã‚Â©dent">
-                        <span class="icon">ÃƒÂ¢Ã‚ÂÃ‚Â®ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
+                    <button class="btn-control" data-view-action="previous" title="PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dent">
+                        <span class="icon">ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â®ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>
                     </button>
                     <button class="btn-control btn-play-pause" data-view-action="togglePlayback">
-                        <span class="icon">${isPlaying ? 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â' : 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â'}</span>
+                        <span class="icon">${isPlaying ? 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â' : 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â'}</span>
                     </button>
                     <button class="btn-control" data-view-action="stop" title="Stop">
-                        <span class="icon">ÃƒÂ¢Ã‚ÂÃ‚Â¹ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
+                        <span class="icon">ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>
                     </button>
                     <button class="btn-control" data-view-action="next" title="Suivant">
-                        <span class="icon">ÃƒÂ¢Ã‚ÂÃ‚Â­ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
+                        <span class="icon">ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â­ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>
                     </button>
                 </div>
                 
                 <div class="secondary-controls">
-                    <button class="btn-icon" data-view-action="toggleShuffle" title="Lecture alÃƒÆ’Ã‚Â©atoire">
-                        ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬
+                    <button class="btn-icon" data-view-action="toggleShuffle" title="Lecture alÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©atoire">
+                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
                     </button>
-                    <button class="btn-icon" data-view-action="toggleRepeat" title="RÃƒÆ’Ã‚Â©pÃƒÆ’Ã‚Â©ter">
-                        ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â
+                    <button class="btn-icon" data-view-action="toggleRepeat" title="RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©pÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ter">
+                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â
                     </button>
                     <div class="volume-control">
-                        <span class="icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â </span>
+                        <span class="icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã‚Â </span>
                         <input type="range" 
                                class="volume-slider" 
                                min="0" max="100" 
@@ -775,20 +786,20 @@ buildPlayerSection(file, isPlaying, position, duration) {
 }
 
 /**
- * Section sÃƒÆ’Ã‚Â©lecteur fichiers
+ * Section sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lecteur fichiers
  */
 buildFileSelectorSection(recentFiles, playlists) {
     return `
         <section class="file-selector-section">
             <div class="selector-tabs">
                 <button class="tab-btn active" data-tab="recent">
-                    ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â RÃƒÆ’Ã‚Â©cents
+                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cents
                 </button>
                 <button class="tab-btn" data-tab="playlists">
-                    ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Playlists
+                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ Playlists
                 </button>
                 <button class="tab-btn" data-tab="browse">
-                    ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Parcourir
+                    ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â Parcourir
                 </button>
             </div>
             
@@ -804,7 +815,7 @@ buildFileSelectorSection(recentFiles, playlists) {
                 <div class="browse-placeholder">
                     <p>Cliquez pour ouvrir l'explorateur de fichiers</p>
                     <button class="btn-primary" data-view-action="openFileExplorer">
-                        ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¡ Parcourir les fichiers
+                        ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ Parcourir les fichiers
                     </button>
                 </div>
             </div>
@@ -813,14 +824,14 @@ buildFileSelectorSection(recentFiles, playlists) {
 }
 
 /**
- * Liste fichiers rÃƒÆ’Ã‚Â©cents
+ * Liste fichiers rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cents
  */
 buildRecentFilesList(files) {
     if (files.length === 0) {
         return `
             <div class="empty-state">
-                <div class="empty-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¼</div>
-                <p>Aucun fichier rÃƒÆ’Ã‚Â©cent</p>
+                <div class="empty-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¼</div>
+                <p>Aucun fichier rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cent</p>
                 <button class="btn-secondary" data-view-action="openFileExplorer">
                     Ajouter des fichiers
                 </button>
@@ -841,12 +852,12 @@ buildRecentFilesList(files) {
 buildFileCard(file) {
     return `
         <div class="file-card" data-file-id="${file.id}">
-            <div class="file-card-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹</div>
+            <div class="file-card-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹</div>
             <div class="file-card-info">
                 <div class="file-card-name">${file.name}</div>
                 <div class="file-card-meta">
                     <span class="duration">${Formatter.formatDuration(file.duration)}</span>
-                    <span class="separator">ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢</span>
+                    <span class="separator">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢</span>
                     <span class="size">${Formatter.formatFileSize(file.size)}</span>
                 </div>
             </div>
@@ -855,13 +866,13 @@ buildFileCard(file) {
                         data-view-action="playFile" 
                         data-file-id="${file.id}"
                         title="Lire">
-                    ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â
+                    ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¶ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â
                 </button>
                 <button class="btn-icon-small" 
                         data-view-action="addToQueue" 
                         data-file-id="${file.id}"
-                        title="Ajouter ÃƒÆ’Ã‚Â  la file">
-                    ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢
+                        title="Ajouter ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la file">
+                    ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢
                 </button>
             </div>
         </div>
@@ -878,9 +889,9 @@ buildInstrumentStatusSection(instruments) {
     return `
         <section class="instrument-status-section">
             <div class="status-header">
-                <h3>ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â‚¬ÂºÃƒÂ¯Ã‚Â¸Ã‚Â Instruments</h3>
+                <h3>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂºÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Instruments</h3>
                 <span class="status-badge ${statusClass}">
-                    ${connectedCount} connectÃƒÆ’Ã‚Â©${connectedCount > 1 ? 's' : ''}
+                    ${connectedCount} connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©${connectedCount > 1 ? 's' : ''}
                 </span>
             </div>
             
@@ -906,9 +917,9 @@ buildInstrumentList(instruments) {
 buildNoInstruments() {
     return `
         <div class="no-instruments">
-            <p>Aucun instrument connectÃƒÆ’Ã‚Â©</p>
+            <p>Aucun instrument connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©</p>
             <button class="btn-secondary" data-view-action="scanInstruments">
-                ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Rechercher des instruments
+                ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â Rechercher des instruments
             </button>
         </div>
     `;
@@ -920,26 +931,26 @@ buildNoInstruments() {
 buildQuickActionsSection() {
     return `
         <section class="quick-actions-section">
-            <h3>ÃƒÂ¢Ã…Â¡Ã‚Â¡ Actions Rapides</h3>
+            <h3>ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¡ Actions Rapides</h3>
             <div class="quick-actions-grid">
                 <button class="action-card" data-view-action="openEditor">
-                    <span class="action-icon">ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â</span>
-                    <span class="action-label">ÃƒÆ’Ã¢â‚¬Â°diteur MIDI</span>
+                    <span class="action-icon">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>
+                    <span class="action-label">ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°diteur MIDI</span>
                 </button>
                 
                 <button class="action-card" data-view-action="openRouting">
-                    <span class="action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬</span>
+                    <span class="action-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬</span>
                     <span class="action-label">Configuration Routing</span>
                 </button>
                 
                 <button class="action-card" data-view-action="createPlaylist">
-                    <span class="action-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹</span>
+                    <span class="action-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹</span>
                     <span class="action-label">Nouvelle Playlist</span>
                 </button>
                 
                 <button class="action-card" data-view-action="openSystem">
-                    <span class="action-icon">ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
-                    <span class="action-label">ParamÃƒÆ’Ã‚Â¨tres</span>
+                    <span class="action-icon">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â</span>
+                    <span class="action-label">ParamÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨tres</span>
                 </button>
             </div>
         </section>
@@ -951,25 +962,25 @@ buildQuickActionsSection() {
  */
 getInstrumentIcon(type) {
     const icons = {
-        'usb': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…â€™',
-        'wifi': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¶',
-        'bluetooth': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¶',
-        'virtual': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â»'
+        'usb': 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢',
+        'wifi': 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¶',
+        'bluetooth': 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¶',
+        'virtual': 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â»'
     };
-    return icons[type] || 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹';
+    return icons[type] || 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹';
 }
 
 buildFileInfo(file) {
     return `
         <div class="file-metadata">
-            ${file.tempo ? `<span class="meta-item">ÃƒÂ¢Ã¢â€žÂ¢Ã‚Â© ${file.tempo} BPM</span>` : ''}
-            ${file.timeSignature ? `<span class="meta-item">ÃƒÂ¢Ã‚ÂÃ‚Â±ÃƒÂ¯Ã‚Â¸Ã‚Â ${file.timeSignature}</span>` : ''}
-            ${file.trackCount ? `<span class="meta-item">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ ${file.trackCount} pistes</span>` : ''}
+            ${file.tempo ? `<span class="meta-item">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â© ${file.tempo} BPM</span>` : ''}
+            ${file.timeSignature ? `<span class="meta-item">ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â±ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â ${file.timeSignature}</span>` : ''}
+            ${file.trackCount ? `<span class="meta-item">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Âµ ${file.trackCount} pistes</span>` : ''}
         </div>
     `;
 }
     /**
-     * Met ÃƒÆ’Ã‚Â  jour les toggles de canaux
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les toggles de canaux
      */
     updateChannelToggles(channels) {
         const container = document.getElementById('channelToggles');
@@ -989,7 +1000,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'ÃƒÆ’Ã‚Â©tat de lecture
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de lecture
      */
     updatePlaybackState(state) {
         const btnPlay = document.getElementById('btnPlay');
@@ -1005,7 +1016,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour la barre de progression
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la barre de progression
      */
     updateProgress(currentTime, totalTime) {
         const percent = (currentTime / totalTime) * 100;
@@ -1014,14 +1025,14 @@ buildFileInfo(file) {
         document.getElementById('playhead').style.left = `${percent}%`;
         document.getElementById('currentTime').textContent = this.formatTime(currentTime);
         
-        // Mettre ÃƒÆ’Ã‚Â  jour le visualizer
+        // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour le visualizer
         if (this.visualizer) {
             this.visualizer.update(currentTime);
         }
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'overlay de notes ÃƒÆ’Ã‚Â  venir
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'overlay de notes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  venir
      */
     updateNotePreview(upcomingNotes) {
         const container = document.getElementById('notePreview');
@@ -1047,7 +1058,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour le moniteur CC
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour le moniteur CC
      */
     updateCCMonitor(ccValues) {
         const container = document.getElementById('ccMonitor');
@@ -1066,7 +1077,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'activitÃƒÆ’Ã‚Â© des canaux
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'activitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© des canaux
      */
     updateChannelActivity(channels) {
         const container = document.getElementById('channelActivity');

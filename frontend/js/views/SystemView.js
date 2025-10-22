@@ -1,11 +1,11 @@
-// ===== SYSTEM VIEW - Vue de configuration systÃ¨me =====
+// ===== SYSTEM VIEW - Vue de configuration systÃƒÂ¨me =====
 // =====================================================
-// GÃ¨re l'affichage de toutes les configurations systÃ¨me :
-// - ParamÃ¨tres audio/MIDI (latence, buffer, sample rate)
+// GÃƒÂ¨re l'affichage de toutes les configurations systÃƒÂ¨me :
+// - ParamÃƒÂ¨tres audio/MIDI (latence, buffer, sample rate)
 // - Calibration automatique des instruments
-// - PrÃ©sets de visualiseur (performance, qualitÃ©, Ã©quilibrÃ©)
-// - Statistiques en temps rÃ©el du systÃ¨me
-// - Configuration des thÃ¨mes et interface
+// - PrÃƒÂ©sets de visualiseur (performance, qualitÃƒÂ©, ÃƒÂ©quilibrÃƒÂ©)
+// - Statistiques en temps rÃƒÂ©el du systÃƒÂ¨me
+// - Configuration des thÃƒÂ¨mes et interface
 // - Monitoring des performances
 // =====================================================
 
@@ -16,7 +16,7 @@ class SystemView extends BaseView {
         // Initialize logger first
         this.logger = window.logger || console;
         
-        // Ã‰tat de la vue
+        // Ãƒâ€°tat de la vue
         this.calibrationInProgress = false;
         this.statsUpdateInterval = null;
         this.currentTheme = 'light';
@@ -26,7 +26,7 @@ class SystemView extends BaseView {
         
         // Log initialization
         if (this.logger && this.logger.info) {
-            this.logger.info('SystemView', 'âœ“ SystemView initialized');
+            this.logger.info('SystemView', 'Ã¢Å“â€œ SystemView initialized');
         }
     }
     
@@ -43,38 +43,38 @@ class SystemView extends BaseView {
     }
 
     /**
-     * Construit le template principal de la page systÃ¨me
-     * @param {Object} data - Configuration systÃ¨me complÃ¨te
-     * @returns {string} - HTML de la page systÃ¨me
+     * Construit le template principal de la page systÃƒÂ¨me
+     * @param {Object} data - Configuration systÃƒÂ¨me complÃƒÂ¨te
+     * @returns {string} - HTML de la page systÃƒÂ¨me
      */
     buildTemplate(data) {
         return `
             <div class="system-layout">
-                <!-- En-tÃªte avec statut systÃ¨me -->
+                <!-- En-tÃƒÂªte avec statut systÃƒÂ¨me -->
                 <div class="system-header">
                     <div class="system-status">
                         <div class="status-indicator ${data.systemHealth === 'good' ? 'status-good' : 'status-warning'}"></div>
                         <div class="status-info">
-                            <h1 class="system-title">Configuration SystÃ¨me</h1>
-                            <p class="system-subtitle">SantÃ©: ${data.systemHealth || 'En cours de vÃ©rification...'}</p>
+                            <h1 class="system-title">Configuration SystÃƒÂ¨me</h1>
+                            <p class="system-subtitle">SantÃƒÂ©: ${data.systemHealth || 'En cours de vÃƒÂ©rification...'}</p>
                         </div>
                     </div>
                     <div class="system-actions">
                         <button class="btn btn-primary" onclick="app.systemController.exportSettings()">
-                            ðŸ“„ Exporter Config
+                            Ã°Å¸â€œâ€ž Exporter Config
                         </button>
                         <button class="btn btn-secondary" onclick="app.systemController.importSettings()">
-                            ðŸ“ Importer Config
+                            Ã°Å¸â€œÂ Importer Config
                         </button>
                     </div>
                 </div>
 <!-- Section Statut Backend C++ -->
 <div class="system-section">
     <div class="section-header">
-        <h3 class="section-title">ðŸ”Œ Backend MIDI C++</h3>
+        <h3 class="section-title">Ã°Å¸â€Å’ Backend MIDI C++</h3>
         <div class="backend-status-indicator ${data.backendConnected ? 'connected' : 'disconnected'}">
             <span class="status-dot"></span>
-            ${data.backendConnected ? 'ConnectÃ©' : 'DÃ©connectÃ©'}
+            ${data.backendConnected ? 'ConnectÃƒÂ©' : 'DÃƒÂ©connectÃƒÂ©'}
         </div>
     </div>
     <div class="section-content">
@@ -86,9 +86,9 @@ class SystemView extends BaseView {
                     <!-- Section Audio/MIDI -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">ðŸŽµ Configuration Audio/MIDI</h3>
+                            <h3 class="section-title">Ã°Å¸Å½Âµ Configuration Audio/MIDI</h3>
                             <button class="btn btn-small btn-success" onclick="app.systemController.autoCalibrate()">
-                                âš¡ Auto-Calibrer
+                                Ã¢Å¡Â¡ Auto-Calibrer
                             </button>
                         </div>
                         <div class="section-content">
@@ -99,7 +99,7 @@ class SystemView extends BaseView {
                     <!-- Section Instruments & Latence -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">ðŸŽ¼ Instruments & Latence</h3>
+                            <h3 class="section-title">Ã°Å¸Å½Â¼ Instruments & Latence</h3>
                             <span class="latency-status ${data.maxLatency > 50 ? 'high-latency' : 'good-latency'}">
                                 Max: ${data.maxLatency || 0}ms
                             </span>
@@ -112,13 +112,13 @@ class SystemView extends BaseView {
                     <!-- Section Visualiseur -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">ðŸŽ¨ Configuration Visualiseur</h3>
+                            <h3 class="section-title">Ã°Å¸Å½Â¨ Configuration Visualiseur</h3>
                             <select class="preset-select" onchange="app.systemController.applyVisualizerPreset(this.value)">
-                                <option value="">SÃ©lectionner un preset</option>
-                                <option value="performance" ${data.visualizerPreset === 'performance' ? 'selected' : ''}>âš¡ Performance</option>
-                                <option value="balanced" ${data.visualizerPreset === 'balanced' ? 'selected' : ''}>âš–ï¸ Ã‰quilibrÃ©</option>
-                                <option value="quality" ${data.visualizerPreset === 'quality' ? 'selected' : ''}>âœ¨ QualitÃ©</option>
-                                <option value="custom" ${data.visualizerPreset === 'custom' ? 'selected' : ''}>ðŸ”§ PersonnalisÃ©</option>
+                                <option value="">SÃƒÂ©lectionner un preset</option>
+                                <option value="performance" ${data.visualizerPreset === 'performance' ? 'selected' : ''}>Ã¢Å¡Â¡ Performance</option>
+                                <option value="balanced" ${data.visualizerPreset === 'balanced' ? 'selected' : ''}>Ã¢Å¡â€“Ã¯Â¸Â Ãƒâ€°quilibrÃƒÂ©</option>
+                                <option value="quality" ${data.visualizerPreset === 'quality' ? 'selected' : ''}>Ã¢Å“Â¨ QualitÃƒÂ©</option>
+                                <option value="custom" ${data.visualizerPreset === 'custom' ? 'selected' : ''}>Ã°Å¸â€Â§ PersonnalisÃƒÂ©</option>
                             </select>
                         </div>
                         <div class="section-content">
@@ -126,15 +126,15 @@ class SystemView extends BaseView {
                         </div>
                     </div>
 
-                    <!-- Section Interface & ThÃ¨me -->
+                    <!-- Section Interface & ThÃƒÂ¨me -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">ðŸŽ¨ Interface & ThÃ¨me</h3>
+                            <h3 class="section-title">Ã°Å¸Å½Â¨ Interface & ThÃƒÂ¨me</h3>
                             <div class="theme-toggle">
                                 <button class="theme-btn ${data.theme === 'light' ? 'active' : ''}" 
-                                        onclick="app.systemController.setTheme('light')">â˜€ï¸</button>
+                                        onclick="app.systemController.setTheme('light')">Ã¢Ëœâ‚¬Ã¯Â¸Â</button>
                                 <button class="theme-btn ${data.theme === 'dark' ? 'active' : ''}" 
-                                        onclick="app.systemController.setTheme('dark')">ðŸŒ™</button>
+                                        onclick="app.systemController.setTheme('dark')">Ã°Å¸Å’â„¢</button>
                             </div>
                         </div>
                         <div class="section-content">
@@ -145,9 +145,9 @@ class SystemView extends BaseView {
                     <!-- Section Statistiques Performance -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">ðŸ“Š Performance & Statistiques</h3>
+                            <h3 class="section-title">Ã°Å¸â€œÅ  Performance & Statistiques</h3>
                             <button class="btn btn-small" onclick="app.systemController.resetStats()">
-                                ðŸ”„ Reset Stats
+                                Ã°Å¸â€â€ž Reset Stats
                             </button>
                         </div>
                         <div class="section-content">
@@ -157,10 +157,10 @@ class SystemView extends BaseView {
                         </div>
                     </div>
 
-                    <!-- Section AvancÃ©e -->
+                    <!-- Section AvancÃƒÂ©e -->
                     <div class="system-section">
                         <div class="section-header">
-                            <h3 class="section-title">âš™ï¸ Configuration AvancÃ©e</h3>
+                            <h3 class="section-title">Ã¢Å¡â„¢Ã¯Â¸Â Configuration AvancÃƒÂ©e</h3>
                             <div class="advanced-toggle">
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="showAdvanced" 
@@ -188,7 +188,7 @@ class SystemView extends BaseView {
     buildAudioMidiConfig(config = {}) {
         return `
             <div class="audio-config-grid">
-                <!-- ParamÃ¨tres de base -->
+                <!-- ParamÃƒÂ¨tres de base -->
                 <div class="config-group">
                     <label class="config-label">Buffer Audio:</label>
                     <select class="config-select" 
@@ -202,7 +202,7 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="config-group">
-                    <label class="config-label">FrÃ©quence d'Ã©chantillonnage:</label>
+                    <label class="config-label">FrÃƒÂ©quence d'ÃƒÂ©chantillonnage:</label>
                     <select class="config-select"
                             onchange="app.systemController.updateAudioConfig('sampleRate', parseInt(this.value))">
                         <option value="44100" ${config.sampleRate === 44100 ? 'selected' : ''}>44.1 kHz</option>
@@ -235,16 +235,16 @@ class SystemView extends BaseView {
 
     /**
      * Construit la liste des instruments avec leurs latences
-     * @param {Array} instruments - Liste des instruments connectÃ©s
+     * @param {Array} instruments - Liste des instruments connectÃƒÂ©s
      * @returns {string} - HTML de la liste des instruments
      */
     buildInstrumentLatencyList(instruments = []) {
         if (instruments.length === 0) {
             return `
                 <div class="empty-state">
-                    <p>ðŸŽ¼ Aucun instrument dÃ©tectÃ©</p>
+                    <p>Ã°Å¸Å½Â¼ Aucun instrument dÃƒÂ©tectÃƒÂ©</p>
                     <button class="btn btn-primary" onclick="app.instrumentController.detectInstruments()">
-                        ðŸ” DÃ©tecter Instruments
+                        Ã°Å¸â€Â DÃƒÂ©tecter Instruments
                     </button>
                 </div>
             `;
@@ -259,22 +259,22 @@ class SystemView extends BaseView {
                             <div class="instrument-type">${instrument.type}</div>
                             <div class="instrument-status">
                                 <span class="status-dot ${instrument.connected ? 'online' : 'offline'}"></span>
-                                ${instrument.connected ? 'ConnectÃ©' : 'DÃ©connectÃ©'}
+                                ${instrument.connected ? 'ConnectÃƒÂ©' : 'DÃƒÂ©connectÃƒÂ©'}
                             </div>
                         </div>
                         <div class="latency-info">
                             <div class="latency-value ${instrument.latency > 20 ? 'high' : 'good'}">
-                                ${instrument.latency ? instrument.latency.toFixed(1) : 'â€“'}ms
+                                ${instrument.latency ? instrument.latency.toFixed(1) : 'Ã¢â‚¬â€œ'}ms
                             </div>
                             <div class="jitter-value">
-                                Jitter: ${instrument.jitter ? instrument.jitter.toFixed(1) : 'â€“'}ms
+                                Jitter: ${instrument.jitter ? instrument.jitter.toFixed(1) : 'Ã¢â‚¬â€œ'}ms
                             </div>
                         </div>
                         <div class="instrument-actions">
                             ${instrument.connected ? `
                                 <button class="btn btn-small" 
                                         onclick="app.systemController.calibrateInstrument('${instrument.id}')">
-                                    ðŸ“Š Calibrer
+                                    Ã°Å¸â€œÅ  Calibrer
                                 </button>
                             ` : ''}
                         </div>
@@ -300,7 +300,7 @@ class SystemView extends BaseView {
                 </div>
                 
                 <div class="config-row">
-                    <label>FenÃªtre temps (s):</label>
+                    <label>FenÃƒÂªtre temps (s):</label>
                     <input type="range" min="1" max="30" value="${config.timeWindow || 10}"
                            oninput="app.systemController.updateVisualizerConfig('timeWindow', parseInt(this.value)); this.nextElementSibling.textContent = this.value">
                     <span class="config-value">${config.timeWindow || 10}</span>
@@ -388,8 +388,8 @@ class SystemView extends BaseView {
     }
 
     /**
-     * Construit les statistiques systÃ¨me
-     * @param {Object} stats - Statistiques systÃ¨me
+     * Construit les statistiques systÃƒÂ¨me
+     * @param {Object} stats - Statistiques systÃƒÂ¨me
      * @returns {string} - HTML des statistiques
      */
     buildSystemStats(stats = {}) {
@@ -404,7 +404,7 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="stat-item">
-                    <div class="stat-label">MÃ©moire</div>
+                    <div class="stat-label">MÃƒÂ©moire</div>
                     <div class="stat-value">${stats.memoryUsage || 0}MB</div>
                     <div class="stat-bar">
                         <div class="stat-fill" style="width: ${(stats.memoryUsage || 0) / 1024 * 100}%"></div>
@@ -428,7 +428,7 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="stat-item">
-                    <div class="stat-label">Fichiers chargÃ©s</div>
+                    <div class="stat-label">Fichiers chargÃƒÂ©s</div>
                     <div class="stat-value">${stats.filesLoaded || 0}</div>
                 </div>
             </div>
@@ -436,17 +436,17 @@ class SystemView extends BaseView {
     }
 
     /**
-     * Construit la configuration avancÃ©e
-     * @param {Object} config - Configuration avancÃ©e
-     * @returns {string} - HTML de la configuration avancÃ©e
+     * Construit la configuration avancÃƒÂ©e
+     * @param {Object} config - Configuration avancÃƒÂ©e
+     * @returns {string} - HTML de la configuration avancÃƒÂ©e
      */
     buildAdvancedConfig(config = {}) {
         return `
             <div class="advanced-config">
                 <div class="config-group">
-                    <h4>ðŸ”§ Mode Debug</h4>
+                    <h4>Ã°Å¸â€Â§ Mode Debug</h4>
                     <div class="config-row">
-                        <label>Logging dÃ©taillÃ©:</label>
+                        <label>Logging dÃƒÂ©taillÃƒÂ©:</label>
                         <label class="toggle-switch">
                             <input type="checkbox" 
                                    ${config.verboseLogging ? 'checked' : ''}
@@ -455,7 +455,7 @@ class SystemView extends BaseView {
                         </label>
                     </div>
                     <div class="config-row">
-                        <label>MÃ©triques temps rÃ©el:</label>
+                        <label>MÃƒÂ©triques temps rÃƒÂ©el:</label>
                         <label class="toggle-switch">
                             <input type="checkbox" 
                                    ${config.realtimeMetrics ? 'checked' : ''}
@@ -466,9 +466,9 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="config-group">
-                    <h4>âš¡ Optimisations</h4>
+                    <h4>Ã¢Å¡Â¡ Optimisations</h4>
                     <div class="config-row">
-                        <label>PrÃ©diction cache:</label>
+                        <label>PrÃƒÂ©diction cache:</label>
                         <label class="toggle-switch">
                             <input type="checkbox" 
                                    ${config.predictiveCache ? 'checked' : ''}
@@ -477,7 +477,7 @@ class SystemView extends BaseView {
                         </label>
                     </div>
                     <div class="config-row">
-                        <label>Compression donnÃ©es:</label>
+                        <label>Compression donnÃƒÂ©es:</label>
                         <label class="toggle-switch">
                             <input type="checkbox" 
                                    ${config.dataCompression ? 'checked' : ''}
@@ -488,7 +488,7 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="config-group">
-                    <h4>ðŸ›¡ï¸ SÃ©curitÃ©</h4>
+                    <h4>Ã°Å¸â€ºÂ¡Ã¯Â¸Â SÃƒÂ©curitÃƒÂ©</h4>
                     <div class="config-row">
                         <label>Validation stricte MIDI:</label>
                         <label class="toggle-switch">
@@ -506,7 +506,7 @@ class SystemView extends BaseView {
     /**
      * Formate le temps d'uptime en format lisible
      * @param {number} uptime - Uptime en secondes
-     * @returns {string} - Uptime formatÃ©
+     * @returns {string} - Uptime formatÃƒÂ©
      */
     formatUptime(uptime) {
         const hours = Math.floor(uptime / 3600);
@@ -523,7 +523,7 @@ class SystemView extends BaseView {
     }
 
     /**
-     * Met Ã  jour l'affichage des statistiques en temps rÃ©el
+     * Met ÃƒÂ  jour l'affichage des statistiques en temps rÃƒÂ©el
      */
     startStatsUpdate() {
         if (this.statsUpdateInterval) {
@@ -533,14 +533,14 @@ class SystemView extends BaseView {
         this.statsUpdateInterval = setInterval(() => {
             const statsContainer = document.getElementById('systemStats');
             if (statsContainer && document.getElementById('system-page').classList.contains('active')) {
-                // Ã‰mettre une demande de mise Ã  jour des stats
+                // Ãƒâ€°mettre une demande de mise ÃƒÂ  jour des stats
                 this.eventBus.emit('system:request_stats_update');
             }
         }, 1000);
     }
 
     /**
-     * ArrÃªte la mise Ã  jour des statistiques
+     * ArrÃƒÂªte la mise ÃƒÂ  jour des statistiques
      */
     stopStatsUpdate() {
         if (this.statsUpdateInterval) {
@@ -558,26 +558,26 @@ class SystemView extends BaseView {
     }
 	/**
  * Construit l'affichage du statut backend
- * @param {Object} backendData - DonnÃ©es du backend
+ * @param {Object} backendData - DonnÃƒÂ©es du backend
  * @returns {string} - HTML du statut backend
  */
-buildBackendStatus(backendData = {}) {
+function buildBackendStatus(backendData = {}) {
     if (!backendData.connected) {
         return `
             <div class="backend-disconnected">
                 <div class="warning-message">
-                    âš ï¸ Backend C++ non connectÃ©
+                    Ã¢Å¡Â Ã¯Â¸Â Backend C++ non connectÃƒÂ©
                 </div>
                 <p class="help-text">
-                    Le backend MIDI n'est pas accessible. VÃ©rifiez que :
+                    Le backend MIDI n'est pas accessible. VÃƒÂ©rifiez que :
                 </p>
                 <ul class="help-list">
-                    <li>Le serveur C++ est dÃ©marrÃ© sur le port 8080</li>
+                    <li>Le serveur C++ est dÃƒÂ©marrÃƒÂ© sur le port 8080</li>
                     <li>L'URL WebSocket est correcte (ws://localhost:8080)</li>
                     <li>Aucun pare-feu ne bloque la connexion</li>
                 </ul>
                 <button class="btn btn-primary" onclick="app.systemController.reconnectBackend()">
-                    ðŸ”„ Tenter reconnexion
+                    Ã°Å¸â€â€ž Tenter reconnexion
                 </button>
             </div>
         `;
@@ -586,7 +586,7 @@ buildBackendStatus(backendData = {}) {
     return `
         <div class="backend-connected">
             <div class="success-message">
-                âœ… Backend opÃ©rationnel
+                Ã¢Å“â€¦ Backend opÃƒÂ©rationnel
             </div>
             
             <div class="backend-info-grid">
@@ -596,9 +596,9 @@ buildBackendStatus(backendData = {}) {
                 </div>
                 
                 <div class="info-item">
-                    <div class="info-label">Ã‰tat</div>
+                    <div class="info-label">Ãƒâ€°tat</div>
                     <div class="info-value status-playing">
-                        ${backendData.isPlaying ? 'â–¶ï¸ En lecture' : 'â¸ï¸ En pause'}
+                        ${backendData.isPlaying ? 'Ã¢â€“Â¶Ã¯Â¸Â En lecture' : 'Ã¢ÂÂ¸Ã¯Â¸Â En pause'}
                     </div>
                 </div>
                 
@@ -625,10 +625,10 @@ buildBackendStatus(backendData = {}) {
             
             <div class="backend-actions">
                 <button class="btn btn-secondary" onclick="app.systemController.testBackendConnection()">
-                    ðŸ” Tester connexion
+                    Ã°Å¸â€Â Tester connexion
                 </button>
                 <button class="btn btn-secondary" onclick="app.systemController.clearBackendQueue()">
-                    ðŸ—‘ï¸ Vider file d'attente
+                    Ã°Å¸â€”â€˜Ã¯Â¸Â Vider file d'attente
                 </button>
             </div>
         </div>
@@ -644,5 +644,5 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-    window.SystemView = SystemView;  // ← AJOUTÉ
+    window.SystemView = SystemView;  // â† AJOUTÃ‰
 }
