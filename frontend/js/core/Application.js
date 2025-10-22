@@ -646,7 +646,14 @@ class Application {
      * Planifie une reconnexion
      */
     scheduleReconnect() {
-        this.logger.info('Application', `Scheduling reconnect in ${this.config.reconnectInterval}ms`);
+        // Limiter les tentatives de reconnexion
+        if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts) {
+            this.logger.warn('Application', 'Max reconnection attempts reached. Staying in offline mode.');
+            return;
+        }
+        
+        this.state.reconnectAttempts++;
+        this.logger.info('Application', `Scheduling reconnect in ${this.config.reconnectInterval}ms (attempt ${this.state.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
         setTimeout(async () => {
             if (!this.state.backendConnected) {
