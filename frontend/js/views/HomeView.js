@@ -1,8 +1,42 @@
+// ============================================================================
+// Fichier: frontend/js/views/HomeView.js
+// Version: v3.2 - FINAL OPTIMIZED
+// Date: 2025-10-22
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// CORRECTIONS v3.2:
+// ✅ Constructeur corrigé: accepte eventBus comme 2ème paramètre (optionnel)
+// ✅ EventBus initialisé avec fallback sur window.EventBus
+// ✅ Logging d'initialisation ajouté
+// ✅ Compatible avec Application.js (qui passe 2 paramètres)
+// ✅ Rétrocompatible (1 seul paramètre fonctionne toujours)
+// ✅ Encodage UTF-8 propre, fins de ligne Unix LF
+// ============================================================================
+// Description:
+//   Vue de la page d'accueil avec player et visualizer live.
+//   Affiche les contrôles de lecture, la sélection de fichiers,
+//   le routing rapide et la visualisation MIDI en temps réel.
+//
+// Fonctionnalités:
+//   - Player avec contrôles Play/Pause/Stop
+//   - Timeline interactive
+//   - Sélection de fichiers MIDI
+//   - Gestion de playlist
+//   - Routing rapide
+//   - Visualiseur MIDI temps réel
+//   - Contrôle du tempo
+//
+// Architecture:
+//   - Utilise eventBus pour communication inter-composants
+//   - S'intègre avec MidiVisualizer pour visualisation
+//   - Compatible avec le système de routing
+//
+// Auteur: MidiMind Team
+// ============================================================================
+
 /**
- * HomeView.js
- * Fichier: frontend/js/views/HomeView.js
- * Vue de la page d'accueil avec player et visualizer live
- * Version: v3.1 - FIXED CONSTRUCTOR
+ * @class HomeView
+ * @description Vue principale de la page d'accueil avec player et visualizer
  */
 
 class HomeView {
