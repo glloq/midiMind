@@ -1,13 +1,13 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.2.0 - FIXED STRUCTURE (app container added)
+Version: v3.2.1 - FIXED ROUTING MATRIX REFERENCE
 Date: 2025-10-22
 ============================================================================ 
-CORRECTIONS v3.2.0:
+CORRECTIONS v3.2.1:
 ✅ Ajout de l'élément #app manquant pour showInterface()
 ✅ Structure HTML corrigée pour affichage des pages
-✅ Toutes les pages maintenant visibles
-✅ Compatibilité totale avec Application.js v3.4
+✅ Suppression de la référence à RoutingMatrix.js (sera chargé dynamiquement si nécessaire)
+✅ Compatibilité totale avec Application.js v3.5
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -25,7 +25,7 @@ CORRECTIONS v3.2.0:
 </head>
 <body>
     <!-- ========================================================================
-         MAIN APP CONTAINER - NOUVEAU
+         MAIN APP CONTAINER
          ======================================================================== -->
     <div id="app" style="display: none;">
         
@@ -201,7 +201,12 @@ CORRECTIONS v3.2.0:
     <script src="js/editor/core/CoordinateSystem.js"></script>
     <script src="js/editor/core/Viewport.js"></script>
     <script src="js/editor/core/RenderEngine.js"></script>
-	<script src="js/rendering/RoutingMatrix.js"></script>
+    
+    <!-- ========================================================================
+         NOTE: RoutingMatrix.js sera chargé dynamiquement si nécessaire
+         Voir README_V2.md pour les instructions d'installation
+         ======================================================================== -->
+    
     <!-- ========================================================================
          ÉTAPE 10: ÉDITEUR - RENDERERS
          ======================================================================== -->

@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.4 - FIXED RENDERING (Vue initialization corrected)
+// Version: v3.5 - FIXED LOGGER INITIALIZATION
 // Date: 2025-10-22
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// CORRECTIONS v3.4:
-// ✅ Conteneurs corrects pour toutes les vues (home, editor, routing, etc.)
-// ✅ Initialisation forcée de toutes les vues avec init() ou render()
+// CORRECTIONS v3.5:
+// ✅ Logger correctement initialisé avec new Logger()
+// ✅ Conteneurs corrects pour toutes les vues
+// ✅ Initialisation forcée de toutes les vues
 // ✅ Interface visible même sans backend
-// ✅ Toutes les pages affichent leur contenu
-// ✅ KeyboardView correctement initialisée
+// ✅ Mode offline gracieux
 // ============================================================================
 
 class Application {
@@ -138,7 +138,9 @@ class Application {
             
         } catch (error) {
             console.error('❌ Failed to initialize application:', error);
-            this.logger.error('Application', 'Initialization failed:', error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('Application', 'Initialization failed:', error);
+            }
             this.handleInitError(error);
         }
     }
@@ -149,19 +151,39 @@ class Application {
     async initFoundations() {
         console.log('📦 Initializing foundations...');
         
-        // EventBus
-        this.eventBus = new EventBus();
+        // EventBus (déjà instancié globalement ou créer nouveau)
+        this.eventBus = window.eventBus || new EventBus();
+        window.eventBus = this.eventBus;
         
-        // Logger
-        this.logger = window.Logger;
+        // Logger - CORRIGÉ : créer une nouvelle instance
+        if (window.Logger && typeof window.Logger === 'function') {
+            this.logger = window.logger || new Logger({
+                level: this.config.logLevel,
+                eventBus: this.eventBus
+            });
+            window.logger = this.logger;
+        } else {
+            // Fallback vers console si Logger n'est pas disponible
+            console.warn('Logger class not available, using console as fallback');
+            this.logger = console;
+            window.logger = console;
+        }
         
         // DebugConsole
         if (this.config.enableDebugConsole && window.DebugConsole) {
-            this.debugConsole = window.DebugConsole;
+            if (typeof window.DebugConsole === 'function') {
+                this.debugConsole = new DebugConsole(this.eventBus, this.logger);
+                window.debugConsole = this.debugConsole;
+            } else {
+                this.debugConsole = window.DebugConsole;
+            }
         }
         
         // Notifications
-        if (window.NotificationManager) {
+        if (window.Notifications && typeof window.Notifications === 'function') {
+            this.notifications = new Notifications(this.eventBus);
+            window.notifications = this.notifications;
+        } else if (window.NotificationManager) {
             this.notifications = window.NotificationManager;
         }
         
@@ -539,7 +561,7 @@ class Application {
      * @param {string} reason - Raison
      */
     showOfflineNotification(reason) {
-        if (this.notifications) {
+        if (this.notifications && this.notifications.show) {
             this.notifications.show(
                 `Mode Offline: ${reason}. Les fonctionnalités locales restent disponibles.`,
                 'warning',
@@ -680,20 +702,24 @@ class Application {
     attachErrorHandlers() {
         // Erreurs JavaScript non capturées
         window.addEventListener('error', (event) => {
-            this.logger.error('Application', 'Uncaught error:', event.error);
+            if (this.logger && this.logger.error) {
+                this.logger.error('Application', 'Uncaught error:', event.error);
+            }
             this.handleError(event.error);
         });
         
         // Promesses rejetées non capturées
         window.addEventListener('unhandledrejection', (event) => {
-            this.logger.error('Application', 'Unhandled rejection:', event.reason);
+            if (this.logger && this.logger.error) {
+                this.logger.error('Application', 'Unhandled rejection:', event.reason);
+            }
             this.handleError(event.reason);
         });
     }
     
     handleError(error) {
         // Afficher notification
-        if (this.notifications) {
+        if (this.notifications && this.notifications.show) {
             this.notifications.show(
                 `Error: ${error.message || error}`,
                 'error'
@@ -701,20 +727,24 @@ class Application {
         }
         
         // Logger détaillé
-        this.logger.error('Application', 'Error occurred:', {
-            message: error.message,
-            stack: error.stack
-        });
+        if (this.logger && this.logger.error) {
+            this.logger.error('Application', 'Error occurred:', {
+                message: error.message,
+                stack: error.stack
+            });
+        }
         
         // Émettre événement erreur
         this.eventBus.emit('app:error', { error });
     }
     
     handleInitError(error) {
-        this.logger.error('Application', 'Initialization error:', error);
+        if (this.logger && this.logger.error) {
+            this.logger.error('Application', 'Initialization error:', error);
+        }
         
         // Afficher erreur à l'utilisateur
-        if (this.notifications) {
+        if (this.notifications && this.notifications.show) {
             this.notifications.show(
                 `Failed to initialize: ${error.message}`,
                 'error',
@@ -810,5 +840,5 @@ class Application {
 }
 
 // ============================================================================
-// FIN DU FICHIER Application.js v3.4
+// FIN DU FICHIER Application.js v3.5
 // ============================================================================
