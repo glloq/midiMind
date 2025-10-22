@@ -1,24 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaybackController.js
-// Version: 3.1.0-corrections
-// Date: 2025-10-15
+// Version: v3.2.0 - CORRECTED (Deferred Init + Offline Mode)
+// Date: 2025-10-21
 // ============================================================================
-// Description:
-//   Contrôleur de lecture MIDI - CORRIGÉ pour BaseController
-//   
-// CORRECTIONS v3.1.0:
-//   ✅ Signature constructor compatible BaseController
-//   ✅ Utilisation models au lieu de paramètres directs
-//   ✅ Intégration backend protocole v3.0
-//   ✅ destroy() complet avec cleanup timer
-//   ✅ Notifications unifiées
-//   ✅ Gestion erreurs standardisée
-//
-// Modifications par rapport à v3.0.0:
-//   - Constructor refactorisé
-//   - Ajout destroy() complet
-//   - Amélioration handleError()
-//   - Integration backend v3.0
+// CORRECTIONS v3.2.0:
+// ✅ Initialisation différée si backend pas disponible
+// ✅ Écoute événement 'backend:connected' pour init
+// ✅ Mode graceful si backend absent (UI désactivée)
+// ✅ Notifications utilisateur claires
+// ✅ Ré-activation automatique quand backend se connecte
+// ✅ Conservation de toutes les fonctionnalités v3.1.0
 // ============================================================================
 
 class PlaybackController extends BaseController {
@@ -45,14 +36,33 @@ class PlaybackController extends BaseController {
             tempo: 120,
             loop: false,
             volume: 100,
-            loadedFile: null
+            loadedFile: null,
+            // ← NOUVEAU
+            backendReady: false,
+            deferredInit: false
         };
         
         // Timer pour mise à jour position
         this.positionUpdateTimer = null;
         
-        // Initialisation
-        this.initialize();
+        // ← MODIFIÉ: Vérifier si backend est prêt avant d'initialiser
+        if (this.backend && this.backend.isConnected()) {
+            // Backend disponible, initialiser normalement
+            this.initialize();
+        } else {
+            // Backend pas prêt, différer l'initialisation
+            this.state.deferredInit = true;
+            this.logDebug('playback', 'Backend not ready, deferring PlaybackController initialization');
+            
+            // Écouter la connexion du backend
+            this.eventBus.once('backend:connected', () => {
+                this.logDebug('playback', 'Backend connected, initializing PlaybackController now');
+                this.initialize();
+            });
+            
+            // Désactiver l'UI en attendant
+            this.disableUI();
+        }
     }
     
     // ========================================================================
@@ -69,11 +79,25 @@ class PlaybackController extends BaseController {
         // Vérifier dépendances
         if (!this.backend) {
             this.logDebug('error', 'BackendService not available');
-            this.showNotification('Backend service not available');
+            this.showError('Backend service not available');
+            this.disableUI();
             return;
         }
         
-        this.logDebug('playback', '✓ PlaybackController initialized');
+        if (!this.backend.isConnected()) {
+            this.logDebug('warn', 'Backend not connected yet');
+            this.disableUI();
+            return;
+        }
+        
+        // Backend OK !
+        this.state.backendReady = true;
+        this.state.deferredInit = false;
+        
+        // Activer l'UI
+        this.enableUI();
+        
+        this.logDebug('playback', '✅ PlaybackController initialized');
     }
     
     /**
@@ -99,173 +123,190 @@ class PlaybackController extends BaseController {
             debounce: 50
         });
         
-        this.subscribe('playback:setTempo', (data) => this.setTempo(data.tempo), {
-            validate: true,
-            debounce: 100
+        this.subscribe('playback:set-tempo', (data) => this.setTempo(data.tempo));
+        this.subscribe('playback:toggle-loop', () => this.toggleLoop());
+        this.subscribe('playback:set-volume', (data) => this.setVolume(data.volume));
+        
+        // Chargement fichier
+        this.subscribe('playback:load-file', (data) => this.loadFile(data.fileId));
+        
+        // ========================================================================
+        // ÉVÉNEMENTS BACKEND → CONTROLLER
+        // ========================================================================
+        
+        this.subscribe('backend:playback:state-changed', (data) => {
+            this.handlePlaybackStateChanged(data);
         });
         
-        this.subscribe('playback:setLoop', (data) => this.setLoop(data.enabled));
+        this.subscribe('backend:playback:position-changed', (data) => {
+            this.handlePositionChanged(data);
+        });
         
-        this.subscribe('playback:setVolume', (data) => this.setVolume(data.volume), {
-            validate: true,
-            debounce: 50
+        this.subscribe('backend:playback:finished', () => {
+            this.handlePlaybackFinished();
         });
         
         // ========================================================================
-        // ÉVÉNEMENTS BACKEND → CONTROLLER (protocole v3.0)
+        // ÉVÉNEMENTS MODEL → CONTROLLER
         // ========================================================================
         
-        this.subscribe('playback.status', (data) => this.handleStateUpdate(data));
-        this.subscribe('playback.position', (data) => this.handlePositionUpdate(data));
-        this.subscribe('playback.finished', () => this.handlePlaybackFinished());
+        if (this.playbackModel) {
+            this.subscribe('playback:model:state-changed', (data) => {
+                this.updateUI(data);
+            });
+        }
         
         // ========================================================================
-        // ÉVÉNEMENTS FICHIERS
+        // ÉVÉNEMENTS BACKEND CONNECTION
         // ========================================================================
         
-        this.subscribe('file:loaded', (data) => this.handleFileLoaded(data));
-        this.subscribe('file:unloaded', () => this.handleFileUnloaded());
+        // ← NOUVEAU: Écouter reconnexion backend
+        this.subscribe('backend:connected', () => {
+            this.logDebug('playback', 'Backend reconnected, re-enabling playback');
+            this.state.backendReady = true;
+            this.enableUI();
+            
+            // Recharger le fichier si on en avait un
+            if (this.state.loadedFile) {
+                this.loadFile(this.state.loadedFile);
+            }
+        });
         
-        // ========================================================================
-        // ÉVÉNEMENTS PLAYLIST
-        // ========================================================================
+        this.subscribe('websocket:disconnected', () => {
+            this.logDebug('playback', 'Backend disconnected, disabling playback');
+            this.state.backendReady = false;
+            this.disableUI();
+            this.stop(); // Arrêter la lecture
+        });
         
-        this.subscribe('playlist:next', () => this.playNext());
-        this.subscribe('playlist:previous', () => this.playPrevious());
-        
-        this.logDebug('playback', '✓ Events bound');
+        this.logDebug('playback', '✅ Events bound');
     }
     
     /**
-     * Cleanup complet
-     * Override de BaseController.destroy()
+     * Nettoyage avant destruction
+     * Override de BaseController.onDestroy()
      */
-    destroy() {
+    onDestroy() {
         this.logDebug('playback', 'Destroying PlaybackController...');
         
-        // 1. Arrêter lecture
+        // Arrêter la lecture
         this.stop();
         
-        // 2. Arrêter timer position
+        // Nettoyer le timer
         if (this.positionUpdateTimer) {
             clearInterval(this.positionUpdateTimer);
             this.positionUpdateTimer = null;
         }
         
-        // 3. Cleanup state
-        this.state.playing = false;
-        this.state.loadedFile = null;
-        
-        // 4. Appeler parent
-        super.destroy();
-        
         this.logDebug('playback', '✓ PlaybackController destroyed');
     }
     
     // ========================================================================
-    // VALIDATEURS
+    // GESTION UI (ACTIVER/DÉSACTIVER)
     // ========================================================================
     
     /**
-     * Initialise les validateurs pour les actions
+     * Désactive l'UI du playback
+     * @private
      */
-    setupValidators() {
-        // Validateur seek
-        this.validators['playback:seek'] = (data) => {
-            if (!data || typeof data.position !== 'number') {
-                this.logDebug('warning', 'Invalid seek data');
-                return false;
-            }
-            
-            if (data.position < 0 || data.position > this.state.duration) {
-                this.logDebug('warning', 'Position out of bounds');
-                return false;
-            }
-            
-            return true;
-        };
+    disableUI() {
+        // Désactiver tous les boutons de lecture
+        const playButtons = document.querySelectorAll('.playback-control');
+        playButtons.forEach(button => {
+            button.disabled = true;
+            button.style.opacity = '0.5';
+            button.style.cursor = 'not-allowed';
+        });
         
-        // Validateur tempo
-        this.validators['playback:setTempo'] = (data) => {
-            if (!data || typeof data.tempo !== 'number') {
-                return false;
-            }
+        // Afficher message dans l'UI
+        const playbackContainer = document.querySelector('.playback-container');
+        if (playbackContainer) {
+            let notice = playbackContainer.querySelector('.playback-disabled-notice');
             
-            if (data.tempo < 20 || data.tempo > 300) {
-                this.logDebug('warning', 'Tempo out of range (20-300)');
-                return false;
+            if (!notice) {
+                notice = document.createElement('div');
+                notice.className = 'playback-disabled-notice';
+                notice.style.cssText = `
+                    padding: 12px;
+                    background: #fef3c7;
+                    border: 1px solid #fbbf24;
+                    border-radius: 8px;
+                    margin-bottom: 16px;
+                    color: #92400e;
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                `;
+                notice.innerHTML = `
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Playback unavailable - Backend not connected</span>
+                `;
+                playbackContainer.insertBefore(notice, playbackContainer.firstChild);
             }
-            
-            return true;
-        };
+        }
         
-        // Validateur volume
-        this.validators['playback:setVolume'] = (data) => {
-            if (!data || typeof data.volume !== 'number') {
-                return false;
-            }
-            
-            if (data.volume < 0 || data.volume > 100) {
-                this.logDebug('warning', 'Volume out of range (0-100)');
-                return false;
-            }
-            
-            return true;
-        };
+        this.logDebug('playback', 'UI disabled');
+    }
+    
+    /**
+     * Active l'UI du playback
+     * @private
+     */
+    enableUI() {
+        // Réactiver tous les boutons de lecture
+        const playButtons = document.querySelectorAll('.playback-control');
+        playButtons.forEach(button => {
+            button.disabled = false;
+            button.style.opacity = '1';
+            button.style.cursor = 'pointer';
+        });
+        
+        // Masquer le message d'avertissement
+        const notice = document.querySelector('.playback-disabled-notice');
+        if (notice) {
+            notice.remove();
+        }
+        
+        this.logDebug('playback', 'UI enabled');
     }
     
     // ========================================================================
-    // CONTRÔLES DE LECTURE
+    // COMMANDES DE LECTURE
     // ========================================================================
     
     /**
-     * Démarre la lecture
+     * Lance la lecture
      */
     async play() {
-        this.logDebug('playback', 'Play requested');
+        if (!this.state.backendReady) {
+            this.showError('Backend not connected');
+            return;
+        }
+        
+        if (!this.state.loadedFile) {
+            this.showWarning('No file loaded');
+            return;
+        }
         
         try {
-            // Vérifier qu'un fichier est chargé
-            if (!this.state.loadedFile) {
-                this.showWarning('No file loaded');
-                this.logDebug('warning', 'Play: No file loaded');
-                return;
-            }
+            this.logDebug('playback', 'Playing...');
             
-            // Déjà en lecture
-            if (this.state.playing) {
-                this.logDebug('playback', 'Already playing');
-                return;
-            }
+            const response = await this.backend.sendCommand('playback.play');
             
-            // Appeler backend avec protocole v3.0
-            const result = await this.backend.sendCommand('playback.start', {});
-            
-            if (result.success) {
-                // Mettre à jour état local
+            if (response.success) {
                 this.state.playing = true;
-                
-                // Démarrer timer position
-                this.startPositionUpdates();
-                
-                // Émettre événement
-                this.emitEvent('playback:state', { state: 'playing' });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('playing', true);
-                }
-                
-                this.showSuccess('Playback started');
-                this.logDebug('playback', '✓ Playback started');
+                this.startPositionUpdate();
+                this.eventBus.emit('playback:started');
+                this.logDebug('playback', '✅ Playback started');
+            } else {
+                throw new Error(response.error || 'Failed to start playback');
             }
-            else {
-                throw new Error(result.error || 'Failed to start playback');
-            }
-        }
-        catch (error) {
-            this.handleError('Play failed', error);
-            this.showNotification('Failed to start playback');
+            
+        } catch (error) {
+            this.handleError('play', error);
         }
     }
     
@@ -273,42 +314,26 @@ class PlaybackController extends BaseController {
      * Met en pause la lecture
      */
     async pause() {
-        this.logDebug('playback', 'Pause requested');
+        if (!this.state.backendReady) {
+            return;
+        }
         
         try {
-            if (!this.state.playing) {
-                this.logDebug('playback', 'Not playing');
-                return;
-            }
+            this.logDebug('playback', 'Pausing...');
             
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.pause', {});
+            const response = await this.backend.sendCommand('playback.pause');
             
-            if (result.success) {
-                // Mettre à jour état
+            if (response.success) {
                 this.state.playing = false;
-                
-                // Arrêter timer
-                this.stopPositionUpdates();
-                
-                // Émettre événement
-                this.emitEvent('playback:state', { state: 'paused' });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('playing', false);
-                }
-                
-                this.showSuccess('Playback paused');
-                this.logDebug('playback', '✓ Playback paused');
+                this.stopPositionUpdate();
+                this.eventBus.emit('playback:paused');
+                this.logDebug('playback', '✅ Playback paused');
+            } else {
+                throw new Error(response.error || 'Failed to pause playback');
             }
-            else {
-                throw new Error(result.error || 'Failed to pause playback');
-            }
-        }
-        catch (error) {
-            this.handleError('Pause failed', error);
-            this.showNotification('Failed to pause playback');
+            
+        } catch (error) {
+            this.handleError('pause', error);
         }
     }
     
@@ -316,473 +341,288 @@ class PlaybackController extends BaseController {
      * Arrête la lecture
      */
     async stop() {
-        this.logDebug('playback', 'Stop requested');
+        if (!this.state.backendReady) {
+            return;
+        }
         
         try {
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.stop', {});
+            this.logDebug('playback', 'Stopping...');
             
-            if (result.success) {
-                // Mettre à jour état
+            const response = await this.backend.sendCommand('playback.stop');
+            
+            if (response.success) {
                 this.state.playing = false;
                 this.state.position = 0;
-                
-                // Arrêter timer
-                this.stopPositionUpdates();
-                
-                // Émettre événement
-                this.emitEvent('playback:state', { state: 'stopped' });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('playing', false);
-                    this.playbackModel.set('position', 0);
-                }
-                
-                this.showSuccess('Playback stopped');
-                this.logDebug('playback', '✓ Playback stopped');
+                this.stopPositionUpdate();
+                this.eventBus.emit('playback:stopped');
+                this.logDebug('playback', '✅ Playback stopped');
+            } else {
+                throw new Error(response.error || 'Failed to stop playback');
             }
-            else {
-                throw new Error(result.error || 'Failed to stop playback');
-            }
-        }
-        catch (error) {
-            this.handleError('Stop failed', error);
-            this.showNotification('Failed to stop playback');
+            
+        } catch (error) {
+            this.handleError('stop', error);
         }
     }
     
     /**
-     * Déplace la position de lecture
-     * @param {number} position - Position en ms
+     * Se positionne dans le fichier
+     * @param {number} position - Position en secondes
      */
     async seek(position) {
-        this.logDebug('playback', `Seek to ${position}ms`);
+        if (!this.state.backendReady) {
+            return;
+        }
         
         try {
-            // Valider position
-            position = Math.max(0, Math.min(position, this.state.duration));
+            this.logDebug('playback', `Seeking to ${position}s`);
             
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.seek', {
+            const response = await this.backend.sendCommand('playback.seek', {
                 position: position
             });
             
-            if (result.success) {
-                // Mettre à jour état
+            if (response.success) {
                 this.state.position = position;
-                
-                // Émettre événement
-                this.emitEvent('playback:position', { position });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('position', position);
-                }
-                
-                this.logDebug('playback', `✓ Seeked to ${position}ms`);
+                this.eventBus.emit('playback:seeked', { position });
+                this.logDebug('playback', `✅ Seeked to ${position}s`);
+            } else {
+                throw new Error(response.error || 'Failed to seek');
             }
-            else {
-                throw new Error(result.error || 'Failed to seek');
-            }
-        }
-        catch (error) {
-            this.handleError('Seek failed', error);
+            
+        } catch (error) {
+            this.handleError('seek', error);
         }
     }
     
     /**
-     * Change le tempo
-     * @param {number} tempo - Tempo en BPM (20-300)
+     * Définit le tempo
+     * @param {number} tempo - Tempo en BPM
      */
     async setTempo(tempo) {
-        this.logDebug('playback', `Set tempo to ${tempo} BPM`);
+        if (!this.state.backendReady) {
+            return;
+        }
         
         try {
-            // Valider tempo
-            tempo = Math.max(20, Math.min(300, tempo));
+            this.logDebug('playback', `Setting tempo to ${tempo} BPM`);
             
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.setTempo', {
+            const response = await this.backend.sendCommand('playback.setTempo', {
                 tempo: tempo
             });
             
-            if (result.success) {
-                // Mettre à jour état
+            if (response.success) {
                 this.state.tempo = tempo;
-                
-                // Émettre événement
-                this.emitEvent('playback:tempo', { tempo });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('tempo', tempo);
-                }
-                
-                this.showSuccess(`Tempo set to ${tempo} BPM`);
-                this.logDebug('playback', `✓ Tempo set to ${tempo} BPM`);
+                this.eventBus.emit('playback:tempo-changed', { tempo });
+                this.logDebug('playback', `✅ Tempo set to ${tempo} BPM`);
+            } else {
+                throw new Error(response.error || 'Failed to set tempo');
             }
-            else {
-                throw new Error(result.error || 'Failed to set tempo');
-            }
-        }
-        catch (error) {
-            this.handleError('Set tempo failed', error);
+            
+        } catch (error) {
+            this.handleError('setTempo', error);
         }
     }
     
     /**
      * Active/désactive le loop
-     * @param {boolean} enabled - Loop activé
      */
-    async setLoop(enabled) {
-        this.logDebug('playback', `Set loop ${enabled ? 'ON' : 'OFF'}`);
+    async toggleLoop() {
+        if (!this.state.backendReady) {
+            return;
+        }
+        
+        const newLoop = !this.state.loop;
         
         try {
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.setLoop', {
-                enabled: enabled
+            this.logDebug('playback', `Toggle loop: ${newLoop}`);
+            
+            const response = await this.backend.sendCommand('playback.setLoop', {
+                loop: newLoop
             });
             
-            if (result.success) {
-                // Mettre à jour état
-                this.state.loop = enabled;
-                
-                // Émettre événement
-                this.emitEvent('playback:loop', { enabled });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('loop', enabled);
-                }
-                
-                this.showSuccess(`Loop ${enabled ? 'enabled' : 'disabled'}`);
-                this.logDebug('playback', `✓ Loop ${enabled ? 'enabled' : 'disabled'}`);
+            if (response.success) {
+                this.state.loop = newLoop;
+                this.eventBus.emit('playback:loop-changed', { loop: newLoop });
+                this.logDebug('playback', `✅ Loop ${newLoop ? 'enabled' : 'disabled'}`);
+            } else {
+                throw new Error(response.error || 'Failed to toggle loop');
             }
-            else {
-                throw new Error(result.error || 'Failed to set loop');
-            }
-        }
-        catch (error) {
-            this.handleError('Set loop failed', error);
+            
+        } catch (error) {
+            this.handleError('toggleLoop', error);
         }
     }
     
     /**
-     * Change le volume
-     * @param {number} volume - Volume 0-100
+     * Définit le volume
+     * @param {number} volume - Volume (0-100)
      */
     async setVolume(volume) {
-        this.logDebug('playback', `Set volume to ${volume}%`);
+        if (!this.state.backendReady) {
+            return;
+        }
         
         try {
-            // Valider volume
-            volume = Math.max(0, Math.min(100, volume));
+            this.logDebug('playback', `Setting volume to ${volume}`);
             
-            // Appeler backend
-            const result = await this.backend.sendCommand('playback.setVolume', {
+            const response = await this.backend.sendCommand('playback.setVolume', {
                 volume: volume
             });
             
-            if (result.success) {
-                // Mettre à jour état
+            if (response.success) {
                 this.state.volume = volume;
-                
-                // Émettre événement
-                this.emitEvent('playback:volume', { volume });
-                
-                // Mettre à jour model
-                if (this.playbackModel) {
-                    this.playbackModel.set('volume', volume);
-                }
-                
-                this.logDebug('playback', `✓ Volume set to ${volume}%`);
+                this.eventBus.emit('playback:volume-changed', { volume });
+                this.logDebug('playback', `✅ Volume set to ${volume}`);
+            } else {
+                throw new Error(response.error || 'Failed to set volume');
             }
-            else {
-                throw new Error(result.error || 'Failed to set volume');
-            }
-        }
-        catch (error) {
-            this.handleError('Set volume failed', error);
+            
+        } catch (error) {
+            this.handleError('setVolume', error);
         }
     }
     
-    // ========================================================================
-    // HANDLERS BACKEND (protocole v3.0)
-    // ========================================================================
-    
     /**
-     * Gère les mises à jour d'état depuis le backend
-     * @param {Object} data - État playback
+     * Charge un fichier MIDI
+     * @param {string} fileId - ID du fichier
      */
-    handleStateUpdate(data) {
-        this.logDebug('playback', 'State update received', data);
+    async loadFile(fileId) {
+        if (!this.state.backendReady) {
+            this.showError('Backend not connected - cannot load file');
+            return;
+        }
         
         try {
-            // Mettre à jour état local
-            if (data.state !== undefined) {
-                this.state.playing = (data.state === 'playing');
+            this.logDebug('playback', `Loading file: ${fileId}`);
+            
+            const response = await this.backend.sendCommand('playback.load', {
+                fileId: fileId
+            });
+            
+            if (response.success) {
+                this.state.loadedFile = fileId;
+                this.state.duration = response.data?.duration || 0;
+                this.eventBus.emit('playback:file-loaded', { fileId, duration: this.state.duration });
+                this.logDebug('playback', `✅ File loaded: ${fileId}`);
+                this.showSuccess(`File loaded: ${fileId}`);
+            } else {
+                throw new Error(response.error || 'Failed to load file');
             }
             
-            if (data.position !== undefined) {
-                this.state.position = data.position;
-            }
-            
-            if (data.duration !== undefined) {
-                this.state.duration = data.duration;
-            }
-            
-            if (data.tempo !== undefined) {
-                this.state.tempo = data.tempo;
-            }
-            
-            if (data.loop !== undefined) {
-                this.state.loop = data.loop;
-            }
-            
-            // Émettre événement
-            this.emitEvent('playback:stateUpdated', data);
-            
-            // Mettre à jour model
-            if (this.playbackModel) {
-                this.playbackModel.set(data);
-            }
-        }
-        catch (error) {
-            this.handleError('State update failed', error);
+        } catch (error) {
+            this.handleError('loadFile', error);
         }
     }
     
+    // ========================================================================
+    // GESTION POSITION
+    // ========================================================================
+    
     /**
-     * Gère les mises à jour de position depuis le backend
+     * Démarre la mise à jour de la position
+     * @private
+     */
+    startPositionUpdate() {
+        this.stopPositionUpdate(); // Au cas où
+        
+        this.positionUpdateTimer = setInterval(async () => {
+            try {
+                const response = await this.backend.sendCommand('playback.getPosition');
+                
+                if (response.success) {
+                    this.state.position = response.data.position;
+                    this.eventBus.emit('playback:position-updated', { 
+                        position: this.state.position,
+                        duration: this.state.duration
+                    });
+                }
+            } catch (error) {
+                // Silencieux - ne pas polluer les logs
+            }
+        }, 100); // Update tous les 100ms
+    }
+    
+    /**
+     * Arrête la mise à jour de la position
+     * @private
+     */
+    stopPositionUpdate() {
+        if (this.positionUpdateTimer) {
+            clearInterval(this.positionUpdateTimer);
+            this.positionUpdateTimer = null;
+        }
+    }
+    
+    // ========================================================================
+    // HANDLERS ÉVÉNEMENTS BACKEND
+    // ========================================================================
+    
+    /**
+     * Gère un changement d'état du playback
+     * @param {Object} data - Données de l'état
+     */
+    handlePlaybackStateChanged(data) {
+        this.state.playing = data.playing;
+        this.state.position = data.position;
+        
+        if (data.playing) {
+            this.startPositionUpdate();
+        } else {
+            this.stopPositionUpdate();
+        }
+        
+        this.eventBus.emit('playback:state-changed', data);
+    }
+    
+    /**
+     * Gère un changement de position
      * @param {Object} data - Position
      */
-    handlePositionUpdate(data) {
-        if (data.position !== undefined) {
-            this.state.position = data.position;
-            
-            // Émettre événement
-            this.emitEvent('playback:positionUpdated', { position: data.position });
-            
-            // Mettre à jour model
-            if (this.playbackModel) {
-                this.playbackModel.set('position', data.position);
-            }
-        }
+    handlePositionChanged(data) {
+        this.state.position = data.position;
+        this.eventBus.emit('playback:position-updated', data);
     }
     
     /**
      * Gère la fin de lecture
      */
     handlePlaybackFinished() {
-        this.logDebug('playback', 'Playback finished');
-        
-        // Arrêter timer
-        this.stopPositionUpdates();
-        
-        // Mettre à jour état
         this.state.playing = false;
-        this.state.position = this.state.loop ? 0 : this.state.duration;
-        
-        // Émettre événement
-        this.emitEvent('playback:finished');
-        
-        // Si auto-advance activé
-        if (this.playlistModel && this.playlistModel.get('autoAdvance')) {
-            this.playNext();
-        }
-    }
-    
-    // ========================================================================
-    // GESTION FICHIERS
-    // ========================================================================
-    
-    /**
-     * Gère le chargement d'un fichier
-     * @param {Object} data - Données du fichier
-     */
-    handleFileLoaded(data) {
-        this.logDebug('playback', 'File loaded', data);
-        
-        this.state.loadedFile = data.file;
-        this.state.duration = data.duration || 0;
         this.state.position = 0;
-        
-        // Émettre événement
-        this.emitEvent('playback:fileLoaded', data);
-    }
-    
-    /**
-     * Gère le déchargement d'un fichier
-     */
-    handleFileUnloaded() {
-        this.logDebug('playback', 'File unloaded');
-        
-        // Arrêter lecture
-        this.stop();
-        
-        // Reset état
-        this.state.loadedFile = null;
-        this.state.duration = 0;
-        this.state.position = 0;
-        
-        // Émettre événement
-        this.emitEvent('playback:fileUnloaded');
+        this.stopPositionUpdate();
+        this.eventBus.emit('playback:finished');
+        this.logDebug('playback', 'Playback finished');
     }
     
     // ========================================================================
-    // GESTION PLAYLIST
+    // MISE À JOUR UI
     // ========================================================================
     
     /**
-     * Lit le fichier suivant de la playlist
+     * Met à jour l'UI avec les données
+     * @param {Object} data - Données de l'état
      */
-    async playNext() {
-        this.logDebug('playback', 'Play next requested');
-        
-        try {
-            if (!this.playlistModel) {
-                this.logDebug('warning', 'PlaylistModel not available');
-                return;
-            }
-            
-            const nextFile = this.playlistModel.getNext();
-            
-            if (nextFile) {
-                // Charger et lire le fichier
-                this.emitEvent('file:load', { file: nextFile });
-                
-                // Attendre chargement
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Lire
-                await this.play();
-            }
-            else {
-                this.showInfo('No next file in playlist');
-                this.logDebug('playback', 'No next file');
-            }
-        }
-        catch (error) {
-            this.handleError('Play next failed', error);
-        }
-    }
-    
-    /**
-     * Lit le fichier précédent de la playlist
-     */
-    async playPrevious() {
-        this.logDebug('playback', 'Play previous requested');
-        
-        try {
-            if (!this.playlistModel) {
-                this.logDebug('warning', 'PlaylistModel not available');
-                return;
-            }
-            
-            const prevFile = this.playlistModel.getPrevious();
-            
-            if (prevFile) {
-                // Charger et lire le fichier
-                this.emitEvent('file:load', { file: prevFile });
-                
-                // Attendre chargement
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Lire
-                await this.play();
-            }
-            else {
-                this.showInfo('No previous file in playlist');
-                this.logDebug('playback', 'No previous file');
-            }
-        }
-        catch (error) {
-            this.handleError('Play previous failed', error);
-        }
+    updateUI(data) {
+        // À implémenter selon votre UI
+        this.eventBus.emit('playback:ui-update', data);
     }
     
     // ========================================================================
-    // TIMER POSITION
+    // GESTION D'ERREURS
     // ========================================================================
     
     /**
-     * Démarre les mises à jour de position
+     * Gère une erreur
+     * @param {string} operation - Opération en cours
+     * @param {Error} error - Erreur
      */
-    startPositionUpdates() {
-        // Arrêter timer existant
-        this.stopPositionUpdates();
-        
-        // Démarrer nouveau timer (100ms = 10 FPS)
-        this.positionUpdateTimer = setInterval(() => {
-            if (this.state.playing) {
-                // Incrémenter position (estimation locale)
-                this.state.position += 100;
-                
-                // Limiter à la durée
-                if (this.state.position >= this.state.duration) {
-                    this.state.position = this.state.duration;
-                    this.handlePlaybackFinished();
-                }
-                
-                // Émettre événement
-                this.emitEvent('playback:positionTick', { 
-                    position: this.state.position 
-                });
-            }
-        }, 100);
-        
-        this.logDebug('playback', 'Position updates started');
-    }
-    
-    /**
-     * Arrête les mises à jour de position
-     */
-    stopPositionUpdates() {
-        if (this.positionUpdateTimer) {
-            clearInterval(this.positionUpdateTimer);
-            this.positionUpdateTimer = null;
-            
-            this.logDebug('playback', 'Position updates stopped');
-        }
-    }
-    
-    // ========================================================================
-    // GETTERS
-    // ========================================================================
-    
-    /**
-     * Retourne l'état actuel de lecture
-     * @returns {Object} État
-     */
-    getState() {
-        return {
-            playing: this.state.playing,
-            position: this.state.position,
-            duration: this.state.duration,
-            tempo: this.state.tempo,
-            loop: this.state.loop,
-            volume: this.state.volume,
-            loadedFile: this.state.loadedFile,
-            progress: this.state.duration > 0 
-                ? (this.state.position / this.state.duration) * 100 
-                : 0
-        };
+    handleError(operation, error) {
+        this.logDebug('error', `Playback error during ${operation}:`, error.message);
+        this.showError(`Playback error: ${error.message}`);
+        this.eventBus.emit('playback:error', { operation, error });
     }
 }
 
 // ============================================================================
-// EXPORT
-// ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlaybackController;
-}
-
-if (typeof window !== 'undefined') {
-    window.PlaybackController = PlaybackController;
-}
-
-// ============================================================================
-// FIN DU FICHIER PlaybackController.js v3.1.0-corrections
+// FIN DU FICHIER PlaybackController.js v3.2.0
 // ============================================================================

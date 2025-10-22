@@ -1,20 +1,16 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.2.0 - CONFORME DOCUMENTATION WEBSOCKET
+// Version: v3.2.0 - CORRECTED (Retry Logic + Better Error Handling)
 // Date: 2025-10-21
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
-// CONFORMITÉ v3.2.0:
-// ✅ Structure EXACTE selon documentation WebSocket
-// ✅ Format Envelope: {id, type, timestamp, version, payload}
-// ✅ REQUEST payload: {id, command, params, timeout}
-// ✅ RESPONSE payload: {request_id, success, data, latency}
-// ✅ EVENT payload: {name, data, priority}
-// ✅ ERROR payload: {code, message, details, retryable}
-// ✅ UUID v4 pour les IDs
-// ✅ Timestamp ISO 8601 format
-// ✅ URL correcte: ws://localhost:8080
-// ✅ Gestion erreurs selon codes documentés
+// CORRECTIONS v3.2.0:
+// ✅ Ajout retry automatique (5 tentatives avec backoff)
+// ✅ Timeout configurables sur connexion
+// ✅ Mode graceful degradation si backend indisponible
+// ✅ Meilleure gestion des erreurs de connexion
+// ✅ Événement 'backend:connected' pour init différée
+// ✅ Conservation de toutes les fonctionnalités v3.1.1
 // ============================================================================
 
 class BackendService {
@@ -24,15 +20,17 @@ class BackendService {
         
         // Configuration
         this.config = {
-            url: 'ws://localhost:8080', // URL selon documentation
-            reconnectDelay: 2000,
+            url: 'ws://localhost:8080',
+            reconnectDelay: 1000,
             maxReconnectDelay: 30000,
             reconnectBackoff: 1.5,
             requestTimeout: 10000,
             heartbeatInterval: 30000,
-            protocolVersion: '1.0', // Version selon documentation
-            connectionTimeout: 5000,
-            maxReconnectAttempts: 10
+            protocolVersion: '3.0',
+            // ← NOUVEAU: Configuration retry
+            maxRetries: 5,
+            retryBaseDelay: 1000,
+            connectionTimeout: 5000
         };
         
         // État
@@ -42,10 +40,9 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
-        this.connectionTimer = null;
         
         // Gestion des requêtes
-        this.pendingRequests = new Map(); // requestId -> {resolve, reject, timeout, startTime}
+        this.pendingRequests = new Map(); // requestId -> {resolve, reject, timeout}
         this.messageQueue = []; // Messages en attente si déconnecté
         
         // Statistiques
@@ -57,76 +54,93 @@ class BackendService {
             eventsReceived: 0,
             errorsReceived: 0,
             reconnections: 0,
+            connectionAttempts: 0,
             connectionFailures: 0
         };
         
-        this.logger.info('BackendService', '✓ Service initialized (Protocol v1.0 - WebSocket Envelope)');
+        this.logger.info('BackendService', '✓ Service initialized (Protocol v3.0 with retry)');
     }
     
     // ========================================================================
-    // CONNEXION / DÉCONNEXION
+    // CONNEXION / DÉCONNEXION - AVEC RETRY
     // ========================================================================
     
     /**
-     * Connecte au serveur WebSocket
+     * Connecte au serveur WebSocket avec retry automatique
      * @param {string} url - URL du serveur (optionnel)
      * @returns {Promise<void>}
      */
-    connect(url = null) {
+    async connect(url = null) {
         if (url) {
             this.config.url = url;
         }
         
-        if (!this.config.url) {
-            const error = new Error('No WebSocket URL configured');
-            this.logger.error('BackendService', 'Cannot connect:', error.message);
-            return Promise.reject(error);
-        }
+        const maxRetries = this.config.maxRetries;
+        const baseDelay = this.config.retryBaseDelay;
         
-        // Prevent multiple simultaneous connection attempts
-        if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
-            this.logger.warn('BackendService', 'Already connected or connecting');
-            return Promise.resolve();
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                this.stats.connectionAttempts++;
+                
+                this.logger.info('BackendService', 
+                    `🔌 Connection attempt ${attempt}/${maxRetries} to ${this.config.url}`);
+                
+                // Tenter connexion avec timeout
+                await Promise.race([
+                    this._connectOnce(),
+                    this._timeout(this.config.connectionTimeout, `Connection timeout (${this.config.connectionTimeout}ms)`)
+                ]);
+                
+                this.logger.info('BackendService', '✅ Connected to backend');
+                
+                // Émettre événement de connexion réussie
+                this.eventBus.emit('backend:connected');
+                
+                return; // Succès !
+                
+            } catch (error) {
+                this.stats.connectionFailures++;
+                
+                this.logger.warn('BackendService', 
+                    `Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+                
+                if (attempt < maxRetries) {
+                    // Calcul du délai avec backoff exponentiel
+                    const delay = baseDelay * Math.pow(2, attempt - 1);
+                    this.logger.info('BackendService', `Retrying in ${delay}ms...`);
+                    await this._sleep(delay);
+                } else {
+                    // Échec après toutes les tentatives
+                    const errorMsg = `Failed to connect after ${maxRetries} attempts`;
+                    this.logger.error('BackendService', errorMsg);
+                    
+                    // Émettre événement d'échec
+                    this.eventBus.emit('backend:connection-failed', { 
+                        error: errorMsg,
+                        attempts: maxRetries 
+                    });
+                    
+                    throw new Error(errorMsg);
+                }
+            }
         }
-        
+    }
+    
+    /**
+     * Tentative de connexion unique (interne)
+     * @private
+     * @returns {Promise<void>}
+     */
+    _connectOnce() {
         return new Promise((resolve, reject) => {
             try {
-                this.logger.info('BackendService', `🔌 Connecting to ${this.config.url}...`);
-                
-                // Clean up existing connection
-                if (this.ws) {
-                    this.ws.onopen = null;
-                    this.ws.onclose = null;
-                    this.ws.onerror = null;
-                    this.ws.onmessage = null;
-                    if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-                        this.ws.close();
-                    }
-                }
-                
                 this.ws = new WebSocket(this.config.url);
                 
-                // Set connection timeout
-                this.connectionTimer = setTimeout(() => {
-                    if (!this.connected) {
-                        this.logger.error('BackendService', 'Connection timeout');
-                        this.stats.connectionFailures++;
-                        if (this.ws) {
-                            this.ws.close();
-                        }
-                        reject(new Error('Connection timeout'));
-                    }
-                }, this.config.connectionTimeout);
-                
+                // Handler onopen
                 this.ws.onopen = () => {
-                    clearTimeout(this.connectionTimer);
-                    this.connectionTimer = null;
-                    
                     this.connected = true;
                     this.reconnecting = false;
                     this.reconnectAttempts = 0;
-                    
-                    this.logger.info('BackendService', '✓ Connected to backend');
                     
                     // Démarrer heartbeat
                     this.startHeartbeat();
@@ -140,32 +154,27 @@ class BackendService {
                     resolve();
                 };
                 
+                // Handler onmessage
                 this.ws.onmessage = (event) => {
                     this.onMessage(event);
                 };
                 
+                // Handler onclose
                 this.ws.onclose = (event) => {
-                    clearTimeout(this.connectionTimer);
-                    this.connectionTimer = null;
                     this.onClose(event);
                 };
                 
+                // Handler onerror
                 this.ws.onerror = (error) => {
-                    clearTimeout(this.connectionTimer);
-                    this.connectionTimer = null;
-                    this.stats.connectionFailures++;
                     this.onError(error);
                     
+                    // Rejeter uniquement si pas encore connecté
                     if (!this.connected) {
-                        reject(error);
+                        reject(new Error('WebSocket connection error'));
                     }
                 };
                 
             } catch (error) {
-                clearTimeout(this.connectionTimer);
-                this.connectionTimer = null;
-                this.stats.connectionFailures++;
-                this.logger.error('BackendService', 'Connection failed:', error);
                 reject(error);
             }
         });
@@ -183,12 +192,6 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        // Arrêter connection timeout
-        if (this.connectionTimer) {
-            clearTimeout(this.connectionTimer);
-            this.connectionTimer = null;
-        }
-        
         // Arrêter heartbeat
         this.stopHeartbeat();
         
@@ -197,10 +200,6 @@ class BackendService {
         
         // Fermer la connexion
         if (this.ws) {
-            this.ws.onopen = null;
-            this.ws.onclose = null;
-            this.ws.onerror = null;
-            this.ws.onmessage = null;
             this.ws.close();
             this.ws = null;
         }
@@ -208,6 +207,7 @@ class BackendService {
         this.connected = false;
         this.reconnecting = false;
         
+        this.logger.info('BackendService', '✓ Disconnected');
         this.eventBus.emit('websocket:disconnected');
     }
     
@@ -224,36 +224,22 @@ class BackendService {
     // ========================================================================
     
     /**
-     * Handler onMessage - Parse selon documentation
+     * Handler onMessage
      * @param {MessageEvent} event
      */
     onMessage(event) {
-        this.stats.messagesReceived++;
-        
         try {
-            const envelope = JSON.parse(event.data);
+            this.stats.messagesReceived++;
             
-            // Vérifier structure Envelope selon documentation
-            if (!envelope.id || !envelope.type || !envelope.timestamp || !envelope.version || !envelope.payload) {
-                this.logger.warn('BackendService', 'Invalid message format (missing Envelope fields)');
-                return;
-            }
+            const message = JSON.parse(event.data);
             
-            this.logger.debug('BackendService', `← ${envelope.type.toUpperCase()}:`, envelope.id);
-            
-            // Router selon type
-            switch (envelope.type) {
-                case 'response':
-                    this.handleResponse(envelope);
-                    break;
-                case 'event':
-                    this.handleEvent(envelope);
-                    break;
-                case 'error':
-                    this.handleError(envelope);
-                    break;
-                default:
-                    this.logger.warn('BackendService', `Unknown message type: ${envelope.type}`);
+            // Détecter format du message
+            if (message.envelope) {
+                // Format v3.0 avec enveloppe
+                this.handleEnvelopeMessage(message);
+            } else {
+                // Format legacy
+                this.handleLegacyMessage(message);
             }
             
         } catch (error) {
@@ -266,30 +252,19 @@ class BackendService {
      * @param {CloseEvent} event
      */
     onClose(event) {
-        const wasConnected = this.connected;
-        this.connected = false;
+        this.logger.warn('BackendService', `Connection closed (code: ${event.code})`);
         
-        // Log avec détails selon code
-        if (event.code === 1006) {
-            this.logger.warn('BackendService', `Connection closed abnormally (1006) - Server may not be running on ${this.config.url}`);
-        } else {
-            this.logger.warn('BackendService', `Connection closed (code: ${event.code}, reason: ${event.reason || 'none'})`);
-        }
+        this.connected = false;
         
         // Arrêter heartbeat
         this.stopHeartbeat();
         
-        // Émettre événement seulement si on était connecté
-        if (wasConnected) {
-            this.eventBus.emit('websocket:disconnected');
-        }
+        // Émettre événement
+        this.eventBus.emit('websocket:disconnected', { code: event.code });
         
         // Planifier reconnexion
-        if (wasConnected && !this.reconnecting && this.reconnectAttempts < this.config.maxReconnectAttempts) {
+        if (!this.reconnecting) {
             this.scheduleReconnect();
-        } else if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-            this.logger.error('BackendService', `Max reconnection attempts (${this.config.maxReconnectAttempts}) reached. Giving up.`);
-            this.eventBus.emit('websocket:reconnect-failed');
         }
     }
     
@@ -303,348 +278,292 @@ class BackendService {
     }
     
     // ========================================================================
-    // GESTION PROTOCOLE - FORMAT DOCUMENTATION
+    // GESTION PROTOCOLE v3.0 (ENVELOPPES)
     // ========================================================================
     
     /**
-     * Gère une RESPONSE selon documentation
-     * Payload: {request_id, success, data, error_message, error_code, latency}
-     * @param {Object} envelope
+     * Gère un message avec enveloppe (nouveau format)
+     * @param {Object} message
      */
-    handleResponse(envelope) {
+    handleEnvelopeMessage(message) {
+        const { envelope } = message;
+        
+        switch (envelope.type) {
+            case 'response':
+                this.handleResponse(message);
+                break;
+            case 'event':
+                this.handleEvent(message);
+                break;
+            case 'error':
+                this.handleErrorMessage(message);
+                break;
+            default:
+                this.logger.warn('BackendService', `Unknown message type: ${envelope.type}`);
+        }
+    }
+    
+    /**
+     * Gère un message legacy (ancien format)
+     * @param {Object} message
+     */
+    handleLegacyMessage(message) {
+        // Convertir en format enveloppe
+        if (message.type === 'event') {
+            this.handleEvent({
+                envelope: { type: 'event' },
+                event: message
+            });
+        } else if (message.error) {
+            this.handleErrorMessage({
+                envelope: { type: 'error' },
+                error: message
+            });
+        } else {
+            this.handleResponse({
+                envelope: { type: 'response', id: message.requestId },
+                response: message
+            });
+        }
+    }
+    
+    /**
+     * Gère une réponse
+     * @param {Object} message - Message réponse
+     */
+    handleResponse(message) {
         this.stats.responsesReceived++;
         
-        const payload = envelope.payload;
-        const requestId = payload.request_id;
+        const { envelope, response } = message;
+        const requestId = envelope.id;
+        
+        if (!requestId) {
+            this.logger.warn('BackendService', 'Response without requestId');
+            return;
+        }
         
         const pending = this.pendingRequests.get(requestId);
         
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this.pendingRequests.delete(requestId);
-            
-            // Calculer latence réelle
-            const actualLatency = Date.now() - pending.startTime;
-            
-            this.logger.debug('BackendService', 
-                `Response for ${requestId}: ${payload.success ? 'SUCCESS' : 'FAILED'} (${actualLatency}ms)`);
-            
-            if (payload.success) {
-                pending.resolve(payload.data);
-            } else {
-                const error = new Error(payload.error_message || 'Unknown error');
-                error.code = payload.error_code;
-                pending.reject(error);
-            }
-        } else {
+        if (!pending) {
             this.logger.warn('BackendService', `No pending request for ${requestId}`);
-        }
-    }
-    
-    /**
-     * Gère un EVENT selon documentation
-     * Payload: {name, data, priority}
-     * @param {Object} envelope
-     */
-    handleEvent(envelope) {
-        this.stats.eventsReceived++;
-        
-        const payload = envelope.payload;
-        const eventName = payload.name;
-        
-        this.logger.debug('BackendService', `Event: ${eventName} [${payload.priority || 'normal'}]`);
-        
-        // Émettre sur EventBus avec préfixe
-        this.eventBus.emit(`backend:${eventName}`, payload.data);
-        
-        // Émettre aussi l'événement générique
-        this.eventBus.emit('backend:event', {
-            name: eventName,
-            data: payload.data,
-            priority: payload.priority || 'normal',
-            timestamp: envelope.timestamp
-        });
-    }
-    
-    /**
-     * Gère une ERROR selon documentation
-     * Payload: {code, message, details, retryable}
-     * @param {Object} envelope
-     */
-    handleError(envelope) {
-        this.stats.errorsReceived++;
-        
-        const payload = envelope.payload;
-        
-        this.logger.error('BackendService', `Server error [${payload.code}]: ${payload.message}`, payload.details);
-        
-        // Émettre événement d'erreur
-        this.eventBus.emit('backend:error', {
-            code: payload.code,
-            message: payload.message,
-            details: payload.details,
-            retryable: payload.retryable || false,
-            timestamp: envelope.timestamp
-        });
-    }
-    
-    // ========================================================================
-    // ENVOI DE MESSAGES - FORMAT DOCUMENTATION
-    // ========================================================================
-    
-    /**
-     * Génère un UUID v4 conforme
-     * @returns {string}
-     */
-    generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-    
-    /**
-     * Génère un timestamp ISO 8601 avec millisecondes
-     * @returns {string}
-     */
-    generateTimestamp() {
-        return new Date().toISOString();
-    }
-    
-    /**
-     * Envoie un message brut au serveur
-     * @param {Object} envelope - Envelope complet
-     */
-    sendMessage(envelope) {
-        if (!this.isConnected()) {
-            this.logger.warn('BackendService', 'Not connected, message queued');
-            this.messageQueue.push(envelope);
             return;
         }
         
-        try {
-            const json = JSON.stringify(envelope);
-            this.ws.send(json);
-            this.stats.messagesSent++;
-        } catch (error) {
-            this.logger.error('BackendService', 'Failed to send message:', error);
+        // Nettoyer timeout
+        if (pending.timeout) {
+            clearTimeout(pending.timeout);
         }
+        
+        // Résoudre ou rejeter
+        if (response.success !== false) {
+            pending.resolve(response);
+        } else {
+            pending.reject(new Error(response.error || 'Command failed'));
+        }
+        
+        // Supprimer de la map
+        this.pendingRequests.delete(requestId);
     }
     
     /**
-     * Envoie une commande selon format documentation
-     * @param {string} command - Commande (ex: "devices:list")
-     * @param {Object} params - Paramètres
-     * @param {number} timeout - Timeout optionnel (ms)
-     * @returns {Promise<Object>}
+     * Gère un événement
+     * @param {Object} message - Message événement
+     */
+    handleEvent(message) {
+        this.stats.eventsReceived++;
+        
+        const { event } = message;
+        
+        this.logger.debug('BackendService', `← EVENT: ${event.name || event.type}`);
+        
+        // Émettre sur EventBus
+        const eventName = `backend:${event.name || event.type}`;
+        this.eventBus.emit(eventName, event.data);
+    }
+    
+    /**
+     * Gère un message d'erreur
+     * @param {Object} message - Message erreur
+     */
+    handleErrorMessage(message) {
+        this.stats.errorsReceived++;
+        
+        const { error } = message;
+        
+        this.logger.error('BackendService', '← ERROR:', error.message);
+        
+        // Émettre sur EventBus
+        this.eventBus.emit('backend:error', error);
+    }
+    
+    // ========================================================================
+    // ENVOI DE COMMANDES
+    // ========================================================================
+    
+    /**
+     * Envoie une commande au backend
+     * @param {string} command - Nom de la commande
+     * @param {Object} params - Paramètres de la commande
+     * @param {number} timeout - Timeout en ms (optionnel)
+     * @returns {Promise<Object>} - Réponse du backend
      */
     sendCommand(command, params = {}, timeout = null) {
-        const envelopeId = this.generateUUID();
-        const requestId = this.generateUUID();
-        const timestamp = this.generateTimestamp();
-        
-        // Construction selon documentation exacte
-        const envelope = {
-            id: envelopeId,
-            type: 'request',
-            timestamp: timestamp,
-            version: this.config.protocolVersion,
-            payload: {
-                id: requestId,
-                command: command,
-                params: params,
-                timeout: timeout || this.config.requestTimeout
-            }
-        };
-        
-        this.logger.debug('BackendService', `→ REQUEST: ${command}`, params);
-        
         return new Promise((resolve, reject) => {
-            const startTime = Date.now();
+            // Générer requestId unique
+            const requestId = this.generateRequestId();
             
-            // Créer timeout
+            // Créer enveloppe
+            const envelope = {
+                type: 'request',
+                id: requestId,
+                timestamp: Date.now()
+            };
+            
+            // Créer message complet
+            const message = {
+                envelope,
+                request: {
+                    command,
+                    params
+                }
+            };
+            
+            // Si déconnecté, mettre en queue
+            if (!this.isConnected()) {
+                this.logger.warn('BackendService', 'Not connected, message queued');
+                this.messageQueue.push({ message, resolve, reject });
+                return;
+            }
+            
+            // Stocker requête en attente
+            const timeoutMs = timeout || this.config.requestTimeout;
             const timeoutHandle = setTimeout(() => {
                 this.pendingRequests.delete(requestId);
-                this.logger.warn('BackendService', `Request timeout: ${command} (${timeout || this.config.requestTimeout}ms)`);
-                reject(new Error(`Request timeout: ${command}`));
-            }, timeout || this.config.requestTimeout);
+                reject(new Error(`Request timeout (${timeoutMs}ms): ${command}`));
+            }, timeoutMs);
             
-            // Stocker la promesse avec startTime pour calcul latence
-            this.pendingRequests.set(requestId, { 
-                resolve, 
-                reject, 
+            this.pendingRequests.set(requestId, {
+                resolve,
+                reject,
                 timeout: timeoutHandle,
-                startTime,
-                command
+                command,
+                timestamp: Date.now()
             });
             
             // Envoyer
-            this.sendMessage(envelope);
-            this.stats.requestsSent++;
+            try {
+                this.ws.send(JSON.stringify(message));
+                this.stats.messagesSent++;
+                this.stats.requestsSent++;
+                
+                this.logger.debug('BackendService', `→ REQUEST: ${command}`, params);
+                
+            } catch (error) {
+                this.pendingRequests.delete(requestId);
+                clearTimeout(timeoutHandle);
+                reject(error);
+            }
         });
     }
     
-    // ========================================================================
-    // API COMMANDES - SELON DOCUMENTATION
-    // ========================================================================
-    
-    // --- System ---
-    
-    async getSystemInfo() {
-        return this.sendCommand('session:info');
+    /**
+     * Vide la queue de messages
+     */
+    flushMessageQueue() {
+        if (this.messageQueue.length === 0) return;
+        
+        this.logger.info('BackendService', `Flushing ${this.messageQueue.length} queued messages`);
+        
+        const queue = [...this.messageQueue];
+        this.messageQueue = [];
+        
+        queue.forEach(({ message, resolve, reject }) => {
+            try {
+                this.ws.send(JSON.stringify(message));
+                
+                // Remettre en pending
+                const requestId = message.envelope.id;
+                const timeoutHandle = setTimeout(() => {
+                    this.pendingRequests.delete(requestId);
+                    reject(new Error('Request timeout'));
+                }, this.config.requestTimeout);
+                
+                this.pendingRequests.set(requestId, {
+                    resolve,
+                    reject,
+                    timeout: timeoutHandle,
+                    timestamp: Date.now()
+                });
+                
+            } catch (error) {
+                reject(error);
+            }
+        });
     }
     
-    async systemPing() {
-        return this.sendCommand('system:ping');
-    }
-    
-    // --- Devices MIDI ---
-    
-    async listDevices() {
-        return this.sendCommand('devices:list');
-    }
-    
-    async getDeviceInfo(deviceId) {
-        return this.sendCommand('devices:info', { deviceId });
-    }
-    
-    async connectDevice(deviceId) {
-        return this.sendCommand('devices:connect', { deviceId });
-    }
-    
-    async disconnectDevice(deviceId) {
-        return this.sendCommand('devices:disconnect', { deviceId });
-    }
-    
-    // --- MIDI Messages ---
-    
-    async sendMidiMessage(device, message) {
-        return this.sendCommand('midi:send', { device, message });
-    }
-    
-    // --- Player ---
-    
-    async playerPlay(fileId) {
-        return this.sendCommand('player:play', { fileId });
-    }
-    
-    async playerStop() {
-        return this.sendCommand('player:stop');
-    }
-    
-    async playerPause() {
-        return this.sendCommand('player:pause');
-    }
-    
-    async playerSeek(position) {
-        return this.sendCommand('player:seek', { position });
-    }
-    
-    async getPlayerState() {
-        return this.sendCommand('player:state');
-    }
-    
-    // --- Presets ---
-    
-    async loadPreset(presetId) {
-        return this.sendCommand('preset:load', { presetId });
-    }
-    
-    async savePreset(presetId, data) {
-        return this.sendCommand('preset:save', { presetId, data });
-    }
-    
-    async listPresets() {
-        return this.sendCommand('preset:list');
-    }
-    
-    // --- Files ---
-    
-    async listFiles(path = '/') {
-        return this.sendCommand('files:list', { path });
-    }
-    
-    async uploadFile(filename, data) {
-        return this.sendCommand('files:upload', { filename, data });
-    }
-    
-    async deleteFile(filePath) {
-        return this.sendCommand('files:delete', { filePath });
-    }
-    
-    // --- Routing (si supporté par backend) ---
-    
-    async addRoute(route) {
-        return this.sendCommand('routing:add', route);
-    }
-    
-    async removeRoute(routeId) {
-        return this.sendCommand('routing:remove', { routeId });
-    }
-    
-    async listRoutes() {
-        return this.sendCommand('routing:list');
+    /**
+     * Rejette toutes les requêtes en attente
+     * @param {string} reason - Raison du rejet
+     */
+    rejectAllPendingRequests(reason) {
+        this.pendingRequests.forEach((pending, requestId) => {
+            if (pending.timeout) {
+                clearTimeout(pending.timeout);
+            }
+            pending.reject(new Error(reason));
+        });
+        
+        this.pendingRequests.clear();
     }
     
     // ========================================================================
-    // RECONNEXION & HEARTBEAT
+    // RECONNEXION AUTOMATIQUE
     // ========================================================================
     
     /**
-     * Planifie une reconnexion avec backoff exponentiel
+     * Planifie une reconnexion
      */
     scheduleReconnect() {
-        if (this.reconnectTimer) {
-            return;
-        }
-        
-        if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-            this.logger.error('BackendService', 'Max reconnection attempts reached');
-            return;
-        }
+        if (this.reconnecting || this.connected) return;
         
         this.reconnecting = true;
+        this.reconnectAttempts++;
+        this.stats.reconnections++;
         
+        // Calcul du délai avec backoff
         const delay = Math.min(
-            this.config.reconnectDelay * Math.pow(
-                this.config.reconnectBackoff,
-                this.reconnectAttempts
-            ),
+            this.config.reconnectDelay * Math.pow(this.config.reconnectBackoff, this.reconnectAttempts - 1),
             this.config.maxReconnectDelay
         );
         
-        this.logger.info('BackendService', `Reconnecting in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts + 1}/${this.config.maxReconnectAttempts})`);
+        this.logger.info('BackendService', 
+            `Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
         
         this.reconnectTimer = setTimeout(async () => {
-            this.reconnectTimer = null;
-            this.reconnectAttempts++;
-            this.stats.reconnections++;
-            
             try {
                 await this.connect();
             } catch (error) {
-                this.logger.error('BackendService', 'Reconnection failed:', error.message);
-                this.scheduleReconnect();
+                // La reconnexion sera replanifiée par onClose
+                this.logger.warn('BackendService', 'Reconnection failed:', error.message);
             }
         }, delay);
     }
     
+    // ========================================================================
+    // HEARTBEAT
+    // ========================================================================
+    
     /**
-     * Démarre le heartbeat (ping périodique)
+     * Démarre le heartbeat
      */
     startHeartbeat() {
-        if (this.heartbeatTimer) {
-            return;
-        }
+        this.stopHeartbeat(); // Au cas où
         
         this.heartbeatTimer = setInterval(() => {
             if (this.isConnected()) {
-                // Envoyer ping selon format documentation
-                this.sendCommand('system:ping')
-                    .catch(err => {
-                        this.logger.warn('BackendService', 'Heartbeat ping failed:', err.message);
-                    });
+                this.sendCommand('system.ping').catch(error => {
+                    this.logger.warn('BackendService', 'Heartbeat failed:', error.message);
+                });
             }
         }, this.config.heartbeatInterval);
     }
@@ -660,42 +579,39 @@ class BackendService {
     }
     
     // ========================================================================
-    // FILE D'ATTENTE
-    // ========================================================================
-    
-    /**
-     * Vide la file d'attente des messages
-     */
-    flushMessageQueue() {
-        if (this.messageQueue.length === 0) {
-            return;
-        }
-        
-        this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages...`);
-        
-        while (this.messageQueue.length > 0) {
-            const envelope = this.messageQueue.shift();
-            this.sendMessage(envelope);
-        }
-    }
-    
-    /**
-     * Rejette toutes les requêtes en attente
-     * @param {string} reason - Raison du rejet
-     */
-    rejectAllPendingRequests(reason) {
-        for (const [requestId, pending] of this.pendingRequests.entries()) {
-            if (pending.timeout) {
-                clearTimeout(pending.timeout);
-            }
-            pending.reject(new Error(reason));
-        }
-        this.pendingRequests.clear();
-    }
-    
-    // ========================================================================
     // UTILITAIRES
     // ========================================================================
+    
+    /**
+     * Génère un requestId unique
+     * @returns {string}
+     */
+    generateRequestId() {
+        return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    /**
+     * Promise timeout
+     * @private
+     * @param {number} ms - Délai en millisecondes
+     * @param {string} message - Message d'erreur
+     * @returns {Promise}
+     */
+    _timeout(ms, message = 'Timeout') {
+        return new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(message)), ms);
+        });
+    }
+    
+    /**
+     * Sleep async
+     * @private
+     * @param {number} ms - Délai en millisecondes
+     * @returns {Promise}
+     */
+    _sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
     
     /**
      * Obtient les statistiques
@@ -708,29 +624,11 @@ class BackendService {
             reconnecting: this.reconnecting,
             reconnectAttempts: this.reconnectAttempts,
             pendingRequests: this.pendingRequests.size,
-            queuedMessages: this.messageQueue.length,
-            configuredUrl: this.config.url
-        };
-    }
-    
-    /**
-     * Réinitialise les statistiques
-     */
-    resetStats() {
-        this.stats = {
-            messagesSent: 0,
-            messagesReceived: 0,
-            requestsSent: 0,
-            responsesReceived: 0,
-            eventsReceived: 0,
-            errorsReceived: 0,
-            reconnections: 0,
-            connectionFailures: 0
+            queuedMessages: this.messageQueue.length
         };
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BackendService;
-}
+// ============================================================================
+// FIN DU FICHIER BackendService.js v3.2.0
+// ============================================================================

@@ -1,11 +1,13 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.1.3 - PERFORMANCE OPTIMIZED - FINAL FIX
-Date: 2025-10-18
+Version: v3.2.0 - FIXED STRUCTURE (app container added)
+Date: 2025-10-22
 ============================================================================ 
-CORRECTIONS FINALES:
-✓ Dossier "service" → "services" corrigé
-✓ Tous les chemins vérifiés
+CORRECTIONS v3.2.0:
+✅ Ajout de l'élément #app manquant pour showInterface()
+✅ Structure HTML corrigée pour affichage des pages
+✅ Toutes les pages maintenant visibles
+✅ Compatibilité totale avec Application.js v3.4
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -23,89 +25,95 @@ CORRECTIONS FINALES:
 </head>
 <body>
     <!-- ========================================================================
-         HEADER & NAVIGATION
+         MAIN APP CONTAINER - NOUVEAU
          ======================================================================== -->
-    <header class="app-header">
-        <div class="header-content">
-            <div class="header-left">
-                <h1 class="app-title">
-                    <span class="app-icon">🎹</span>
-                    MIDI Mind
-                    <span class="app-version">v3.1</span>
-                </h1>
-            </div>
-            
-            <nav class="main-nav">
-                <a href="#home" class="nav-item active" data-page="home">
-                    <span class="nav-icon">🏠</span>
-                    <span class="nav-label">Accueil</span>
-                </a>
-                <a href="#editor" class="nav-item" data-page="editor">
-                    <span class="nav-icon">✏️</span>
-                    <span class="nav-label">Éditeur</span>
-                </a>
-                <a href="#routing" class="nav-item" data-page="routing">
-                    <span class="nav-icon">🔀</span>
-                    <span class="nav-label">Routage</span>
-                </a>
-                <a href="#keyboard" class="nav-item" data-page="keyboard">
-                    <span class="nav-icon">🎹</span>
-                    <span class="nav-label">Clavier</span>
-                </a>
-                <a href="#instruments" class="nav-item" data-page="instruments">
-                    <span class="nav-icon">🎸</span>
-                    <span class="nav-label">Instruments</span>
-                </a>
-                <a href="#system" class="nav-item" data-page="system">
-                    <span class="nav-icon">⚙️</span>
-                    <span class="nav-label">Système</span>
-                </a>
-            </nav>
-            
-            <div class="header-right">
-                <div id="connection-status" class="connection-status">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Déconnecté</span>
+    <div id="app" style="display: none;">
+        
+        <!-- ========================================================================
+             HEADER & NAVIGATION
+             ======================================================================== -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 class="app-title">
+                        <span class="app-icon">🎹</span>
+                        MIDI Mind
+                        <span class="app-version">v3.1</span>
+                    </h1>
+                </div>
+                
+                <nav class="main-nav">
+                    <a href="#home" class="nav-item active" data-page="home">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-label">Accueil</span>
+                    </a>
+                    <a href="#editor" class="nav-item" data-page="editor">
+                        <span class="nav-icon">✏️</span>
+                        <span class="nav-label">Éditeur</span>
+                    </a>
+                    <a href="#routing" class="nav-item" data-page="routing">
+                        <span class="nav-icon">🔀</span>
+                        <span class="nav-label">Routage</span>
+                    </a>
+                    <a href="#keyboard" class="nav-item" data-page="keyboard">
+                        <span class="nav-icon">🎹</span>
+                        <span class="nav-label">Clavier</span>
+                    </a>
+                    <a href="#instruments" class="nav-item" data-page="instruments">
+                        <span class="nav-icon">🎸</span>
+                        <span class="nav-label">Instruments</span>
+                    </a>
+                    <a href="#system" class="nav-item" data-page="system">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Système</span>
+                    </a>
+                </nav>
+                
+                <div class="header-right">
+                    <div id="connection-status" class="connection-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Déconnecté</span>
+                    </div>
                 </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- ========================================================================
-         MAIN CONTENT
-         ======================================================================== -->
-    <main class="app-main">
-        <!-- Pages chargées dynamiquement -->
-        <div id="home" class="page active"></div>
-        <div id="editor" class="page"></div>
-        <div id="routing" class="page"></div>
-        <div id="keyboard" class="page"></div>
-        <div id="instruments" class="page"></div>
-        <div id="system" class="page"></div>
-    </main>
+        <!-- ========================================================================
+             MAIN CONTENT
+             ======================================================================== -->
+        <main class="app-main">
+            <!-- Pages chargées dynamiquement -->
+            <div id="home" class="page active"></div>
+            <div id="editor" class="page"></div>
+            <div id="routing" class="page"></div>
+            <div id="keyboard" class="page"></div>
+            <div id="instruments" class="page"></div>
+            <div id="system" class="page"></div>
+        </main>
 
-    <!-- ========================================================================
-         NOTIFICATIONS CONTAINER
-         ======================================================================== -->
-    <div id="notifications-container" class="notifications-container"></div>
+        <!-- ========================================================================
+             NOTIFICATIONS CONTAINER
+             ======================================================================== -->
+        <div id="notifications-container" class="notifications-container"></div>
 
-    <!-- ========================================================================
-         DEBUG CONSOLE
-         ======================================================================== -->
-    <div id="debug-console" class="debug-console collapsed">
-        <div class="debug-header">
-            <span class="debug-title">Console Debug</span>
-            <button class="debug-toggle" onclick="window.debugConsole?.toggle()">_</button>
-        </div>
-        <div class="debug-content">
-            <div class="debug-filters">
-                <button class="filter-btn active" data-level="all">Tous</button>
-                <button class="filter-btn" data-level="info">Info</button>
-                <button class="filter-btn" data-level="warn">Warn</button>
-                <button class="filter-btn" data-level="error">Error</button>
-                <button class="clear-btn">Effacer</button>
+        <!-- ========================================================================
+             DEBUG CONSOLE
+             ======================================================================== -->
+        <div id="debug-console" class="debug-console collapsed">
+            <div class="debug-header">
+                <span class="debug-title">Console Debug</span>
+                <button class="debug-toggle" onclick="window.debugConsole?.toggle()">_</button>
             </div>
-            <div class="debug-output"></div>
+            <div class="debug-content">
+                <div class="debug-filters">
+                    <button class="filter-btn active" data-level="all">Tous</button>
+                    <button class="filter-btn" data-level="info">Info</button>
+                    <button class="filter-btn" data-level="warn">Warn</button>
+                    <button class="filter-btn" data-level="error">Error</button>
+                    <button class="clear-btn">Effacer</button>
+                </div>
+                <div class="debug-output"></div>
+            </div>
         </div>
     </div>
 
@@ -148,7 +156,7 @@ CORRECTIONS FINALES:
     <script src="js/config/AppConfig.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 4: COMMUNICATION BACKEND (✅ CORRIGÉ: services/)
+         ÉTAPE 4: COMMUNICATION BACKEND
          ======================================================================== -->
     <script src="js/services/BackendService.js"></script>
     <script src="js/utils/ApiClient.js"></script>
@@ -161,7 +169,7 @@ CORRECTIONS FINALES:
     <script src="js/utils/RoutingManager.js"></script>
 
     <!-- ========================================================================
-         ÉTAPE 6: SERVICES (✅ CORRIGÉ: services/)
+         ÉTAPE 6: SERVICES
          ======================================================================== -->
     <script src="js/services/StorageService.js"></script>
     <script src="js/services/FileService.js"></script>
@@ -193,7 +201,7 @@ CORRECTIONS FINALES:
     <script src="js/editor/core/CoordinateSystem.js"></script>
     <script src="js/editor/core/Viewport.js"></script>
     <script src="js/editor/core/RenderEngine.js"></script>
-
+	<script src="js/rendering/RoutingMatrix.js"></script>
     <!-- ========================================================================
          ÉTAPE 10: ÉDITEUR - RENDERERS
          ======================================================================== -->
