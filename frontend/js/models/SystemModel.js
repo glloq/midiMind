@@ -4,27 +4,27 @@
 // Date: 2025-10-19
 // ============================================================================
 // SIMPLIFICATION: Seulement les fonctions de base
-// - Infos système (CPU, RAM, temp)
+// - Infos systÃ¨me (CPU, RAM, temp)
 // - Configuration basique
-// - Pas de monitoring avancé
+// - Pas de monitoring avancÃ©
 // - Pas de logs complexes
 // ============================================================================
 
 class SystemModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✅ FIX: Correct super() call
+        // âœ… FIX: Correct super() call
         super({}, {
             persistKey: 'systemmodel',
             eventPrefix: 'system',
             autoPersist: true
         });
         
-        // ✅ FIX: Assign immediately
+        // âœ… FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // ✅ FIX: Initialize data directly
+        // âœ… FIX: Initialize data directly
         this.data = {
             status: 'unknown',
             cpu: 0,
@@ -39,10 +39,18 @@ class SystemModel extends BaseModel {
             midiLatency: 5
         };
         
-        this.logger.info('SystemModel', '✓ Model initialized (minimal version)');
+        this.logger.info('SystemModel', 'âœ“ Model initialized (minimal version)');
         
-        // Démarrer monitoring simple
+        // DÃ©marrer monitoring simple
         this.startMonitoring();
+    }
+    
+    /**
+     * Vérifie si le backend est disponible
+     * @private
+     */
+    _isBackendAvailable() {
+        return this.backend && typeof this.backend.sendCommand === 'function';
     }
     
     // ========================================================================
@@ -50,12 +58,12 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     startMonitoring() {
-        // Rafraîchir toutes les 5 secondes
+        // RafraÃ®chir toutes les 5 secondes
         this.monitoringTimer = setInterval(() => {
             this.refreshSystemInfo();
         }, 5000);
         
-        // Premier refresh immédiat
+        // Premier refresh immÃ©diat
         this.refreshSystemInfo();
         
         this.logger.debug('SystemModel', 'Monitoring started');
@@ -74,13 +82,25 @@ class SystemModel extends BaseModel {
      * Rafraîchit les informations système
      */
     async refreshSystemInfo() {
+        // Vérifier si backend est disponible
+        if (!this._isBackendAvailable()) {
+            // Mode hors ligne - retourner des données par défaut sans erreur
+            return {
+                status: 'offline',
+                cpu: 0,
+                memory: 0,
+                temperature: 0,
+                uptime: 0
+            };
+        }
+        
         try {
             const response = await this.backend.sendCommand('system.get-info', {});
             
             if (response.success && response.data) {
                 const info = response.data;
                 
-                // Mettre à jour silencieusement
+                // Mettre Ã  jour silencieusement
                 this.update({
                     status: info.status || 'ready',
                     cpu: info.cpu || 0,
@@ -89,7 +109,7 @@ class SystemModel extends BaseModel {
                     uptime: info.uptime || 0
                 }, { silent: true });
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('system:info-updated', { info });
                 
                 return info;
@@ -105,10 +125,15 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     /**
-     * Met à jour la configuration audio
+     * Met Ã  jour la configuration audio
      */
     async updateAudioConfig(config) {
         try {
+        if (!this._isBackendAvailable()) {
+            this.logger.warn('SystemModel', 'Cannot update audio config: backend not available');
+            return false;
+        }
+
             this.logger.info('SystemModel', 'Updating audio config');
             
             const response = await this.backend.sendCommand('system.set-audio-config', {
@@ -136,9 +161,14 @@ class SystemModel extends BaseModel {
     }
     
     /**
-     * Met à jour la configuration MIDI
+     * Met Ã  jour la configuration MIDI
      */
     async updateMidiConfig(config) {
+        if (!this._isBackendAvailable()) {
+            this.logger.warn('SystemModel', 'Cannot update MIDI config: backend not available');
+            return false;
+        }
+
         try {
             this.logger.info('SystemModel', 'Updating MIDI config');
             
@@ -165,12 +195,17 @@ class SystemModel extends BaseModel {
     }
     
     // ========================================================================
-    // ACTIONS SYSTÈME
+    // ACTIONS SYSTÃˆME
     // ========================================================================
     
     /**
-     * Redémarre le système
+     * RedÃ©marre le systÃ¨me
      */
+        if (!this._isBackendAvailable()) {
+            this.logger.warn('SystemModel', 'Cannot restart: backend not available');
+            return false;
+        }
+
     async restart() {
         try {
             this.logger.warn('SystemModel', 'System restart requested');
@@ -191,8 +226,13 @@ class SystemModel extends BaseModel {
     }
     
     /**
-     * Arrête le système
+     * ArrÃªte le systÃ¨me
      */
+        if (!this._isBackendAvailable()) {
+            this.logger.warn('SystemModel', 'Cannot shutdown: backend not available');
+            return false;
+        }
+
     async shutdown() {
         try {
             this.logger.warn('SystemModel', 'System shutdown requested');
