@@ -1,12 +1,11 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.1.1 - CORRIGÉ
+// Version: 4.1.2 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.1:
-//   - Fixed toJsonString() → toString()
-//   - Fixed fromJsonString() → fromString()
+// Changes v4.1.2:
+//   - Fixed listen() to bind on 0.0.0.0 instead of localhost
 //
 // ============================================================================
 
@@ -159,7 +158,7 @@ ApiServer::Stats ApiServer::getStats() const {
 
 bool ApiServer::sendTo(connection_hdl hdl, const MessageEnvelope& message) {
     try {
-        std::string jsonStr = message.toString();  // ✅ CORRIGÉ
+        std::string jsonStr = message.toString();
         
         server_.send(hdl, jsonStr, websocketpp::frame::opcode::text);
         
@@ -206,7 +205,7 @@ bool ApiServer::sendError(connection_hdl hdl,
 void ApiServer::broadcast(const MessageEnvelope& message) {
     std::lock_guard<std::mutex> lock(connectionsMutex_);
     
-    std::string jsonStr = message.toString();  // ✅ CORRIGÉ
+    std::string jsonStr = message.toString();
     
     for (auto& hdl : connections_) {
         try {
@@ -289,7 +288,7 @@ void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
                      payload.substr(0, 100) + (payload.size() > 100 ? "..." : ""));
         
         // Parse message
-        auto messageOpt = MessageEnvelope::fromString(payload);  // ✅ CORRIGÉ
+        auto messageOpt = MessageEnvelope::fromString(payload);
         
         if (!messageOpt) {
             Logger::error("ApiServer", "Failed to parse message");
@@ -362,13 +361,16 @@ void ApiServer::serverThread() {
     Logger::debug("ApiServer", "Server thread started");
     
     try {
-        // Listen
-        server_.listen(port_);
+        // Listen on 0.0.0.0 to accept connections from any interface
+        boost::asio::ip::tcp::endpoint endpoint(
+            boost::asio::ip::tcp::v4(), port_);
+        
+        server_.listen(endpoint);
         
         // Start accepting connections
         server_.start_accept();
         
-        Logger::info("ApiServer", "WebSocket server listening on port " + 
+        Logger::info("ApiServer", "WebSocket server listening on 0.0.0.0:" + 
                     std::to_string(port_));
         
         // Run event loop
@@ -482,5 +484,5 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE ApiServer.cpp v4.1.1
+// END OF FILE ApiServer.cpp v4.1.2
 // ============================================================================
