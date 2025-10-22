@@ -556,83 +556,85 @@ class SystemView extends BaseView {
         this.stopStatsUpdate();
         super.destroy();
     }
-	/**
- * Construit l'affichage du statut backend
- * @param {Object} backendData - DonnÃƒÂ©es du backend
- * @returns {string} - HTML du statut backend
- */
-function buildBackendStatus(backendData = {}) {
-    if (!backendData.connected) {
-        return `
-            <div class="backend-disconnected">
-                <div class="warning-message">
-                    Ã¢Å¡Â Ã¯Â¸Â Backend C++ non connectÃƒÂ©
+
+    /**
+     * Construit l'affichage du statut backend
+     * @param {Object} backendData - Données du backend
+     * @returns {string} - HTML du statut backend
+     */
+    buildBackendStatus(backendData = {}) {
+        if (!backendData.connected) {
+            return `
+                <div class="backend-disconnected">
+                    <div class="warning-message">
+                        Ã¢Å¡Â Ã¯Â¸Â Backend C++ non connectÃƒÂ©
+                    </div>
+                    <p class="help-text">
+                        Le backend MIDI n'est pas accessible. VÃƒÂ©rifiez que :
+                    </p>
+                    <ul class="help-list">
+                        <li>Le serveur C++ est dÃƒÂ©marrÃƒÂ© sur le port 8080</li>
+                        <li>L'URL WebSocket est correcte (ws://localhost:8080)</li>
+                        <li>Aucun pare-feu ne bloque la connexion</li>
+                    </ul>
+                    <button class="btn btn-primary" onclick="app.systemController.reconnectBackend()">
+                        Ã°Å¸â€â€ž Tenter reconnexion
+                    </button>
                 </div>
-                <p class="help-text">
-                    Le backend MIDI n'est pas accessible. VÃƒÂ©rifiez que :
-                </p>
-                <ul class="help-list">
-                    <li>Le serveur C++ est dÃƒÂ©marrÃƒÂ© sur le port 8080</li>
-                    <li>L'URL WebSocket est correcte (ws://localhost:8080)</li>
-                    <li>Aucun pare-feu ne bloque la connexion</li>
-                </ul>
-                <button class="btn btn-primary" onclick="app.systemController.reconnectBackend()">
-                    Ã°Å¸â€â€ž Tenter reconnexion
-                </button>
-            </div>
-        `;
-    }
-    
-    return `
-        <div class="backend-connected">
-            <div class="success-message">
-                Ã¢Å“â€¦ Backend opÃƒÂ©rationnel
-            </div>
-            
-            <div class="backend-info-grid">
-                <div class="info-item">
-                    <div class="info-label">URL WebSocket</div>
-                    <div class="info-value">${backendData.url || 'ws://localhost:8080'}</div>
+            `;
+        }
+        
+        return `
+            <div class="backend-connected">
+                <div class="success-message">
+                    Ã¢Å“â€¦ Backend opÃƒÂ©rationnel
                 </div>
                 
-                <div class="info-item">
-                    <div class="info-label">Ãƒâ€°tat</div>
-                    <div class="info-value status-playing">
-                        ${backendData.isPlaying ? 'Ã¢â€“Â¶Ã¯Â¸Â En lecture' : 'Ã¢ÂÂ¸Ã¯Â¸Â En pause'}
+                <div class="backend-info-grid">
+                    <div class="info-item">
+                        <div class="info-label">URL WebSocket</div>
+                        <div class="info-value">${backendData.url || 'ws://localhost:8080'}</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Ãƒâ€°tat</div>
+                        <div class="info-value status-playing">
+                            ${backendData.isPlaying ? 'Ã¢â€“Â¶Ã¯Â¸Â En lecture' : 'Ã¢ÂÂ¸Ã¯Â¸Â En pause'}
+                        </div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Position</div>
+                        <div class="info-value">${backendData.position?.toFixed(2) || '0.00'}s</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Tempo</div>
+                        <div class="info-value">${backendData.tempo || 120} BPM</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Fichier actuel</div>
+                        <div class="info-value">${backendData.currentFile || 'Aucun'}</div>
+                    </div>
+                    
+                    <div class="info-item">
+                        <div class="info-label">Messages en attente</div>
+                        <div class="info-value">${backendData.queuedCommands || 0}</div>
                     </div>
                 </div>
                 
-                <div class="info-item">
-                    <div class="info-label">Position</div>
-                    <div class="info-value">${backendData.position?.toFixed(2) || '0.00'}s</div>
-                </div>
-                
-                <div class="info-item">
-                    <div class="info-label">Tempo</div>
-                    <div class="info-value">${backendData.tempo || 120} BPM</div>
-                </div>
-                
-                <div class="info-item">
-                    <div class="info-label">Fichier actuel</div>
-                    <div class="info-value">${backendData.currentFile || 'Aucun'}</div>
-                </div>
-                
-                <div class="info-item">
-                    <div class="info-label">Messages en attente</div>
-                    <div class="info-value">${backendData.queuedCommands || 0}</div>
+                <div class="backend-actions">
+                    <button class="btn btn-secondary" onclick="app.systemController.testBackendConnection()">
+                        Ã°Å¸â€Â Tester connexion
+                    </button>
+                    <button class="btn btn-secondary" onclick="app.systemController.clearBackendQueue()">
+                        Ã°Å¸â€”â€˜Ã¯Â¸Â Vider file d'attente
+                    </button>
                 </div>
             </div>
-            
-            <div class="backend-actions">
-                <button class="btn btn-secondary" onclick="app.systemController.testBackendConnection()">
-                    Ã°Å¸â€Â Tester connexion
-                </button>
-                <button class="btn btn-secondary" onclick="app.systemController.clearBackendQueue()">
-                    Ã°Å¸â€”â€˜Ã¯Â¸Â Vider file d'attente
-                </button>
-            </div>
-        </div>
-    `;
+        `;
+    }
 }
 
 // ============================================================================
