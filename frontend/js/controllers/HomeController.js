@@ -109,6 +109,38 @@ class HomeController extends BaseController {
         this.logDebug('home', '✓ HomeController v3.2.0 initialized');
     }
     
+	/**
+ * Méthode init() publique appelée par Application.js
+ */
+init() {
+    this.logDebug('home', 'HomeController.init() called');
+    
+    // S'assurer que la vue est rendue
+    if (this.homeView && typeof this.homeView.render === 'function') {
+        this.homeView.render();
+        this.logDebug('home', 'HomeView rendered from controller');
+    }
+    
+    // Charger les données initiales
+    this.loadInitialData();
+}
+
+/**
+ * Charge les données initiales
+ */
+loadInitialData() {
+    // Charger fichiers récents
+    if (this.fileModel) {
+        const recentFiles = this.fileModel.get('recentFiles') || [];
+        this.logDebug('home', `Loaded ${recentFiles.length} recent files`);
+    }
+    
+    // Charger playlists
+    if (this.playlistModel) {
+        const playlists = this.playlistModel.get('playlists') || [];
+        this.logDebug('home', `Loaded ${playlists.length} playlists`);
+    }
+}
     /**
      * Binding des événements
      * Override de BaseController.bindEvents()

@@ -79,7 +79,24 @@ class EditorController extends BaseController {
 			this.initVisualizer();
 		}, 100);
     }
+    /**
+ * Méthode init() publique appelée par Application.js
+ */
+init() {
+    this.logDebug('editor', 'EditorController.init() called');
     
+    // S'assurer que la vue est initialisée
+    if (this.view && typeof this.view.init === 'function') {
+        this.view.init();
+    }
+    
+    // Forcer le rendu initial
+    if (this.view && typeof this.view.render === 'function') {
+        this.view.render();
+        this.logDebug('editor', 'EditorView rendered');
+    }
+}
+	
     bindEvents() {
         // Événements d'actions d'édition
         this.eventBus.on('editor:action:undo', () => this.undo());

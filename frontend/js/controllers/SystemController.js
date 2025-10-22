@@ -110,6 +110,37 @@ class SystemController extends BaseController {
         }
     }
 
+/**
+ * Méthode init() publique appelée par Application.js
+ */
+init() {
+    if (this.logger && this.logger.info) {
+        this.logger.info('SystemController', 'SystemController.init() called');
+    }
+    
+    // S'assurer que la vue est rendue
+    this.refreshSystemView();
+    
+    // Charger la configuration système
+    this.initializeSystemConfig();
+}
+
+/**
+ * Rafraîchit la vue système
+ */
+refreshSystemView() {
+    if (!this.view) {
+        return;
+    }
+    
+    if (typeof this.view.render === 'function') {
+        this.view.render();
+        if (this.logger && this.logger.debug) {
+            this.logger.debug('SystemController', 'SystemView rendered');
+        }
+    }
+}
+
     /**
      * Initialise la configuration systÃ¨me
      */

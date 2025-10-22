@@ -307,9 +307,14 @@ class Application {
         console.log('🎨 Initializing views...');
         
         // HomeView - Conteneur 'home'
-        const homeElement = document.getElementById('home');
-        if (homeElement && window.HomeView) {
-            this.views.home = new HomeView(homeElement, this.eventBus);
+		if (window.HomeView) {
+			this.views.home = new HomeView('home');
+			if (typeof this.views.home.init === 'function') {
+				this.views.home.init();
+			}
+			console.log('✓ HomeView initialized and rendered');
+		}
+
             // Initialiser la vue
             if (typeof this.views.home.init === 'function') {
                 this.views.home.init();
@@ -317,7 +322,7 @@ class Application {
                 this.views.home.render();
             }
             console.log('✓ HomeView initialized');
-        }
+        
         
         // EditorView - Conteneur 'editor'
         const editorElement = document.getElementById('editor');
@@ -422,18 +427,27 @@ class Application {
                 this.debugConsole
             );
         }
-        
+        // FileController
+		if (window.FileController) {
+			this.controllers.file = new FileController(
+				this.eventBus,
+				this.models,
+				this.views,
+				this.notifications,
+				this.debugConsole
+			);
+		}
         // PlaylistController
-        if (window.PlaylistController) {
-            this.controllers.playlist = new PlaylistController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
+		if (window.PlaylistController) {
+			this.controllers.playlist = new PlaylistController(
+				this.eventBus,
+				this.models,
+				this.views,
+				this.notifications,
+				this.debugConsole
+			);
+		}
+
         // InstrumentController
         if (window.InstrumentController) {
             this.controllers.instrument = new InstrumentController(
@@ -721,22 +735,37 @@ class Application {
         });
     }
     
-    initPageController(page) {
-        // Initialiser les contrôleurs spécifiques aux pages
-        switch (page) {
-            case 'home':
-                if (this.controllers.home && typeof this.controllers.home.init === 'function') {
-                    this.controllers.home.init();
-                }
-                break;
-            case 'editor':
-                if (this.controllers.editor && typeof this.controllers.editor.init === 'function') {
-                    this.controllers.editor.init();
-                }
-                break;
-            // Autres pages...
-        }
-    }
+initPageController(page) {
+    // Initialiser les contrôleurs et vues spécifiques aux pages
+    switch (page) {
+        case 'home':
+            // Initialiser le contrôleur s'il existe
+            if (this.controllers.home && typeof this.controllers.home.init === 'function') {
+                this.controllers.home.init();
+            }
+            // Forcer le rendu de la vue si pas encore fait
+            else if (this.views.home && typeof this.views.home.render === 'function') {
+                this.views.home.render();
+            }
+            break;
+        case 'system':
+            if (this.controllers.system && typeof this.controllers.system.init === 'function') {
+                this.controllers.system.init();
+            }
+            else if (this.views.system && typeof this.views.system.render === 'function') {
+                this.views.system.render();
+            }
+            break;
+        case 'editor':
+            if (this.controllers.editor && typeof this.controllers.editor.init === 'function') {
+                this.controllers.editor.init();
+            }
+            else if (this.views.editor && typeof this.views.editor.render === 'function') {
+                this.views.editor.render();
+            }
+            break;
+	}
+}
     
     // ========================================================================
     // GESTION DES ERREURS
