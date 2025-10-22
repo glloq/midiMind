@@ -1,10 +1,12 @@
 /**
  * HomeView.js
+ * Fichier: frontend/js/views/HomeView.js
  * Vue de la page d'accueil avec player et visualizer live
+ * Version: v3.1 - FIXED CONSTRUCTOR
  */
 
 class HomeView {
-    constructor(container) {
+    constructor(container, eventBus = null) {
         // Resolve container properly
         if (typeof container === 'string') {
             this.container = document.getElementById(container) || document.querySelector(container);
@@ -19,9 +21,17 @@ class HomeView {
             console.error('[HomeView] Container not found:', container);
         }
         
+        // EventBus (use global if not provided)
+        this.eventBus = eventBus || window.EventBus || null;
+        
         this.visualizer = null;
         this.currentFile = null;
         this.logger = window.logger || console;
+        
+        // Log initialization
+        if (this.logger && this.logger.debug) {
+            this.logger.debug('HomeView', 'Constructor initialized with eventBus:', !!this.eventBus);
+        }
     }
 
     /**
@@ -52,29 +62,29 @@ class HomeView {
 		
         this.container.innerHTML = `
             <div class="home-container">
-                <!-- Barre de contrÃ´le supÃ©rieure -->
+                <!-- Barre de contrÃƒÂ´le supÃƒÂ©rieure -->
                 <div class="top-bar">
                     <div class="file-info">
-                        <span class="file-icon">ðŸŽµ</span>
+                        <span class="file-icon">Ã°Å¸Å½Âµ</span>
                         <span class="file-name" id="currentFileName">No file loaded</span>
                         <span class="file-duration" id="fileDuration">--:--</span>
                     </div>
                     
                     <div class="playback-controls">
                         <button class="btn-control" id="btnPrevious" title="Previous">
-                            â®ï¸
+                            Ã¢ÂÂ®Ã¯Â¸Â
                         </button>
                         <button class="btn-control btn-play" id="btnPlay" title="Play">
-                            â–¶ï¸
+                            Ã¢â€“Â¶Ã¯Â¸Â
                         </button>
                         <button class="btn-control" id="btnPause" title="Pause" style="display: none;">
-                            â¸ï¸
+                            Ã¢ÂÂ¸Ã¯Â¸Â
                         </button>
                         <button class="btn-control" id="btnStop" title="Stop">
-                            â¹ï¸
+                            Ã¢ÂÂ¹Ã¯Â¸Â
                         </button>
                         <button class="btn-control" id="btnNext" title="Next">
-                            â­ï¸
+                            Ã¢ÂÂ­Ã¯Â¸Â
                         </button>
                     </div>
                     
@@ -86,10 +96,10 @@ class HomeView {
                     
                     <div class="top-bar-actions">
                         <button class="btn-secondary" onclick="homeController.openEditor()" title="Open Editor">
-                            âœï¸ Editor
+                            Ã¢Å“ÂÃ¯Â¸Â Editor
                         </button>
                         <button class="btn-secondary" onclick="homeController.openSettings()" title="Settings">
-                            âš™ï¸
+                            Ã¢Å¡â„¢Ã¯Â¸Â
                         </button>
                     </div>
                 </div>
@@ -109,7 +119,7 @@ class HomeView {
 
                 <!-- Layout principal -->
                 <div class="home-layout">
-                    <!-- Section gauche - SÃ©lection et Routing (25%) -->
+                    <!-- Section gauche - SÃƒÂ©lection et Routing (25%) -->
                     <aside class="left-panel">
                         <div class="panel-section file-section">
                             <h3>File Selection</h3>
@@ -118,10 +128,10 @@ class HomeView {
                                     <option value="">-- Select a file --</option>
                                 </select>
                                 <button class="btn-icon" onclick="homeController.refreshFiles()" title="Refresh">
-                                    ðŸ”„
+                                    Ã°Å¸â€â€ž
                                 </button>
                                 <button class="btn-icon" onclick="homeController.uploadFile()" title="Upload">
-                                    ðŸ“
+                                    Ã°Å¸â€œÂ
                                 </button>
                             </div>
                             
@@ -129,7 +139,7 @@ class HomeView {
                                 <div class="section-header">
                                     <span>Playlist</span>
                                     <button class="btn-icon" onclick="homeController.managePlaylist()">
-                                        ðŸ“‹
+                                        Ã°Å¸â€œâ€¹
                                     </button>
                                 </div>
                                 <div class="playlist-info" id="playlistInfo">
@@ -142,15 +152,15 @@ class HomeView {
                             <div class="section-header">
                                 <h3>Quick Routing</h3>
                                 <button class="btn-small" onclick="homeController.autoRoute()">
-                                    ðŸŽ¯ Auto
+                                    Ã°Å¸Å½Â¯ Auto
                                 </button>
                                 <button class="btn-small" onclick="homeController.clearRouting()">
-                                    ðŸ—‘ï¸ Clear
+                                    Ã°Å¸â€”â€˜Ã¯Â¸Â Clear
                                 </button>
                             </div>
                             
                             <div class="routing-grid" id="routingGrid">
-                                <!-- GÃ©nÃ©rÃ© dynamiquement -->
+                                <!-- GÃƒÂ©nÃƒÂ©rÃƒÂ© dynamiquement -->
                             </div>
                             
                             <div class="routing-presets">
@@ -159,12 +169,12 @@ class HomeView {
                                     <option value="">-- Select preset --</option>
                                 </select>
                                 <button class="btn-icon" onclick="homeController.saveRoutingPreset()" title="Save preset">
-                                    ðŸ’¾
+                                    Ã°Å¸â€™Â¾
                                 </button>
                             </div>
                             
                             <div class="routing-stats" id="routingStats">
-                                <!-- Statistiques de compatibilitÃ© -->
+                                <!-- Statistiques de compatibilitÃƒÂ© -->
                             </div>
                         </div>
                     </aside>
@@ -180,7 +190,7 @@ class HomeView {
                             </div>
                             
                             <div class="channel-filter-toggles" id="channelToggles">
-                                <!-- Toggles par canal gÃ©nÃ©rÃ©s dynamiquement -->
+                                <!-- Toggles par canal gÃƒÂ©nÃƒÂ©rÃƒÂ©s dynamiquement -->
                             </div>
                             
                             <div class="visualizer-view-options">
@@ -205,22 +215,22 @@ class HomeView {
                             <!-- Overlay pour informations -->
                             <div class="visualizer-overlay">
                                 <div class="note-preview" id="notePreview">
-                                    <!-- Notes Ã  venir dans les prochaines secondes -->
+                                    <!-- Notes ÃƒÂ  venir dans les prochaines secondes -->
                                 </div>
                                 
                                 <div class="cc-monitor" id="ccMonitor" style="display: none;">
-                                    <!-- Valeurs CC en temps rÃ©el -->
+                                    <!-- Valeurs CC en temps rÃƒÂ©el -->
                                 </div>
                                 
                                 <div class="channel-activity" id="channelActivity">
-                                    <!-- Indicateurs d'activitÃ© par canal -->
+                                    <!-- Indicateurs d'activitÃƒÂ© par canal -->
                                 </div>
                             </div>
                             
                             <!-- Message quand pas de fichier -->
                             <div class="empty-visualizer" id="emptyVisualizer">
                                 <div class="empty-state-large">
-                                    <span class="icon">ðŸŽ¹</span>
+                                    <span class="icon">Ã°Å¸Å½Â¹</span>
                                     <h2>No MIDI file loaded</h2>
                                     <p>Select a file from the left panel to start</p>
                                     <button class="btn-primary" onclick="homeController.selectFirstFile()">
@@ -255,10 +265,10 @@ class HomeView {
     }
 
     /**
-     * Attache les Ã©vÃ©nements
+     * Attache les ÃƒÂ©vÃƒÂ©nements
      */
     attachEvents() {
-        // ContrÃ´les de lecture
+        // ContrÃƒÂ´les de lecture
         document.getElementById('btnPlay')?.addEventListener('click', () => {
             homeController.play();
         });
@@ -279,7 +289,7 @@ class HomeView {
             homeController.next();
         });
 
-        // SÃ©lection de fichier
+        // SÃƒÂ©lection de fichier
         document.getElementById('fileSelect')?.addEventListener('change', (e) => {
             homeController.loadFile(e.target.value);
         });
@@ -338,7 +348,7 @@ class HomeView {
 
 
 /**
- * Attache les Ã©vÃ©nements DOM
+ * Attache les ÃƒÂ©vÃƒÂ©nements DOM
  */
 attachDOMEvents() {
     // Player controls
@@ -424,7 +434,7 @@ switchTab(tabName) {
         return;
     }
     
-    // DÃ©sactiver tous les tabs
+    // DÃƒÂ©sactiver tous les tabs
     this.container.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
@@ -433,7 +443,7 @@ switchTab(tabName) {
         content.classList.remove('active');
     });
     
-    // Activer le tab sÃ©lectionnÃ©
+    // Activer le tab sÃƒÂ©lectionnÃƒÂ©
     this.container.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
     this.container.querySelector(`[data-tab-content="${tabName}"]`)?.classList.add('active');
 }
@@ -443,7 +453,7 @@ switchTab(tabName) {
 
 
     /**
-     * Met Ã  jour la liste des fichiers
+     * Met ÃƒÂ  jour la liste des fichiers
      */
     updateFileList(files) {
         const select = document.getElementById('fileSelect');
@@ -461,7 +471,7 @@ switchTab(tabName) {
     }
 
     /**
-     * Met Ã  jour les informations du fichier courant
+     * Met ÃƒÂ  jour les informations du fichier courant
      */
     updateCurrentFile(file) {
         this.currentFile = file;
@@ -483,7 +493,7 @@ switchTab(tabName) {
         }
     }
 /**
- * Met Ã  jour la position de lecture
+ * Met ÃƒÂ  jour la position de lecture
  */
 updatePlaybackPosition(position, duration) {
     if (!this.container) {
@@ -492,14 +502,14 @@ updatePlaybackPosition(position, duration) {
     
     const progress = duration > 0 ? (position / duration) * 100 : 0;
     
-    // Mise Ã  jour barre de progression
+    // Mise ÃƒÂ  jour barre de progression
     const fill = this.container.querySelector('.progress-fill');
     const handle = this.container.querySelector('.progress-handle');
     
     if (fill) fill.style.width = `${progress}%`;
     if (handle) handle.style.left = `${progress}%`;
     
-    // Mise Ã  jour temps
+    // Mise ÃƒÂ  jour temps
     const currentTimeEl = this.container.querySelector('.current-time');
     if (currentTimeEl) {
         currentTimeEl.textContent = Formatter.formatDuration(position);
@@ -507,31 +517,31 @@ updatePlaybackPosition(position, duration) {
 }
 
 /**
- * Met Ã  jour l'Ã©tat de lecture
+ * Met ÃƒÂ  jour l'ÃƒÂ©tat de lecture
  */
 updatePlaybackState(isPlaying) {
     const playPauseBtn = this.container.querySelector('.btn-play-pause .icon');
     const status = this.container.querySelector('.player-status');
     
     if (playPauseBtn) {
-        playPauseBtn.textContent = isPlaying ? 'â¸ï¸' : 'â–¶ï¸';
+        playPauseBtn.textContent = isPlaying ? 'Ã¢ÂÂ¸Ã¯Â¸Â' : 'Ã¢â€“Â¶Ã¯Â¸Â';
     }
     
     if (status) {
         status.className = `player-status ${isPlaying ? 'playing' : 'paused'}`;
-        status.textContent = isPlaying ? 'â–¶ï¸ Lecture' : 'â¸ï¸ Pause';
+        status.textContent = isPlaying ? 'Ã¢â€“Â¶Ã¯Â¸Â Lecture' : 'Ã¢ÂÂ¸Ã¯Â¸Â Pause';
     }
 }
 
 /**
- * Met Ã  jour le fichier courant
+ * Met ÃƒÂ  jour le fichier courant
  */
 updateCurrentFile(file) {
     const fileName = this.container.querySelector('.file-name');
     const fileInfo = this.container.querySelector('.file-metadata');
     
     if (fileName) {
-        fileName.textContent = file ? file.name : 'Aucun fichier sÃ©lectionnÃ©';
+        fileName.textContent = file ? file.name : 'Aucun fichier sÃƒÂ©lectionnÃƒÂ©';
     }
     
     if (fileInfo && file) {
@@ -539,7 +549,7 @@ updateCurrentFile(file) {
     }
 }
     /**
-     * Met Ã  jour la grille de routing
+     * Met ÃƒÂ  jour la grille de routing
      */
     updateRoutingGrid(channels, instruments) {
         const grid = document.getElementById('routingGrid');
@@ -577,7 +587,7 @@ updateCurrentFile(file) {
     }
 
     /**
-     * Obtient le badge de compatibilitÃ©
+     * Obtient le badge de compatibilitÃƒÂ©
      */
     getCompatibilityBadge(compatibility) {
         if (!compatibility) {
@@ -587,18 +597,18 @@ updateCurrentFile(file) {
         const percent = compatibility.percentage;
         
         if (percent === 100) {
-            return '<span class="badge badge-success" title="Perfect compatibility">âœ…</span>';
+            return '<span class="badge badge-success" title="Perfect compatibility">Ã¢Å“â€¦</span>';
         } else if (percent >= 80) {
-            return `<span class="badge badge-warning" title="${percent}% compatible">âš ï¸</span>`;
+            return `<span class="badge badge-warning" title="${percent}% compatible">Ã¢Å¡Â Ã¯Â¸Â</span>`;
         } else if (percent >= 50) {
-            return `<span class="badge badge-warning" title="${percent}% compatible">âš ï¸</span>`;
+            return `<span class="badge badge-warning" title="${percent}% compatible">Ã¢Å¡Â Ã¯Â¸Â</span>`;
         } else {
-            return `<span class="badge badge-error" title="${percent}% compatible">âŒ</span>`;
+            return `<span class="badge badge-error" title="${percent}% compatible">Ã¢ÂÅ’</span>`;
         }
     }
 
     /**
-     * Met Ã  jour les statistiques de routing
+     * Met ÃƒÂ  jour les statistiques de routing
      */
     updateRoutingStats(stats) {
         const container = document.getElementById('routingStats');
@@ -631,7 +641,7 @@ updateCurrentFile(file) {
             </div>
         `;
     }
-// frontend/js/views/HomeView.js - MÃ©thode buildTemplate()
+// frontend/js/views/HomeView.js - MÃƒÂ©thode buildTemplate()
 
 /**
  * Construit le template HTML de la page d'accueil
@@ -661,21 +671,21 @@ buildTemplate(data = {}) {
  * Section Player principal
  */
 buildPlayerSection(file, isPlaying, position, duration) {
-    const fileName = file ? file.name : 'Aucun fichier sÃ©lectionnÃ©';
+    const fileName = file ? file.name : 'Aucun fichier sÃƒÂ©lectionnÃƒÂ©';
     const fileInfo = file ? this.buildFileInfo(file) : '';
     const progress = duration > 0 ? (position / duration) * 100 : 0;
     
     return `
         <section class="player-section">
             <div class="player-header">
-                <h2>ðŸŽµ Lecteur MIDI</h2>
+                <h2>Ã°Å¸Å½Âµ Lecteur MIDI</h2>
                 <div class="player-status ${isPlaying ? 'playing' : 'paused'}">
-                    ${isPlaying ? 'â–¶ï¸ Lecture' : 'â¸ï¸ Pause'}
+                    ${isPlaying ? 'Ã¢â€“Â¶Ã¯Â¸Â Lecture' : 'Ã¢ÂÂ¸Ã¯Â¸Â Pause'}
                 </div>
             </div>
             
             <div class="current-file-display">
-                <div class="file-icon">ðŸŽ¹</div>
+                <div class="file-icon">Ã°Å¸Å½Â¹</div>
                 <div class="file-details">
                     <div class="file-name">${fileName}</div>
                     ${fileInfo}
@@ -695,29 +705,29 @@ buildPlayerSection(file, isPlaying, position, duration) {
                 </div>
                 
                 <div class="control-buttons">
-                    <button class="btn-control" data-view-action="previous" title="PrÃ©cÃ©dent">
-                        <span class="icon">â®ï¸</span>
+                    <button class="btn-control" data-view-action="previous" title="PrÃƒÂ©cÃƒÂ©dent">
+                        <span class="icon">Ã¢ÂÂ®Ã¯Â¸Â</span>
                     </button>
                     <button class="btn-control btn-play-pause" data-view-action="togglePlayback">
-                        <span class="icon">${isPlaying ? 'â¸ï¸' : 'â–¶ï¸'}</span>
+                        <span class="icon">${isPlaying ? 'Ã¢ÂÂ¸Ã¯Â¸Â' : 'Ã¢â€“Â¶Ã¯Â¸Â'}</span>
                     </button>
                     <button class="btn-control" data-view-action="stop" title="Stop">
-                        <span class="icon">â¹ï¸</span>
+                        <span class="icon">Ã¢ÂÂ¹Ã¯Â¸Â</span>
                     </button>
                     <button class="btn-control" data-view-action="next" title="Suivant">
-                        <span class="icon">â­ï¸</span>
+                        <span class="icon">Ã¢ÂÂ­Ã¯Â¸Â</span>
                     </button>
                 </div>
                 
                 <div class="secondary-controls">
-                    <button class="btn-icon" data-view-action="toggleShuffle" title="Lecture alÃ©atoire">
-                        ðŸ”€
+                    <button class="btn-icon" data-view-action="toggleShuffle" title="Lecture alÃƒÂ©atoire">
+                        Ã°Å¸â€â‚¬
                     </button>
-                    <button class="btn-icon" data-view-action="toggleRepeat" title="RÃ©pÃ©ter">
-                        ðŸ”
+                    <button class="btn-icon" data-view-action="toggleRepeat" title="RÃƒÂ©pÃƒÂ©ter">
+                        Ã°Å¸â€Â
                     </button>
                     <div class="volume-control">
-                        <span class="icon">ðŸ”Š</span>
+                        <span class="icon">Ã°Å¸â€Å </span>
                         <input type="range" 
                                class="volume-slider" 
                                min="0" max="100" 
@@ -731,20 +741,20 @@ buildPlayerSection(file, isPlaying, position, duration) {
 }
 
 /**
- * Section sÃ©lecteur fichiers
+ * Section sÃƒÂ©lecteur fichiers
  */
 buildFileSelectorSection(recentFiles, playlists) {
     return `
         <section class="file-selector-section">
             <div class="selector-tabs">
                 <button class="tab-btn active" data-tab="recent">
-                    ðŸ“ RÃ©cents
+                    Ã°Å¸â€œÂ RÃƒÂ©cents
                 </button>
                 <button class="tab-btn" data-tab="playlists">
-                    ðŸ“‹ Playlists
+                    Ã°Å¸â€œâ€¹ Playlists
                 </button>
                 <button class="tab-btn" data-tab="browse">
-                    ðŸ” Parcourir
+                    Ã°Å¸â€Â Parcourir
                 </button>
             </div>
             
@@ -760,7 +770,7 @@ buildFileSelectorSection(recentFiles, playlists) {
                 <div class="browse-placeholder">
                     <p>Cliquez pour ouvrir l'explorateur de fichiers</p>
                     <button class="btn-primary" data-view-action="openFileExplorer">
-                        ðŸ“‚ Parcourir les fichiers
+                        Ã°Å¸â€œâ€š Parcourir les fichiers
                     </button>
                 </div>
             </div>
@@ -769,14 +779,14 @@ buildFileSelectorSection(recentFiles, playlists) {
 }
 
 /**
- * Liste fichiers rÃ©cents
+ * Liste fichiers rÃƒÂ©cents
  */
 buildRecentFilesList(files) {
     if (files.length === 0) {
         return `
             <div class="empty-state">
-                <div class="empty-icon">ðŸŽ¼</div>
-                <p>Aucun fichier rÃ©cent</p>
+                <div class="empty-icon">Ã°Å¸Å½Â¼</div>
+                <p>Aucun fichier rÃƒÂ©cent</p>
                 <button class="btn-secondary" data-view-action="openFileExplorer">
                     Ajouter des fichiers
                 </button>
@@ -797,12 +807,12 @@ buildRecentFilesList(files) {
 buildFileCard(file) {
     return `
         <div class="file-card" data-file-id="${file.id}">
-            <div class="file-card-icon">ðŸŽ¹</div>
+            <div class="file-card-icon">Ã°Å¸Å½Â¹</div>
             <div class="file-card-info">
                 <div class="file-card-name">${file.name}</div>
                 <div class="file-card-meta">
                     <span class="duration">${Formatter.formatDuration(file.duration)}</span>
-                    <span class="separator">â€¢</span>
+                    <span class="separator">Ã¢â‚¬Â¢</span>
                     <span class="size">${Formatter.formatFileSize(file.size)}</span>
                 </div>
             </div>
@@ -811,13 +821,13 @@ buildFileCard(file) {
                         data-view-action="playFile" 
                         data-file-id="${file.id}"
                         title="Lire">
-                    â–¶ï¸
+                    Ã¢â€“Â¶Ã¯Â¸Â
                 </button>
                 <button class="btn-icon-small" 
                         data-view-action="addToQueue" 
                         data-file-id="${file.id}"
-                        title="Ajouter Ã  la file">
-                    âž•
+                        title="Ajouter ÃƒÂ  la file">
+                    Ã¢Å¾â€¢
                 </button>
             </div>
         </div>
@@ -834,9 +844,9 @@ buildInstrumentStatusSection(instruments) {
     return `
         <section class="instrument-status-section">
             <div class="status-header">
-                <h3>ðŸŽ›ï¸ Instruments</h3>
+                <h3>Ã°Å¸Å½â€ºÃ¯Â¸Â Instruments</h3>
                 <span class="status-badge ${statusClass}">
-                    ${connectedCount} connectÃ©${connectedCount > 1 ? 's' : ''}
+                    ${connectedCount} connectÃƒÂ©${connectedCount > 1 ? 's' : ''}
                 </span>
             </div>
             
@@ -862,9 +872,9 @@ buildInstrumentList(instruments) {
 buildNoInstruments() {
     return `
         <div class="no-instruments">
-            <p>Aucun instrument connectÃ©</p>
+            <p>Aucun instrument connectÃƒÂ©</p>
             <button class="btn-secondary" data-view-action="scanInstruments">
-                ðŸ” Rechercher des instruments
+                Ã°Å¸â€Â Rechercher des instruments
             </button>
         </div>
     `;
@@ -876,26 +886,26 @@ buildNoInstruments() {
 buildQuickActionsSection() {
     return `
         <section class="quick-actions-section">
-            <h3>âš¡ Actions Rapides</h3>
+            <h3>Ã¢Å¡Â¡ Actions Rapides</h3>
             <div class="quick-actions-grid">
                 <button class="action-card" data-view-action="openEditor">
-                    <span class="action-icon">âœï¸</span>
-                    <span class="action-label">Ã‰diteur MIDI</span>
+                    <span class="action-icon">Ã¢Å“ÂÃ¯Â¸Â</span>
+                    <span class="action-label">Ãƒâ€°diteur MIDI</span>
                 </button>
                 
                 <button class="action-card" data-view-action="openRouting">
-                    <span class="action-icon">ðŸ”€</span>
+                    <span class="action-icon">Ã°Å¸â€â‚¬</span>
                     <span class="action-label">Configuration Routing</span>
                 </button>
                 
                 <button class="action-card" data-view-action="createPlaylist">
-                    <span class="action-icon">ðŸ“‹</span>
+                    <span class="action-icon">Ã°Å¸â€œâ€¹</span>
                     <span class="action-label">Nouvelle Playlist</span>
                 </button>
                 
                 <button class="action-card" data-view-action="openSystem">
-                    <span class="action-icon">âš™ï¸</span>
-                    <span class="action-label">ParamÃ¨tres</span>
+                    <span class="action-icon">Ã¢Å¡â„¢Ã¯Â¸Â</span>
+                    <span class="action-label">ParamÃƒÂ¨tres</span>
                 </button>
             </div>
         </section>
@@ -907,25 +917,25 @@ buildQuickActionsSection() {
  */
 getInstrumentIcon(type) {
     const icons = {
-        'usb': 'ðŸ”Œ',
-        'wifi': 'ðŸ“¶',
-        'bluetooth': 'ðŸ“¶',
-        'virtual': 'ðŸ’»'
+        'usb': 'Ã°Å¸â€Å’',
+        'wifi': 'Ã°Å¸â€œÂ¶',
+        'bluetooth': 'Ã°Å¸â€œÂ¶',
+        'virtual': 'Ã°Å¸â€™Â»'
     };
-    return icons[type] || 'ðŸŽ¹';
+    return icons[type] || 'Ã°Å¸Å½Â¹';
 }
 
 buildFileInfo(file) {
     return `
         <div class="file-metadata">
-            ${file.tempo ? `<span class="meta-item">â™© ${file.tempo} BPM</span>` : ''}
-            ${file.timeSignature ? `<span class="meta-item">â±ï¸ ${file.timeSignature}</span>` : ''}
-            ${file.trackCount ? `<span class="meta-item">ðŸŽµ ${file.trackCount} pistes</span>` : ''}
+            ${file.tempo ? `<span class="meta-item">Ã¢â„¢Â© ${file.tempo} BPM</span>` : ''}
+            ${file.timeSignature ? `<span class="meta-item">Ã¢ÂÂ±Ã¯Â¸Â ${file.timeSignature}</span>` : ''}
+            ${file.trackCount ? `<span class="meta-item">Ã°Å¸Å½Âµ ${file.trackCount} pistes</span>` : ''}
         </div>
     `;
 }
     /**
-     * Met Ã  jour les toggles de canaux
+     * Met ÃƒÂ  jour les toggles de canaux
      */
     updateChannelToggles(channels) {
         const container = document.getElementById('channelToggles');
@@ -945,7 +955,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met Ã  jour l'Ã©tat de lecture
+     * Met ÃƒÂ  jour l'ÃƒÂ©tat de lecture
      */
     updatePlaybackState(state) {
         const btnPlay = document.getElementById('btnPlay');
@@ -961,7 +971,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met Ã  jour la barre de progression
+     * Met ÃƒÂ  jour la barre de progression
      */
     updateProgress(currentTime, totalTime) {
         const percent = (currentTime / totalTime) * 100;
@@ -970,14 +980,14 @@ buildFileInfo(file) {
         document.getElementById('playhead').style.left = `${percent}%`;
         document.getElementById('currentTime').textContent = this.formatTime(currentTime);
         
-        // Mettre Ã  jour le visualizer
+        // Mettre ÃƒÂ  jour le visualizer
         if (this.visualizer) {
             this.visualizer.update(currentTime);
         }
     }
 
     /**
-     * Met Ã  jour l'overlay de notes Ã  venir
+     * Met ÃƒÂ  jour l'overlay de notes ÃƒÂ  venir
      */
     updateNotePreview(upcomingNotes) {
         const container = document.getElementById('notePreview');
@@ -1003,7 +1013,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met Ã  jour le moniteur CC
+     * Met ÃƒÂ  jour le moniteur CC
      */
     updateCCMonitor(ccValues) {
         const container = document.getElementById('ccMonitor');
@@ -1022,7 +1032,7 @@ buildFileInfo(file) {
     }
 
     /**
-     * Met Ã  jour l'activitÃ© des canaux
+     * Met ÃƒÂ  jour l'activitÃƒÂ© des canaux
      */
     updateChannelActivity(channels) {
         const container = document.getElementById('channelActivity');
