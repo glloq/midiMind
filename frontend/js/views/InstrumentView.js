@@ -3,7 +3,7 @@
 // Version: v3.0.8 - FIXED (Initialization order corrected)
 // Date: 2025-10-20
 // ============================================================================
-// VERSION Ã‰QUILIBRÃ‰E - Features utiles sans complexitÃ© excessive
+// VERSION Ãƒâ€°QUILIBRÃƒâ€°E - Features utiles sans complexitÃƒÂ© excessive
 // FIX: Proper initialization order to prevent undefined displayConfig error
 // ============================================================================
 
@@ -14,7 +14,7 @@ class InstrumentView extends BaseView {
         // Configure to prevent auto-render during construction
         this.config.autoRender = false;
         
-        // Ã‰tat local
+        // Ãƒâ€°tat local
         this.localState = {
             selectedInstruments: new Set(),
             expandedInstruments: new Set(),
@@ -39,7 +39,7 @@ class InstrumentView extends BaseView {
         // Logger safe - MUST be initialized before initialize() is called
         this.logger = window.logger || console;
         
-        this.logger.info('InstrumentView', 'âœ“ View initialized (balanced version)');
+        this.logger.info('InstrumentView', 'Ã¢Å“â€œ View initialized (balanced version)');
     }
     
     // Override initialize to prevent BaseView from calling render before properties are set
@@ -59,7 +59,7 @@ class InstrumentView extends BaseView {
     render(data = {}) {
         if (!this.container) {
             if (this.logger) {
-                this.logger.warning('InstrumentView', 'Container not found');
+                this.logger.warn('InstrumentView', 'Container not found');
             }
             return;
         }
@@ -67,7 +67,7 @@ class InstrumentView extends BaseView {
         // Safety check: ensure displayConfig exists
         if (!this.displayConfig) {
             if (this.logger) {
-                this.logger.warning('InstrumentView', 'displayConfig not initialized yet, skipping render');
+                this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
             }
             return;
         }
@@ -79,13 +79,13 @@ class InstrumentView extends BaseView {
                 
                 <!-- Header avec actions -->
                 <div class="instrument-header">
-                    <h2>ðŸŽ¹ MIDI Instruments</h2>
+                    <h2>Ã°Å¸Å½Â¹ MIDI Instruments</h2>
                     <div class="header-actions">
                         <button id="scan-instruments-btn" class="btn btn-primary">
-                            ðŸ”„ Scan Devices
+                            Ã°Å¸â€â€ž Scan Devices
                         </button>
                         <button id="toggle-view-btn" class="btn btn-secondary">
-                            ${this.displayConfig.compactMode ? 'ðŸ“‹ Normal View' : 'ðŸ“Š Compact View'}
+                            ${this.displayConfig.compactMode ? 'Ã°Å¸â€œâ€¹ Normal View' : 'Ã°Å¸â€œÅ  Compact View'}
                         </button>
                     </div>
                 </div>
@@ -124,21 +124,21 @@ class InstrumentView extends BaseView {
         return `
             <div class="instrument-stats">
                 <div class="stat-card">
-                    <span class="stat-icon">ðŸ“Š</span>
+                    <span class="stat-icon">Ã°Å¸â€œÅ </span>
                     <div class="stat-info">
                         <span class="stat-value">${total}</span>
                         <span class="stat-label">Total</span>
                     </div>
                 </div>
                 <div class="stat-card connected">
-                    <span class="stat-icon">ðŸŸ¢</span>
+                    <span class="stat-icon">Ã°Å¸Å¸Â¢</span>
                     <div class="stat-info">
                         <span class="stat-value">${connected}</span>
                         <span class="stat-label">Connected</span>
                     </div>
                 </div>
                 <div class="stat-card disconnected">
-                    <span class="stat-icon">ðŸ”´</span>
+                    <span class="stat-icon">Ã°Å¸â€Â´</span>
                     <div class="stat-info">
                         <span class="stat-value">${disconnected}</span>
                         <span class="stat-label">Disconnected</span>
@@ -184,7 +184,7 @@ class InstrumentView extends BaseView {
     // ========================================================================
     
     renderCardHeader(instrument) {
-        const statusIcon = instrument.connected ? 'ðŸŸ¢' : 'ðŸ”´';
+        const statusIcon = instrument.connected ? 'Ã°Å¸Å¸Â¢' : 'Ã°Å¸â€Â´';
         const statusText = instrument.connected ? 'Connected' : 'Disconnected';
         
         return `
@@ -208,7 +208,7 @@ class InstrumentView extends BaseView {
                     <button class="btn-icon expand-btn" 
                             data-id="${instrument.id}"
                             title="Show details">
-                        ${this.localState.expandedInstruments.has(instrument.id) ? 'â–¼' : 'â–¶'}
+                        ${this.localState.expandedInstruments.has(instrument.id) ? 'Ã¢â€“Â¼' : 'Ã¢â€“Â¶'}
                     </button>
                 </div>
             </div>
@@ -216,14 +216,14 @@ class InstrumentView extends BaseView {
     }
     
     // ========================================================================
-    // RENDU BODY CARTE (DÃ‰TAILS)
+    // RENDU BODY CARTE (DÃƒâ€°TAILS)
     // ========================================================================
     
     renderCardBody(instrument) {
         return `
             <div class="card-body">
                 
-                <!-- Informations dÃ©taillÃ©es -->
+                <!-- Informations dÃƒÂ©taillÃƒÂ©es -->
                 <div class="detailed-info">
                     ${instrument.model ? 
                         `<div class="info-item">
@@ -267,10 +267,10 @@ class InstrumentView extends BaseView {
             <div class="capabilities">
                 <h4>Capabilities</h4>
                 <div class="capability-tags">
-                    ${caps.input ? '<span class="cap-tag">ðŸ“¥ Input</span>' : ''}
-                    ${caps.output ? '<span class="cap-tag">ðŸ“¤ Output</span>' : ''}
-                    ${caps.clock ? '<span class="cap-tag">ðŸ• Clock</span>' : ''}
-                    ${caps.program ? '<span class="cap-tag">ðŸŽ›ï¸ Program</span>' : ''}
+                    ${caps.input ? '<span class="cap-tag">Ã°Å¸â€œÂ¥ Input</span>' : ''}
+                    ${caps.output ? '<span class="cap-tag">Ã°Å¸â€œÂ¤ Output</span>' : ''}
+                    ${caps.clock ? '<span class="cap-tag">Ã°Å¸â€¢Â Clock</span>' : ''}
+                    ${caps.program ? '<span class="cap-tag">Ã°Å¸Å½â€ºÃ¯Â¸Â Program</span>' : ''}
                 </div>
             </div>
         `;
@@ -324,17 +324,17 @@ class InstrumentView extends BaseView {
                 ${instrument.connected ? 
                     `<button class="btn btn-sm btn-danger disconnect-btn" 
                             data-id="${instrument.id}">
-                        ðŸ”Œ Disconnect
+                        Ã°Å¸â€Å’ Disconnect
                     </button>` : 
                     `<button class="btn btn-sm btn-success connect-btn" 
                             data-id="${instrument.id}">
-                        ðŸ”Œ Connect
+                        Ã°Å¸â€Å’ Connect
                     </button>`
                 }
                 ${instrument.connected ? 
                     `<button class="btn btn-sm btn-secondary config-btn" 
                             data-id="${instrument.id}">
-                        âš™ï¸ Configure
+                        Ã¢Å¡â„¢Ã¯Â¸Â Configure
                     </button>` : ''
                 }
             </div>
@@ -348,18 +348,18 @@ class InstrumentView extends BaseView {
     renderEmptyState() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">ðŸŽ¹</div>
+                <div class="empty-icon">Ã°Å¸Å½Â¹</div>
                 <h3>No MIDI Instruments Found</h3>
                 <p>Connect a MIDI device and click "Scan Devices" to detect it.</p>
                 <button id="scan-empty-btn" class="btn btn-primary">
-                    ðŸ”„ Scan Now
+                    Ã°Å¸â€â€ž Scan Now
                 </button>
             </div>
         `;
     }
     
     // ========================================================================
-    // Ã‰VÃ‰NEMENTS
+    // Ãƒâ€°VÃƒâ€°NEMENTS
     // ========================================================================
     
     attachEventListeners() {
@@ -443,7 +443,7 @@ class InstrumentView extends BaseView {
         // Re-render la carte
         const card = this.container.querySelector(`[data-instrument-id="${instrumentId}"]`);
         if (card) {
-            // Trouver l'instrument dans les donnÃ©es
+            // Trouver l'instrument dans les donnÃƒÂ©es
             this.emit('instrument:expand-toggled', { instrumentId });
         }
     }
@@ -459,7 +459,7 @@ class InstrumentView extends BaseView {
     }
     
     // ========================================================================
-    // MISES Ã€ JOUR
+    // MISES Ãƒâ‚¬ JOUR
     // ========================================================================
     
     updateInstrumentList(instruments) {
@@ -484,7 +484,7 @@ class InstrumentView extends BaseView {
         const scanBtn = this.container.querySelector('#scan-instruments-btn');
         if (scanBtn) {
             scanBtn.disabled = true;
-            scanBtn.innerHTML = 'â³ Scanning...';
+            scanBtn.innerHTML = 'Ã¢ÂÂ³ Scanning...';
         }
     }
     
@@ -492,7 +492,7 @@ class InstrumentView extends BaseView {
         const scanBtn = this.container.querySelector('#scan-instruments-btn');
         if (scanBtn) {
             scanBtn.disabled = false;
-            scanBtn.innerHTML = 'ðŸ”„ Scan Devices';
+            scanBtn.innerHTML = 'Ã°Å¸â€â€ž Scan Devices';
         }
     }
     
@@ -517,7 +517,7 @@ class InstrumentView extends BaseView {
         if (this.container) {
             this.container.innerHTML = `
                 <div class="error-message">
-                    <p>âŒ ${this.escapeHtml(message)}</p>
+                    <p>Ã¢ÂÅ’ ${this.escapeHtml(message)}</p>
                     <button id="retry-scan-btn" class="btn btn-primary">Retry Scan</button>
                 </div>
             `;
