@@ -1,13 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.5 - FIXED LOGGER INITIALIZATION
+// Version: v3.6 - FIXED FILESERVICE INITIALIZATION
 // Date: 2025-10-22
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// CORRECTIONS v3.5:
+// CORRECTIONS v3.6:
+// ✅ FileService correctement initialisé avec backendService, eventBus, logger
 // ✅ Logger correctement initialisé avec new Logger()
 // ✅ Conteneurs corrects pour toutes les vues
-// ✅ Initialisation forcée de toutes les vues
 // ✅ Interface visible même sans backend
 // ✅ Mode offline gracieux
 // ============================================================================
@@ -215,9 +215,13 @@ class Application {
             this.services.midi = new MidiService(this.eventBus);
         }
         
-        // FileService
+        // FileService - CORRIGÉ : passer les paramètres requis
         if (window.FileService) {
-            this.services.file = new FileService();
+            this.services.file = new FileService(
+                this.services.backend,
+                this.eventBus,
+                this.logger
+            );
         }
         
         this.logger.info('Application', '✓ Services initialized');
@@ -318,8 +322,13 @@ class Application {
         // InstrumentView - Conteneur 'instruments'
         const instrumentElement = document.getElementById('instruments');
         if (instrumentElement && window.InstrumentView) {
-            this.views.instrument = new InstrumentView(instrumentElement, this.eventBus, this.logger);
-            // La vue s'initialise elle-même via BaseView
+            this.views.instrument = new InstrumentView(instrumentElement, this.eventBus);
+            // Initialiser la vue
+            if (typeof this.views.instrument.init === 'function') {
+                this.views.instrument.init();
+            } else if (typeof this.views.instrument.render === 'function') {
+                this.views.instrument.render();
+            }
             console.log('✓ InstrumentView initialized');
         }
         
@@ -327,20 +336,17 @@ class Application {
         const systemElement = document.getElementById('system');
         if (systemElement && window.SystemView) {
             this.views.system = new SystemView(systemElement, this.eventBus);
-            // Forcer le rendu initial
-            if (typeof this.views.system.render === 'function') {
-                this.views.system.render({
-                    systemHealth: 'good',
-                    cpu: { usage: 0, cores: 4 },
-                    memory: { used: 0, total: 100 },
-                    latency: { current: 0, target: 10 }
-                });
+            // Initialiser la vue
+            if (typeof this.views.system.init === 'function') {
+                this.views.system.init();
+            } else if (typeof this.views.system.render === 'function') {
+                this.views.system.render();
             }
             console.log('✓ SystemView initialized');
         }
         
-        // FileView (si élément existe)
-        const fileElement = document.querySelector('.file-view-container');
+        // FileView - si disponible
+        const fileElement = document.querySelector('.files-list');
         if (fileElement && window.FileView) {
             this.views.file = new FileView(fileElement, this.eventBus);
             console.log('✓ FileView initialized');
@@ -350,7 +356,7 @@ class Application {
     }
     
     /**
-     * Initialise les contrôleurs
+     * Initialise les contrôleurs - CORRIGÉ
      */
     async initControllers() {
         console.log('🎮 Initializing controllers...');
@@ -449,6 +455,7 @@ class Application {
         // EditorController
         if (window.EditorController) {
             this.controllers.editor = new EditorController(
+                this.services.backend,
                 this.models.editor,
                 this.views.editor,
                 this.eventBus,
@@ -457,14 +464,33 @@ class Application {
             );
         }
         
+        // KeyboardController
+        if (window.KeyboardController) {
+            this.controllers.keyboard = new KeyboardController(
+                this.services.midi,
+                this.views.keyboard,
+                this.eventBus,
+                this.notifications
+            );
+        }
+        
+        // GlobalPlaybackController
+        if (window.GlobalPlaybackController) {
+            this.controllers.globalPlayback = new GlobalPlaybackController(
+                this.services.backend,
+                this.models.playback,
+                this.eventBus,
+                this.notifications
+            );
+        }
+        
         // SearchController
         if (window.SearchController) {
             this.controllers.search = new SearchController(
+                this.services.backend,
+                this.models.file,
                 this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.notifications
             );
         }
         
@@ -472,15 +498,13 @@ class Application {
     }
     
     /**
-     * Initialise le système de navigation
+     * Initialise la navigation
      */
     async initNavigation() {
-        console.log('🗺️ Initializing navigation...');
+        console.log('🧭 Initializing navigation...');
         
-        // Écouter les changements de hash
-        window.addEventListener('hashchange', () => {
-            this.handleNavigation();
-        });
+        // Gestionnaire de navigation
+        window.addEventListener('hashchange', () => this.handleNavigation());
         
         // Navigation initiale
         this.handleNavigation();
@@ -488,121 +512,106 @@ class Application {
         this.logger.info('Application', '✓ Navigation initialized');
     }
     
-    // ========================================================================
-    // CONNEXION BACKEND - AVEC MODE OFFLINE
-    // ========================================================================
-    
     /**
-     * Connexion au backend avec gestion du mode offline
+     * Connexion au backend (non-bloquant)
      */
     async connectBackend() {
         console.log('🔌 Connecting to backend...');
         
         if (!this.services.backend) {
-            this.logger.warn('Application', 'BackendService not available');
-            this.enableOfflineMode('BackendService not available');
+            console.warn('⚠️ Backend service not available');
+            this.enableOfflineMode('Backend service not available');
             return;
         }
         
         try {
-            // Tenter connexion avec retry automatique
+            // Tentative de connexion
             await this.services.backend.connect();
             
-            // Succès !
-            this.state.backendConnected = true;
-            this.state.offlineMode = false;
+            // Attendre confirmation de connexion (timeout 3s)
+            const connected = await this.waitForConnection(3000);
             
-            this.logger.info('Application', '✅ Backend connected');
-            
-            // Afficher notification de connexion
-            this.showConnectionStatus(true);
-            
-            // Émettre événement pour init différée des contrôleurs
-            this.eventBus.emit('backend:connected');
+            if (connected) {
+                this.state.backendConnected = true;
+                this.logger.info('Application', '✅ Backend connected');
+                this.showConnectionStatus(true);
+            } else {
+                throw new Error('Connection timeout');
+            }
             
         } catch (error) {
-            // Échec après toutes les tentatives
-            this.logger.error('Application', 'Backend connection failed:', error);
-            
-            // Activer mode offline
-            this.enableOfflineMode(error.message);
-            
-            // Planifier reconnexion si autoReconnect activé
-            if (this.config.autoReconnect) {
-                this.scheduleReconnect();
-            }
+            console.warn('⚠️ Backend connection failed:', error.message);
+            this.logger.warn('Application', 'Backend connection failed, continuing in offline mode');
+            this.enableOfflineMode('Backend connection failed');
         }
     }
     
     /**
+     * Attend la connexion backend avec timeout
+     */
+    waitForConnection(timeout) {
+        return new Promise((resolve) => {
+            let timeoutId;
+            
+            const checkConnection = () => {
+                if (this.services.backend.isConnected()) {
+                    clearTimeout(timeoutId);
+                    resolve(true);
+                }
+            };
+            
+            // Écouter l'événement de connexion
+            this.eventBus.once('backend:connected', () => {
+                clearTimeout(timeoutId);
+                resolve(true);
+            });
+            
+            // Timeout
+            timeoutId = setTimeout(() => {
+                resolve(false);
+            }, timeout);
+            
+            // Vérification immédiate
+            checkConnection();
+        });
+    }
+    
+    /**
      * Active le mode offline
-     * @param {string} reason - Raison du mode offline
      */
     enableOfflineMode(reason) {
         this.state.offlineMode = true;
         this.state.backendConnected = false;
         
-        this.logger.warn('Application', `🔴 Offline mode activated: ${reason}`);
+        this.logger.warn('Application', `Offline mode enabled: ${reason}`);
         
-        // Afficher notification à l'utilisateur
-        if (this.config.offlineMode.showNotification) {
-            this.showOfflineNotification(reason);
+        if (this.config.offlineMode.showNotification && this.notifications) {
+            this.notifications.show(
+                'Working in offline mode - Some features may be limited',
+                'warning',
+                { duration: 5000 }
+            );
         }
         
-        // Afficher indicateur visuel
         this.showConnectionStatus(false);
         
-        // Émettre événement
-        this.eventBus.emit('app:offline-mode', { reason });
-    }
-    
-    /**
-     * Affiche une notification de mode offline
-     * @param {string} reason - Raison
-     */
-    showOfflineNotification(reason) {
-        if (this.notifications && this.notifications.show) {
-            this.notifications.show(
-                `Mode Offline: ${reason}. Les fonctionnalités locales restent disponibles.`,
-                'warning',
-                { duration: 5000, closable: true }
-            );
+        // Planifier une tentative de reconnexion
+        if (this.config.autoReconnect) {
+            this.scheduleReconnect();
         }
     }
     
     /**
      * Affiche le statut de connexion
-     * @param {boolean} connected - État de connexion
      */
     showConnectionStatus(connected) {
-        const indicator = document.getElementById('connection-status');
-        if (!indicator) return;
-        
-        if (connected) {
-            indicator.style.backgroundColor = '#10b981';
-            indicator.style.color = 'white';
-            indicator.style.display = 'flex';
-            indicator.style.opacity = '1';
-            indicator.innerHTML = `
-                <span style="width: 8px; height: 8px; background: white; border-radius: 50%; display: inline-block;"></span>
-                Online
-            `;
-            
-            // Masquer après 3 secondes
-            setTimeout(() => {
-                indicator.style.opacity = '0';
-                setTimeout(() => indicator.style.display = 'none', 300);
-            }, 3000);
-            
-        } else {
-            indicator.style.backgroundColor = '#ef4444';
-            indicator.style.color = 'white';
-            indicator.style.display = 'flex';
-            indicator.style.opacity = '1';
-            indicator.innerHTML = `
-                <span style="width: 8px; height: 8px; background: white; border-radius: 50%; display: inline-block;"></span>
-                Offline
-            `;
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            statusElement.className = connected ? 'online' : 'offline';
+            statusElement.textContent = connected ? 'Online' : 'Offline';
+            statusElement.innerHTML = connected 
+                ? `<span class="status-dot online"></span> Online` 
+                : `<span class="status-dot offline"></span> Offline`;
         }
     }
     
@@ -840,5 +849,5 @@ class Application {
 }
 
 // ============================================================================
-// FIN DU FICHIER Application.js v3.5
+// FIN DU FICHIER Application.js v3.6
 // ============================================================================
