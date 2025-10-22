@@ -33,8 +33,12 @@
 // ============================================================================
 
 class MidiVisualizer {
-    constructor(canvas, config = {}) {
+    constructor(canvas, config = {}, eventBus = null, debugConsole = null) {
         this.canvas = canvas;
+        
+        // EventBus et DebugConsole (avec fallback)
+        this.eventBus = eventBus || window.EventBus || this.createDummyEventBus();
+        this.debugConsole = debugConsole || window.DebugConsole || null;
         
         // DonnÃ©es MIDI
         this.midiData = null;
@@ -42,7 +46,7 @@ class MidiVisualizer {
         // SystÃ¨mes de base
         this.coordSystem = new CoordinateSystem(config.coordSystem);
         this.viewport = new Viewport(canvas, this.coordSystem);
-        this.renderEngine = new RenderEngine(canvas, config.rendering);
+        this.renderEngine = new RenderEngine(canvas, this.eventBus, this.debugConsole);
         
         // Interaction
         this.selection = new SelectionManager(this);
@@ -631,6 +635,18 @@ class MidiVisualizer {
     /**
      * âœ… COMPLET: Nettoie les ressources
      */
+    /**
+     * Crée un EventBus factice si aucun n'est fourni
+     * @returns {Object}
+     */
+    createDummyEventBus() {
+        return {
+            on: () => {},
+            off: () => {},
+            emit: () => {}
+        };
+    }
+
     destroy() {
         console.log('[MidiVisualizer] Destroying...');
         
