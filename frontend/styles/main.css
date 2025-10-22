@@ -1,13 +1,14 @@
 /* ============================================================================
    Fichier: frontend/styles/main.css
-   Version: v3.1.0 - PERFORMANCE OPTIMIZED
-   Date: 2025-10-16
+   Version: v3.2.0 - INTERFACE FIXES
+   Date: 2025-10-22
    Projet: MidiMind v3.0
    ============================================================================
-   MODIFICATIONS v3.1.0:
-   ✓ Mode performance ajouté (désactive toutes les animations)
-   ✓ Smooth scroll désactivé en mode performance
-   ✓ Transitions préservées pour notifications uniquement
+   CORRECTIONS v3.2.0:
+   ✓ Ajout règles html/body pour hauteur 100%
+   ✓ #app forcé en position fixed avec display flex
+   ✓ .app-main ajusté pour prendre toute la hauteur disponible
+   ✓ .page corrigé pour remplir l'espace parent
    ============================================================================ */
 
 /* ============================================================================
@@ -88,12 +89,40 @@ body.performance-mode .notification-exit {
     --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.20);
 }
 
+/* ============================================================================
+   HTML & BODY - CRITICAL FOR LAYOUT
+   ============================================================================ */
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: var(--bg-dark);
     color: var(--text-primary);
     font-size: 14px;
     line-height: 1.5;
+}
+
+/* ============================================================================
+   APP CONTAINER - CRITICAL FOR DISPLAY
+   ============================================================================ */
+
+#app {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: flex !important;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -184,10 +213,7 @@ body {
     display: flex;
     align-items: center;
     padding: 0 var(--spacing-lg);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
     z-index: 1000;
 }
 
@@ -251,18 +277,15 @@ body.performance-mode .nav-item {
 }
 
 /* ============================================================================
-   MAIN CONTENT
+   MAIN CONTENT - CORRECTED FOR FULL HEIGHT
    ============================================================================ */
 
 .app-main {
-    position: fixed;
-    top: 60px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: auto;
-    /* Smooth scroll désactivé en mode performance */
-    scroll-behavior: smooth;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
 }
 
 body.performance-mode .app-main {
@@ -271,13 +294,20 @@ body.performance-mode .app-main {
 
 .page {
     display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
     height: 100%;
     padding: var(--spacing-lg);
+    overflow: auto;
 }
 
 .page.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 
 /* ============================================================================
@@ -552,4 +582,3 @@ body.performance-mode .status-dot {
 .connection-status.disconnected .status-dot {
     background: var(--color-secondary);
 }
-    
