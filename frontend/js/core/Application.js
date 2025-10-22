@@ -1,882 +1,545 @@
 // ============================================================================
-// Fichier: frontend/js/core/Application.js
-// Version: v3.7 - FIXED ALL MODELS INITIALIZATION
-// Date: 2025-10-22
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI
+// Fichier: frontend/js/views/InstrumentView.js
+// Version: v3.0.8 - FIXED (Initialization order corrected)
+// Date: 2025-10-20
 // ============================================================================
-// CORRECTIONS v3.7:
-// ✅ FileService correctement initialisé avec backendService, eventBus, logger
-// ✅ TOUS les Models correctement initialisés avec 3 paramètres (eventBus, backend, logger)
-// ✅ FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
-// ✅ Logger correctement initialisé avec new Logger()
-// ✅ Interface visible même sans backend
-// ✅ Mode offline gracieux
+// VERSION Ãƒâ€°QUILIBRÃƒâ€°E - Features utiles sans complexitÃƒÂ© excessive
+// FIX: Proper initialization order to prevent undefined displayConfig error
 // ============================================================================
 
-class Application {
-    constructor() {
-        // État de l'application
-        this.state = {
-            initialized: false,
-            ready: false,
-            currentPage: 'home',
-            backendConnected: false,
-            offlineMode: false
-        };
+class InstrumentView extends BaseView {
+    constructor(containerId, eventBus) {
+        super(containerId, eventBus);
         
-        // Composants de l'application
-        this.eventBus = null;
-        this.logger = null;
-        this.debugConsole = null;
-        this.notifications = null;
+        // Configure to prevent auto-render during construction
+        this.config.autoRender = false;
         
-        // Services
-        this.services = {
-            backend: null,
-            storage: null,
-            midi: null,
-            file: null
-        };
-        
-        // Modèles
-        this.models = {
-            file: null,
-            playlist: null,
-            instrument: null,
-            system: null,
-            playback: null,
-            editor: null,
-            routing: null
-        };
-        
-        // Vues
-        this.views = {
-            home: null,
-            file: null,
-            instrument: null,
-            keyboard: null,
-            system: null,
-            routing: null,
-            editor: null
-        };
-        
-        // Contrôleurs
-        this.controllers = {
-            navigation: null,
-            file: null,
-            playlist: null,
-            instrument: null,
-            playback: null,
-            globalPlayback: null,
-            system: null,
-            search: null,
-            routing: null,
-            editor: null,
-            home: null
+        // Ãƒâ€°tat local
+        this.localState = {
+            selectedInstruments: new Set(),
+            expandedInstruments: new Set(),
+            displayMode: 'normal' // normal, compact, detailed
         };
         
         // Configuration
-        this.config = {
-            backendUrl: 'ws://localhost:8080',
-            autoReconnect: true,
-            reconnectInterval: 5000,
-            logLevel: 'debug',
-            enableDebugConsole: true,
-            offlineMode: {
-                enabled: true,
-                showNotification: true,
-                allowLocalOperations: true
-            }
+        this.displayConfig = {
+            compactMode: false,
+            showMetrics: true,
+            showCapabilities: true
         };
         
-        // Référence globale
-        window.app = this;
+        // Couleurs de connexion
+        this.connectionColors = {
+            'usb': '#3498db',
+            'bluetooth': '#9b59b6',
+            'network': '#1abc9c',
+            'virtual': '#95a5a6'
+        };
+        
+        // Logger safe - MUST be initialized before initialize() is called
+        this.logger = window.logger || console;
+        
+        this.logger.info('InstrumentView', 'Ã¢Å“â€œ View initialized (balanced version)');
+    }
+    
+    // Override initialize to prevent BaseView from calling render before properties are set
+    initialize() {
+        // Don't call super.initialize() - it would call render() with autoRender
+        // Properties are already initialized in constructor
+        // Just do the initial render now that everything is ready
+        if (this.container) {
+            this.render();
+        }
     }
     
     // ========================================================================
-    // INITIALISATION
+    // RENDU PRINCIPAL
     // ========================================================================
     
-    /**
-     * Initialise l'application complète
-     */
-    async init() {
-        console.log('🚀 Initializing midiMind v3.0...');
-        
-        try {
-            // Étape 1: Fondations
-            await this.initFoundations();
-            
-            // Étape 2: Services
-            await this.initServices();
-            
-            // Étape 3: Modèles
-            await this.initModels();
-            
-            // Étape 4: Vues (CRITIQUE)
-            await this.initViews();
-            
-            // Étape 5: Contrôleurs
-            await this.initControllers();
-            
-            // Étape 6: Navigation
-            await this.initNavigation();
-            
-            // Étape 7: Connexion backend (non-bloquant)
-            await this.connectBackend();
-            
-            // Étape 8: Finalisation
-            await this.finalize();
-            
-            this.state.initialized = true;
-            this.state.ready = true;
-            
-            console.log('✅ midiMind initialized successfully');
-            this.logger.info('Application', '✅ Application ready');
-            
-            // Émettre événement ready
-            this.eventBus.emit('app:ready');
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize application:', error);
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Initialization failed:', error);
+    render(data = {}) {
+        if (!this.container) {
+            if (this.logger) {
+                this.logger.warn('InstrumentView', 'Container not found');
             }
-            this.handleInitError(error);
-        }
-    }
-    
-    /**
-     * Initialise les composants de base
-     */
-    async initFoundations() {
-        console.log('📦 Initializing foundations...');
-        
-        // EventBus (déjà instancié globalement ou créer nouveau)
-        this.eventBus = window.eventBus || new EventBus();
-        window.eventBus = this.eventBus;
-        
-        // Logger - CORRIGÉ : créer une nouvelle instance
-        if (window.Logger && typeof window.Logger === 'function') {
-            this.logger = window.logger || new Logger({
-                level: this.config.logLevel,
-                eventBus: this.eventBus
-            });
-            window.logger = this.logger;
-        } else {
-            // Fallback vers console si Logger n'est pas disponible
-            console.warn('Logger class not available, using console as fallback');
-            this.logger = console;
-            window.logger = console;
-        }
-        
-        // DebugConsole
-        if (this.config.enableDebugConsole && window.DebugConsole) {
-            if (typeof window.DebugConsole === 'function') {
-                this.debugConsole = new DebugConsole(this.eventBus, this.logger);
-                window.debugConsole = this.debugConsole;
-            } else {
-                this.debugConsole = window.DebugConsole;
-            }
-        }
-        
-        // Notifications
-        if (window.Notifications && typeof window.Notifications === 'function') {
-            this.notifications = new Notifications(this.eventBus);
-            window.notifications = this.notifications;
-        } else if (window.NotificationManager) {
-            this.notifications = window.NotificationManager;
-        }
-        
-        this.logger.info('Application', '✓ Foundations initialized');
-    }
-    
-    /**
-     * Initialise les services
-     */
-    async initServices() {
-        console.log('🔧 Initializing services...');
-        
-        // BackendService
-        if (window.BackendService) {
-            this.services.backend = new BackendService(
-                this.config.backendUrl,
-                this.eventBus,
-                this.logger
-            );
-        }
-        
-        // StorageService
-        if (window.StorageService) {
-            this.services.storage = new StorageService();
-        }
-        
-        // MidiService
-        if (window.MidiService) {
-            this.services.midi = new MidiService(this.eventBus);
-        }
-        
-        // FileService - CORRIGÉ : passer les paramètres requis
-        if (window.FileService) {
-            this.services.file = new FileService(
-                this.services.backend,
-                this.eventBus,
-                this.logger
-            );
-        }
-        
-        this.logger.info('Application', '✓ Services initialized');
-    }
-    
-    /**
-     * Initialise les modèles de données
-     */
-    async initModels() {
-        console.log('📊 Initializing models...');
-        
-        // FileModel - CORRIGÉ : 3 paramètres requis (eventBus, backend, logger)
-        if (window.FileModel) {
-            this.models.file = new FileModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // PlaylistModel - CORRIGÉ : 3 paramètres requis
-        if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // InstrumentModel - CORRIGÉ : 3 paramètres requis
-        if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // SystemModel - CORRIGÉ : 3 paramètres requis
-        if (window.SystemModel) {
-            this.models.system = new SystemModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // PlaybackModel - CORRIGÉ : 3 paramètres requis
-        if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // EditorModel - CORRIGÉ : 3 paramètres requis
-        if (window.EditorModel) {
-            this.models.editor = new EditorModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        // RoutingModel - CORRIGÉ : 3 paramètres requis
-        if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-        }
-        
-        this.logger.info('Application', '✓ Models initialized');
-    }
-    
-    /**
-     * Initialise les vues - CORRIGÉ
-     */
-    async initViews() {
-        console.log('🎨 Initializing views...');
-        
-        // HomeView - Conteneur 'home'
-        const homeElement = document.getElementById('home');
-        if (homeElement && window.HomeView) {
-            this.views.home = new HomeView(homeElement, this.eventBus);
-            // Initialiser la vue
-            if (typeof this.views.home.init === 'function') {
-                this.views.home.init();
-            } else if (typeof this.views.home.render === 'function') {
-                this.views.home.render();
-            }
-            console.log('✓ HomeView initialized');
-        }
-        
-        // EditorView - Conteneur 'editor'
-        const editorElement = document.getElementById('editor');
-        if (editorElement && window.EditorView) {
-            this.views.editor = new EditorView(editorElement, this.eventBus, this.logger);
-            // La vue s'initialise elle-même via BaseView
-            console.log('✓ EditorView initialized');
-        }
-        
-        // RoutingView - Conteneur 'routing'
-        const routingElement = document.getElementById('routing');
-        if (routingElement && window.RoutingView) {
-            this.views.routing = new RoutingView(routingElement, this.eventBus, this.logger);
-            // La vue s'initialise elle-même via BaseView
-            console.log('✓ RoutingView initialized');
-        }
-        
-        // KeyboardView - Conteneur 'keyboard'
-        const keyboardElement = document.getElementById('keyboard');
-        if (keyboardElement && window.KeyboardView) {
-            this.views.keyboard = new KeyboardView(keyboardElement, this.eventBus);
-            // Initialiser la vue
-            if (typeof this.views.keyboard.init === 'function') {
-                this.views.keyboard.init();
-            } else if (typeof this.views.keyboard.render === 'function') {
-                this.views.keyboard.render();
-            }
-            console.log('✓ KeyboardView initialized');
-        }
-        
-        // InstrumentView - Conteneur 'instruments'
-        const instrumentElement = document.getElementById('instruments');
-        if (instrumentElement && window.InstrumentView) {
-            this.views.instrument = new InstrumentView(instrumentElement, this.eventBus);
-            // Initialiser la vue
-            if (typeof this.views.instrument.init === 'function') {
-                this.views.instrument.init();
-            } else if (typeof this.views.instrument.render === 'function') {
-                this.views.instrument.render();
-            }
-            console.log('✓ InstrumentView initialized');
-        }
-        
-        // SystemView - Conteneur 'system'
-        const systemElement = document.getElementById('system');
-        if (systemElement && window.SystemView) {
-            this.views.system = new SystemView(systemElement, this.eventBus);
-            // Initialiser la vue
-            if (typeof this.views.system.init === 'function') {
-                this.views.system.init();
-            } else if (typeof this.views.system.render === 'function') {
-                this.views.system.render();
-            }
-            console.log('✓ SystemView initialized');
-        }
-        
-        // FileView - si disponible
-        const fileElement = document.querySelector('.files-list');
-        if (fileElement && window.FileView) {
-            this.views.file = new FileView(fileElement, this.eventBus);
-            console.log('✓ FileView initialized');
-        }
-        
-        this.logger.info('Application', '✓ Views initialized');
-    }
-    
-    /**
-     * Initialise les contrôleurs - CORRIGÉ
-     */
-    async initControllers() {
-        console.log('🎮 Initializing controllers...');
-        
-        // NavigationController
-        if (window.NavigationController) {
-            this.controllers.navigation = new NavigationController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // HomeController
-        if (window.HomeController) {
-            this.controllers.home = new HomeController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // FileController
-        if (window.FileController) {
-            this.controllers.file = new FileController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // PlaylistController
-        if (window.PlaylistController) {
-            this.controllers.playlist = new PlaylistController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // InstrumentController
-        if (window.InstrumentController) {
-            this.controllers.instrument = new InstrumentController(
-                this.services.backend,
-                this.models.instrument,
-                this.views.instrument,
-                this.eventBus,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // SystemController
-        if (window.SystemController) {
-            this.controllers.system = new SystemController(
-                this.services.backend,
-                this.models.system,
-                this.views.system,
-                this.eventBus,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // PlaybackController
-        if (window.PlaybackController) {
-            this.controllers.playback = new PlaybackController(
-                this.services.backend,
-                this.models.playback,
-                this.eventBus,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // RoutingController
-        if (window.RoutingController) {
-            this.controllers.routing = new RoutingController(
-                this.services.backend,
-                this.models.routing,
-                this.views.routing,
-                this.eventBus,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // EditorController
-        if (window.EditorController) {
-            this.controllers.editor = new EditorController(
-                this.services.backend,
-                this.models.editor,
-                this.views.editor,
-                this.eventBus,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-        // KeyboardController
-        if (window.KeyboardController) {
-            this.controllers.keyboard = new KeyboardController(
-                this.services.midi,
-                this.views.keyboard,
-                this.eventBus,
-                this.notifications
-            );
-        }
-        
-        // GlobalPlaybackController
-        if (window.GlobalPlaybackController) {
-            this.controllers.globalPlayback = new GlobalPlaybackController(
-                this.services.backend,
-                this.models.playback,
-                this.eventBus,
-                this.notifications
-            );
-        }
-        
-        // SearchController
-        if (window.SearchController) {
-            this.controllers.search = new SearchController(
-                this.services.backend,
-                this.models.file,
-                this.eventBus,
-                this.notifications
-            );
-        }
-        
-        this.logger.info('Application', '✓ Controllers initialized');
-    }
-    
-    /**
-     * Initialise la navigation
-     */
-    async initNavigation() {
-        console.log('🧭 Initializing navigation...');
-        
-        // Gestionnaire de navigation
-        window.addEventListener('hashchange', () => this.handleNavigation());
-        
-        // Navigation initiale
-        this.handleNavigation();
-        
-        this.logger.info('Application', '✓ Navigation initialized');
-    }
-    
-    /**
-     * Connexion au backend (non-bloquant)
-     */
-    async connectBackend() {
-        console.log('🔌 Connecting to backend...');
-        
-        if (!this.services.backend) {
-            console.warn('⚠️ Backend service not available');
-            this.enableOfflineMode('Backend service not available');
             return;
         }
         
-        try {
-            // Tentative de connexion
-            await this.services.backend.connect();
-            
-            // Attendre confirmation de connexion (timeout 3s)
-            const connected = await this.waitForConnection(3000);
-            
-            if (connected) {
-                this.state.backendConnected = true;
-                this.logger.info('Application', '✅ Backend connected');
-                this.showConnectionStatus(true);
-            } else {
-                throw new Error('Connection timeout');
+        // Safety check: ensure displayConfig exists
+        if (!this.displayConfig) {
+            if (this.logger) {
+                this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
             }
-            
-        } catch (error) {
-            console.warn('⚠️ Backend connection failed:', error.message);
-            this.logger.warn('Application', 'Backend connection failed, continuing in offline mode');
-            this.enableOfflineMode('Backend connection failed');
+            return;
+        }
+        
+        const instruments = data.instruments || [];
+        
+        const html = `
+            <div class="instrument-view">
+                
+                <!-- Header avec actions -->
+                <div class="instrument-header">
+                    <h2>Ã°Å¸Å½Â¹ MIDI Instruments</h2>
+                    <div class="header-actions">
+                        <button id="scan-instruments-btn" class="btn btn-primary">
+                            Ã°Å¸â€â€ž Scan Devices
+                        </button>
+                        <button id="toggle-view-btn" class="btn btn-secondary">
+                            ${this.displayConfig.compactMode ? 'Ã°Å¸â€œâ€¹ Normal View' : 'Ã°Å¸â€œÅ  Compact View'}
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Statistiques -->
+                ${this.renderStats(instruments)}
+                
+                <!-- Liste des instruments -->
+                <div class="instrument-list ${this.displayConfig.compactMode ? 'compact' : ''}">
+                    ${instruments.length === 0 ? 
+                        this.renderEmptyState() :
+                        instruments.map(inst => this.renderInstrumentCard(inst)).join('')
+                    }
+                </div>
+                
+            </div>
+        `;
+        
+        this.container.innerHTML = html;
+        this.attachEventListeners();
+        
+        if (this.logger) {
+            this.logger.debug('InstrumentView', `Rendered ${instruments.length} instruments`);
         }
     }
     
-    /**
-     * Attend la connexion backend avec timeout
-     */
-    waitForConnection(timeout) {
-        return new Promise((resolve) => {
-            let timeoutId;
-            
-            const checkConnection = () => {
-                if (this.services.backend.isConnected()) {
-                    clearTimeout(timeoutId);
-                    resolve(true);
+    // ========================================================================
+    // RENDU STATISTIQUES
+    // ========================================================================
+    
+    renderStats(instruments) {
+        const total = instruments.length;
+        const connected = instruments.filter(i => i.connected).length;
+        const disconnected = total - connected;
+        
+        return `
+            <div class="instrument-stats">
+                <div class="stat-card">
+                    <span class="stat-icon">Ã°Å¸â€œÅ </span>
+                    <div class="stat-info">
+                        <span class="stat-value">${total}</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                </div>
+                <div class="stat-card connected">
+                    <span class="stat-icon">Ã°Å¸Å¸Â¢</span>
+                    <div class="stat-info">
+                        <span class="stat-value">${connected}</span>
+                        <span class="stat-label">Connected</span>
+                    </div>
+                </div>
+                <div class="stat-card disconnected">
+                    <span class="stat-icon">Ã°Å¸â€Â´</span>
+                    <div class="stat-info">
+                        <span class="stat-value">${disconnected}</span>
+                        <span class="stat-label">Disconnected</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU CARTE INSTRUMENT
+    // ========================================================================
+    
+    renderInstrumentCard(instrument) {
+        const isSelected = this.localState.selectedInstruments.has(instrument.id);
+        const isExpanded = this.localState.expandedInstruments.has(instrument.id);
+        const connectionColor = this.connectionColors[instrument.type] || '#95a5a6';
+        
+        const cardClasses = [
+            'instrument-card',
+            instrument.connected ? 'connected' : 'disconnected',
+            isSelected ? 'selected' : '',
+            isExpanded ? 'expanded' : ''
+        ].filter(Boolean).join(' ');
+        
+        return `
+            <div class="${cardClasses}" 
+                 data-instrument-id="${instrument.id}"
+                 style="border-left: 4px solid ${connectionColor}">
+                
+                ${this.renderCardHeader(instrument)}
+                
+                ${isExpanded ? this.renderCardBody(instrument) : ''}
+                
+                ${this.renderCardFooter(instrument)}
+                
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU HEADER CARTE
+    // ========================================================================
+    
+    renderCardHeader(instrument) {
+        const statusIcon = instrument.connected ? 'Ã°Å¸Å¸Â¢' : 'Ã°Å¸â€Â´';
+        const statusText = instrument.connected ? 'Connected' : 'Disconnected';
+        
+        return `
+            <div class="card-header">
+                <div class="instrument-info">
+                    <div class="info-row">
+                        <span class="status-indicator">${statusIcon}</span>
+                        <h3 class="instrument-name">${this.escapeHtml(instrument.name)}</h3>
+                    </div>
+                    <div class="info-row details">
+                        <span class="instrument-type">${instrument.type || 'MIDI'}</span>
+                        ${instrument.manufacturer ? 
+                            `<span class="instrument-manufacturer">${this.escapeHtml(instrument.manufacturer)}</span>` :
+                            ''
+                        }
+                        <span class="instrument-status">${statusText}</span>
+                    </div>
+                </div>
+                
+                <div class="card-actions">
+                    <button class="btn-icon expand-btn" 
+                            data-id="${instrument.id}"
+                            title="Show details">
+                        ${this.localState.expandedInstruments.has(instrument.id) ? 'Ã¢â€“Â¼' : 'Ã¢â€“Â¶'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU BODY CARTE (DÃƒâ€°TAILS)
+    // ========================================================================
+    
+    renderCardBody(instrument) {
+        return `
+            <div class="card-body">
+                
+                <!-- Informations dÃƒÂ©taillÃƒÂ©es -->
+                <div class="detailed-info">
+                    ${instrument.model ? 
+                        `<div class="info-item">
+                            <strong>Model:</strong> ${this.escapeHtml(instrument.model)}
+                        </div>` : ''
+                    }
+                    ${instrument.id ? 
+                        `<div class="info-item">
+                            <strong>ID:</strong> <code>${this.escapeHtml(instrument.id)}</code>
+                        </div>` : ''
+                    }
+                    ${instrument.port ? 
+                        `<div class="info-item">
+                            <strong>Port:</strong> ${this.escapeHtml(instrument.port)}
+                        </div>` : ''
+                    }
+                </div>
+                
+                <!-- Capabilities -->
+                ${this.renderCapabilities(instrument)}
+                
+                <!-- Metrics -->
+                ${this.renderMetrics(instrument)}
+                
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU CAPABILITIES
+    // ========================================================================
+    
+    renderCapabilities(instrument) {
+        if (!this.displayConfig.showCapabilities || !instrument.capabilities) {
+            return '';
+        }
+        
+        const caps = instrument.capabilities;
+        
+        return `
+            <div class="capabilities">
+                <h4>Capabilities</h4>
+                <div class="capability-tags">
+                    ${caps.input ? '<span class="cap-tag">Ã°Å¸â€œÂ¥ Input</span>' : ''}
+                    ${caps.output ? '<span class="cap-tag">Ã°Å¸â€œÂ¤ Output</span>' : ''}
+                    ${caps.clock ? '<span class="cap-tag">Ã°Å¸â€¢Â Clock</span>' : ''}
+                    ${caps.program ? '<span class="cap-tag">Ã°Å¸Å½â€ºÃ¯Â¸Â Program</span>' : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU METRICS
+    // ========================================================================
+    
+    renderMetrics(instrument) {
+        if (!this.displayConfig.showMetrics || !instrument.metrics) {
+            return '';
+        }
+        
+        const metrics = instrument.metrics;
+        
+        return `
+            <div class="metrics">
+                <h4>Metrics</h4>
+                <div class="metric-grid">
+                    ${metrics.notesReceived !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Notes Received:</span>
+                            <span class="metric-value">${metrics.notesReceived}</span>
+                        </div>` : ''
+                    }
+                    ${metrics.notesSent !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Notes Sent:</span>
+                            <span class="metric-value">${metrics.notesSent}</span>
+                        </div>` : ''
+                    }
+                    ${metrics.latency !== undefined ? 
+                        `<div class="metric">
+                            <span class="metric-label">Latency:</span>
+                            <span class="metric-value">${metrics.latency}ms</span>
+                        </div>` : ''
+                    }
+                </div>
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU FOOTER CARTE
+    // ========================================================================
+    
+    renderCardFooter(instrument) {
+        return `
+            <div class="card-footer">
+                ${instrument.connected ? 
+                    `<button class="btn btn-sm btn-danger disconnect-btn" 
+                            data-id="${instrument.id}">
+                        Ã°Å¸â€Å’ Disconnect
+                    </button>` : 
+                    `<button class="btn btn-sm btn-success connect-btn" 
+                            data-id="${instrument.id}">
+                        Ã°Å¸â€Å’ Connect
+                    </button>`
                 }
-            };
-            
-            // Écouter l'événement de connexion
-            this.eventBus.once('backend:connected', () => {
-                clearTimeout(timeoutId);
-                resolve(true);
+                ${instrument.connected ? 
+                    `<button class="btn btn-sm btn-secondary config-btn" 
+                            data-id="${instrument.id}">
+                        Ã¢Å¡â„¢Ã¯Â¸Â Configure
+                    </button>` : ''
+                }
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // RENDU EMPTY STATE
+    // ========================================================================
+    
+    renderEmptyState() {
+        return `
+            <div class="empty-state">
+                <div class="empty-icon">Ã°Å¸Å½Â¹</div>
+                <h3>No MIDI Instruments Found</h3>
+                <p>Connect a MIDI device and click "Scan Devices" to detect it.</p>
+                <button id="scan-empty-btn" class="btn btn-primary">
+                    Ã°Å¸â€â€ž Scan Now
+                </button>
+            </div>
+        `;
+    }
+    
+    // ========================================================================
+    // Ãƒâ€°VÃƒâ€°NEMENTS
+    // ========================================================================
+    
+    attachEventListeners() {
+        // Bouton scan
+        const scanBtn = this.container.querySelector('#scan-instruments-btn');
+        if (scanBtn) {
+            scanBtn.addEventListener('click', () => {
+                this.emit('instrument:scan-requested');
             });
-            
-            // Timeout
-            timeoutId = setTimeout(() => {
-                resolve(false);
-            }, timeout);
-            
-            // Vérification immédiate
-            checkConnection();
+        }
+        
+        // Bouton scan empty state
+        const scanEmptyBtn = this.container.querySelector('#scan-empty-btn');
+        if (scanEmptyBtn) {
+            scanEmptyBtn.addEventListener('click', () => {
+                this.emit('instrument:scan-requested');
+            });
+        }
+        
+        // Toggle view mode
+        const toggleViewBtn = this.container.querySelector('#toggle-view-btn');
+        if (toggleViewBtn) {
+            toggleViewBtn.addEventListener('click', () => {
+                this.displayConfig.compactMode = !this.displayConfig.compactMode;
+                this.emit('instrument:view-mode-changed', { 
+                    compact: this.displayConfig.compactMode 
+                });
+                // Re-render needed
+            });
+        }
+        
+        // Boutons expand
+        const expandBtns = this.container.querySelectorAll('.expand-btn');
+        expandBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const instrumentId = btn.getAttribute('data-id');
+                this.toggleExpand(instrumentId);
+            });
+        });
+        
+        // Boutons connect
+        const connectBtns = this.container.querySelectorAll('.connect-btn');
+        connectBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const instrumentId = btn.getAttribute('data-id');
+                this.emit('instrument:connect-requested', { instrumentId });
+            });
+        });
+        
+        // Boutons disconnect
+        const disconnectBtns = this.container.querySelectorAll('.disconnect-btn');
+        disconnectBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const instrumentId = btn.getAttribute('data-id');
+                this.emit('instrument:disconnect-requested', { instrumentId });
+            });
+        });
+        
+        // Boutons config
+        const configBtns = this.container.querySelectorAll('.config-btn');
+        configBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const instrumentId = btn.getAttribute('data-id');
+                this.emit('instrument:configure-requested', { instrumentId });
+            });
         });
     }
     
-    /**
-     * Active le mode offline
-     */
-    enableOfflineMode(reason) {
-        this.state.offlineMode = true;
-        this.state.backendConnected = false;
-        
-        this.logger.warn('Application', `Offline mode enabled: ${reason}`);
-        
-        if (this.config.offlineMode.showNotification && this.notifications) {
-            this.notifications.show(
-                'Working in offline mode - Some features may be limited',
-                'warning',
-                { duration: 5000 }
-            );
-        }
-        
-        this.showConnectionStatus(false);
-        
-        // Planifier une tentative de reconnexion
-        if (this.config.autoReconnect) {
-            this.scheduleReconnect();
-        }
-    }
-    
-    /**
-     * Affiche le statut de connexion
-     */
-    showConnectionStatus(connected) {
-        const statusElement = document.getElementById('connection-status');
-        if (statusElement) {
-            statusElement.className = connected ? 'online' : 'offline';
-            statusElement.textContent = connected ? 'Online' : 'Offline';
-            statusElement.innerHTML = connected 
-                ? `<span class="status-dot online"></span> Online` 
-                : `<span class="status-dot offline"></span> Offline`;
-        }
-    }
-    
-    /**
-     * Planifie une reconnexion
-     */
-    scheduleReconnect() {
-        this.logger.info('Application', `Scheduling reconnect in ${this.config.reconnectInterval}ms`);
-        
-        setTimeout(async () => {
-            if (!this.state.backendConnected) {
-                this.logger.info('Application', 'Attempting reconnection...');
-                await this.connectBackend();
-            }
-        }, this.config.reconnectInterval);
-    }
-    
-    /**
-     * Finalisation de l'initialisation
-     */
-    async finalize() {
-        console.log('🎯 Finalizing initialization...');
-        
-        // Attacher gestionnaires d'erreurs globaux
-        this.attachErrorHandlers();
-        
-        // Attacher événements application
-        this.attachAppEvents();
-        
-        // Rendre l'interface visible
-        this.showInterface();
-        
-        this.logger.info('Application', '✓ Initialization finalized');
-    }
-    
     // ========================================================================
-    // NAVIGATION
+    // INTERACTIONS
     // ========================================================================
     
-    handleNavigation() {
-        const hash = window.location.hash.slice(1) || 'home';
-        const page = hash.split('/')[0];
-        
-        this.logger.debug('Application', `Navigating to: ${page}`);
-        
-        // Masquer toutes les pages
-        this.hideAllPages();
-        
-        // Afficher la page demandée
-        const pageElement = document.getElementById(page);
-        if (pageElement) {
-            pageElement.style.display = 'block';
-            this.state.currentPage = page;
-            
-            // Émettre événement de navigation
-            this.eventBus.emit('navigation:changed', { page, hash });
-            
-            // Initialiser le contrôleur de la page si nécessaire
-            this.initPageController(page);
+    toggleExpand(instrumentId) {
+        if (this.localState.expandedInstruments.has(instrumentId)) {
+            this.localState.expandedInstruments.delete(instrumentId);
         } else {
-            this.logger.warn('Application', `Page not found: ${page}`);
-            window.location.hash = '#home';
+            this.localState.expandedInstruments.add(instrumentId);
+        }
+        
+        // Re-render la carte
+        const card = this.container.querySelector(`[data-instrument-id="${instrumentId}"]`);
+        if (card) {
+            // Trouver l'instrument dans les donnÃƒÂ©es
+            this.emit('instrument:expand-toggled', { instrumentId });
         }
     }
     
-    hideAllPages() {
-        const pages = ['home', 'editor', 'routing', 'keyboard', 'instruments', 'system'];
-        pages.forEach(page => {
-            const element = document.getElementById(page);
-            if (element) {
-                element.style.display = 'none';
+    selectInstrument(instrumentId) {
+        this.localState.selectedInstruments.add(instrumentId);
+        this.emit('instrument:selected', { instrumentId });
+    }
+    
+    deselectInstrument(instrumentId) {
+        this.localState.selectedInstruments.delete(instrumentId);
+        this.emit('instrument:deselected', { instrumentId });
+    }
+    
+    // ========================================================================
+    // MISES Ãƒâ‚¬ JOUR
+    // ========================================================================
+    
+    updateInstrumentList(instruments) {
+        this.render({ instruments });
+    }
+    
+    updateInstrumentStatus(instrumentId, connected) {
+        const card = this.container.querySelector(`[data-instrument-id="${instrumentId}"]`);
+        
+        if (card) {
+            if (connected) {
+                card.classList.remove('disconnected');
+                card.classList.add('connected');
+            } else {
+                card.classList.remove('connected');
+                card.classList.add('disconnected');
             }
-        });
+        }
     }
     
-    initPageController(page) {
-        // Initialiser les contrôleurs spécifiques aux pages
-        switch (page) {
-            case 'home':
-                if (this.controllers.home && typeof this.controllers.home.init === 'function') {
-                    this.controllers.home.init();
-                }
-                break;
-            case 'editor':
-                if (this.controllers.editor && typeof this.controllers.editor.init === 'function') {
-                    this.controllers.editor.init();
-                }
-                break;
-            // Autres pages...
+    showScanProgress() {
+        const scanBtn = this.container.querySelector('#scan-instruments-btn');
+        if (scanBtn) {
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = 'Ã¢ÂÂ³ Scanning...';
+        }
+    }
+    
+    hideScanProgress() {
+        const scanBtn = this.container.querySelector('#scan-instruments-btn');
+        if (scanBtn) {
+            scanBtn.disabled = false;
+            scanBtn.innerHTML = 'Ã°Å¸â€â€ž Scan Devices';
         }
     }
     
     // ========================================================================
-    // GESTION DES ERREURS
+    // UTILITAIRES
     // ========================================================================
     
-    attachErrorHandlers() {
-        // Erreurs JavaScript non capturées
-        window.addEventListener('error', (event) => {
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Uncaught error:', event.error);
-            }
-            this.handleError(event.error);
-        });
-        
-        // Promesses rejetées non capturées
-        window.addEventListener('unhandledrejection', (event) => {
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Unhandled rejection:', event.reason);
-            }
-            this.handleError(event.reason);
-        });
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
-    handleError(error) {
-        // Afficher notification
-        if (this.notifications && this.notifications.show) {
-            this.notifications.show(
-                `Error: ${error.message || error}`,
-                'error'
-            );
+    clear() {
+        if (this.container) {
+            this.container.innerHTML = '<p class="loading">Loading instruments...</p>';
         }
-        
-        // Logger détaillé
-        if (this.logger && this.logger.error) {
-            this.logger.error('Application', 'Error occurred:', {
-                message: error.message,
-                stack: error.stack
-            });
-        }
-        
-        // Émettre événement erreur
-        this.eventBus.emit('app:error', { error });
     }
     
-    handleInitError(error) {
-        if (this.logger && this.logger.error) {
-            this.logger.error('Application', 'Initialization error:', error);
-        }
-        
-        // Afficher erreur à l'utilisateur
-        if (this.notifications && this.notifications.show) {
-            this.notifications.show(
-                `Failed to initialize: ${error.message}`,
-                'error',
-                { duration: 0, closable: true }
-            );
-        }
-        
-        // Essayer de continuer en mode dégradé
-        this.state.initialized = false;
-        this.state.ready = false;
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS APPLICATION
-    // ========================================================================
-    
-    attachAppEvents() {
-        // Écouter la connexion backend
-        this.eventBus.on('backend:connected', () => {
-            this.logger.info('Application', '✅ Backend connected event received');
-            this.state.backendConnected = true;
-            this.state.offlineMode = false;
-            this.showConnectionStatus(true);
-        });
-        
-        // Écouter la déconnexion backend
-        this.eventBus.on('websocket:disconnected', () => {
-            this.logger.warn('Application', '🔴 Backend disconnected');
-            this.state.backendConnected = false;
+    showError(message) {
+        if (this.container) {
+            this.container.innerHTML = `
+                <div class="error-message">
+                    <p>Ã¢ÂÅ’ ${this.escapeHtml(message)}</p>
+                    <button id="retry-scan-btn" class="btn btn-primary">Retry Scan</button>
+                </div>
+            `;
             
-            if (!this.state.offlineMode) {
-                this.enableOfflineMode('Connection lost');
+            const retryBtn = this.container.querySelector('#retry-scan-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    this.emit('instrument:scan-requested');
+                });
             }
-        });
-        
-        // Écouter les erreurs backend
-        this.eventBus.on('backend:connection-failed', (data) => {
-            this.logger.error('Application', 'Backend connection failed:', data);
-        });
-    }
-    
-    // ========================================================================
-    // INTERFACE UTILISATEUR
-    // ========================================================================
-    
-    showInterface() {
-        // Masquer le loading indicator
-        const loading = document.getElementById('loading-indicator');
-        if (loading) {
-            loading.style.display = 'none';
         }
-        
-        // Afficher l'interface principale
-        const app = document.getElementById('app');
-        if (app) {
-            app.style.display = 'block';
-        }
-        
-        // S'assurer que la page home est visible au démarrage
-        const homePage = document.getElementById('home');
-        if (homePage) {
-            homePage.style.display = 'block';
-        }
-    }
-    
-    // ========================================================================
-    // API PUBLIQUE
-    // ========================================================================
-    
-    /**
-     * Obtient l'état de l'application
-     * @returns {Object}
-     */
-    getState() {
-        return { ...this.state };
-    }
-    
-    /**
-     * Vérifie si le backend est connecté
-     * @returns {boolean}
-     */
-    isBackendConnected() {
-        return this.state.backendConnected && this.services.backend?.isConnected();
-    }
-    
-    /**
-     * Vérifie si en mode offline
-     * @returns {boolean}
-     */
-    isOfflineMode() {
-        return this.state.offlineMode;
     }
 }
 
 // ============================================================================
-// FIN DU FICHIER Application.js v3.6
+// EXPORT
 // ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = InstrumentView;
+}
+
+if (typeof window !== 'undefined') {
+    window.InstrumentView = InstrumentView;
+}
