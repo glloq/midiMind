@@ -1,30 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/models/SystemModel.js
-// Version: v3.0.6 - MINIMAL (Constructor fixed + basic functions only)
-// Date: 2025-10-19
+// Version: v3.0.7 - MINIMAL + OFFLINE MODE FIX
+// Date: 2025-10-22
 // ============================================================================
-// SIMPLIFICATION: Seulement les fonctions de base
-// - Infos systÃ¨me (CPU, RAM, temp)
-// - Configuration basique
-// - Pas de monitoring avancÃ©
-// - Pas de logs complexes
+// CORRECTIONS v3.0.7:
+// ✅ Ajout de _isBackendAvailable() pour vérifier le backend
+// ✅ Gestion gracieuse du mode hors ligne (pas d'erreurs répétitives)
+// ✅ Toutes les méthodes vérifient le backend avant utilisation
 // ============================================================================
 
 class SystemModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // âœ… FIX: Correct super() call
+        // ✅ FIX: Correct super() call
         super({}, {
             persistKey: 'systemmodel',
             eventPrefix: 'system',
             autoPersist: true
         });
         
-        // âœ… FIX: Assign immediately
+        // ✅ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // âœ… FIX: Initialize data directly
+        // ✅ FIX: Initialize data directly
         this.data = {
             status: 'unknown',
             cpu: 0,
@@ -39,11 +38,15 @@ class SystemModel extends BaseModel {
             midiLatency: 5
         };
         
-        this.logger.info('SystemModel', 'âœ“ Model initialized (minimal version)');
+        this.logger.info('SystemModel', '✓ Model initialized (minimal version)');
         
-        // DÃ©marrer monitoring simple
+        // Démarrer monitoring simple
         this.startMonitoring();
     }
+    
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
     
     /**
      * Vérifie si le backend est disponible
@@ -58,12 +61,12 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     startMonitoring() {
-        // RafraÃ®chir toutes les 5 secondes
+        // Rafraîchir toutes les 5 secondes
         this.monitoringTimer = setInterval(() => {
             this.refreshSystemInfo();
         }, 5000);
         
-        // Premier refresh immÃ©diat
+        // Premier refresh immédiat
         this.refreshSystemInfo();
         
         this.logger.debug('SystemModel', 'Monitoring started');
@@ -100,7 +103,7 @@ class SystemModel extends BaseModel {
             if (response.success && response.data) {
                 const info = response.data;
                 
-                // Mettre Ã  jour silencieusement
+                // Mettre à jour silencieusement
                 this.update({
                     status: info.status || 'ready',
                     cpu: info.cpu || 0,
@@ -109,7 +112,7 @@ class SystemModel extends BaseModel {
                     uptime: info.uptime || 0
                 }, { silent: true });
                 
-                // Ã‰mettre Ã©vÃ©nement
+                // Émettre événement
                 this.eventBus.emit('system:info-updated', { info });
                 
                 return info;
@@ -125,15 +128,15 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     /**
-     * Met Ã  jour la configuration audio
+     * Met à jour la configuration audio
      */
     async updateAudioConfig(config) {
-        try {
         if (!this._isBackendAvailable()) {
             this.logger.warn('SystemModel', 'Cannot update audio config: backend not available');
             return false;
         }
-
+        
+        try {
             this.logger.info('SystemModel', 'Updating audio config');
             
             const response = await this.backend.sendCommand('system.set-audio-config', {
@@ -147,28 +150,26 @@ class SystemModel extends BaseModel {
                     sampleRate: config.sampleRate || this.get('sampleRate')
                 });
                 
-                this.eventBus.emit('system:audio-config-updated', { config });
-                
+                this.logger.info('SystemModel', 'Audio config updated');
                 return true;
             }
             
-            throw new Error(response.error || 'Failed to update audio config');
-            
         } catch (error) {
-            this.logger.error('SystemModel', `Update audio config failed: ${error.message}`);
-            throw error;
+            this.logger.error('SystemModel', `Audio config update failed: ${error.message}`);
         }
+        
+        return false;
     }
     
     /**
-     * Met Ã  jour la configuration MIDI
+     * Met à jour la configuration MIDI
      */
     async updateMidiConfig(config) {
         if (!this._isBackendAvailable()) {
             this.logger.warn('SystemModel', 'Cannot update MIDI config: backend not available');
             return false;
         }
-
+        
         try {
             this.logger.info('SystemModel', 'Updating MIDI config');
             
@@ -181,92 +182,76 @@ class SystemModel extends BaseModel {
                     midiLatency: config.latency || this.get('midiLatency')
                 });
                 
-                this.eventBus.emit('system:midi-config-updated', { config });
-                
+                this.logger.info('SystemModel', 'MIDI config updated');
                 return true;
             }
             
-            throw new Error(response.error || 'Failed to update MIDI config');
-            
         } catch (error) {
-            this.logger.error('SystemModel', `Update MIDI config failed: ${error.message}`);
-            throw error;
+            this.logger.error('SystemModel', `MIDI config update failed: ${error.message}`);
         }
+        
+        return false;
     }
     
     // ========================================================================
-    // ACTIONS SYSTÃˆME
+    // ACTIONS SYSTÈME
     // ========================================================================
     
     /**
-     * RedÃ©marre le systÃ¨me
+     * Redémarre le système
      */
+    async restart() {
         if (!this._isBackendAvailable()) {
             this.logger.warn('SystemModel', 'Cannot restart: backend not available');
             return false;
         }
-
-    async restart() {
+        
         try {
             this.logger.warn('SystemModel', 'System restart requested');
             
             const response = await this.backend.sendCommand('system.restart', {});
             
             if (response.success) {
-                this.eventBus.emit('system:restarting');
+                this.logger.info('SystemModel', 'System restarting...');
                 return true;
             }
             
-            throw new Error(response.error || 'Failed to restart system');
-            
         } catch (error) {
             this.logger.error('SystemModel', `Restart failed: ${error.message}`);
-            throw error;
         }
+        
+        return false;
     }
     
     /**
-     * ArrÃªte le systÃ¨me
+     * Éteint le système
      */
+    async shutdown() {
         if (!this._isBackendAvailable()) {
             this.logger.warn('SystemModel', 'Cannot shutdown: backend not available');
             return false;
         }
-
-    async shutdown() {
+        
         try {
             this.logger.warn('SystemModel', 'System shutdown requested');
             
             const response = await this.backend.sendCommand('system.shutdown', {});
             
             if (response.success) {
-                this.eventBus.emit('system:shutting-down');
+                this.logger.info('SystemModel', 'System shutting down...');
                 return true;
             }
             
-            throw new Error(response.error || 'Failed to shutdown system');
-            
         } catch (error) {
             this.logger.error('SystemModel', `Shutdown failed: ${error.message}`);
-            throw error;
         }
+        
+        return false;
     }
     
     // ========================================================================
-    // UTILITAIRES
+    // GETTERS
     // ========================================================================
-    
-    getStatus() {
-        return this.get('status');
-    }
-    
-    isReady() {
-        return this.get('status') === 'ready';
-    }
-    
-    getUptime() {
-        return this.get('uptime');
-    }
     
     getSystemInfo() {
         return {
@@ -278,21 +263,18 @@ class SystemModel extends BaseModel {
         };
     }
     
-    getConfig() {
+    getAudioConfig() {
         return {
-            audioLatency: this.get('audioLatency'),
+            latency: this.get('audioLatency'),
             bufferSize: this.get('bufferSize'),
-            sampleRate: this.get('sampleRate'),
-            midiLatency: this.get('midiLatency')
+            sampleRate: this.get('sampleRate')
         };
     }
     
-    /**
-     * Nettoyage
-     */
-    destroy() {
-        this.stopMonitoring();
-        super.destroy();
+    getMidiConfig() {
+        return {
+            latency: this.get('midiLatency')
+        };
     }
 }
 

@@ -129,10 +129,12 @@ class KeyboardView extends BaseView {
     }
     
     renderNoteRangeDisplay() {
-        let rangeText = `${this.noteRange.min}-${this.noteRange.max}`;
+        // Sécurité: vérifier que noteRange existe
+        const noteRange = this.noteRange || { min: 21, max: 108 };
+        let rangeText = `${noteRange.min}-${noteRange.max}`;
         
         if (this.customNoteMapping) {
-            rangeText += ` (${this.customNoteMapping.size} notes mappÃ©es)`;
+            rangeText += ` (${this.customNoteMapping.size} notes mappées)`;
         }
         
         return `
