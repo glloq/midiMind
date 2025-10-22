@@ -208,12 +208,12 @@ class Application {
         
         // StorageService
         if (window.StorageService) {
-            this.services.storage = new StorageService();
+			this.services.storage = new StorageService(this.eventBus, this.logger);
         }
         
         // MidiService
         if (window.MidiService) {
-            this.services.midi = new MidiService(this.eventBus);
+            this.services.midi = new MidiService(this.eventBus, this.logger);
         }
         
         // FileService - CORRIGÉ : passer les paramètres requis
