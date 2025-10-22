@@ -1,29 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/utils/Logger.js
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: 3.0.1 - FIXED GLOBAL EXPOSURE
+// Date: 2025-10-22
 // ============================================================================
-// Description:
-//   Système de logging centralisé avec niveaux, timestamps, catégories.
-//   Compatible avec DebugConsole et export fichiers logs.
-//
-// Fonctionnalités:
-//   - Niveaux : DEBUG, INFO, WARN, ERROR
-//   - Catégories (midi, audio, ui, network, etc.)
-//   - Timestamps automatiques
-//   - Filtrage par niveau/catégorie
-//   - Output multiple (console, debugConsole, fichier)
-//   - Format personnalisable
-//   - Rotation logs automatique
-//
-// Architecture:
-//   Logger (classe singleton)
-//   - Queue de logs (buffer)
-//   - Transports multiples (console, file, remote)
-//   - Pattern Observer pour listeners
-//
-// Auteur: MidiMind Team
+// CORRECTIONS v3.0.1:
+// ✅ Exposition globale explicite de la classe Logger
+// ✅ Vérification de disponibilité window
 // ============================================================================
 
 class Logger {
@@ -173,3 +156,15 @@ class Logger {
         return { ...this.stats };
     }
 }
+
+// ============================================================================
+// EXPOSITION GLOBALE - CRITIQUE
+// ============================================================================
+if (typeof window !== 'undefined') {
+    window.Logger = Logger;
+    console.log('✓ Logger class exposed globally');
+}
+
+// ============================================================================
+// FIN DU FICHIER Logger.js v3.0.1
+// ============================================================================
