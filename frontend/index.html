@@ -1,14 +1,15 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.3.0 - CHEMINS ET SCRIPTS CORRIGÉS
+Version: v3.3.1 - CHEMINS CORRECTS AVEC STRUCTURE DE DOSSIERS
 Date: 2025-10-22
 ============================================================================ 
-CORRECTIONS v3.3.0:
-✅ Chemins CSS corrigés (css/ au lieu de styles/)
-✅ Chemins JS corrigés (racine au lieu de js/)
+CORRECTIONS v3.3.1:
+✅ Structure de dossiers respectée (js/*, css/*)
+✅ Chemins CSS: css/main.css, css/components.css, etc.
+✅ Chemins JS: js/config/*, js/core/*, js/utils/*, js/services/*, etc.
 ✅ Ajout de PlaylistController.js
-✅ Ajout de homeView.js (minuscule)
-✅ Tous les CSS nécessaires chargés
+✅ Ajout de GlobalPlaybackController.js
+✅ Ordre de chargement préservé
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -17,18 +18,28 @@ CORRECTIONS v3.3.0:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MIDI Mind - Système d'Orchestration MIDI v3.1</title>
     
-    <!-- Styles CSS - Chemins corrigés -->
+    <!-- ========================================================================
+         STYLES CSS - Structure: css/*.css
+         ======================================================================== -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/pages.css">
     <link rel="stylesheet" href="css/home.css">
     <link rel="stylesheet" href="css/instruments.css">
     <link rel="stylesheet" href="css/keyboard.css">
+    <link rel="stylesheet" href="css/keyboard-polish.css">
     <link rel="stylesheet" href="css/midi.css">
     <link rel="stylesheet" href="css/editor.css">
+    <link rel="stylesheet" href="css/editor-phase2.css">
+    <link rel="stylesheet" href="css/editor-phase3.css">
+    <link rel="stylesheet" href="css/editor-notifications.css">
     <link rel="stylesheet" href="css/routing.css">
+    <link rel="stylesheet" href="css/routing-matrix-editor.css">
     <link rel="stylesheet" href="css/playlist.css">
+    <link rel="stylesheet" href="css/modal-playlist.css">
     <link rel="stylesheet" href="css/visualizer.css">
+    <link rel="stylesheet" href="css/loop-recorder.css">
+    <link rel="stylesheet" href="css/fileview-extended.css">
     <link rel="stylesheet" href="css/themes.css">
 </head>
 <body>
@@ -135,106 +146,146 @@ CORRECTIONS v3.3.0:
 
     <!-- ========================================================================
          SCRIPTS - ORDRE CRITIQUE POUR PERFORMANCE
+         Structure: js/[dossier]/[fichier].js
          ======================================================================== -->
     
-    <!-- ÉTAPE 0: CONFIGURATION PERFORMANCE -->
-    <script src="PerformanceConfig.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 0: CONFIGURATION PERFORMANCE (DOIT ÊTRE CHARGÉ EN PREMIER !)
+         ======================================================================== -->
+    <script src="js/config/PerformanceConfig.js"></script>
     
-    <!-- ÉTAPE 1: FONDATIONS - EventBus -->
-    <script src="EventBus.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 1: FONDATIONS - EventBus (utilisé par TOUT le reste)
+         ======================================================================== -->
+    <script src="js/core/EventBus.js"></script>
 
-    <!-- ÉTAPE 2: UTILITAIRES DE BASE -->
-    <script src="Logger.js"></script>
-    <script src="Constants.js"></script>
-    <script src="MidiConstants.js"></script>
-    <script src="Formatter.js"></script>
-    <script src="Validator.js"></script>
-    <script src="DebugConsole.js"></script>
-    <script src="Notifications.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 2: UTILITAIRES DE BASE (pas de dépendances)
+         ======================================================================== -->
+    <script src="js/utils/Logger.js"></script>
+    <script src="js/utils/Constants.js"></script>
+    <script src="js/utils/MidiConstants.js"></script>
+    <script src="js/utils/Formatter.js"></script>
+    <script src="js/utils/Validator.js"></script>
+    <script src="js/utils/DebugConsole.js"></script>
+    <script src="js/utils/Notifications.js"></script>
 
-    <!-- ÉTAPE 3: CONFIGURATION -->
-    <script src="AppConfig.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 3: CONFIGURATION
+         ======================================================================== -->
+    <script src="js/config/AppConfig.js"></script>
 
-    <!-- ÉTAPE 4: COMMUNICATION BACKEND -->
-    <script src="BackendService.js"></script>
-    <script src="ApiClient.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 4: COMMUNICATION BACKEND
+         ======================================================================== -->
+    <script src="js/services/BackendService.js"></script>
+    <script src="js/utils/ApiClient.js"></script>
 
-    <!-- ÉTAPE 5: UTILITAIRES AVANCÉS -->
-    <script src="PerformanceMonitor.js"></script>
-    <script src="NotificationManager.js"></script>
-    <script src="RoutingManager.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 5: UTILITAIRES AVANCÉS
+         ======================================================================== -->
+    <script src="js/monitoring/PerformanceMonitor.js"></script>
+    <script src="js/ui/NotificationManager.js"></script>
+    <script src="js/utils/RoutingManager.js"></script>
 
-    <!-- ÉTAPE 6: SERVICES -->
-    <script src="StorageService.js"></script>
-    <script src="FileService.js"></script>
-    <script src="MidiService.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 6: SERVICES
+         ======================================================================== -->
+    <script src="js/services/StorageService.js"></script>
+    <script src="js/services/FileService.js"></script>
+    <script src="js/services/MidiService.js"></script>
 
-    <!-- ÉTAPE 7: CLASSES DE BASE -->
-    <script src="BaseModel.js"></script>
-    <script src="BaseView.js"></script>
-    <script src="BaseController.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 7: CLASSES DE BASE (CRITIQUE - avant héritage)
+         ======================================================================== -->
+    <script src="js/core/BaseModel.js"></script>
+    <script src="js/core/BaseView.js"></script>
+    <script src="js/core/BaseController.js"></script>
 
-    <!-- ÉTAPE 8: MODÈLES DE DONNÉES -->
-    <script src="StateModel.js"></script>
-    <script src="FileModel.js"></script>
-    <script src="InstrumentModel.js"></script>
-    <script src="EditorModel.js"></script>
-    <script src="RoutingModel.js"></script>
-    <script src="SystemModel.js"></script>
-    <script src="PlaybackModel.js"></script>
-    <script src="PlaylistModel.js"></script>
-    <script src="LoopModel.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 8: MODÈLES DE DONNÉES (héritent de BaseModel)
+         ======================================================================== -->
+    <script src="js/models/StateModel.js"></script>
+    <script src="js/models/FileModel.js"></script>
+    <script src="js/models/InstrumentModel.js"></script>
+    <script src="js/models/EditorModel.js"></script>
+    <script src="js/models/RoutingModel.js"></script>
+    <script src="js/models/SystemModel.js"></script>
+    <script src="js/models/PlaybackModel.js"></script>
+    <script src="js/models/PlaylistModel.js"></script>
+    <script src="js/models/LoopModel.js"></script>
 
-    <!-- ÉTAPE 9: ÉDITEUR - CORE -->
-    <script src="CoordinateSystem.js"></script>
-    <script src="Viewport.js"></script>
-    <script src="RenderEngine.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 9: ÉDITEUR - CORE
+         ======================================================================== -->
+    <script src="js/editor/core/CoordinateSystem.js"></script>
+    <script src="js/editor/core/Viewport.js"></script>
+    <script src="js/editor/core/RenderEngine.js"></script>
     
-    <!-- ÉTAPE 10: ÉDITEUR - RENDERERS -->
-    <script src="GridRenderer.js"></script>
-    <script src="TimelineRenderer.js"></script>
-    <script src="NoteRenderer.js"></script>
-    <script src="PianoRollRenderer.js"></script>
-    <script src="CCRenderer.js"></script>
+    <!-- ========================================================================
+         NOTE: RoutingMatrix.js sera chargé dynamiquement si nécessaire
+         Voir README_V2.md pour les instructions d'installation
+         ======================================================================== -->
+    
+    <!-- ========================================================================
+         ÉTAPE 10: ÉDITEUR - RENDERERS
+         ======================================================================== -->
+    <script src="js/editor/renderers/GridRenderer.js"></script>
+    <script src="js/editor/renderers/TimelineRenderer.js"></script>
+    <script src="js/editor/renderers/NoteRenderer.js"></script>
+    <script src="js/editor/renderers/PianoRollRenderer.js"></script>
+    <script src="js/editor/renderers/CCRenderer.js"></script>
 
-    <!-- ÉTAPE 11: ÉDITEUR - INTERACTION -->
-    <script src="SelectionManager.js"></script>
-    <script src="DragHandler.js"></script>
-    <script src="EditorMode.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 11: ÉDITEUR - INTERACTION
+         ======================================================================== -->
+    <script src="js/editor/interaction/SelectionManager.js"></script>
+    <script src="js/editor/interaction/DragHandler.js"></script>
+    <script src="js/editor/interaction/EditorMode.js"></script>
 
-    <!-- ÉTAPE 12: ÉDITEUR - UTILS -->
-    <script src="ClipboardManager.js"></script>
-    <script src="HistoryManager.js"></script>
-    <script src="EditorRoutingManager.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 12: ÉDITEUR - UTILS
+         ======================================================================== -->
+    <script src="js/editor/utils/ClipboardManager.js"></script>
+    <script src="js/editor/utils/HistoryManager.js"></script>
+    <script src="js/editor/utils/EditorRoutingManager.js"></script>
 
-    <!-- ÉTAPE 13: VUES - PAGES -->
-    <script src="homeView.js"></script>
-    <script src="EditorView.js"></script>
-    <script src="RoutingView.js"></script>
-    <script src="KeyboardView.js"></script>
-    <script src="InstrumentView.js"></script>
-    <script src="SystemView.js"></script>
-    <script src="PlaylistView.js"></script>
-    <script src="FileView.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 13: VUES - PAGES (héritent de BaseView)
+         ======================================================================== -->
+    <script src="js/views/homeView.js"></script>
+    <script src="js/views/EditorView.js"></script>
+    <script src="js/views/RoutingView.js"></script>
+    <script src="js/views/KeyboardView.js"></script>
+    <script src="js/views/InstrumentView.js"></script>
+    <script src="js/views/SystemView.js"></script>
+    <script src="js/views/PlaylistView.js"></script>
+    <script src="js/views/FileView.js"></script>
 
-    <!-- ÉTAPE 14: CONTRÔLEURS -->
-    <script src="HomeController.js"></script>
-    <script src="FileController.js"></script>
-    <script src="PlaylistController.js"></script>
-    <script src="EditorController.js"></script>
-    <script src="RoutingController.js"></script>
-    <script src="KeyboardController.js"></script>
-    <script src="InstrumentController.js"></script>
-    <script src="SystemController.js"></script>
-    <script src="PlaybackController.js"></script>
-    <script src="GlobalPlaybackController.js"></script>
-    <script src="NavigationController.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 14: CONTRÔLEURS (héritent de BaseController)
+         ======================================================================== -->
+    <script src="js/controllers/HomeController.js"></script>
+    <script src="js/controllers/FileController.js"></script>
+    <script src="js/controllers/PlaylistController.js"></script>
+    <script src="js/controllers/EditorController.js"></script>
+    <script src="js/controllers/RoutingController.js"></script>
+    <script src="js/controllers/KeyboardController.js"></script>
+    <script src="js/controllers/InstrumentController.js"></script>
+    <script src="js/controllers/SystemController.js"></script>
+    <script src="js/controllers/PlaybackController.js"></script>
+    <script src="js/controllers/GlobalPlaybackController.js"></script>
+    <script src="js/controllers/NavigationController.js"></script>
 
-    <!-- ÉTAPE 15: APPLICATION -->
-    <script src="Application.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 15: APPLICATION (dépend de TOUT)
+         ======================================================================== -->
+    <script src="js/core/Application.js"></script>
 
-    <!-- ÉTAPE 16: INITIALISATION -->
-    <script src="main.js"></script>
+    <!-- ========================================================================
+         ÉTAPE 16: INITIALISATION (DOIT ÊTRE LE DERNIER)
+         ======================================================================== -->
+    <script src="js/main.js"></script>
 
 </body>
 </html>
