@@ -1,15 +1,14 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.3.1 - CHEMINS CORRECTS AVEC STRUCTURE DE DOSSIERS
+Version: v3.3.2 - CHEMINS CORRECTS FINAUX
 Date: 2025-10-22
 ============================================================================ 
-CORRECTIONS v3.3.1:
-✅ Structure de dossiers respectée (js/*, css/*)
-✅ Chemins CSS: css/main.css, css/components.css, etc.
-✅ Chemins JS: js/config/*, js/core/*, js/utils/*, js/services/*, etc.
-✅ Ajout de PlaylistController.js
-✅ Ajout de GlobalPlaybackController.js
-✅ Ordre de chargement préservé
+CORRECTIONS v3.3.2:
+✅ CSS: styles/ (PAS css/) ← CORRIGÉ !
+✅ JS: js/ avec sous-dossiers
+✅ PlaylistController ajouté
+✅ GlobalPlaybackController ajouté
+✅ Tous les CSS nécessaires
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -19,28 +18,28 @@ CORRECTIONS v3.3.1:
     <title>MIDI Mind - Système d'Orchestration MIDI v3.1</title>
     
     <!-- ========================================================================
-         STYLES CSS - Structure: css/*.css
+         STYLES CSS - Structure: styles/*.css (PAS css/)
          ======================================================================== -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/pages.css">
-    <link rel="stylesheet" href="css/home.css">
-    <link rel="stylesheet" href="css/instruments.css">
-    <link rel="stylesheet" href="css/keyboard.css">
-    <link rel="stylesheet" href="css/keyboard-polish.css">
-    <link rel="stylesheet" href="css/midi.css">
-    <link rel="stylesheet" href="css/editor.css">
-    <link rel="stylesheet" href="css/editor-phase2.css">
-    <link rel="stylesheet" href="css/editor-phase3.css">
-    <link rel="stylesheet" href="css/editor-notifications.css">
-    <link rel="stylesheet" href="css/routing.css">
-    <link rel="stylesheet" href="css/routing-matrix-editor.css">
-    <link rel="stylesheet" href="css/playlist.css">
-    <link rel="stylesheet" href="css/modal-playlist.css">
-    <link rel="stylesheet" href="css/visualizer.css">
-    <link rel="stylesheet" href="css/loop-recorder.css">
-    <link rel="stylesheet" href="css/fileview-extended.css">
-    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="styles/pages.css">
+    <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/instruments.css">
+    <link rel="stylesheet" href="styles/keyboard.css">
+    <link rel="stylesheet" href="styles/keyboard-polish.css">
+    <link rel="stylesheet" href="styles/midi.css">
+    <link rel="stylesheet" href="styles/editor.css">
+    <link rel="stylesheet" href="styles/editor-phase2.css">
+    <link rel="stylesheet" href="styles/editor-phase3.css">
+    <link rel="stylesheet" href="styles/editor-notifications.css">
+    <link rel="stylesheet" href="styles/routing.css">
+    <link rel="stylesheet" href="styles/routing-matrix-editor.css">
+    <link rel="stylesheet" href="styles/playlist.css">
+    <link rel="stylesheet" href="styles/modal-playlist.css">
+    <link rel="stylesheet" href="styles/visualizer.css">
+    <link rel="stylesheet" href="styles/loop-recorder.css">
+    <link rel="stylesheet" href="styles/fileview-extended.css">
+    <link rel="stylesheet" href="styles/themes.css">
 </head>
 <body>
     <!-- ========================================================================
