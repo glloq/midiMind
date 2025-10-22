@@ -1,13 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.6 - FIXED FILESERVICE INITIALIZATION
+// Version: v3.7 - FIXED ALL MODELS INITIALIZATION
 // Date: 2025-10-22
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// CORRECTIONS v3.6:
+// CORRECTIONS v3.7:
 // ✅ FileService correctement initialisé avec backendService, eventBus, logger
+// ✅ TOUS les Models correctement initialisés avec 3 paramètres (eventBus, backend, logger)
+// ✅ FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
 // ✅ Logger correctement initialisé avec new Logger()
-// ✅ Conteneurs corrects pour toutes les vues
 // ✅ Interface visible même sans backend
 // ✅ Mode offline gracieux
 // ============================================================================
@@ -233,39 +234,67 @@ class Application {
     async initModels() {
         console.log('📊 Initializing models...');
         
-        // FileModel
+        // FileModel - CORRIGÉ : 3 paramètres requis (eventBus, backend, logger)
         if (window.FileModel) {
-            this.models.file = new FileModel(this.eventBus, this.logger);
+            this.models.file = new FileModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // PlaylistModel
+        // PlaylistModel - CORRIGÉ : 3 paramètres requis
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(this.eventBus, this.logger);
+            this.models.playlist = new PlaylistModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // InstrumentModel
+        // InstrumentModel - CORRIGÉ : 3 paramètres requis
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(this.eventBus, this.logger);
+            this.models.instrument = new InstrumentModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // SystemModel
+        // SystemModel - CORRIGÉ : 3 paramètres requis
         if (window.SystemModel) {
-            this.models.system = new SystemModel(this.eventBus, this.logger);
+            this.models.system = new SystemModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // PlaybackModel
+        // PlaybackModel - CORRIGÉ : 3 paramètres requis
         if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(this.eventBus, this.logger);
+            this.models.playback = new PlaybackModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // EditorModel
+        // EditorModel - CORRIGÉ : 3 paramètres requis
         if (window.EditorModel) {
-            this.models.editor = new EditorModel(this.eventBus, this.logger);
+            this.models.editor = new EditorModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
-        // RoutingModel
+        // RoutingModel - CORRIGÉ : 3 paramètres requis
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(this.eventBus, this.logger);
+            this.models.routing = new RoutingModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
         this.logger.info('Application', '✓ Models initialized');
