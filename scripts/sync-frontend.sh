@@ -1,15 +1,13 @@
 #!/bin/bash
 # ============================================================================
 # Script: sync-frontend.sh
-# Version: v1.2 - COMPLETE GIT PERMISSIONS FIX
+# Version: v1.3 - FIX EDITOR FOLDER SYNC
 # Description: Synchronise le frontend depuis le repo vers www après git pull
 # Usage: ./sync-frontend.sh
 # ============================================================================
-# CORRECTIONS v1.2:
-# ✅ Réparation COMPLÈTE de toutes les permissions Git
-# ✅ Fix de FETCH_HEAD, ORIG_HEAD, HEAD, etc.
-# ✅ Réparation récursive de tout le dossier .git
-# ✅ Option de réparation forcée au début
+# CORRECTIONS v1.3:
+# ✅ AJOUT de la synchronisation du dossier js/editor/ (CRITIQUE)
+# ✅ Correction de la structure complète
 # ============================================================================
 
 # Couleurs pour les messages
@@ -33,8 +31,8 @@ BACKUP_DIR="$HOME/backups/midimind"
 print_header() {
     echo -e "${BLUE}"
     echo "╔════════════════════════════════════════════════════════╗"
-    echo "║         MidiMind Frontend Sync Script v1.2            ║"
-    echo "║          (Complete Git Permissions Fix)              ║"
+    echo "║         MidiMind Frontend Sync Script v1.3            ║"
+    echo "║              (Editor Folder Fix)                      ║"
     echo "╚════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -303,7 +301,7 @@ sync_files() {
     print_step "Synchronizing files..."
     
     # Créer la structure de destination si nécessaire
-    sudo mkdir -p "$WWW_DEST/js/"{core,models,views,controllers,utils,services}
+    sudo mkdir -p "$WWW_DEST/js/"{core,models,views,controllers,utils,services,editor}
     sudo mkdir -p "$WWW_DEST/css"
     sudo mkdir -p "$WWW_DEST/styles"
     
@@ -315,6 +313,17 @@ sync_files() {
     if [ -d "$FRONTEND_SRC/js/core" ]; then
         sudo rsync -av --delete "$FRONTEND_SRC/js/core/" "$WWW_DEST/js/core/" | grep -v "/$" | wc -l
         SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/core" -type f | wc -l)))
+    fi
+    
+    # ✅ AJOUT CRITIQUE : Synchroniser le dossier editor
+    echo "  → Syncing editor files... (CRITICAL)"
+    if [ -d "$FRONTEND_SRC/js/editor" ]; then
+        sudo rsync -av --delete "$FRONTEND_SRC/js/editor/" "$WWW_DEST/js/editor/" | grep -v "/$" | wc -l
+        EDITOR_COUNT=$(find "$WWW_DEST/js/editor" -type f | wc -l)
+        SYNC_COUNT=$((SYNC_COUNT + EDITOR_COUNT))
+        print_success "Editor files synced: $EDITOR_COUNT files"
+    else
+        print_warning "Editor folder not found in source!"
     fi
     
     echo "  → Syncing models..."
@@ -376,6 +385,13 @@ sync_files() {
     fi
     
     print_success "Files synchronized ($SYNC_COUNT files)"
+    
+    # Vérification spécifique de RenderEngine.js
+    if [ -f "$WWW_DEST/js/editor/core/RenderEngine.js" ]; then
+        print_success "RenderEngine.js found in destination ✓"
+    else
+        print_error "RenderEngine.js NOT FOUND in destination!"
+    fi
 }
 
 set_permissions() {
@@ -407,6 +423,10 @@ show_summary() {
         JS_FILES=$(find "$WWW_DEST/js" -type f -name "*.js" | wc -l)
         echo "  • JavaScript: $JS_FILES files"
     fi
+    if [ -d "$WWW_DEST/js/editor" ]; then
+        EDITOR_FILES=$(find "$WWW_DEST/js/editor" -type f -name "*.js" | wc -l)
+        echo "  • Editor JS: $EDITOR_FILES files"
+    fi
     if [ -d "$WWW_DEST/css" ] || [ -d "$WWW_DEST/styles" ]; then
         CSS_FILES=$(find "$WWW_DEST" -type f -name "*.css" | wc -l)
         echo "  • CSS: $CSS_FILES files"
@@ -437,6 +457,7 @@ verify_sync() {
     ESSENTIAL_FILES=(
         "$WWW_DEST/index.html"
         "$WWW_DEST/js/main.js"
+        "$WWW_DEST/js/editor/core/RenderEngine.js"
     )
     
     MISSING_FILES=0
@@ -444,6 +465,8 @@ verify_sync() {
         if [ ! -f "$file" ]; then
             print_warning "Missing essential file: $file"
             MISSING_FILES=$((MISSING_FILES + 1))
+        else
+            echo "  ✓ Found: $(basename $file)"
         fi
     done
     
