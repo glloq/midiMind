@@ -2,19 +2,19 @@
 // Fichier: frontend/js/services/FileService.js
 // Version: v3.0.2 - COMPLET (CRUD complet)
 // Date: 2025-10-08
-// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
 //   Service de gestion des fichiers MIDI.
-//   Centralise toutes les opÃ©rations sur les fichiers.
+//   Centralise toutes les opÃƒÂ©rations sur les fichiers.
 //
 // CORRECTIONS v3.0.2:
-//   âœ… uploadFile() complet avec validation
-//   âœ… deleteFile() complet avec confirmation
-//   âœ… moveFile() implÃ©mentÃ©
-//   âœ… renameFile() implÃ©mentÃ©
-//   âœ… Gestion erreurs robuste
-//   âœ… Progress callbacks pour upload
+//   Ã¢Å“â€¦ uploadFile() complet avec validation
+//   Ã¢Å“â€¦ deleteFile() complet avec confirmation
+//   Ã¢Å“â€¦ moveFile() implÃƒÂ©mentÃƒÂ©
+//   Ã¢Å“â€¦ renameFile() implÃƒÂ©mentÃƒÂ©
+//   Ã¢Å“â€¦ Gestion erreurs robuste
+//   Ã¢Å“â€¦ Progress callbacks pour upload
 //
 // Auteur: midiMind Team
 // ============================================================================
@@ -32,7 +32,7 @@ class FileService {
         // Index de recherche
         this.searchIndex = new Map();
         
-        // Ã‰tat du service
+        // Ãƒâ€°tat du service
         this.state = {
             isScanning: false,
             isUploading: false,
@@ -64,9 +64,9 @@ class FileService {
             deletesCount: 0
         };
         
-        this.logger.info('FileService', 'âœ“ Service initialized');
+        this.logger.info('FileService', 'Ã¢Å“â€œ Service initialized');
         
-        // Ã‰couter les Ã©vÃ©nements backend
+        // Ãƒâ€°couter les ÃƒÂ©vÃƒÂ©nements backend
         this._bindBackendEvents();
     }
     
@@ -75,12 +75,12 @@ class FileService {
     // ========================================================================
     
     _bindBackendEvents() {
-        // Ã‰couter la rÃ©ception de la liste de fichiers
+        // Ãƒâ€°couter la rÃƒÂ©ception de la liste de fichiers
         this.eventBus.on('backend:event:files_list', (data) => {
             this._handleFilesList(data);
         });
         
-        // Ã‰couter les Ã©vÃ©nements de fichier ajoutÃ©/supprimÃ©
+        // Ãƒâ€°couter les ÃƒÂ©vÃƒÂ©nements de fichier ajoutÃƒÂ©/supprimÃƒÂ©
         this.eventBus.on('backend:event:file_added', (data) => {
             this._handleFileAdded(data);
         });
@@ -89,7 +89,7 @@ class FileService {
             this._handleFileRemoved(data);
         });
         
-        // Ã‰couter la connexion backend
+        // Ãƒâ€°couter la connexion backend
         this.eventBus.on('backend:connected', () => {
             if (this.config.autoRefresh) {
                 this.scanFiles();
@@ -110,7 +110,7 @@ class FileService {
             return;
         }
         
-        // VÃ©rifier si cache encore valide
+        // VÃƒÂ©rifier si cache encore valide
         const now = Date.now();
         if (!force && (now - this.lastScanTimestamp < this.config.cacheExpiration)) {
             this.logger.info('FileService', 'Using cached file list');
@@ -126,7 +126,7 @@ class FileService {
         const startTime = Date.now();
         
         try {
-            this.logger.info('FileService', 'ðŸ” Scanning files...');
+            this.logger.info('FileService', 'Ã°Å¸â€Â Scanning files...');
             
             const response = await this.backend.sendCommand('files.scan', {
                 recursive: true
@@ -146,7 +146,7 @@ class FileService {
                 this._addToCache(normalizedFile);
             }
             
-            // Mettre Ã  jour l'Ã©tat
+            // Mettre ÃƒÂ  jour l'ÃƒÂ©tat
             const duration = Date.now() - startTime;
             
             this.state.lastScanDuration = duration;
@@ -156,9 +156,9 @@ class FileService {
             this.stats.scansPerformed++;
             
             this.logger.info('FileService', 
-                `âœ“ Scan complete: ${files.length} files in ${duration}ms`);
+                `Ã¢Å“â€œ Scan complete: ${files.length} files in ${duration}ms`);
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
             this.eventBus.emit('files:scan-complete', {
                 files: this.getAllFiles(),
                 count: this.fileCache.size,
@@ -182,12 +182,12 @@ class FileService {
     }
     
     // ========================================================================
-    // UPLOAD FICHIER - âœ… COMPLET
+    // UPLOAD FICHIER - Ã¢Å“â€¦ COMPLET
     // ========================================================================
     
 /**
  * Upload un fichier MIDI
- * @param {File} file - Fichier Ã  uploader
+ * @param {File} file - Fichier ÃƒÂ  uploader
  * @param {Function} onProgress - Callback progression
  * @returns {Promise<Object>}
  */
@@ -219,17 +219,17 @@ async uploadFile(file, onProgress = null) {
             throw new Error(result.error || 'Upload failed');
         }
         
-        // CORRECTION: Invalider cache et rafraÃ®chir
+        // CORRECTION: Invalider cache et rafraÃƒÂ®chir
         this.fileCache.clear();
         this.lastScanTimestamp = 0;
         
-        this.logger.info('FileService', `Ã¢Å“â€¦ Upload successful: ${file.name}`);
+        this.logger.info('FileService', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Upload successful: ${file.name}`);
         this.eventBus.emit('file:upload:complete', { 
             filename: file.name,
             fileId: result.fileId
         });
         
-        // RafraÃ®chir la liste automatiquement
+        // RafraÃƒÂ®chir la liste automatiquement
         await this.scanFiles();
         
         this.stats.uploadsSucceeded++;
@@ -253,11 +253,12 @@ async uploadFile(file, onProgress = null) {
 
 /**
  * Upload un fichier MIDI vers le backend
- * @param {File} file - Fichier Ã  uploader
+ * @param {File} file - Fichier ÃƒÂ  uploader
  * @param {Function} onProgress - Callback de progression (0-100)
  * @param {Object} options - Options d'upload
- * @returns {Promise<Object>} RÃ©sultat de l'upload
+ * @returns {Promise<Object>} RÃƒÂ©sultat de l'upload
  */
+async uploadMIDI(file, onProgress, options = {}) {
     this.logger.info('FileService', `Uploading file: ${file.name} (${file.size} bytes)`);
     
     // ========================================================================
@@ -324,7 +325,7 @@ async uploadFile(file, onProgress = null) {
         if (onProgress) onProgress(90);
         
         // ====================================================================
-        // MISE Ã€ JOUR CACHE ET STATS
+        // MISE Ãƒâ‚¬ JOUR CACHE ET STATS
         // ====================================================================
         if (result.success !== false && result.data) {
             const fileData = {
@@ -339,16 +340,16 @@ async uploadFile(file, onProgress = null) {
             // Ajouter au cache
             this.fileCache.set(fileData.id, fileData);
             
-            // Mettre Ã  jour stats
+            // Mettre ÃƒÂ  jour stats
             this.stats.uploadsCount++;
             this.stats.uploadsSucceeded++;
             this.state.totalFiles++;
             this.state.totalSize += fileData.size;
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
             this.eventBus.emit('file:uploaded', fileData);
             
-            this.logger.info('FileService', `âœ“ File uploaded: ${fileData.name}`);
+            this.logger.info('FileService', `Ã¢Å“â€œ File uploaded: ${fileData.name}`);
             
             if (onProgress) onProgress(100);
             
@@ -373,9 +374,9 @@ async uploadFile(file, onProgress = null) {
 
 /**
  * Convertit un fichier en base64
- * @param {File} file - Fichier Ã  convertir
+ * @param {File} file - Fichier ÃƒÂ  convertir
  * @param {Function} onProgress - Callback de progression
- * @returns {Promise<string>} Contenu base64 (sans prÃ©fixe data:)
+ * @returns {Promise<string>} Contenu base64 (sans prÃƒÂ©fixe data:)
  */
 fileToBase64(file, onProgress = null) {
     return new Promise((resolve, reject) => {
@@ -418,9 +419,9 @@ fileToBase64(file, onProgress = null) {
 
 /**
  * Upload multiple fichiers
- * @param {FileList|Array<File>} files - Fichiers Ã  uploader
+ * @param {FileList|Array<File>} files - Fichiers ÃƒÂ  uploader
  * @param {Function} onProgress - Callback global de progression
- * @returns {Promise<Array>} RÃ©sultats des uploads
+ * @returns {Promise<Array>} RÃƒÂ©sultats des uploads
  */
 async uploadMultipleFiles(files, onProgress = null) {
     const results = [];
@@ -470,24 +471,24 @@ async uploadMultipleFiles(files, onProgress = null) {
 
 
     // ========================================================================
-    // DELETE FICHIER - âœ… COMPLET
+    // DELETE FICHIER - Ã¢Å“â€¦ COMPLET
     // ========================================================================
     /**
  * Supprimer un fichier avec confirmation
- * @param {string} fileId - ID du fichier Ã  supprimer
+ * @param {string} fileId - ID du fichier ÃƒÂ  supprimer
  * @param {boolean} skipConfirmation - Passer la confirmation
  * @returns {Promise<void>}
  */
 async deleteFile(fileId, skipConfirmation = false) {
     this.logger.info('FileService', `Deleting file: ${fileId}`);
     
-    // RÃ©cupÃ©rer info fichier
+    // RÃƒÂ©cupÃƒÂ©rer info fichier
     const file = this.fileCache.get(fileId);
     if (!file) {
         throw new Error('File not found in cache');
     }
     
-    // VÃ©rifier utilisation dans playlists (si model disponible)
+    // VÃƒÂ©rifier utilisation dans playlists (si model disponible)
     if (!skipConfirmation && window.playlistModel) {
         const playlists = window.playlistModel.get('playlists') || [];
         const usedIn = playlists.filter(p => 
@@ -509,7 +510,7 @@ async deleteFile(fileId, skipConfirmation = false) {
     }
     
     try {
-        // Supprimer cÃ´tÃ© backend
+        // Supprimer cÃƒÂ´tÃƒÂ© backend
         const result = await this.backend.sendCommand('files.delete', {
             file_path: fileId
         });
@@ -518,7 +519,7 @@ async deleteFile(fileId, skipConfirmation = false) {
             throw new Error(result.error || 'Delete failed');
         }
         
-        // Mettre Ã  jour cache et stats
+        // Mettre ÃƒÂ  jour cache et stats
         this.fileCache.delete(fileId);
         this.stats.deletesCount++;
         this.state.totalFiles--;
@@ -526,10 +527,10 @@ async deleteFile(fileId, skipConfirmation = false) {
             this.state.totalSize -= file.size;
         }
         
-        // Ã‰mettre Ã©vÃ©nement
+        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
         this.eventBus.emit('file:deleted', { fileId, file });
         
-        this.logger.info('FileService', `âœ“ File deleted: ${file.name}`);
+        this.logger.info('FileService', `Ã¢Å“â€œ File deleted: ${file.name}`);
         
     } catch (error) {
         this.logger.error('FileService', 'Delete failed:', error);
@@ -538,11 +539,11 @@ async deleteFile(fileId, skipConfirmation = false) {
 }
 
     // ========================================================================
-    // MOVE FICHIER - âœ… NOUVEAU
+    // MOVE FICHIER - Ã¢Å“â€¦ NOUVEAU
     // ========================================================================
     
     /**
-     * DÃ©place un fichier vers un autre dossier
+     * DÃƒÂ©place un fichier vers un autre dossier
      * @param {string} fileId - ID du fichier
      * @param {string} newPath - Nouveau chemin
      */
@@ -553,7 +554,7 @@ async deleteFile(fileId, skipConfirmation = false) {
             throw new Error(`File not found: ${fileId}`);
         }
         
-        this.logger.info('FileService', `Moving: ${file.name} â†’ ${newPath}`);
+        this.logger.info('FileService', `Moving: ${file.name} Ã¢â€ â€™ ${newPath}`);
         
         this.eventBus.emit('files:move-start', {
             fileId: fileId,
@@ -572,12 +573,12 @@ async deleteFile(fileId, skipConfirmation = false) {
                 throw new Error(response.error || 'Move failed');
             }
             
-            // Mettre Ã  jour le cache
+            // Mettre ÃƒÂ  jour le cache
             file.path = newPath;
             file.directory = newPath.substring(0, newPath.lastIndexOf('/')) || '/';
             this._addToCache(file);
             
-            this.logger.info('FileService', `âœ“ Moved: ${file.name}`);
+            this.logger.info('FileService', `Ã¢Å“â€œ Moved: ${file.name}`);
             
             this.eventBus.emit('files:move-complete', {
                 fileId: fileId,
@@ -601,7 +602,7 @@ async deleteFile(fileId, skipConfirmation = false) {
     }
     
     // ========================================================================
-    // RENAME FICHIER - âœ… NOUVEAU
+    // RENAME FICHIER - Ã¢Å“â€¦ NOUVEAU
     // ========================================================================
 
 
@@ -609,7 +610,7 @@ async deleteFile(fileId, skipConfirmation = false) {
  * Renommer un fichier
  * @param {string} fileId - ID du fichier
  * @param {string} newName - Nouveau nom
- * @returns {Promise<Object>} Fichier renommÃ©
+ * @returns {Promise<Object>} Fichier renommÃƒÂ©
  */
 async renameFile(fileId, newName) {
     this.logger.info('FileService', `Renaming file: ${fileId} -> ${newName}`);
@@ -619,7 +620,7 @@ async renameFile(fileId, newName) {
         throw new Error('New name cannot be empty');
     }
     
-    // VÃ©rifier extension
+    // VÃƒÂ©rifier extension
     if (!newName.endsWith('.mid') && !newName.endsWith('.midi')) {
         newName += '.mid';
     }
@@ -634,7 +635,7 @@ async renameFile(fileId, newName) {
             throw new Error(result.error || 'Rename failed');
         }
         
-        // Mettre Ã  jour cache
+        // Mettre ÃƒÂ  jour cache
         const file = this.fileCache.get(fileId);
         if (file) {
             this.fileCache.delete(fileId);
@@ -648,7 +649,7 @@ async renameFile(fileId, newName) {
             
             this.fileCache.set(updatedFile.id, updatedFile);
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
             this.eventBus.emit('file:renamed', {
                 oldId: fileId,
                 newId: updatedFile.id,
@@ -670,12 +671,12 @@ async renameFile(fileId, newName) {
     // ========================================================================
     
     _validateFile(file) {
-        // VÃ©rifier existence
+        // VÃƒÂ©rifier existence
         if (!file) {
             return { valid: false, error: 'No file provided' };
         }
         
-        // VÃ©rifier taille
+        // VÃƒÂ©rifier taille
         if (file.size === 0) {
             return { valid: false, error: 'File is empty' };
         }
@@ -687,7 +688,7 @@ async renameFile(fileId, newName) {
             };
         }
         
-        // VÃ©rifier extension
+        // VÃƒÂ©rifier extension
         const extension = '.' + file.name.split('.').pop().toLowerCase();
         if (!this.config.supportedExtensions.includes(extension)) {
             return { 
@@ -696,7 +697,7 @@ async renameFile(fileId, newName) {
             };
         }
         
-        // VÃ©rifier MIME type
+        // VÃƒÂ©rifier MIME type
         if (file.type && !this.config.allowedMimeTypes.includes(file.type)) {
             this.logger.warn('FileService', `Unusual MIME type: ${file.type}`);
             // Ne pas bloquer, juste avertir
@@ -708,11 +709,11 @@ async renameFile(fileId, newName) {
     _isValidFileName(name) {
         if (!name || name.trim() === '') return false;
         
-        // Interdire certains caractÃ¨res
+        // Interdire certains caractÃƒÂ¨res
         const invalidChars = /[<>:"/\\|?*\x00-\x1F]/g;
         if (invalidChars.test(name)) return false;
         
-        // Interdire ".." pour Ã©viter path traversal
+        // Interdire ".." pour ÃƒÂ©viter path traversal
         if (name.includes('..')) return false;
         
         return true;
@@ -878,7 +879,7 @@ async renameFile(fileId, newName) {
     }
     
     // ========================================================================
-    // HANDLERS Ã‰VÃ‰NEMENTS BACKEND
+    // HANDLERS Ãƒâ€°VÃƒâ€°NEMENTS BACKEND
     // ========================================================================
     
     _handleFilesList(data) {
@@ -906,7 +907,7 @@ async renameFile(fileId, newName) {
             this.state.totalSize = this._calculateTotalSize();
             
             this.eventBus.emit('files:file-added', { file });
-            this.logger.info('FileService', `âž• File added: ${file.name}`);
+            this.logger.info('FileService', `Ã¢Å¾â€¢ File added: ${file.name}`);
         }
     }
     
@@ -922,7 +923,7 @@ async renameFile(fileId, newName) {
                 this.state.totalSize = this._calculateTotalSize();
                 
                 this.eventBus.emit('files:file-removed', { file });
-                this.logger.info('FileService', `âž– File removed: ${file.name}`);
+                this.logger.info('FileService', `Ã¢Å¾â€“ File removed: ${file.name}`);
             }
         }
     }

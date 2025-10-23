@@ -4,34 +4,34 @@
 // Date: 2025-10-14
 // ============================================================================
 // CORRECTIONS v3.6.0:
-// Ã¢Å“â€¦ HÃƒâ€°RITAGE: HÃƒÂ©rite maintenant de BaseView (CRITIQUE)
-// Ã¢Å“â€¦ ARCHITECTURE: Appelle super() et initialize() correctement
-// Ã¢Å“â€¦ CANVAS: IntÃƒÂ©gration RenderEngine + Viewport + CoordinateSystem
-// Ã¢Å“â€¦ Ãƒâ€°VÃƒâ€°NEMENTS: Tous les ÃƒÂ©vÃƒÂ©nements DOM bindÃƒÂ©s proprement
-// Ã¢Å“â€¦ RÃƒâ€°ACTIVITÃƒâ€°: Ãƒâ€°coute tous les ÃƒÂ©vÃƒÂ©nements EditorModel
-// Ã¢Å“â€¦ COMPOSANTS: VelocityEditor et CCEditor intÃƒÂ©grÃƒÂ©s
-// Ã¢Å“â€¦ STATE: Utilise viewState conforme ÃƒÂ  BaseView
-// Ã¢Å“â€¦ CLEANUP: MÃƒÂ©thode destroy() complÃƒÂ¨te
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ HÃƒÆ’Ã¢â‚¬Â°RITAGE: HÃƒÆ’Ã‚Â©rite maintenant de BaseView (CRITIQUE)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ARCHITECTURE: Appelle super() et initialize() correctement
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CANVAS: IntÃƒÆ’Ã‚Â©gration RenderEngine + Viewport + CoordinateSystem
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS: Tous les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM bindÃƒÆ’Ã‚Â©s proprement
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ RÃƒÆ’Ã¢â‚¬Â°ACTIVITÃƒÆ’Ã¢â‚¬Â°: ÃƒÆ’Ã¢â‚¬Â°coute tous les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements EditorModel
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ COMPOSANTS: VelocityEditor et CCEditor intÃƒÆ’Ã‚Â©grÃƒÆ’Ã‚Â©s
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ STATE: Utilise viewState conforme ÃƒÆ’Ã‚Â  BaseView
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CLEANUP: MÃƒÆ’Ã‚Â©thode destroy() complÃƒÆ’Ã‚Â¨te
 // ============================================================================
 // Description:
-//   Vue principale de l'ÃƒÂ©diteur MIDI avec interface complÃƒÂ¨te.
+//   Vue principale de l'ÃƒÆ’Ã‚Â©diteur MIDI avec interface complÃƒÆ’Ã‚Â¨te.
 //   Toolbar, Canvas principal, Velocity Editor, CC Editor, Properties Modal,
 //   Routing Panel, Context Menu.
 //
-// FonctionnalitÃƒÂ©s:
-//   - Toolbar complÃƒÂ¨te (15 outils)
-//   - Snap grid configurable (1/32 ÃƒÂ  1 mesure)
+// FonctionnalitÃƒÆ’Ã‚Â©s:
+//   - Toolbar complÃƒÆ’Ã‚Â¨te (15 outils)
+//   - Snap grid configurable (1/32 ÃƒÆ’Ã‚Â  1 mesure)
 //   - Canvas principal avec MidiVisualizer
 //   - Velocity editor (draw, scale, randomize)
-//   - CC editor (6 types de contrÃƒÂ´leurs)
-//   - Properties modal (ÃƒÂ©dition note dÃƒÂ©taillÃƒÂ©e)
+//   - CC editor (6 types de contrÃƒÆ’Ã‚Â´leurs)
+//   - Properties modal (ÃƒÆ’Ã‚Â©dition note dÃƒÆ’Ã‚Â©taillÃƒÆ’Ã‚Â©e)
 //   - Routing panel (sidebar)
 //   - Context menu (clic droit)
 //
 // Architecture:
 //   EditorView extends BaseView
 //   - Utilise MidiVisualizer pour le canvas principal
-//   - RenderEngine pour rendu optimisÃƒÂ©
+//   - RenderEngine pour rendu optimisÃƒÆ’Ã‚Â©
 //   - Viewport pour zoom/pan/culling
 //   - CoordinateSystem pour conversions
 //
@@ -42,22 +42,22 @@
 class EditorView extends BaseView {
     /**
      * Constructeur
-     * @param {string|HTMLElement} containerId - ID du conteneur ou ÃƒÂ©lÃƒÂ©ment DOM
-     * @param {EventBus} eventBus - Bus d'ÃƒÂ©vÃƒÂ©nements global
+     * @param {string|HTMLElement} containerId - ID du conteneur ou ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment DOM
+     * @param {EventBus} eventBus - Bus d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements global
      */
     constructor(containerId, eventBus) {
         super(containerId, eventBus);
         
-        // Configuration spÃƒÂ©cifique
+        // Configuration spÃƒÆ’Ã‚Â©cifique
         this.config.autoRender = false; // Rendu manuel via controller
         this.config.preserveState = true;
-        this.config.debounceRender = 0; // Pas de debounce pour rÃƒÂ©activitÃƒÂ©
+        this.config.debounceRender = 0; // Pas de debounce pour rÃƒÆ’Ã‚Â©activitÃƒÆ’Ã‚Â©
         this.config.name = 'EditorView';
         
-        // RÃƒÂ©fÃƒÂ©rence au modÃƒÂ¨le (injection via setModel())
+        // RÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rence au modÃƒÆ’Ã‚Â¨le (injection via setModel())
         this.editorModel = null;
         
-        // Ãƒâ€°tat de la vue (conforme BaseView)
+        // ÃƒÆ’Ã¢â‚¬Â°tat de la vue (conforme BaseView)
         this.viewState = {
             // Toolbar
             currentTool: 'select',
@@ -71,7 +71,7 @@ class EditorView extends BaseView {
             showVelocity: false,
             showModulation: false,
             velocityMode: 'draw', // draw, scale, randomize
-            modulationCC: 1, // Modulation Wheel par dÃƒÂ©faut
+            modulationCC: 1, // Modulation Wheel par dÃƒÆ’Ã‚Â©faut
             
             // Panels
             showRoutingPanel: false,
@@ -97,9 +97,9 @@ class EditorView extends BaseView {
         this.renderEngine = null;
         this.viewport = null;
         this.coordSystem = null;
-        this.visualizer = null; // MidiVisualizer (injectÃƒÂ©)
+        this.visualizer = null; // MidiVisualizer (injectÃƒÆ’Ã‚Â©)
         
-        // Ãƒâ€°diteurs Canvas
+        // ÃƒÆ’Ã¢â‚¬Â°diteurs Canvas
         this.velocityEditor = {
             canvas: null,
             ctx: null,
@@ -152,7 +152,7 @@ class EditorView extends BaseView {
             
             this.bindCustomEvents();
             
-            // Exposer globalement pour compatibilitÃƒÂ©
+            // Exposer globalement pour compatibilitÃƒÆ’Ã‚Â©
             if (typeof window !== 'undefined') {
                 window.editorView = this;
             }
@@ -162,52 +162,52 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Lie les ÃƒÂ©vÃƒÂ©nements personnalisÃƒÂ©s (EventBus)
+     * Lie les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements personnalisÃƒÆ’Ã‚Â©s (EventBus)
      */
     bindCustomEvents() {
-        // Ãƒâ€°vÃƒÂ©nements du modÃƒÂ¨le
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements du modÃƒÆ’Ã‚Â¨le
         this.eventBus.on('editor:loaded', (data) => this.onFileLoaded(data));
         this.eventBus.on('editor:modified', () => this.onDataModified());
         this.eventBus.on('editor:saved', () => this.onFileSaved());
         
-        // Ãƒâ€°vÃƒÂ©nements notes
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements notes
         this.eventBus.on('editor:note:added', (data) => this.onNoteAdded(data));
         this.eventBus.on('editor:note:updated', (data) => this.onNoteUpdated(data));
         this.eventBus.on('editor:notes:deleted', (data) => this.onNotesDeleted(data));
         
-        // Ãƒâ€°vÃƒÂ©nements sÃƒÂ©lection
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements sÃƒÆ’Ã‚Â©lection
         this.eventBus.on('editor:selection:changed', (data) => this.onSelectionChanged(data));
         this.eventBus.on('editor:selection:cleared', () => this.onSelectionCleared());
         
-        // Ãƒâ€°vÃƒÂ©nements CC
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements CC
         this.eventBus.on('editor:cc:added', (data) => this.onCCAdded(data));
         this.eventBus.on('editor:cc:updated', (data) => this.onCCUpdated(data));
         this.eventBus.on('editor:cc:deleted', (data) => this.onCCDeleted(data));
         
-        // Ãƒâ€°vÃƒÂ©nements viewport
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements viewport
         this.eventBus.on('editor:zoom:changed', (data) => this.onZoomChanged(data));
         this.eventBus.on('editor:pan:changed', (data) => this.onPanChanged(data));
         
-        // Ãƒâ€°vÃƒÂ©nements historique
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements historique
         this.eventBus.on('editor:undo', () => this.onUndo());
         this.eventBus.on('editor:redo', () => this.onRedo());
         
-        // Ãƒâ€°vÃƒÂ©nements toolbar
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements toolbar
         this.eventBus.on('editor:tool:changed', (data) => this.onToolChanged(data));
         this.eventBus.on('editor:snap:toggled', (data) => this.onSnapToggled(data));
         this.eventBus.on('editor:snap:grid:changed', (data) => this.onSnapGridChanged(data));
         
-        // Ãƒâ€°vÃƒÂ©nements routing
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements routing
         this.eventBus.on('routing:channel:assigned', () => this.refreshRoutingPanel());
         this.eventBus.on('routing:validated', (data) => this.onRoutingValidated(data));
     }
     
     // ========================================================================
-    // INJECTION DÃƒâ€°PENDANCES
+    // INJECTION DÃƒÆ’Ã¢â‚¬Â°PENDANCES
     // ========================================================================
     
     /**
-     * Injecte le modÃƒÂ¨le EditorModel
+     * Injecte le modÃƒÆ’Ã‚Â¨le EditorModel
      * @param {EditorModel} editorModel
      */
     setModel(editorModel) {
@@ -222,7 +222,7 @@ class EditorView extends BaseView {
     setVisualizer(visualizer) {
         this.visualizer = visualizer;
         
-        // RÃƒÂ©cupÃƒÂ©rer les composants canvas
+        // RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â©rer les composants canvas
         if (visualizer) {
             this.canvas = visualizer.canvas;
             this.renderEngine = visualizer.renderEngine;
@@ -295,7 +295,7 @@ class EditorView extends BaseView {
      */
     renderFileInfo() {
         const fileName = this.viewState.fileName || 'Untitled';
-        const modifiedIndicator = this.viewState.isModified ? 'Ã¢â‚¬Â¢ ' : '';
+        const modifiedIndicator = this.viewState.isModified ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ' : '';
         
         return `
             <div class="editor-file-info">
@@ -344,11 +344,11 @@ class EditorView extends BaseView {
      */
     renderToolButtons() {
         const tools = [
-            { id: 'select', icon: 'Ã°Å¸Å½Â¯', title: 'Select (V)' },
-            { id: 'pencil', icon: 'Ã¢Å“ÂÃ¯Â¸Â', title: 'Pencil (P)' },
-            { id: 'eraser', icon: 'Ã°Å¸â€”â€˜Ã¯Â¸Â', title: 'Eraser (E)' },
-            { id: 'line', icon: 'Ã°Å¸â€œÂ', title: 'Line (L)' },
-            { id: 'rectangle', icon: 'Ã¢Â¬Å“', title: 'Rectangle (R)' }
+            { id: 'select', icon: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¯', title: 'Select (V)' },
+            { id: 'pencil', icon: 'ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â', title: 'Pencil (P)' },
+            { id: 'eraser', icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â', title: 'Eraser (E)' },
+            { id: 'line', icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â', title: 'Line (L)' },
+            { id: 'rectangle', icon: 'ÃƒÂ¢Ã‚Â¬Ã…â€œ', title: 'Rectangle (R)' }
         ];
         
         return tools.map(tool => `
@@ -411,14 +411,14 @@ class EditorView extends BaseView {
                     ${!canUndo ? 'disabled' : ''}
                     title="Undo (Ctrl+Z)"
                     onclick="app.editorController?.undo()">
-                Ã¢â€ Â¶ Undo
+                ÃƒÂ¢Ã¢â‚¬Â Ã‚Â¶ Undo
             </button>
             
             <button class="action-btn" 
                     ${!canRedo ? 'disabled' : ''}
                     title="Redo (Ctrl+Y)"
                     onclick="app.editorController?.redo()">
-                Ã¢â€ Â· Redo
+                ÃƒÂ¢Ã¢â‚¬Â Ã‚Â· Redo
             </button>
             
             <div class="toolbar-divider"></div>
@@ -427,78 +427,78 @@ class EditorView extends BaseView {
                     ${this.viewState.selectedNotes.size === 0 ? 'disabled' : ''}
                     title="Cut (Ctrl+X)"
                     onclick="app.editorController?.cut()">
-                Ã¢Å“â€šÃ¯Â¸Â Cut
+                ÃƒÂ¢Ã…â€œÃ¢â‚¬Å¡ÃƒÂ¯Ã‚Â¸Ã‚Â Cut
             </button>
             
             <button class="action-btn"
                     ${this.viewState.selectedNotes.size === 0 ? 'disabled' : ''}
                     title="Copy (Ctrl+C)"
                     onclick="app.editorController?.copy()">
-                Ã°Å¸â€œâ€¹ Copy
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Copy
             </button>
             
             <button class="action-btn"
                     ${!hasClipboard ? 'disabled' : ''}
                     title="Paste (Ctrl+V)"
                     onclick="app.editorController?.paste()">
-                Ã°Å¸â€œâ€ž Paste
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾ Paste
             </button>
             
             <button class="action-btn"
                     ${this.viewState.selectedNotes.size === 0 ? 'disabled' : ''}
                     title="Delete (Del)"
                     onclick="app.editorController?.deleteSelection()">
-                Ã°Å¸â€”â€˜Ã¯Â¸Â Delete
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â Delete
             </button>
         `;
     }
     
     /**
-     * Rendu des toggles d'ÃƒÂ©diteurs
+     * Rendu des toggles d'ÃƒÆ’Ã‚Â©diteurs
      */
     renderEditorToggles() {
         return `
             <button class="editor-toggle-btn ${this.viewState.showVelocity ? 'active' : ''}"
                     title="Toggle Velocity Editor"
                     onclick="app.editorView.toggleVelocityEditor()">
-                Ã°Å¸â€œÅ  Velocity
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Velocity
             </button>
             
             <button class="editor-toggle-btn ${this.viewState.showModulation ? 'active' : ''}"
                     title="Toggle Modulation Editor"
                     onclick="app.editorView.toggleModulationEditor()">
-                Ã°Å¸Å½â€ºÃ¯Â¸Â CC
+                ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â‚¬ÂºÃƒÂ¯Ã‚Â¸Ã‚Â CC
             </button>
             
             <button class="editor-toggle-btn ${this.viewState.showRoutingPanel ? 'active' : ''}"
                     title="Toggle Routing Panel"
                     onclick="app.editorView.toggleRoutingPanel()">
-                Ã°Å¸â€â‚¬ Routing
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬ Routing
             </button>
         `;
     }
     
     /**
-     * Rendu des contrÃƒÂ´les de vue
+     * Rendu des contrÃƒÆ’Ã‚Â´les de vue
      */
     renderViewControls() {
         return `
             <button class="view-btn" 
                     title="Zoom In (+)"
                     onclick="app.editorController?.zoomIn()">
-                Ã°Å¸â€Â+
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â+
             </button>
             
             <button class="view-btn" 
                     title="Zoom Out (-)"
                     onclick="app.editorController?.zoomOut()">
-                Ã°Å¸â€Â-
+                ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â-
             </button>
             
             <button class="view-btn" 
                     title="Fit to View (F)"
                     onclick="app.editorController?.fitToView()">
-                Ã¢â€ºÂ¶ Fit
+                ÃƒÂ¢Ã¢â‚¬ÂºÃ‚Â¶ Fit
             </button>
         `;
     }
@@ -530,7 +530,7 @@ class EditorView extends BaseView {
                     
                     <button class="close-btn" 
                             onclick="app.editorView.toggleVelocityEditor()">
-                        Ã¢Å“â€¢
+                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
                     </button>
                 </div>
                 
@@ -580,7 +580,7 @@ class EditorView extends BaseView {
                     
                     <button class="close-btn" 
                             onclick="app.editorView.toggleModulationEditor()">
-                        Ã¢Å“â€¢
+                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
                     </button>
                 </div>
                 
@@ -602,10 +602,10 @@ class EditorView extends BaseView {
             <div class="routing-sidebar-container">
                 <!-- Header -->
                 <div class="routing-sidebar-header">
-                    <span class="routing-sidebar-title">Ã°Å¸â€â‚¬ Routing</span>
+                    <span class="routing-sidebar-title">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬ Routing</span>
                     <button class="close-btn" 
                             onclick="app.editorView.toggleRoutingPanel()">
-                        Ã¢Å“â€¢
+                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
                     </button>
                 </div>
                 
@@ -683,7 +683,7 @@ class EditorView extends BaseView {
                         <h3>Note Properties</h3>
                         <button class="close-btn" 
                                 onclick="app.editorView.hideNoteProperties()">
-                            Ã¢Å“â€¢
+                            ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
                         </button>
                     </div>
                     
@@ -773,10 +773,10 @@ class EditorView extends BaseView {
         
         this.viewState.currentTool = tool;
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
         this.emit('editor:tool:changed', { tool });
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre ÃƒÆ’Ã‚Â  jour UI
         this.updateToolbarButtons();
         
         this.logDebug(`Tool changed to: ${tool}`);
@@ -789,10 +789,10 @@ class EditorView extends BaseView {
     toggleSnap(enabled) {
         this.viewState.snapEnabled = enabled;
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
         this.emit('editor:snap:toggled', { enabled });
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre ÃƒÆ’Ã‚Â  jour UI
         this.updateSnapControls();
         
         this.logDebug(`Snap ${enabled ? 'enabled' : 'disabled'}`);
@@ -809,10 +809,10 @@ class EditorView extends BaseView {
             this.viewState.snapEnabled = false;
         }
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
         this.emit('editor:snap:grid:changed', { value });
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre ÃƒÆ’Ã‚Â  jour UI
         this.updateSnapControls();
         
         this.logDebug(`Snap grid set to 1/${value}`);
@@ -829,13 +829,13 @@ class EditorView extends BaseView {
         this.viewState.showVelocity = !this.viewState.showVelocity;
         
         if (this.viewState.showVelocity) {
-            // CrÃƒÂ©er canvas si pas encore fait
+            // CrÃƒÆ’Ã‚Â©er canvas si pas encore fait
             this.setupVelocityCanvas();
             // Dessiner
             this.drawVelocityBars();
         }
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre ÃƒÆ’Ã‚Â  jour UI
         this.updateEditorToggles();
         
         this.emit('editor:velocity:toggled', { show: this.viewState.showVelocity });
@@ -856,14 +856,14 @@ class EditorView extends BaseView {
         this.viewState.velocityMode = mode;
         this.velocityEditor.mode = mode;
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre ÃƒÆ’Ã‚Â  jour UI
         this.updateVelocityModeButtons();
         
         this.logDebug(`Velocity mode: ${mode}`);
     }
     
     /**
-     * Dessine les barres de vÃƒÂ©locitÃƒÂ©
+     * Dessine les barres de vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â©
      */
     drawVelocityBars() {
         if (!this.velocityEditor.canvas || !this.editorModel) {
@@ -899,14 +899,14 @@ class EditorView extends BaseView {
             const barHeight = (note.velocity / 127) * (height - 20);
             const y = height - 10 - barHeight;
             
-            // Couleur selon vÃƒÂ©locitÃƒÂ©
+            // Couleur selon vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â©
             const hue = (note.velocity / 127) * 120; // Rouge -> Vert
             ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
             
             // Barre
             ctx.fillRect(x, y, barWidth, barHeight);
             
-            // Border si sÃƒÂ©lectionnÃƒÂ©e
+            // Border si sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©e
             if (this.viewState.selectedNotes.has(note.id)) {
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2;
@@ -948,7 +948,7 @@ class EditorView extends BaseView {
         this.velocityEditor.canvas = canvas;
         this.velocityEditor.ctx = canvas.getContext('2d');
         
-        // Ãƒâ€°vÃƒÂ©nements
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements
         canvas.addEventListener('mousedown', (e) => this.onVelocityCanvasMouseDown(e));
         canvas.addEventListener('mousemove', (e) => this.onVelocityCanvasMouseMove(e));
         canvas.addEventListener('mouseup', (e) => this.onVelocityCanvasMouseUp(e));
@@ -972,7 +972,7 @@ class EditorView extends BaseView {
         
         if (!note) return;
         
-        // Calculer nouvelle vÃƒÂ©locitÃƒÂ© depuis position Y
+        // Calculer nouvelle vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â© depuis position Y
         const height = canvas.height;
         const newVelocity = Math.round((1 - (y - 10) / (height - 20)) * 127);
         const clampedVelocity = Math.max(1, Math.min(127, newVelocity));
@@ -986,7 +986,7 @@ class EditorView extends BaseView {
                 break;
                 
             case 'scale':
-                // PrÃƒÂ©parer scaling sur sÃƒÂ©lection
+                // PrÃƒÆ’Ã‚Â©parer scaling sur sÃƒÆ’Ã‚Â©lection
                 if (this.viewState.selectedNotes.size > 0) {
                     this.velocityEditor.draggedBar = note;
                     this.velocityEditor.scaleStart = clampedVelocity;
@@ -1017,7 +1017,7 @@ class EditorView extends BaseView {
         const rect = canvas.getBoundingClientRect();
         const y = e.clientY - rect.top;
         
-        // Calculer nouvelle vÃƒÂ©locitÃƒÂ©
+        // Calculer nouvelle vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â©
         const height = canvas.height;
         const newVelocity = Math.round((1 - (y - 10) / (height - 20)) * 127);
         const clampedVelocity = Math.max(1, Math.min(127, newVelocity));
@@ -1032,7 +1032,7 @@ class EditorView extends BaseView {
                 break;
                 
             case 'scale':
-                // Scale toutes les notes sÃƒÂ©lectionnÃƒÂ©es
+                // Scale toutes les notes sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©es
                 if (this.viewState.selectedNotes.size > 0 && this.velocityEditor.scaleStart) {
                     const scaleFactor = clampedVelocity / this.velocityEditor.scaleStart;
                     this.scaleVelocity(scaleFactor);
@@ -1048,7 +1048,7 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Trouve une note ÃƒÂ  la position X du velocity canvas
+     * Trouve une note ÃƒÆ’Ã‚Â  la position X du velocity canvas
      */
     findNoteAtVelocityX(x) {
         if (!this.editorModel) return null;
@@ -1071,7 +1071,7 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Randomize velocity sur sÃƒÂ©lection
+     * Randomize velocity sur sÃƒÆ’Ã‚Â©lection
      */
     randomizeVelocity() {
         if (!this.editorModel || this.viewState.selectedNotes.size === 0) return;
@@ -1083,7 +1083,7 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Scale velocity sur sÃƒÂ©lection
+     * Scale velocity sur sÃƒÆ’Ã‚Â©lection
      */
     scaleVelocity(factor) {
         if (!this.editorModel || this.viewState.selectedNotes.size === 0) return;
@@ -1121,8 +1121,8 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Change le CC affichÃƒÂ©
-     * @param {number} ccNumber - NumÃƒÂ©ro CC (1, 7, 10, 11, 64, 74)
+     * Change le CC affichÃƒÆ’Ã‚Â©
+     * @param {number} ccNumber - NumÃƒÆ’Ã‚Â©ro CC (1, 7, 10, 11, 64, 74)
      */
     setModulationCC(ccNumber) {
         this.viewState.modulationCC = ccNumber;
@@ -1138,14 +1138,14 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Efface tous les ÃƒÂ©vÃƒÂ©nements CC du type sÃƒÂ©lectionnÃƒÂ©
+     * Efface tous les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements CC du type sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©
      */
     clearModulationCC() {
         if (!this.editorModel) return;
         
         const ccNumber = this.viewState.modulationCC;
         
-        // Effacer dans le modÃƒÂ¨le
+        // Effacer dans le modÃƒÆ’Ã‚Â¨le
         this.editorModel.clearCC(ccNumber);
         
         // Effacer dans la vue
@@ -1156,7 +1156,7 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Charge les points CC depuis le modÃƒÂ¨le
+     * Charge les points CC depuis le modÃƒÆ’Ã‚Â¨le
      */
     loadCCPoints() {
         if (!this.editorModel) {
@@ -1278,7 +1278,7 @@ class EditorView extends BaseView {
         this.modulationEditor.canvas = canvas;
         this.modulationEditor.ctx = canvas.getContext('2d');
         
-        // Ãƒâ€°vÃƒÂ©nements
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements
         canvas.addEventListener('dblclick', (e) => this.onCCCanvasDoubleClick(e));
         canvas.addEventListener('mousedown', (e) => this.onCCCanvasMouseDown(e));
         canvas.addEventListener('mousemove', (e) => this.onCCCanvasMouseMove(e));
@@ -1307,7 +1307,7 @@ class EditorView extends BaseView {
         const value = Math.round((1 - (y - 10) / (height - 20)) * 127);
         const clampedValue = Math.max(0, Math.min(127, value));
         
-        // Ajouter le point CC dans le modÃƒÂ¨le
+        // Ajouter le point CC dans le modÃƒÆ’Ã‚Â¨le
         const ccNumber = this.viewState.modulationCC;
         const channel = 0; // TODO: Get from current file or selection
         
@@ -1357,7 +1357,7 @@ class EditorView extends BaseView {
             const newValue = Math.round((1 - (y - 10) / (height - 20)) * 127);
             const clampedValue = Math.max(0, Math.min(127, newValue));
             
-            // Mettre ÃƒÂ  jour dans le modÃƒÂ¨le
+            // Mettre ÃƒÆ’Ã‚Â  jour dans le modÃƒÆ’Ã‚Â¨le
             const point = this.modulationEditor.draggedPoint;
             this.editorModel.updateCC(point.id, {
                 time: Math.max(0, newTime),
@@ -1389,10 +1389,10 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Trouve un point CC ÃƒÂ  la position donnÃƒÂ©e
+     * Trouve un point CC ÃƒÆ’Ã‚Â  la position donnÃƒÆ’Ã‚Â©e
      * @param {number} x - Position X
      * @param {number} y - Position Y
-     * @returns {Object|null} Point trouvÃƒÂ©
+     * @returns {Object|null} Point trouvÃƒÆ’Ã‚Â©
      */
     findCCPointAt(x, y) {
         const canvas = this.modulationEditor.canvas;
@@ -1402,7 +1402,7 @@ class EditorView extends BaseView {
         const pixelsPerMs = canvas.width / totalDuration;
         const height = canvas.height;
         
-        const hitRadius = 8; // Pixels de tolÃƒÂ©rance
+        const hitRadius = 8; // Pixels de tolÃƒÆ’Ã‚Â©rance
         
         for (const point of this.modulationEditor.points) {
             const pointX = point.time * pixelsPerMs;
@@ -1442,13 +1442,13 @@ class EditorView extends BaseView {
     }
     
     /**
-     * RafraÃƒÂ®chit le contenu du Routing Panel
+     * RafraÃƒÆ’Ã‚Â®chit le contenu du Routing Panel
      */
     refreshRoutingPanel() {
         const container = document.querySelector('[data-routing-content]');
         if (!container) return;
         
-        // RÃƒÂ©cupÃƒÂ©rer donnÃƒÂ©es routing depuis le contrÃƒÂ´leur
+        // RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â©rer donnÃƒÆ’Ã‚Â©es routing depuis le contrÃƒÆ’Ã‚Â´leur
         const routingData = this.getRoutingData();
         
         if (!routingData || routingData.channels.length === 0) {
@@ -1483,7 +1483,7 @@ class EditorView extends BaseView {
                                 <button class="clear-btn" 
                                         onclick="app.editorController?.clearChannelRouting(${channel.number})"
                                         title="Clear">
-                                    Ã¢Å“â€¢
+                                    ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
                                 </button>
                             </div>
                             
@@ -1532,7 +1532,7 @@ class EditorView extends BaseView {
                 <div class="stat">
                     <span class="stat-label">Valid</span>
                     <span class="stat-value ${routingData.isValid ? 'valid' : 'invalid'}">
-                        ${routingData.isValid ? 'Ã¢Å“â€œ' : 'Ã¢Å“â€”'}
+                        ${routingData.isValid ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“' : 'ÃƒÂ¢Ã…â€œÃ¢â‚¬â€'}
                     </span>
                 </div>
             </div>
@@ -1540,11 +1540,11 @@ class EditorView extends BaseView {
     }
     
     /**
-     * RÃƒÂ©cupÃƒÂ¨re les donnÃƒÂ©es de routing
+     * RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â¨re les donnÃƒÆ’Ã‚Â©es de routing
      * @returns {Object}
      */
     getRoutingData() {
-        // Essayer de rÃƒÂ©cupÃƒÂ©rer depuis RoutingModel ou EditorController
+        // Essayer de rÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â©rer depuis RoutingModel ou EditorController
         if (window.app?.controllers?.routing) {
             const routingController = window.app.controllers.routing;
             return routingController.getRoutingData?.();
@@ -1560,7 +1560,7 @@ class EditorView extends BaseView {
             const data = this.editorModel.getData();
             if (!data) return null;
             
-            // Analyser les canaux utilisÃƒÂ©s
+            // Analyser les canaux utilisÃƒÆ’Ã‚Â©s
             const channelMap = new Map();
             const notes = this.editorModel.getAllNotes();
             
@@ -1592,22 +1592,22 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Obtient l'icÃƒÂ´ne pour un type d'instrument
+     * Obtient l'icÃƒÆ’Ã‚Â´ne pour un type d'instrument
      * @param {string} type - Type d'instrument
      * @returns {string}
      */
     getInstrumentIcon(type) {
         const icons = {
-            'piano': 'Ã°Å¸Å½Â¹',
-            'guitar': 'Ã°Å¸Å½Â¸',
-            'bass': 'Ã°Å¸Å½Â¸',
-            'drums': 'Ã°Å¸Â¥Â',
-            'strings': 'Ã°Å¸Å½Â»',
-            'brass': 'Ã°Å¸Å½Âº',
-            'woodwind': 'Ã°Å¸Å½Â·',
-            'synth': 'Ã°Å¸Å½â€ºÃ¯Â¸Â',
-            'percussion': 'Ã°Å¸Â¥Â',
-            'other': 'Ã°Å¸Å½Âµ'
+            'piano': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹',
+            'guitar': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¸',
+            'bass': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¸',
+            'drums': 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â',
+            'strings': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â»',
+            'brass': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âº',
+            'woodwind': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â·',
+            'synth': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â‚¬ÂºÃƒÂ¯Ã‚Â¸Ã‚Â',
+            'percussion': 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â',
+            'other': 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ'
         };
         
         return icons[type] || icons.other;
@@ -1636,7 +1636,7 @@ class EditorView extends BaseView {
             existingMenu.outerHTML = menuHTML;
         }
         
-        // Fermer au clic extÃƒÂ©rieur
+        // Fermer au clic extÃƒÆ’Ã‚Â©rieur
         setTimeout(() => {
             document.addEventListener('click', () => this.hideContextMenu(), { once: true });
         }, 0);
@@ -1668,46 +1668,46 @@ class EditorView extends BaseView {
         
         const options = [
             {
-                icon: 'Ã¢Å“ÂÃ¯Â¸Â',
+                icon: 'ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â',
                 label: 'Properties',
                 action: `app.editorView.showNoteProperties('${noteId}')`,
                 disabled: false
             },
             { divider: true },
             {
-                icon: 'Ã¢Å“â€šÃ¯Â¸Â',
+                icon: 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å¡ÃƒÂ¯Ã‚Â¸Ã‚Â',
                 label: 'Cut',
                 action: `app.editorController.cut()`,
                 disabled: !hasSelection
             },
             {
-                icon: 'Ã°Å¸â€œâ€¹',
+                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹',
                 label: 'Copy',
                 action: `app.editorController.copy()`,
                 disabled: !hasSelection
             },
             {
-                icon: 'Ã°Å¸â€œâ€ž',
+                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾',
                 label: 'Paste',
                 action: `app.editorController.paste()`,
                 disabled: !this.editorModel?.hasClipboardContent()
             },
             { divider: true },
             {
-                icon: 'Ã°Å¸â€”â€˜Ã¯Â¸Â',
+                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â',
                 label: 'Delete',
                 action: `app.editorController.deleteSelection()`,
                 disabled: !hasSelection
             },
             { divider: true },
             {
-                icon: 'Ã°Å¸Å½Âµ',
+                icon: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ',
                 label: 'Quantize',
                 action: `app.editorController.quantize()`,
                 disabled: !hasSelection
             },
             {
-                icon: 'Ã°Å¸Å½Â¹',
+                icon: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹',
                 label: 'Transpose',
                 action: `app.editorController.transpose(1)`,
                 disabled: !hasSelection
@@ -1722,7 +1722,7 @@ class EditorView extends BaseView {
     // ========================================================================
     
     /**
-     * Affiche la modal de propriÃƒÂ©tÃƒÂ©s d'une note
+     * Affiche la modal de propriÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â©s d'une note
      * @param {string} noteId
      */
     showNoteProperties(noteId) {
@@ -1748,7 +1748,7 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Cache la modal de propriÃƒÂ©tÃƒÂ©s
+     * Cache la modal de propriÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â©s
      */
     hideNoteProperties() {
         this.viewState.showPropertiesModal = false;
@@ -1762,14 +1762,14 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Applique les modifications de la modal de propriÃƒÂ©tÃƒÂ©s
+     * Applique les modifications de la modal de propriÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â©s
      */
     applyNoteProperties() {
         if (!this.editorModel || !this.viewState.selectedNoteData) return;
         
         const noteId = this.viewState.selectedNoteData.id;
         
-        // RÃƒÂ©cupÃƒÂ©rer les valeurs des champs
+        // RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â©rer les valeurs des champs
         const pitch = parseInt(document.getElementById('prop-pitch').value);
         const time = parseInt(document.getElementById('prop-time').value);
         const duration = parseInt(document.getElementById('prop-duration').value);
@@ -1786,7 +1786,7 @@ class EditorView extends BaseView {
             return;
         }
         
-        // Mettre ÃƒÂ  jour dans le modÃƒÂ¨le
+        // Mettre ÃƒÆ’Ã‚Â  jour dans le modÃƒÆ’Ã‚Â¨le
         this.editorModel.updateNote(noteId, {
             pitch,
             time,
@@ -1921,19 +1921,19 @@ class EditorView extends BaseView {
     }
     
     onRoutingValidated(data) {
-        // TODO: Afficher rÃƒÂ©sultats validation
+        // TODO: Afficher rÃƒÆ’Ã‚Â©sultats validation
         this.logDebug('Routing validated');
     }
     
     // ========================================================================
-    // MISE Ãƒâ‚¬ JOUR UI
+    // MISE ÃƒÆ’Ã¢â€šÂ¬ JOUR UI
     // ========================================================================
     
     updateFileInfo() {
         const fileInfoEl = this.container?.querySelector('.editor-file-info .file-name');
         if (fileInfoEl) {
             const fileName = this.viewState.fileName || 'Untitled';
-            const modifiedIndicator = this.viewState.isModified ? 'Ã¢â‚¬Â¢ ' : '';
+            const modifiedIndicator = this.viewState.isModified ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ' : '';
             fileInfoEl.textContent = `${modifiedIndicator}${fileName}`;
         }
     }
@@ -2084,7 +2084,7 @@ class EditorView extends BaseView {
      * Nettoie la vue
      */
     destroy() {
-        // DÃƒÂ©truire visualizer
+        // DÃƒÆ’Ã‚Â©truire visualizer
         if (this.visualizer) {
             this.visualizer.destroy();
             this.visualizer = null;
@@ -2116,74 +2116,3 @@ class EditorView extends BaseView {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = EditorView;
 }
-
-if (typeof window !== 'undefined') {
-    window.EditorView = EditorView;
-    
-    /**
-     * Rendu du piano roll
-     */
-    renderPianoRoll() {
-        const container = document.getElementById('piano-roll-container');
-        if (!container) {
-            console.warn('Piano roll container not found');
-            return;
-        }
-        
-        // Le rendu réel est géré par MidiVisualizer
-        // Cette méthode initialise ou met à jour le conteneur
-        container.innerHTML = '';
-        
-        const canvas = document.createElement('canvas');
-        canvas.id = 'midi-visualizer-canvas';
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-        container.appendChild(canvas);
-        
-        this.emit('pianoroll:rendered');
-    }
-    
-    /**
-     * Rendu de la timeline
-     */
-    renderTimeline() {
-        const container = document.getElementById('timeline-container');
-        if (!container) {
-            console.warn('Timeline container not found');
-            return;
-        }
-        
-        // Créer le canvas de timeline
-        const canvas = document.createElement('canvas');
-        canvas.id = 'timeline-canvas';
-        canvas.width = container.clientWidth;
-        canvas.height = 40;
-        container.innerHTML = '';
-        container.appendChild(canvas);
-        
-        // Dessiner les marqueurs de temps
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#2a2a2a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px monospace';
-        
-        // Dessiner des marqueurs de temps simplifiés
-        for (let i = 0; i < 10; i++) {
-            const x = (canvas.width / 10) * i;
-            ctx.fillText(`${i}:00`, x + 5, 20);
-            ctx.strokeStyle = '#555';
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
-        }
-        
-        this.emit('timeline:rendered');
-    }
-}
-
-
-
-window.EditorView = EditorView;

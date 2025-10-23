@@ -1,21 +1,21 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaylistController_ImportExport.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0 - 2025-10-09
 // ============================================================================
 // Description:
 //   Module d'import/export de playlists
-//   Gère les formats: M3U, PLS, XSPF, JSON
+//   GÃ¨re les formats: M3U, PLS, XSPF, JSON
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Export playlists (M3U, PLS, XSPF, JSON)
 //   - Import playlists depuis fichiers
 //   - Validation et parsing
-//   - Résolution des chemins de fichiers
+//   - RÃ©solution des chemins de fichiers
 // ============================================================================
 
 /**
- * Extension du PlaylistController avec fonctionnalités Import/Export
+ * Extension du PlaylistController avec fonctionnalitÃ©s Import/Export
  * @module PlaylistController_ImportExport
  */
 
@@ -34,10 +34,10 @@ const PlaylistImportExport = {
     // ========================================================================
 
     /**
-     * Exporte une playlist dans le format spécifié
-     * @param {Object} playlist - Playlist à exporter
+     * Exporte une playlist dans le format spÃ©cifiÃ©
+     * @param {Object} playlist - Playlist Ã  exporter
      * @param {string} format - Format: 'm3u', 'pls', 'xspf', 'json'
-     * @returns {string} Contenu du fichier exporté
+     * @returns {string} Contenu du fichier exportÃ©
      */
     async exportPlaylist(playlist, format = 'm3u') {
         this.logDebug('playlist', `Exporting playlist as ${format.toUpperCase()}`);
@@ -46,7 +46,7 @@ const PlaylistImportExport = {
             throw new Error('Playlist is empty or invalid');
         }
         
-        // Résoudre les fichiers complets
+        // RÃ©soudre les fichiers complets
         const files = await this.resolvePlaylistFiles(playlist.files);
         
         if (files.length === 0) {
@@ -198,8 +198,8 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Télécharge une playlist exportée
-     * @param {Object} playlist - Playlist à exporter
+     * TÃ©lÃ©charge une playlist exportÃ©e
+     * @param {Object} playlist - Playlist Ã  exporter
      * @param {string} format - Format d'export
      */
     async downloadPlaylist(playlist, format = 'm3u') {
@@ -221,7 +221,7 @@ const PlaylistImportExport = {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            this.logInfo('playlist', `✓ Playlist exported: ${filename}`);
+            this.logInfo('playlist', `âœ“ Playlist exported: ${filename}`);
             
         } catch (error) {
             this.logError('playlist', 'Export failed:', error);
@@ -235,18 +235,18 @@ const PlaylistImportExport = {
 
     /**
      * Importe une playlist depuis un fichier
-     * @param {File} file - Fichier à importer
-     * @returns {Object} Playlist importée
+     * @param {File} file - Fichier Ã  importer
+     * @returns {Object} Playlist importÃ©e
      */
     async importPlaylist(file) {
         this.logInfo('playlist', `Importing playlist: ${file.name}`);
         
-        // Vérifier la taille
+        // VÃ©rifier la taille
         if (file.size > this.MAX_FILE_SIZE) {
             throw new Error('File too large (max 10MB)');
         }
         
-        // Détecter le format
+        // DÃ©tecter le format
         const format = this.detectFormat(file.name);
         
         if (!this.SUPPORTED_FORMATS.includes(format)) {
@@ -281,10 +281,10 @@ const PlaylistImportExport = {
                 throw new Error(`Cannot parse format: ${format}`);
         }
         
-        // Résoudre les IDs de fichiers
+        // RÃ©soudre les IDs de fichiers
         playlistData.fileIds = await this.resolveFileIds(playlistData.files);
         
-        this.logInfo('playlist', `✓ Imported ${playlistData.fileIds.length} files`);
+        this.logInfo('playlist', `âœ“ Imported ${playlistData.fileIds.length} files`);
         
         return playlistData;
     },
@@ -382,7 +382,7 @@ const PlaylistImportExport = {
         const parser = new DOMParser();
         const doc = parser.parseFromString(content, 'text/xml');
         
-        // Vérifier erreurs de parsing
+        // VÃ©rifier erreurs de parsing
         if (doc.querySelector('parsererror')) {
             throw new Error('Invalid XSPF XML');
         }
@@ -402,7 +402,7 @@ const PlaylistImportExport = {
             const location = this.getXmlText(track, 'location');
             if (!location) continue;
             
-            // Retirer le préfixe file://
+            // Retirer le prÃ©fixe file://
             const path = location.replace(/^file:\/\//, '');
             
             files.push({
@@ -423,7 +423,7 @@ const PlaylistImportExport = {
     parseJSON(content) {
         const data = JSON.parse(content);
         
-        // Vérifier la structure
+        // VÃ©rifier la structure
         if (!data.playlist || !data.playlist.files) {
             throw new Error('Invalid JSON playlist structure');
         }
@@ -462,7 +462,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Détecte le format depuis le nom de fichier
+     * DÃ©tecte le format depuis le nom de fichier
      * @private
      */
     detectFormat(filename) {
@@ -471,7 +471,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Récupère le type MIME pour un format
+     * RÃ©cupÃ¨re le type MIME pour un format
      * @private
      */
     getMimeType(format) {
@@ -487,7 +487,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Résout les fichiers complets depuis les IDs
+     * RÃ©sout les fichiers complets depuis les IDs
      * @private
      */
     async resolvePlaylistFiles(fileIds) {
@@ -511,7 +511,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Résout les IDs de fichiers depuis paths
+     * RÃ©sout les IDs de fichiers depuis paths
      * @private
      */
     async resolveFileIds(files) {
@@ -535,7 +535,7 @@ const PlaylistImportExport = {
             if (matchingFile) {
                 fileIds.push(matchingFile.id);
             } else {
-                this.logDebug('playlist', `⚠️ File not found: ${path}`);
+                this.logDebug('playlist', `âš ï¸ File not found: ${path}`);
             }
         }
         
@@ -543,7 +543,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Calcule durée totale
+     * Calcule durÃ©e totale
      * @private
      */
     calculateTotalDuration(files) {
@@ -574,7 +574,7 @@ const PlaylistImportExport = {
      * @private
      */
     makeRelativePath(path) {
-        // Retirer préfixe absolu commun si présent
+        // Retirer prÃ©fixe absolu commun si prÃ©sent
         const basePath = '/midi/';
         
         if (path.startsWith(basePath)) {
@@ -585,7 +585,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Échappe M3U
+     * Ã‰chappe M3U
      * @private
      */
     escapeM3U(str) {
@@ -593,7 +593,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Échappe PLS
+     * Ã‰chappe PLS
      * @private
      */
     escapePLS(str) {
@@ -601,7 +601,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Échappe XML
+     * Ã‰chappe XML
      * @private
      */
     escapeXml(str) {
@@ -614,7 +614,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Déséchappe XML
+     * DÃ©sÃ©chappe XML
      * @private
      */
     unescapeXml(str) {
@@ -627,7 +627,7 @@ const PlaylistImportExport = {
     },
 
     /**
-     * Récupère texte d'un élément XML
+     * RÃ©cupÃ¨re texte d'un Ã©lÃ©ment XML
      * @private
      */
     getXmlText(parent, tagName) {
@@ -644,7 +644,7 @@ const PlaylistImportExport = {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PlaylistImportExport;
 }
-window.PlaylistController_ImportExport = PlaylistController_ImportExport;
+window.PlaylistController_ImportExport = PlaylistImportExport;
 // ============================================================================
 // FIN DU MODULE PlaylistController_ImportExport.js
 // ============================================================================

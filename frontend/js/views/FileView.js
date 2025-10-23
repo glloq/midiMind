@@ -2,17 +2,17 @@
 // Fichier: frontend/js/views/FileView.js
 // Version: v1.1.0 - SELECTION & CONTEXT MENU
 // Date: 2025-10-10
-// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃƒÆ’Ã‚Â¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
-//   Vue amÃƒÂ©liorÃƒÂ©e pour afficher la liste des fichiers MIDI.
+//   Vue amÃƒÆ’Ã‚Â©liorÃƒÆ’Ã‚Â©e pour afficher la liste des fichiers MIDI.
 //
 // NOUVEAU v1.1.0:
-//   Ã¢Å“â€¦ SÃƒÂ©lection multiple (Ctrl+Click, Shift+Click, Ctrl+A)
-//   Ã¢Å“â€¦ Menu contextuel clic droit
-//   Ã¢Å“â€¦ Drag & drop vers playlist/queue
-//   Ã¢Å“â€¦ Indicateur fichiers sÃƒÂ©lectionnÃƒÂ©s
-//   Ã¢Å“â€¦ Actions bulk sur sÃƒÂ©lection
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ SÃƒÆ’Ã‚Â©lection multiple (Ctrl+Click, Shift+Click, Ctrl+A)
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Menu contextuel clic droit
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Drag & drop vers playlist/queue
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Indicateur fichiers sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©s
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Actions bulk sur sÃƒÆ’Ã‚Â©lection
 //
 // Auteur: midiMind Team
 // ============================================================================
@@ -22,7 +22,7 @@ class FileView extends BaseView {
     constructor(containerId, eventBus) {
         super(containerId, eventBus);
         
-        // Ãƒâ€°tat de la vue
+        // ÃƒÆ’Ã¢â‚¬Â°tat de la vue
         this.viewState = {
             files: [],
             selectedFiles: [],
@@ -47,7 +47,7 @@ class FileView extends BaseView {
     
     init() {
         this.setupGlobalEvents();
-        this.logger.info('FileView', 'Ã°Å¸Å½Âµ FileView v1.1.0 initialized with multi-select');
+        this.logger.info('FileView', 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ FileView v1.1.0 initialized with multi-select');
     }
     
     // ========================================================================
@@ -61,13 +61,13 @@ class FileView extends BaseView {
         return `
             <div class="file-view-container">
                 
-                <!-- Header avec compteur sÃƒÂ©lection -->
+                <!-- Header avec compteur sÃƒÆ’Ã‚Â©lection -->
                 <div class="file-view-header">
                     <div class="file-header-left">
-                        <h2 class="file-view-title">Ã°Å¸â€œÂ Fichiers MIDI</h2>
+                        <h2 class="file-view-title">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Fichiers MIDI</h2>
                         <span class="file-count">${state.files.length} fichier(s)</span>
                         ${selectedCount > 0 ? `
-                            <span class="selected-count">${selectedCount} sÃƒÂ©lectionnÃƒÂ©(s)</span>
+                            <span class="selected-count">${selectedCount} sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©(s)</span>
                         ` : ''}
                     </div>
                     
@@ -76,12 +76,12 @@ class FileView extends BaseView {
                         <div class="search-box">
                             <input type="text" 
                                    class="search-input" 
-                                   placeholder="Ã°Å¸â€Â Rechercher..."
+                                   placeholder="ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Rechercher..."
                                    value="${state.searchQuery}"
                                    onkeyup="app.fileView.onSearch(this.value)">
                         </div>
                         
-                        <!-- Actions bulk si sÃƒÂ©lection -->
+                        <!-- Actions bulk si sÃƒÆ’Ã‚Â©lection -->
                         ${selectedCount > 0 ? this.renderBulkActions(selectedCount) : ''}
                     </div>
                 </div>
@@ -123,7 +123,7 @@ class FileView extends BaseView {
                  ondragstart="app.fileView.onFileDragStart(event, ${index})"
                  ondragend="app.fileView.onFileDragEnd(event)">
                 
-                <!-- Checkbox sÃƒÂ©lection -->
+                <!-- Checkbox sÃƒÆ’Ã‚Â©lection -->
                 ${this.config.enableMultiSelect ? `
                     <div class="file-checkbox">
                         <input type="checkbox" 
@@ -132,8 +132,8 @@ class FileView extends BaseView {
                     </div>
                 ` : ''}
                 
-                <!-- IcÃƒÂ´ne -->
-                <div class="file-icon">Ã°Å¸Å½Âµ</div>
+                <!-- IcÃƒÆ’Ã‚Â´ne -->
+                <div class="file-icon">ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ</div>
                 
                 <!-- Infos -->
                 <div class="file-info">
@@ -141,9 +141,9 @@ class FileView extends BaseView {
                         ${this.escapeHtml(file.name)}
                     </div>
                     <div class="file-metadata">
-                        ${duration ? `<span>Ã¢ÂÂ±Ã¯Â¸Â ${duration}</span>` : ''}
-                        ${file.trackCount ? `<span>Ã°Å¸Å½Â¹ ${file.trackCount} pistes</span>` : ''}
-                        ${file.bpm ? `<span>Ã°Å¸Â¥Â ${file.bpm} BPM</span>` : ''}
+                        ${duration ? `<span>ÃƒÂ¢Ã‚ÂÃ‚Â±ÃƒÂ¯Ã‚Â¸Ã‚Â ${duration}</span>` : ''}
+                        ${file.trackCount ? `<span>ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹ ${file.trackCount} pistes</span>` : ''}
+                        ${file.bpm ? `<span>ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â ${file.bpm} BPM</span>` : ''}
                     </div>
                 </div>
                 
@@ -157,7 +157,7 @@ class FileView extends BaseView {
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.fileView.playFile('${file.id}')"
                             title="Lire">
-                        Ã¢â€“Â¶Ã¯Â¸Â
+                        ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â
                     </button>
                 </div>
                 
@@ -174,18 +174,18 @@ class FileView extends BaseView {
             <div class="bulk-actions">
                 <button class="btn btn-sm btn-primary" 
                         onclick="app.fileView.addSelectedToPlaylist()"
-                        title="Ajouter ÃƒÂ  la playlist">
-                    Ã¢Å¾â€¢ Playlist
+                        title="Ajouter ÃƒÆ’Ã‚Â  la playlist">
+                    ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢ Playlist
                 </button>
                 <button class="btn btn-sm btn-secondary" 
                         onclick="app.fileView.addSelectedToQueue()"
-                        title="Ajouter ÃƒÂ  la queue">
-                    Ã°Å¸â€œâ€¹ Queue
+                        title="Ajouter ÃƒÆ’Ã‚Â  la queue">
+                    ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Queue
                 </button>
                 <button class="btn btn-sm btn-danger" 
                         onclick="app.fileView.clearSelection()"
-                        title="DÃƒÂ©sÃƒÂ©lectionner tout">
-                    Ã¢Å“â€“Ã¯Â¸Â
+                        title="DÃƒÆ’Ã‚Â©sÃƒÆ’Ã‚Â©lectionner tout">
+                    ÃƒÂ¢Ã…â€œÃ¢â‚¬â€œÃƒÂ¯Ã‚Â¸Ã‚Â
                 </button>
             </div>
         `;
@@ -202,24 +202,24 @@ class FileView extends BaseView {
                  style="display: none;"
                  data-context-menu>
                 <div class="context-menu-item" onclick="app.fileView.contextPlay()">
-                    <span class="icon">Ã¢â€“Â¶Ã¯Â¸Â</span>
+                    <span class="icon">ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
                     Lire
                 </div>
                 <div class="context-menu-item" onclick="app.fileView.contextAddToPlaylist()">
-                    <span class="icon">Ã¢Å¾â€¢</span>
-                    Ajouter ÃƒÂ  la playlist
+                    <span class="icon">ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢</span>
+                    Ajouter ÃƒÆ’Ã‚Â  la playlist
                 </div>
                 <div class="context-menu-item" onclick="app.fileView.contextAddToQueue()">
-                    <span class="icon">Ã°Å¸â€œâ€¹</span>
-                    Ajouter ÃƒÂ  la queue
+                    <span class="icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹</span>
+                    Ajouter ÃƒÆ’Ã‚Â  la queue
                 </div>
                 <div class="context-menu-divider"></div>
                 <div class="context-menu-item" onclick="app.fileView.contextInfo()">
-                    <span class="icon">Ã¢â€žÂ¹Ã¯Â¸Â</span>
+                    <span class="icon">ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¹ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
                     Informations
                 </div>
                 <div class="context-menu-item danger" onclick="app.fileView.contextDelete()">
-                    <span class="icon">Ã°Å¸â€”â€˜Ã¯Â¸Â</span>
+                    <span class="icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â</span>
                     Supprimer
                 </div>
             </div>
@@ -229,18 +229,18 @@ class FileView extends BaseView {
     renderEmptyState() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">Ã°Å¸â€œÂ­</div>
+                <div class="empty-icon">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â­</div>
                 <p>Aucun fichier</p>
             </div>
         `;
     }
     
     // ========================================================================
-    // SÃƒâ€°LECTION MULTIPLE
+    // SÃƒÆ’Ã¢â‚¬Â°LECTION MULTIPLE
     // ========================================================================
     
     /**
-     * GÃƒÂ¨re le clic sur un fichier avec Ctrl/Shift
+     * GÃƒÆ’Ã‚Â¨re le clic sur un fichier avec Ctrl/Shift
      */
     onFileClick(event, index) {
         event.preventDefault();
@@ -252,10 +252,10 @@ class FileView extends BaseView {
             // Ctrl+Click : Toggle individuel
             this.toggleFileSelection(index);
         } else if (event.shiftKey && this.viewState.lastSelectedIndex >= 0) {
-            // Shift+Click : SÃƒÂ©lection de plage
+            // Shift+Click : SÃƒÆ’Ã‚Â©lection de plage
             this.selectRange(this.viewState.lastSelectedIndex, index);
         } else {
-            // Click simple : SÃƒÂ©lection unique
+            // Click simple : SÃƒÆ’Ã‚Â©lection unique
             this.selectSingleFile(index);
         }
         
@@ -263,7 +263,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * Toggle sÃƒÂ©lection d'un fichier
+     * Toggle sÃƒÆ’Ã‚Â©lection d'un fichier
      */
     toggleFileSelection(index) {
         const file = this.viewState.files[index];
@@ -282,7 +282,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * SÃƒÂ©lectionne un seul fichier
+     * SÃƒÆ’Ã‚Â©lectionne un seul fichier
      */
     selectSingleFile(index) {
         const file = this.viewState.files[index];
@@ -292,7 +292,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * SÃƒÂ©lectionne une plage de fichiers (Shift+Click)
+     * SÃƒÆ’Ã‚Â©lectionne une plage de fichiers (Shift+Click)
      */
     selectRange(startIndex, endIndex) {
         const start = Math.min(startIndex, endIndex);
@@ -304,7 +304,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * SÃƒÂ©lectionne tous les fichiers (Ctrl+A)
+     * SÃƒÆ’Ã‚Â©lectionne tous les fichiers (Ctrl+A)
      */
     selectAll() {
         this.viewState.selectedFiles = [...this.viewState.files];
@@ -313,7 +313,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * DÃƒÂ©sÃƒÂ©lectionne tout
+     * DÃƒÆ’Ã‚Â©sÃƒÆ’Ã‚Â©lectionne tout
      */
     clearSelection() {
         this.viewState.selectedFiles = [];
@@ -333,14 +333,14 @@ class FileView extends BaseView {
         
         event.preventDefault();
         
-        // Trouver le fichier cliquÃƒÂ©
+        // Trouver le fichier cliquÃƒÆ’Ã‚Â©
         const fileItem = event.target.closest('.file-item');
         if (!fileItem) return false;
         
         const fileId = fileItem.getAttribute('data-file-id');
         const fileIndex = parseInt(fileItem.getAttribute('data-file-index'));
         
-        // Si le fichier n'est pas dans la sÃƒÂ©lection, le sÃƒÂ©lectionner
+        // Si le fichier n'est pas dans la sÃƒÆ’Ã‚Â©lection, le sÃƒÆ’Ã‚Â©lectionner
         const isSelected = this.viewState.selectedFiles.some(f => f.id === fileId);
         if (!isSelected) {
             this.selectSingleFile(fileIndex);
@@ -353,7 +353,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * Affiche le menu aux coordonnÃƒÂ©es donnÃƒÂ©es
+     * Affiche le menu aux coordonnÃƒÆ’Ã‚Â©es donnÃƒÆ’Ã‚Â©es
      */
     showContextMenu(x, y) {
         const menu = document.querySelector('[data-context-menu]');
@@ -420,13 +420,13 @@ class FileView extends BaseView {
     onFileDragStart(event, index) {
         const file = this.viewState.files[index];
         
-        // Si le fichier n'est pas sÃƒÂ©lectionnÃƒÂ©, le sÃƒÂ©lectionner
+        // Si le fichier n'est pas sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©, le sÃƒÆ’Ã‚Â©lectionner
         const isSelected = this.viewState.selectedFiles.some(f => f.id === file.id);
         if (!isSelected) {
             this.selectSingleFile(index);
         }
         
-        // Stocker les IDs des fichiers sÃƒÂ©lectionnÃƒÂ©s
+        // Stocker les IDs des fichiers sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©s
         const fileIds = this.viewState.selectedFiles.map(f => f.id);
         event.dataTransfer.setData('application/json', JSON.stringify(fileIds));
         event.dataTransfer.effectAllowed = 'copy';
@@ -461,7 +461,7 @@ class FileView extends BaseView {
             window.app.playlistController.addMultipleFiles(fileIds);
         }
         
-        this.showSuccess(`${fileIds.length} fichier(s) ajoutÃƒÂ©(s) ÃƒÂ  la playlist`);
+        this.showSuccess(`${fileIds.length} fichier(s) ajoutÃƒÆ’Ã‚Â©(s) ÃƒÆ’Ã‚Â  la playlist`);
     }
     
     addSelectedToQueue() {
@@ -472,7 +472,7 @@ class FileView extends BaseView {
             window.app.playlistController.addMultipleToQueue(fileIds);
         }
         
-        this.showSuccess(`${fileIds.length} fichier(s) ajoutÃƒÂ©(s) ÃƒÂ  la queue`);
+        this.showSuccess(`${fileIds.length} fichier(s) ajoutÃƒÆ’Ã‚Â©(s) ÃƒÆ’Ã‚Â  la queue`);
     }
     
     deleteSelected() {
@@ -480,7 +480,7 @@ class FileView extends BaseView {
         if (count === 0) return;
         
         const confirmed = confirm(
-            `Supprimer ${count} fichier(s) sÃƒÂ©lectionnÃƒÂ©(s) ?\n\nCette action est irrÃƒÂ©versible.`
+            `Supprimer ${count} fichier(s) sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©(s) ?\n\nCette action est irrÃƒÆ’Ã‚Â©versible.`
         );
         
         if (!confirmed) return;
@@ -509,7 +509,7 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // MISE Ãƒâ‚¬ JOUR UI
+    // MISE ÃƒÆ’Ã¢â€šÂ¬ JOUR UI
     // ========================================================================
     
     updateFileItemState(index) {
@@ -553,10 +553,10 @@ class FileView extends BaseView {
                     if (!countEl) {
                         const newCount = document.createElement('span');
                         newCount.className = 'selected-count';
-                        newCount.textContent = `${selectedCount} sÃƒÂ©lectionnÃƒÂ©(s)`;
+                        newCount.textContent = `${selectedCount} sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©(s)`;
                         header.querySelector('.file-header-left').appendChild(newCount);
                     } else {
-                        countEl.textContent = `${selectedCount} sÃƒÂ©lectionnÃƒÂ©(s)`;
+                        countEl.textContent = `${selectedCount} sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©(s)`;
                     }
                     
                     if (!bulkActions) {
@@ -574,11 +574,11 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS GLOBAUX
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS GLOBAUX
     // ========================================================================
     
     setupGlobalEvents() {
-        // Ctrl+A pour sÃƒÂ©lectionner tout
+        // Ctrl+A pour sÃƒÆ’Ã‚Â©lectionner tout
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
                 // Seulement si focus dans file view
@@ -627,7 +627,7 @@ class FileView extends BaseView {
     }
     
     showSuccess(message) {
-        console.log('Ã¢Å“â€¦', message);
+        console.log('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦', message);
         if (window.app?.notifications) {
             window.app.notifications.success(message);
         }
@@ -644,48 +644,3 @@ if (typeof module !== 'undefined' && module.exports) {
 
 if (typeof window !== 'undefined') {
     window.FileView = FileView;
-    
-    /**
-     * Sélectionne un fichier dans l'UI
-     * @param {string} fileId - ID du fichier
-     */
-    selectFile(fileId) {
-        // Désélectionner tous d'abord
-        this.deselectAll();
-        
-        // Trouver et sélectionner l'élément
-        const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
-        if (fileElement) {
-            fileElement.classList.add('selected', 'active');
-            fileElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-        
-        // Émettre événement
-        this.emit('file:selected', { fileId });
-    }
-    
-    /**
-     * Désélectionne un fichier
-     * @param {string} fileId - ID du fichier
-     */
-    deselectFile(fileId) {
-        const fileElement = document.querySelector(`[data-file-id="${fileId}"]`);
-        if (fileElement) {
-            fileElement.classList.remove('selected', 'active');
-        }
-        
-        this.emit('file:deselected', { fileId });
-    }
-    
-    /**
-     * Désélectionne tous les fichiers
-     */
-    deselectAll() {
-        const selectedElements = document.querySelectorAll('.file-item.selected');
-        selectedElements.forEach(el => {
-            el.classList.remove('selected', 'active');
-        });
-    }
-}
-
-window.FileView = FileView;

@@ -4,12 +4,12 @@
 // Date: 2025-10-23
 // ============================================================================
 // CORRECTIONS v3.3.0:
-// ✓ Ajout de sendCommand() pour tous les contrôleurs
-// ✓ Ajout de uploadFile() pour FileService
-// ✓ Ajout des méthodes de routing (listDevices, setChannelRouting, etc.)
-// ✓ Reconnexion automatique améliorée avec backoff exponentiel
-// ✓ Heartbeat pour détecter les connexions mortes
-// ✓ File d'attente de messages en cas de déconnexion
+// âœ“ Ajout de sendCommand() pour tous les contrÃ´leurs
+// âœ“ Ajout de uploadFile() pour FileService
+// âœ“ Ajout des mÃ©thodes de routing (listDevices, setChannelRouting, etc.)
+// âœ“ Reconnexion automatique amÃ©liorÃ©e avec backoff exponentiel
+// âœ“ Heartbeat pour dÃ©tecter les connexions mortes
+// âœ“ File d'attente de messages en cas de dÃ©connexion
 // ============================================================================
 
 class BackendService {
@@ -17,7 +17,7 @@ class BackendService {
         this.eventBus = eventBus;
         this.logger = logger || console;
         
-        // État de la connexion
+        // Ã‰tat de la connexion
         this.ws = null;
         this.connected = false;
         this.connecting = false;
@@ -43,11 +43,11 @@ class BackendService {
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        // Compteur de requêtes pour les IDs
+        // Compteur de requÃªtes pour les IDs
         this.requestId = 0;
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized');
+        console.log('BackendService', 'Service initialized');
     }
     
     /**
@@ -55,18 +55,18 @@ class BackendService {
      */
     async connect(url = null) {
         if (this.connected) {
-            this.logger.warn('BackendService', 'Already connected');
+            console.warn('BackendService', 'Already connected');
             return true;
         }
         
         if (this.connecting) {
-            this.logger.warn('BackendService', 'Connection already in progress');
+            console.warn('BackendService', 'Connection already in progress');
             return false;
         }
         
         const wsUrl = url || this.config.url;
         this.connecting = true;
-        this.logger.info('BackendService', `Connecting to ${wsUrl}...`);
+        console.log('BackendService', `Connecting to ${wsUrl}...`);
         
         return new Promise((resolve) => {
             try {
@@ -75,13 +75,13 @@ class BackendService {
                 // Timeout de connexion
                 this.connectionTimeout = setTimeout(() => {
                     if (!this.connected) {
-                        this.logger.error('BackendService', 'Connection timeout');
+                        console.error('BackendService', 'Connection timeout');
                         this.handleConnectionError('Connection timeout');
                         resolve(false);
                     }
                 }, this.config.timeoutInterval);
                 
-                // Événements WebSocket
+                // Ã‰vÃ©nements WebSocket
                 this.ws.onopen = () => {
                     clearTimeout(this.connectionTimeout);
                     this.handleOpen();
@@ -102,7 +102,7 @@ class BackendService {
                 };
                 
             } catch (error) {
-                this.logger.error('BackendService', 'Connection error:', error);
+                console.error('BackendService', 'Connection error:', error);
                 this.connecting = false;
                 this.handleConnectionError(error.message);
                 resolve(false);
@@ -111,17 +111,17 @@ class BackendService {
     }
     
     /**
-     * Gère l'ouverture de la connexion
+     * GÃ¨re l'ouverture de la connexion
      */
     handleOpen() {
         this.connected = true;
         this.connecting = false;
         this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', '✓ Connected to backend');
+        console.log('BackendService', 'âœ“ Connected to backend');
         this.eventBus.emit('backend:connected');
         
-        // Démarrer le heartbeat
+        // DÃ©marrer le heartbeat
         this.startHeartbeat();
         
         // Envoyer les messages en attente
@@ -129,7 +129,7 @@ class BackendService {
     }
     
     /**
-     * Gère la fermeture de la connexion
+     * GÃ¨re la fermeture de la connexion
      */
     handleClose(event) {
         this.connected = false;
@@ -139,7 +139,7 @@ class BackendService {
         const reason = event.reason || 'Unknown reason';
         const code = event.code;
         
-        this.logger.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
+        console.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
         this.eventBus.emit('websocket:disconnected', { code, reason });
         
         // Tenter une reconnexion automatique
@@ -149,15 +149,15 @@ class BackendService {
     }
     
     /**
-     * Gère les erreurs
+     * GÃ¨re les erreurs
      */
     handleError(error) {
-        this.logger.error('BackendService', 'WebSocket error:', error);
+        console.error('BackendService', 'WebSocket error:', error);
         this.eventBus.emit('backend:error', { error });
     }
     
     /**
-     * Gère une erreur de connexion
+     * GÃ¨re une erreur de connexion
      */
     handleConnectionError(message) {
         this.connected = false;
@@ -180,28 +180,28 @@ class BackendService {
         }
         
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-            this.logger.error('BackendService', 'Max reconnection attempts reached');
+            console.error('BackendService', 'Max reconnection attempts reached');
             this.eventBus.emit('backend:max-reconnect-attempts');
             return;
         }
         
-        // Calculer le délai avec backoff exponentiel
+        // Calculer le dÃ©lai avec backoff exponentiel
         const delay = Math.min(
             this.config.reconnectInterval * Math.pow(this.config.reconnectDecay, this.reconnectAttempts),
             this.config.maxReconnectInterval
         );
         
         this.reconnectAttempts++;
-        this.logger.info('BackendService', `Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
+        console.log('BackendService', `Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
         this.reconnectTimer = setTimeout(() => {
-            this.logger.info('BackendService', 'Attempting reconnection...');
+            console.log('BackendService', 'Attempting reconnection...');
             this.connect();
         }, delay);
     }
     
     /**
-     * Démarre le heartbeat
+     * DÃ©marre le heartbeat
      */
     startHeartbeat() {
         this.stopHeartbeat();
@@ -214,7 +214,7 @@ class BackendService {
     }
     
     /**
-     * Arrête le heartbeat
+     * ArrÃªte le heartbeat
      */
     stopHeartbeat() {
         if (this.heartbeatTimer) {
@@ -224,19 +224,19 @@ class BackendService {
     }
     
     /**
-     * Gère les messages reçus
+     * GÃ¨re les messages reÃ§us
      */
     handleMessage(event) {
         try {
             const data = JSON.parse(event.data);
             
-            // Répondre aux pings
+            // RÃ©pondre aux pings
             if (data.type === 'ping') {
                 this.send({ type: 'pong' });
                 return;
             }
             
-            // Gérer les réponses aux requêtes
+            // GÃ©rer les rÃ©ponses aux requÃªtes
             if (data.requestId && this.pendingRequests.has(data.requestId)) {
                 const { resolve, reject } = this.pendingRequests.get(data.requestId);
                 this.pendingRequests.delete(data.requestId);
@@ -249,16 +249,16 @@ class BackendService {
                 return;
             }
             
-            // Émettre le message via l'eventBus
+            // Ã‰mettre le message via l'eventBus
             this.eventBus.emit('backend:message', data);
             
-            // Émettre également un événement spécifique au type
+            // Ã‰mettre Ã©galement un Ã©vÃ©nement spÃ©cifique au type
             if (data.type) {
                 this.eventBus.emit(`backend:${data.type}`, data);
             }
             
         } catch (error) {
-            this.logger.error('BackendService', 'Error parsing message:', error);
+            console.error('BackendService', 'Error parsing message:', error);
         }
     }
     
@@ -267,12 +267,12 @@ class BackendService {
      */
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            // Ajouter à la file d'attente
+            // Ajouter Ã  la file d'attente
             if (this.messageQueue.length < this.maxQueueSize) {
                 this.messageQueue.push(data);
                 this.logger.debug('BackendService', 'Message queued (not connected)');
             } else {
-                this.logger.warn('BackendService', 'Message queue full, dropping message');
+                console.warn('BackendService', 'Message queue full, dropping message');
             }
             return false;
         }
@@ -282,16 +282,16 @@ class BackendService {
             this.ws.send(message);
             return true;
         } catch (error) {
-            this.logger.error('BackendService', 'Error sending message:', error);
+            console.error('BackendService', 'Error sending message:', error);
             return false;
         }
     }
     
     /**
-     * Envoie une commande au backend et attend la réponse
+     * Envoie une commande au backend et attend la rÃ©ponse
      * @param {string} command - Nom de la commande
-     * @param {Object} params - Paramètres de la commande
-     * @returns {Promise<Object>} Réponse du backend
+     * @param {Object} params - ParamÃ¨tres de la commande
+     * @returns {Promise<Object>} RÃ©ponse du backend
      */
     async sendCommand(command, params = {}) {
         return new Promise((resolve, reject) => {
@@ -302,10 +302,10 @@ class BackendService {
             
             const requestId = ++this.requestId;
             
-            // Enregistrer la requête en attente
+            // Enregistrer la requÃªte en attente
             this.pendingRequests.set(requestId, { resolve, reject });
             
-            // Timeout après 30 secondes
+            // Timeout aprÃ¨s 30 secondes
             setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
@@ -325,9 +325,9 @@ class BackendService {
     
     /**
      * Upload un fichier au backend
-     * @param {File} file - Fichier à uploader
+     * @param {File} file - Fichier Ã  uploader
      * @param {Function} progressCallback - Callback pour la progression
-     * @returns {Promise<Object>} Réponse du backend
+     * @returns {Promise<Object>} RÃ©ponse du backend
      */
     async uploadFile(file, progressCallback = null) {
         return new Promise((resolve, reject) => {
@@ -367,7 +367,7 @@ class BackendService {
     }
     
     // ========================================================================
-    // MÉTHODES DE ROUTING
+    // MÃ‰THODES DE ROUTING
     // ========================================================================
     
     /**
@@ -392,35 +392,35 @@ class BackendService {
     }
     
     /**
-     * Définit le volume d'un canal
+     * DÃ©finit le volume d'un canal
      */
     async setChannelVolume(channelId, volume) {
         return this.sendCommand('set_channel_volume', { channelId, volume });
     }
     
     /**
-     * Définit le panoramique d'un canal
+     * DÃ©finit le panoramique d'un canal
      */
     async setChannelPan(channelId, pan) {
         return this.sendCommand('set_channel_pan', { channelId, pan });
     }
     
     /**
-     * Active/désactive le mute d'un canal
+     * Active/dÃ©sactive le mute d'un canal
      */
     async muteChannel(channelId, muted) {
         return this.sendCommand('mute_channel', { channelId, muted });
     }
     
     /**
-     * Active/désactive le solo d'un canal
+     * Active/dÃ©sactive le solo d'un canal
      */
     async soloChannel(channelId, soloed) {
         return this.sendCommand('solo_channel', { channelId, soloed });
     }
     
     /**
-     * Définit la transposition d'un canal
+     * DÃ©finit la transposition d'un canal
      */
     async setChannelTranspose(channelId, semitones) {
         return this.sendCommand('set_channel_transpose', { channelId, semitones });
@@ -432,7 +432,7 @@ class BackendService {
     flushMessageQueue() {
         if (this.messageQueue.length === 0) return;
         
-        this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages`);
+        console.log('BackendService', `Sending ${this.messageQueue.length} queued messages`);
         
         while (this.messageQueue.length > 0) {
             const message = this.messageQueue.shift();
@@ -441,7 +441,7 @@ class BackendService {
     }
     
     /**
-     * Déconnecte du backend
+     * DÃ©connecte du backend
      */
     disconnect() {
         this.stopHeartbeat();
@@ -451,7 +451,7 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        // Rejeter toutes les requêtes en attente
+        // Rejeter toutes les requÃªtes en attente
         for (const [requestId, { reject }] of this.pendingRequests.entries()) {
             reject(new Error('Disconnected'));
         }
@@ -466,18 +466,18 @@ class BackendService {
         this.connecting = false;
         this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', 'Disconnected');
+        console.log('BackendService', 'Disconnected');
     }
     
     /**
-     * Vérifie si connecté
+     * VÃ©rifie si connectÃ©
      */
     isConnected() {
         return this.connected && this.ws && this.ws.readyState === WebSocket.OPEN;
     }
     
     /**
-     * Obtient l'état de la connexion
+     * Obtient l'Ã©tat de la connexion
      */
     getConnectionState() {
         if (!this.ws) return 'disconnected';
