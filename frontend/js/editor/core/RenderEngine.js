@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/js/editor/renderers/RenderEngine.js
+// Fichier: frontend/js/editor/core/RenderEngine.js
 // Version: v3.1.1 - PERFORMANCE OPTIMIZED + FIXED
 // Date: 2025-10-23
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
