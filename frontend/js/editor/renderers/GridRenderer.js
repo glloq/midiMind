@@ -304,3 +304,4 @@ class GridRenderer {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = GridRenderer;
 }
+window.GridRenderer = GridRenderer;

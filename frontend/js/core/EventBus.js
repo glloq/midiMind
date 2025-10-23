@@ -1,59 +1,59 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
-// Version: 3.0.5 - Phase 2 - Avec Priorités
+// Version: 3.0.5 - Phase 2 - Avec PrioritÃ©s
 // Date: 2025-10-09
 // ============================================================================
 // Description:
-//   Event Bus centralisé avec système de priorités pour optimisation latence.
+//   Event Bus centralisÃ© avec systÃ¨me de prioritÃ©s pour optimisation latence.
 //
-// Nouveautés Phase 2:
-//   ✅ Priorités d'événements (HIGH/NORMAL/LOW)
-//   ✅ Files d'attente séparées par priorité
-//   ✅ Traitement asynchrone optimisé
-//   ✅ Throttling et debouncing intégrés
-//   ✅ Métriques de performance
+// NouveautÃ©s Phase 2:
+//   âœ… PrioritÃ©s d'Ã©vÃ©nements (HIGH/NORMAL/LOW)
+//   âœ… Files d'attente sÃ©parÃ©es par prioritÃ©
+//   âœ… Traitement asynchrone optimisÃ©
+//   âœ… Throttling et debouncing intÃ©grÃ©s
+//   âœ… MÃ©triques de performance
 //
 // Auteur: midiMind Team
 // ============================================================================
 
 /**
  * @enum EventPriority
- * @description Niveaux de priorité des événements
+ * @description Niveaux de prioritÃ© des Ã©vÃ©nements
  */
 const EventPriority = {
-    HIGH: 'high',       // Traité immédiatement (ex: MIDI messages)
-    NORMAL: 'normal',   // Traité normalement (ex: UI updates)
-    LOW: 'low'          // Traité quand le système est libre (ex: stats)
+    HIGH: 'high',       // TraitÃ© immÃ©diatement (ex: MIDI messages)
+    NORMAL: 'normal',   // TraitÃ© normalement (ex: UI updates)
+    LOW: 'low'          // TraitÃ© quand le systÃ¨me est libre (ex: stats)
 };
 
 /**
  * @class EventBus
- * @description Bus d'événements centralisé avec gestion de priorités
+ * @description Bus d'Ã©vÃ©nements centralisÃ© avec gestion de prioritÃ©s
  * 
  * Architecture Phase 2:
  * ```
- * emit(event, data, priority) →
- *   ↓
- * [Dispatcher avec priorités]
- *   ↓
- * ┌─────┬────────┬─────┐
- * │HIGH │ NORMAL │ LOW │ (Files d'attente)
- * └─────┴────────┴─────┘
- *   ↓      ↓       ↓
- * Listeners (triés par priorité)
+ * emit(event, data, priority) â†’
+ *   â†“
+ * [Dispatcher avec prioritÃ©s]
+ *   â†“
+ * â”Œâ”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”
+ * â”‚HIGH â”‚ NORMAL â”‚ LOW â”‚ (Files d'attente)
+ * â””â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”˜
+ *   â†“      â†“       â†“
+ * Listeners (triÃ©s par prioritÃ©)
  * ```
  * 
  * Objectifs:
- * - Latence < 5ms pour événements HIGH
- * - Latence < 20ms pour événements NORMAL
- * - Latence < 100ms pour événements LOW
+ * - Latence < 5ms pour Ã©vÃ©nements HIGH
+ * - Latence < 20ms pour Ã©vÃ©nements NORMAL
+ * - Latence < 100ms pour Ã©vÃ©nements LOW
  */
 class EventBus {
     constructor() {
-        // Listeners organisés par événement
+        // Listeners organisÃ©s par Ã©vÃ©nement
         this.listeners = new Map();
         
-        // Files d'attente par priorité
+        // Files d'attente par prioritÃ©
         this.queues = {
             [EventPriority.HIGH]: [],
             [EventPriority.NORMAL]: [],
@@ -69,7 +69,7 @@ class EventBus {
             processingInterval: 10  // ms
         };
         
-        // Métriques
+        // MÃ©triques
         this.metrics = {
             eventsEmitted: 0,
             eventsProcessed: 0,
@@ -105,9 +105,9 @@ class EventBus {
     // ========================================================================
     
     init() {
-        console.log('🔄 EventBus v3.0.5 initialized with priorities');
+        console.log('ðŸ”„ EventBus v3.0.5 initialized with priorities');
         
-        // Démarrer le traitement des queues
+        // DÃ©marrer le traitement des queues
         this.startProcessing();
     }
     
@@ -131,11 +131,11 @@ class EventBus {
     // ========================================================================
     
     /**
-     * Enregistre un listener pour un événement
-     * @param {string} eventName - Nom de l'événement
-     * @param {Function} callback - Fonction à appeler
+     * Enregistre un listener pour un Ã©vÃ©nement
+     * @param {string} eventName - Nom de l'Ã©vÃ©nement
+     * @param {Function} callback - Fonction Ã  appeler
      * @param {Object} options - Options (priority, once, throttle, debounce)
-     * @returns {Function} Fonction pour se désabonner
+     * @returns {Function} Fonction pour se dÃ©sabonner
      */
     on(eventName, callback, options = {}) {
         if (!this.listeners.has(eventName)) {
@@ -151,24 +151,24 @@ class EventBus {
             id: this.generateListenerId()
         };
         
-        // Insérer en respectant la priorité
+        // InsÃ©rer en respectant la prioritÃ©
         const listeners = this.listeners.get(eventName);
         const insertIndex = this.findInsertIndex(listeners, listener.priority);
         listeners.splice(insertIndex, 0, listener);
         
-        // Retourner fonction de désabonnement
+        // Retourner fonction de dÃ©sabonnement
         return () => this.off(eventName, listener.id);
     }
     
     /**
-     * Enregistre un listener qui ne s'exécute qu'une fois
+     * Enregistre un listener qui ne s'exÃ©cute qu'une fois
      */
     once(eventName, callback, options = {}) {
         return this.on(eventName, callback, { ...options, once: true });
     }
     
     /**
-     * Désenregistre un listener
+     * DÃ©senregistre un listener
      */
     off(eventName, listenerId) {
         if (!this.listeners.has(eventName)) return;
@@ -187,21 +187,21 @@ class EventBus {
     }
     
     /**
-     * Désenregistre tous les listeners d'un événement
+     * DÃ©senregistre tous les listeners d'un Ã©vÃ©nement
      */
     offAll(eventName) {
         this.listeners.delete(eventName);
     }
     
     // ========================================================================
-    // ÉMISSION D'ÉVÉNEMENTS
+    // Ã‰MISSION D'Ã‰VÃ‰NEMENTS
     // ========================================================================
     
     /**
-     * Émet un événement
-     * @param {string} eventName - Nom de l'événement
-     * @param {*} data - Données de l'événement
-     * @param {string} priority - Priorité (HIGH/NORMAL/LOW)
+     * Ã‰met un Ã©vÃ©nement
+     * @param {string} eventName - Nom de l'Ã©vÃ©nement
+     * @param {*} data - DonnÃ©es de l'Ã©vÃ©nement
+     * @param {string} priority - PrioritÃ© (HIGH/NORMAL/LOW)
      */
     emit(eventName, data = {}, priority = EventPriority.NORMAL) {
         this.metrics.eventsEmitted++;
@@ -215,37 +215,37 @@ class EventBus {
         };
         
         if (!this.config.enablePriorities || priority === EventPriority.HIGH) {
-            // Traiter immédiatement les événements HIGH
+            // Traiter immÃ©diatement les Ã©vÃ©nements HIGH
             this.processEventNow(event);
         } else {
-            // Ajouter à la queue appropriée
+            // Ajouter Ã  la queue appropriÃ©e
             this.enqueueEvent(event);
         }
     }
     
     /**
-     * Émet un événement HIGH priority (immédiat)
+     * Ã‰met un Ã©vÃ©nement HIGH priority (immÃ©diat)
      */
     emitHigh(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.HIGH);
     }
     
     /**
-     * Émet un événement NORMAL priority
+     * Ã‰met un Ã©vÃ©nement NORMAL priority
      */
     emitNormal(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.NORMAL);
     }
     
     /**
-     * Émet un événement LOW priority
+     * Ã‰met un Ã©vÃ©nement LOW priority
      */
     emitLow(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.LOW);
     }
     
     /**
-     * Émet avec throttling
+     * Ã‰met avec throttling
      */
     emitThrottled(eventName, data = {}, throttleMs = 100, priority = EventPriority.NORMAL) {
         const key = `${eventName}_${priority}`;
@@ -259,17 +259,17 @@ class EventBus {
     }
     
     /**
-     * Émet avec debouncing
+     * Ã‰met avec debouncing
      */
     emitDebounced(eventName, data = {}, debounceMs = 300, priority = EventPriority.NORMAL) {
         const key = `${eventName}_${priority}`;
         
-        // Annuler le timer précédent
+        // Annuler le timer prÃ©cÃ©dent
         if (this.debounceTimers.has(key)) {
             clearTimeout(this.debounceTimers.get(key));
         }
         
-        // Créer nouveau timer
+        // CrÃ©er nouveau timer
         const timer = setTimeout(() => {
             this.emit(eventName, data, priority);
             this.debounceTimers.delete(key);
@@ -279,11 +279,11 @@ class EventBus {
     }
     
     // ========================================================================
-    // TRAITEMENT DES ÉVÉNEMENTS
+    // TRAITEMENT DES Ã‰VÃ‰NEMENTS
     // ========================================================================
     
     /**
-     * Ajoute un événement à la queue
+     * Ajoute un Ã©vÃ©nement Ã  la queue
      */
     enqueueEvent(event) {
         const queue = this.queues[event.priority];
@@ -298,10 +298,10 @@ class EventBus {
     }
     
     /**
-     * Traite les queues dans l'ordre de priorité
+     * Traite les queues dans l'ordre de prioritÃ©
      */
     processQueues() {
-        // HIGH (déjà traités en direct)
+        // HIGH (dÃ©jÃ  traitÃ©s en direct)
         
         // NORMAL
 		this.processQueue(EventPriority.NORMAL, 10);
@@ -309,7 +309,7 @@ class EventBus {
 		// LOW
 		this.processQueue(EventPriority.LOW, 5);
 		
-		// ✅ NOUVEAU: Nettoyage périodique du cache (toutes les 60s)
+		// âœ… NOUVEAU: Nettoyage pÃ©riodique du cache (toutes les 60s)
 		const now = Date.now();
 		if (!this._lastCacheClean || now - this._lastCacheClean > 60000) {
 			this.cleanThrottleCache();
@@ -333,7 +333,7 @@ class EventBus {
     }
     
     /**
-     * Traite un événement immédiatement
+     * Traite un Ã©vÃ©nement immÃ©diatement
      */
     processEventNow(event) {
         const startTime = performance.now();
@@ -347,7 +347,7 @@ class EventBus {
         
         for (const listener of listeners) {
             try {
-                // Vérifier throttle
+                // VÃ©rifier throttle
                 if (listener.throttle > 0) {
                     const key = `${event.name}_${listener.id}`;
                     const lastCall = this.throttleCache.get(key) || 0;
@@ -384,11 +384,11 @@ class EventBus {
     }
     
     // ========================================================================
-    // MÉTRIQUES
+    // MÃ‰TRIQUES
     // ========================================================================
     
     /**
-     * Met à jour les métriques de latence
+     * Met Ã  jour les mÃ©triques de latence
      */
     updateLatencyMetrics(priority, latency) {
         if (!this.config.enableMetrics) return;
@@ -396,7 +396,7 @@ class EventBus {
         const history = this.metrics.latencyHistory[priority];
         history.push(latency);
         
-        // Garder seulement les 100 dernières
+        // Garder seulement les 100 derniÃ¨res
         if (history.length > 100) {
             history.shift();
         }
@@ -407,7 +407,7 @@ class EventBus {
     }
     
     /**
-     * Récupère les métriques
+     * RÃ©cupÃ¨re les mÃ©triques
      */
     getMetrics() {
         return {
@@ -423,7 +423,7 @@ class EventBus {
     }
     
     /**
-     * Réinitialise les métriques
+     * RÃ©initialise les mÃ©triques
      */
     resetMetrics() {
         this.metrics = {
@@ -450,7 +450,7 @@ cleanThrottleCache() {
     }
 }
     /**
-     * Trouve l'index d'insertion pour respecter la priorité
+     * Trouve l'index d'insertion pour respecter la prioritÃ©
      */
     findInsertIndex(listeners, priority) {
         const priorityOrder = {
@@ -469,28 +469,28 @@ cleanThrottleCache() {
     }
     
     /**
-     * Génère un ID unique pour listener
+     * GÃ©nÃ¨re un ID unique pour listener
      */
     generateListenerId() {
         return 'listener_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
     /**
-     * Génère un ID unique pour événement
+     * GÃ©nÃ¨re un ID unique pour Ã©vÃ©nement
      */
     generateEventId() {
         return 'event_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
     /**
-     * Liste tous les événements enregistrés
+     * Liste tous les Ã©vÃ©nements enregistrÃ©s
      */
     listEvents() {
         return Array.from(this.listeners.keys());
     }
     
     /**
-     * Compte les listeners pour un événement
+     * Compte les listeners pour un Ã©vÃ©nement
      */
     listenerCount(eventName) {
         if (!this.listeners.has(eventName)) return 0;
@@ -507,6 +507,16 @@ cleanThrottleCache() {
         this.debounceTimers.forEach(timer => clearTimeout(timer));
         this.debounceTimers.clear();
     }
+	
+	/**
+     * Efface tous les événements
+     */
+    clearEvents() {
+        this.listeners = {};
+        this.wildcardListeners = [];
+        this.maxListeners = 100;
+        console.log('✅ All events cleared');
+    }
 }
 
 // Export
@@ -514,49 +524,4 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { EventBus, EventPriority };
 }
 
-// ============================================================================
-// EXEMPLES D'UTILISATION
-// ============================================================================
-
-/*
-// Événement HIGH (MIDI message) - traité immédiatement
-eventBus.emitHigh('midi:message', {
-    note: 60,
-    velocity: 100
-});
-
-// Événement NORMAL (UI update)
-eventBus.emitNormal('playback:position', {
-    position: 1000
-});
-
-// Événement LOW (stats)
-eventBus.emitLow('stats:update', {
-    cpu: 45,
-    ram: 60
-});
-
-// Listener avec priorité HIGH
-eventBus.on('midi:message', (data) => {
-    // Traité en premier
-}, { priority: EventPriority.HIGH });
-
-// Listener avec throttling (max 1 fois par 100ms)
-eventBus.on('playback:position', (data) => {
-    updateUI(data);
-}, { throttle: 100 });
-
-// Listener avec debouncing (attend 300ms de calme)
-eventBus.on('search:query', (data) => {
-    performSearch(data);
-}, { debounce: 300 });
-
-// Listener "once"
-eventBus.once('app:ready', () => {
-    console.log('App is ready!');
-});
-*/
-
-// ============================================================================
-// FIN DU FICHIER EventBus.js
-// ============================================================================
+window.EventBus = EventBus;

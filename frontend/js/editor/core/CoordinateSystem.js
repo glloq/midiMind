@@ -416,4 +416,6 @@ class CoordinateSystem {
 // Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CoordinateSystem;
+
 }
+window.CoordinateSystem = CoordinateSystem;

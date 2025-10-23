@@ -6,21 +6,22 @@
 // SIMPLIFICATION: Seulement les fonctions de base
 // - Scanner les instruments
 // - Lister les instruments
-// - Connecter/Déconnecter
+// - Connecter/DÃ©connecter
 // - Pas de SysEx complexe
-// - Pas de capabilities avancées
+// - Pas de capabilities avancÃ©es
 // ============================================================================
+
 
 class InstrumentModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✅ FIX: Correct super() call
+        // âœ… FIX: Correct super() call
         super({}, {
             persistKey: 'instrumentmodel',
             eventPrefix: 'instrument',
             autoPersist: false
         });
         
-        // ✅ FIX: Assign immediately
+        // âœ… FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
@@ -28,7 +29,7 @@ class InstrumentModel extends BaseModel {
         // Cache des instruments
         this.instruments = new Map();
         
-        // État
+        // Ã‰tat
         this.state = {
             scanning: false,
             lastScan: null,
@@ -36,7 +37,7 @@ class InstrumentModel extends BaseModel {
             connectedCount: 0
         };
         
-        this.logger.info('InstrumentModel', '✓ Model initialized (minimal version)');
+        this.logger.info('InstrumentModel', 'âœ“ Model initialized (minimal version)');
     }
     
     // ========================================================================
@@ -63,7 +64,7 @@ class InstrumentModel extends BaseModel {
             if (response.success) {
                 const instruments = response.data.instruments || [];
                 
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 this.instruments.clear();
                 instruments.forEach(inst => {
                     this.instruments.set(inst.id, inst);
@@ -99,7 +100,7 @@ class InstrumentModel extends BaseModel {
     }
     
     /**
-     * Charge les détails d'un instrument
+     * Charge les dÃ©tails d'un instrument
      */
     async loadInstrument(instrumentId) {
         try {
@@ -112,7 +113,7 @@ class InstrumentModel extends BaseModel {
             if (response.success) {
                 const instrument = response.data;
                 
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 this.instruments.set(instrumentId, instrument);
                 
                 this.eventBus.emit('instrument:loaded', { instrument });
@@ -129,7 +130,7 @@ class InstrumentModel extends BaseModel {
     }
     
     // ========================================================================
-    // CONNEXION/DÉCONNEXION
+    // CONNEXION/DÃ‰CONNEXION
     // ========================================================================
     
     /**
@@ -165,7 +166,7 @@ class InstrumentModel extends BaseModel {
     }
     
     /**
-     * Déconnecte un instrument
+     * DÃ©connecte un instrument
      */
     async disconnect(instrumentId) {
         try {
@@ -201,35 +202,35 @@ class InstrumentModel extends BaseModel {
     // ========================================================================
     
     /**
-     * Récupère un instrument par ID
+     * RÃ©cupÃ¨re un instrument par ID
      */
     getInstrument(instrumentId) {
         return this.instruments.get(instrumentId) || null;
     }
     
     /**
-     * Récupère tous les instruments
+     * RÃ©cupÃ¨re tous les instruments
      */
     getAllInstruments() {
         return Array.from(this.instruments.values());
     }
     
     /**
-     * Récupère les instruments connectés
+     * RÃ©cupÃ¨re les instruments connectÃ©s
      */
     getConnectedInstruments() {
         return this.getAllInstruments().filter(inst => inst.connected);
     }
     
     /**
-     * Récupère les instruments par type
+     * RÃ©cupÃ¨re les instruments par type
      */
     getInstrumentsByType(type) {
         return this.getAllInstruments().filter(inst => inst.type === type);
     }
     
     /**
-     * Vérifie si un instrument est connecté
+     * VÃ©rifie si un instrument est connectÃ©
      */
     isConnected(instrumentId) {
         const instrument = this.instruments.get(instrumentId);
@@ -237,14 +238,14 @@ class InstrumentModel extends BaseModel {
     }
     
     /**
-     * Récupère le nombre d'instruments
+     * RÃ©cupÃ¨re le nombre d'instruments
      */
     getInstrumentCount() {
         return this.instruments.size;
     }
     
     /**
-     * Récupère le nombre d'instruments connectés
+     * RÃ©cupÃ¨re le nombre d'instruments connectÃ©s
      */
     getConnectedCount() {
         return this.state.connectedCount;
@@ -280,3 +281,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.InstrumentModel = InstrumentModel;
 }
+
+// Export par défaut
+window.InstrumentModel = InstrumentModel;

@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/components/Modal.js
+// Fichier: frontend/js/views/components/Modal.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi  
 // ============================================================================
 // Description:
@@ -818,3 +818,4 @@ class Modal {
         [...Modal.stack].forEach(modal => modal.hide());
     }
 }
+window.Modal = Modal;

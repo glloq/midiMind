@@ -383,7 +383,7 @@ class Metronome {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Metronome;
 }
-
+window.Metronome = Metronome;
 // ============================================================================
 // FIN DU FICHIER Metronome.js - v1.1.0
 // ============================================================================

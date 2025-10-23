@@ -644,7 +644,7 @@ const PlaylistImportExport = {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PlaylistImportExport;
 }
-
+window.PlaylistController_ImportExport = PlaylistController_ImportExport;
 // ============================================================================
 // FIN DU MODULE PlaylistController_ImportExport.js
 // ============================================================================

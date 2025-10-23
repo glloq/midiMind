@@ -512,3 +512,4 @@ if (typeof module !== 'undefined' && module.exports) {
 } else if (typeof window !== 'undefined') {
     window.MidiConstants = MidiConstants;
 }
+window.MidiConstants = MidiConstants;

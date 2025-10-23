@@ -535,3 +535,4 @@ class MidiParser {
         return metadata;
     }
 }
+window.MidiParser = MidiParser;

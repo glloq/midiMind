@@ -1,24 +1,25 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.3.2 - CHEMINS CORRECTS FINAUX
-Date: 2025-10-22
+Version: v3.6.0 - STRUCTURE RÉELLE CORRECTE
+Date: 2025-10-23
 ============================================================================ 
-CORRECTIONS v3.3.2:
-âœ… CSS: styles/ (PAS css/) â† CORRIGÃ‰ !
-âœ… JS: js/ avec sous-dossiers
-âœ… PlaylistController ajoutÃ©
-âœ… GlobalPlaybackController ajoutÃ©
-âœ… Tous les CSS nÃ©cessaires
+CORRECTIONS v3.6.0:
+✅ Structure CORRECTE : js/ et styles/ UNIQUEMENT
+✅ PLUS de dossiers scripts/ ou src/ ou css/
+✅ Router.js dans js/core/ (pas scripts/core/)
+✅ MidiService.js et StorageService.js dans js/services/ (pas scripts/services/)
+✅ DeviceCard, Modal, etc. dans js/views/components/ (pas scripts/views/components/)
+✅ Tous les chemins corrigés selon la structure RÉELLE
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI Mind - SystÃ¨me d'Orchestration MIDI v3.1</title>
+    <title>MIDI Mind - Système d'Orchestration MIDI v3.1</title>
     
     <!-- ========================================================================
-         STYLES CSS - Structure: styles/*.css (PAS css/)
+         STYLES CSS - Tous dans styles/
          ======================================================================== -->
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/components.css">
@@ -54,7 +55,7 @@ CORRECTIONS v3.3.2:
             <div class="header-content">
                 <div class="header-left">
                     <h1 class="app-title">
-                        <span class="app-icon">ðŸŽ¹</span>
+                        <span class="app-icon">🎹</span>
                         MIDI Mind
                         <span class="app-version">v3.1</span>
                     </h1>
@@ -62,35 +63,35 @@ CORRECTIONS v3.3.2:
                 
                 <nav class="main-nav">
                     <a href="#home" class="nav-item active" data-page="home">
-                        <span class="nav-icon">ðŸ </span>
+                        <span class="nav-icon">🏠</span>
                         <span class="nav-label">Accueil</span>
                     </a>
                     <a href="#editor" class="nav-item" data-page="editor">
-                        <span class="nav-icon">âœï¸</span>
-                        <span class="nav-label">Ã‰diteur</span>
+                        <span class="nav-icon">✏️</span>
+                        <span class="nav-label">Éditeur</span>
                     </a>
                     <a href="#routing" class="nav-item" data-page="routing">
-                        <span class="nav-icon">ðŸ”€</span>
+                        <span class="nav-icon">🔀</span>
                         <span class="nav-label">Routage</span>
                     </a>
                     <a href="#keyboard" class="nav-item" data-page="keyboard">
-                        <span class="nav-icon">ðŸŽ¹</span>
+                        <span class="nav-icon">🎹</span>
                         <span class="nav-label">Clavier</span>
                     </a>
                     <a href="#instruments" class="nav-item" data-page="instruments">
-                        <span class="nav-icon">ðŸŽ¸</span>
+                        <span class="nav-icon">🎸</span>
                         <span class="nav-label">Instruments</span>
                     </a>
                     <a href="#system" class="nav-item" data-page="system">
-                        <span class="nav-icon">âš™ï¸</span>
-                        <span class="nav-label">SystÃ¨me</span>
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Système</span>
                     </a>
                 </nav>
                 
                 <div class="header-right">
                     <div id="connection-status" class="connection-status">
                         <span class="status-dot"></span>
-                        <span class="status-text">DÃ©connectÃ©</span>
+                        <span class="status-text">Déconnecté</span>
                     </div>
                 </div>
             </div>
@@ -100,7 +101,6 @@ CORRECTIONS v3.3.2:
              MAIN CONTENT
              ======================================================================== -->
         <main class="app-main">
-            <!-- Pages chargÃ©es dynamiquement -->
             <div id="home" class="page active"></div>
             <div id="editor" class="page"></div>
             <div id="routing" class="page"></div>
@@ -144,66 +144,52 @@ CORRECTIONS v3.3.2:
     </div>
 
     <!-- ========================================================================
-         SCRIPTS - ORDRE CRITIQUE POUR PERFORMANCE
-         Structure: js/[dossier]/[fichier].js
+         SCRIPTS - ORDRE CRITIQUE v3.6.0
+         Structure RÉELLE : js/ uniquement (pas de scripts/ ni src/)
          ======================================================================== -->
     
-    <!-- ========================================================================
-         Ã‰TAPE 0: CONFIGURATION PERFORMANCE (DOIT ÃŠTRE CHARGÃ‰ EN PREMIER !)
-         ======================================================================== -->
+    <!-- ÉTAPE 1: CONFIGURATION -->
+    <script src="js/config/AppConfig.js"></script>
     <script src="js/config/PerformanceConfig.js"></script>
-    
-    <!-- ========================================================================
-         Ã‰TAPE 1: FONDATIONS - EventBus (utilisÃ© par TOUT le reste)
-         ======================================================================== -->
-    <script src="js/core/EventBus.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 2: UTILITAIRES DE BASE (pas de dÃ©pendances)
-         ======================================================================== -->
+    <!-- ÉTAPE 2: UTILITAIRES DE BASE -->
     <script src="js/utils/Logger.js"></script>
+    <script src="js/utils/DebugConsole.js"></script>
     <script src="js/utils/Constants.js"></script>
     <script src="js/utils/MidiConstants.js"></script>
     <script src="js/utils/Formatter.js"></script>
     <script src="js/utils/Validator.js"></script>
-    <script src="js/utils/DebugConsole.js"></script>
+    <script src="js/utils/MidiUtils.js"></script>
     <script src="js/utils/Notifications.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 3: CONFIGURATION
-         ======================================================================== -->
-    <script src="js/config/AppConfig.js"></script>
+    <!-- ÉTAPE 3: MONITORING -->
+    <script src="js/monitoring/PerformanceMonitor.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 4: COMMUNICATION BACKEND
-         ======================================================================== -->
-    <script src="js/services/BackendService.js"></script>
+    <!-- ÉTAPE 4: AUDIO -->
+    <script src="js/audio/Metronome.js"></script>
+    <script src="js/utils/MetronomeEngine.js"></script>
+
+    <!-- ÉTAPE 5: PARSERS & UTILS -->
+    <script src="js/utils/MidiParser.js"></script>
+    <script src="js/utils/KeyboardShortcuts.js"></script>
+    <script src="js/utils/RoutingManager.js"></script>
     <script src="js/utils/ApiClient.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 5: UTILITAIRES AVANCÃ‰S
-         ======================================================================== -->
-    <script src="js/monitoring/PerformanceMonitor.js"></script>
-    <script src="js/ui/NotificationManager.js"></script>
-    <script src="js/utils/RoutingManager.js"></script>
+    <!-- ÉTAPE 6: EVENT BUS (critique) -->
+    <script src="js/core/EventBus.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 6: SERVICES
-         ======================================================================== -->
+    <!-- ÉTAPE 7: SERVICES - Tous dans js/services/ -->
     <script src="js/services/StorageService.js"></script>
     <script src="js/services/FileService.js"></script>
     <script src="js/services/MidiService.js"></script>
+    <script src="js/services/BackendService.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 7: CLASSES DE BASE (CRITIQUE - avant hÃ©ritage)
-         ======================================================================== -->
+    <!-- ÉTAPE 8: CLASSES DE BASE -->
     <script src="js/core/BaseModel.js"></script>
     <script src="js/core/BaseView.js"></script>
     <script src="js/core/BaseController.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 8: MODÃˆLES DE DONNÃ‰ES (hÃ©ritent de BaseModel)
-         ======================================================================== -->
+    <!-- ÉTAPE 9: MODÈLES -->
     <script src="js/models/StateModel.js"></script>
     <script src="js/models/FileModel.js"></script>
     <script src="js/models/InstrumentModel.js"></script>
@@ -214,46 +200,43 @@ CORRECTIONS v3.3.2:
     <script src="js/models/PlaylistModel.js"></script>
     <script src="js/models/LoopModel.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 9: Ã‰DITEUR - CORE
-         ======================================================================== -->
+    <!-- ÉTAPE 10: ÉDITEUR - CORE -->
     <script src="js/editor/core/CoordinateSystem.js"></script>
     <script src="js/editor/core/Viewport.js"></script>
     <script src="js/editor/core/RenderEngine.js"></script>
-    
-    <!-- ========================================================================
-         NOTE: RoutingMatrix.js sera chargÃ© dynamiquement si nÃ©cessaire
-         Voir README_V2.md pour les instructions d'installation
-         ======================================================================== -->
-    
-    <!-- ========================================================================
-         Ã‰TAPE 10: Ã‰DITEUR - RENDERERS
-         ======================================================================== -->
+    <script src="js/editor/core/MidiVisualizer.js"></script>
+
+    <!-- ÉTAPE 11: ÉDITEUR - RENDERERS -->
     <script src="js/editor/renderers/GridRenderer.js"></script>
     <script src="js/editor/renderers/TimelineRenderer.js"></script>
     <script src="js/editor/renderers/NoteRenderer.js"></script>
     <script src="js/editor/renderers/PianoRollRenderer.js"></script>
     <script src="js/editor/renderers/CCRenderer.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 11: Ã‰DITEUR - INTERACTION
-         ======================================================================== -->
+    <!-- ÉTAPE 12: ÉDITEUR - INTERACTION -->
     <script src="js/editor/interaction/SelectionManager.js"></script>
     <script src="js/editor/interaction/DragHandler.js"></script>
     <script src="js/editor/interaction/EditorMode.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 12: Ã‰DITEUR - UTILS
-         ======================================================================== -->
+    <!-- ÉTAPE 13: ÉDITEUR - UTILS -->
     <script src="js/editor/utils/ClipboardManager.js"></script>
     <script src="js/editor/utils/HistoryManager.js"></script>
     <script src="js/editor/utils/EditorRoutingManager.js"></script>
 
-    <script src="js/editor/core/MidiVisualizer.js"></script>
+    <!-- ÉTAPE 14: UI COMPONENTS - Tous dans js/views/components/ -->
+    <script src="js/ui/NotificationManager.js"></script>
+    <script src="js/views/components/Modal.js"></script>
+    <script src="js/views/components/DeviceCard.js"></script>
+    <script src="js/views/components/ProgressBar.js"></script>
+    <script src="js/views/components/ToggleSwitch.js"></script>
+    <script src="js/views/components/RoutingMatrixView.js"></script>
+    <script src="js/views/components/RoutingMatrix.js"></script>
+    <script src="js/views/components/routing-matrix-editor.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 13: VUES - PAGES (hÃ©ritent de BaseView)
-         ======================================================================== -->
+    <!-- ÉTAPE 15: VUES - BASE -->
+    <script src="js/views/BaseCanvasView.js"></script>
+
+    <!-- ÉTAPE 16: VUES - PAGES -->
     <script src="js/views/HomeView.js"></script>
     <script src="js/views/EditorView.js"></script>
     <script src="js/views/RoutingView.js"></script>
@@ -262,13 +245,25 @@ CORRECTIONS v3.3.2:
     <script src="js/views/SystemView.js"></script>
     <script src="js/views/PlaylistView.js"></script>
     <script src="js/views/FileView.js"></script>
+    <script src="js/views/CCEditorView.js"></script>
+    <script src="js/views/PianoRollView.js"></script>
+    <script src="js/views/LoopRecorderView.js"></script>
+    <script src="js/views/VisualizerView.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 14: CONTRÃ”LEURS (hÃ©ritent de BaseController)
-         ======================================================================== -->
+    <!-- ÉTAPE 17: ROUTER - Dans js/core/ -->
+    <script src="js/core/Router.js"></script>
+
+    <!-- ÉTAPE 18: MIDI JSON CONVERTER - Dans js/core/ -->
+    <script src="js/core/MidiJsonConverter.js"></script>
+
+    <!-- ÉTAPE 19: CONTRÔLEURS -->
+    <script src="js/controllers/DebugController.js"></script>
+    <script src="js/controllers/NavigationController.js"></script>
+    <script src="js/controllers/SearchController.js"></script>
     <script src="js/controllers/HomeController.js"></script>
     <script src="js/controllers/FileController.js"></script>
     <script src="js/controllers/PlaylistController.js"></script>
+    <script src="js/controllers/PlaylistController_ImportExport.js"></script>
     <script src="js/controllers/EditorController.js"></script>
     <script src="js/controllers/RoutingController.js"></script>
     <script src="js/controllers/KeyboardController.js"></script>
@@ -276,16 +271,19 @@ CORRECTIONS v3.3.2:
     <script src="js/controllers/SystemController.js"></script>
     <script src="js/controllers/PlaybackController.js"></script>
     <script src="js/controllers/GlobalPlaybackController.js"></script>
-    <script src="js/controllers/NavigationController.js"></script>
+    <script src="js/controllers/LoopController.js"></script>
+    <script src="js/controllers/MidiFilterController.js"></script>
+    <script src="js/controllers/ModalController.js"></script>
+    <script src="js/controllers/ValidationController.js"></script>
+    <script src="js/controllers/DataPersistenceController.js"></script>
+    <script src="js/controllers/PerformanceController.js"></script>
+    <script src="js/controllers/VisualizerController.js"></script>
+    <script src="js/controllers/PianoRollController.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 15: APPLICATION (dÃ©pend de TOUT)
-         ======================================================================== -->
+    <!-- ÉTAPE 20: APPLICATION -->
     <script src="js/core/Application.js"></script>
 
-    <!-- ========================================================================
-         Ã‰TAPE 16: INITIALISATION (DOIT ÃŠTRE LE DERNIER)
-         ======================================================================== -->
+    <!-- ÉTAPE 21: INITIALISATION -->
     <script src="js/main.js"></script>
 
 </body>

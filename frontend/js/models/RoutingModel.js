@@ -1,40 +1,40 @@
 // ============================================================================
 // Fichier: frontend/js/models/RoutingModel.js
-// Version: v3.0.6 - MINIMAL (Constructor fixed + basic functions only)
-// Date: 2025-10-19
+// Version: v3.1.01 - FIXED (Methods inside class)
+// Date: 2025-10-23
 // ============================================================================
-// SIMPLIFICATION: Seulement les fonctions de base pour le routing
-// - Assignation canal → device
-// - Mute/Solo
-// - Volume/Pan basique
-// - Pas de transformations avancées
-// - Pas de presets complexes
+// CORRECTIONS v3.1.01:
+// ✓ Toutes les méthodes sont maintenant DANS la classe
+// ✓ Suppression du code hors classe
+// ✓ Méthodes setCurrentFile, getRouting, clearAll, etc. correctement placées
 // ============================================================================
+
 
 class RoutingModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✅ FIX: Correct super() call
+        // ✓ FIX: Correct super() call
         super({}, {
             persistKey: 'routingmodel',
             eventPrefix: 'routing',
             autoPersist: true
         });
         
-        // ✅ FIX: Assign immediately
+        // ✓ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // ✅ FIX: Initialize data directly
+        // ✓ FIX: Initialize data directly
         this.data = {
             channels: this.createDefaultChannels(),
             devices: [],
             globalMute: false,
             globalSolo: false,
-            masterVolume: 100
+            masterVolume: 100,
+            currentFile: null  // ✓ FIX: Ajouté dans data
         };
         
-        this.logger.info('RoutingModel', '✓ Model initialized (minimal version)');
+        this.logger.info('RoutingModel', '✓ Model initialized v3.1.01');
     }
     
     // ========================================================================
@@ -259,6 +259,136 @@ class RoutingModel extends BaseModel {
             soloedChannels: this.get('channels').filter(ch => ch.solo).length
         };
     }
+    
+    // ========================================================================
+    // MÉTHODES AJOUTÉES POUR COMPATIBILITÉ (maintenant DANS la classe)
+    // ========================================================================
+    
+    /**
+     * Définit le fichier courant
+     */
+    setCurrentFile(fileId) {
+        this.set('currentFile', fileId);
+        this.eventBus.emit('routing:file-changed', { fileId });
+    }
+    
+    /**
+     * Récupère le routing d'un canal spécifique ou la configuration complète
+     */
+    getRouting(channelId = null) {
+        if (channelId !== null) {
+            return this.getChannel(channelId);
+        }
+        return this.getRoutingConfiguration();
+    }
+    
+    /**
+     * Efface tous les routings
+     */
+    clearAll() {
+        this.resetAll();
+    }
+    
+    /**
+     * Supprime le routing d'un canal
+     */
+    removeRouting(channelId) {
+        this.assignChannelToDevice(channelId, null);
+    }
+    
+    /**
+     * Récupère tous les routings
+     */
+    getAllRoutings() {
+        return this.getAllChannels();
+    }
+    
+    /**
+     * Assigne un instrument à un canal
+     */
+    assignInstrument(channelId, instrumentId) {
+        this.assignChannelToDevice(channelId, instrumentId);
+    }
+    
+    /**
+     * Auto-route les canaux
+     */
+    autoRoute() {
+        const channels = this.getAllChannels();
+        // TODO: Implémenter la logique d'auto-routing
+        this.eventBus.emit('routing:auto-routed');
+    }
+    
+    /**
+     * Récupère la compatibilité globale
+     */
+    getGlobalCompatibility() {
+        return { midiCompatible: true, version: '1.0' };
+    }
+    
+    /**
+     * Sauvegarde un preset
+     */
+    savePreset(name) {
+        const preset = {
+            name,
+            routing: this.getRoutingConfiguration(),
+            timestamp: Date.now()
+        };
+        const presets = JSON.parse(localStorage.getItem('routing_presets') || '[]');
+        presets.push(preset);
+        localStorage.setItem('routing_presets', JSON.stringify(presets));
+        this.eventBus.emit('routing:preset-saved', { preset });
+        return preset;
+    }
+    
+    /**
+     * Charge un preset
+     */
+    loadPreset(presetId) {
+        const presets = JSON.parse(localStorage.getItem('routing_presets') || '[]');
+        const preset = presets.find(p => p.name === presetId);
+        if (preset) {
+            // Restaurer la configuration
+            if (preset.routing) {
+                if (preset.routing.channels) {
+                    this.set('channels', preset.routing.channels);
+                }
+                if (preset.routing.globalMute !== undefined) {
+                    this.set('globalMute', preset.routing.globalMute);
+                }
+                if (preset.routing.globalSolo !== undefined) {
+                    this.set('globalSolo', preset.routing.globalSolo);
+                }
+                if (preset.routing.masterVolume !== undefined) {
+                    this.set('masterVolume', preset.routing.masterVolume);
+                }
+            }
+            this.eventBus.emit('routing:preset-loaded', { preset });
+        }
+        return preset;
+    }
+    
+    // ========================================================================
+    // MÉTHODES HÉRITÉES/OVERRIDES
+    // ========================================================================
+    
+    /**
+     * Override get() depuis BaseModel si nécessaire
+     */
+    get(key) {
+        return this.data[key];
+    }
+    
+    /**
+     * Override set() depuis BaseModel si nécessaire
+     */
+    set(key, value) {
+        this.data[key] = value;
+        if (this.eventBus) {
+            this.eventBus.emit('routing:' + key + '-changed', value);
+        }
+    }
 }
 
 // ============================================================================
@@ -272,3 +402,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.RoutingModel = RoutingModel;
 }
+
+// Export par défaut
+window.RoutingModel = RoutingModel;

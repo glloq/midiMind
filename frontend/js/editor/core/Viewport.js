@@ -1,34 +1,34 @@
 // ============================================================================
 // Fichier: frontend/js/editor/core/Viewport.js
-// Projet: MidiMind v3.2.1 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.2.1 (Complétée selon audit 2025-10-14)
+// Projet: MidiMind v3.2.1 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.2.1 (ComplÃ©tÃ©e selon audit 2025-10-14)
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Gestion du viewport de l'éditeur MIDI (zone visible, zoom, pan).
-//   Contrôle ce qui est affiché et comment (limites, transformations).
+//   Gestion du viewport de l'Ã©diteur MIDI (zone visible, zoom, pan).
+//   ContrÃ´le ce qui est affichÃ© et comment (limites, transformations).
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Gestion zone visible (bounds)
 //   - Zoom in/out (molette, pinch)
-//   - Zoom sur sélection (fit selection)
-//   - Pan (défilement) horizontal/vertical
+//   - Zoom sur sÃ©lection (fit selection)
+//   - Pan (dÃ©filement) horizontal/vertical
 //   - Limites configurables (min/max zoom)
 //   - Centrage automatique (center on time/pitch)
 //   - Smooth scrolling (animation)
 //   - Sauvegarde/restore vue
 //
 // Corrections v3.2.1:
-//   ✅ getVisibleRect() - Retourne noteRange complet et correct
-//   ✅ fitToNotes() - Zoom optimal pour afficher toutes notes
-//   ✅ emitChange() - Notification changements viewport
-//   ✅ animateScroll() - Smooth scrolling avec easing
-//   ✅ Ajout focusRegion(), followPlayhead()
+//   âœ… getVisibleRect() - Retourne noteRange complet et correct
+//   âœ… fitToNotes() - Zoom optimal pour afficher toutes notes
+//   âœ… emitChange() - Notification changements viewport
+//   âœ… animateScroll() - Smooth scrolling avec easing
+//   âœ… Ajout focusRegion(), followPlayhead()
 //
 // Architecture:
 //   Viewport (classe)
 //   - Utilise CoordinateSystem pour conversions
-//   - Émet événements sur changements (zoom, pan)
+//   - Ã‰met Ã©vÃ©nements sur changements (zoom, pan)
 //   - Animation avec requestAnimationFrame
 //
 // Auteur: MidiMind Team
@@ -66,7 +66,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Met à jour les dimensions du viewport
+     * Met Ã  jour les dimensions du viewport
      * @param {number} width - Largeur
      * @param {number} height - Hauteur
      */
@@ -91,11 +91,11 @@ class Viewport {
     }
 
     // ========================================================================
-    // VISIBILITÉ
+    // VISIBILITÃ‰
     // ========================================================================
 
     /**
-     * ✅ AMÉLIORÉ: Obtient le rectangle visible (en coordonnées monde)
+     * âœ… AMÃ‰LIORÃ‰: Obtient le rectangle visible (en coordonnÃ©es monde)
      * @returns {Object} Rectangle visible avec timeRange et noteRange complets
      */
     getVisibleRect() {
@@ -122,7 +122,7 @@ class Viewport {
     }
 
     /**
-     * Vérifie si un point est visible
+     * VÃ©rifie si un point est visible
      * @param {number} x - Position X
      * @param {number} y - Position Y
      * @returns {boolean}
@@ -132,7 +132,7 @@ class Viewport {
     }
 
     /**
-     * Vérifie si un rectangle est visible
+     * VÃ©rifie si un rectangle est visible
      * @param {Object} rect - Rectangle {x, y, width, height}
      * @returns {boolean}
      */
@@ -178,7 +178,7 @@ class Viewport {
     }
 
     /**
-     * Scroll vers un temps spécifique
+     * Scroll vers un temps spÃ©cifique
      * @param {number} timeMs - Temps en millisecondes
      * @param {boolean} animated - Animer le scroll
      */
@@ -196,8 +196,8 @@ class Viewport {
     }
 
     /**
-     * Scroll vers une note spécifique
-     * @param {number} note - Numéro MIDI
+     * Scroll vers une note spÃ©cifique
+     * @param {number} note - NumÃ©ro MIDI
      * @param {boolean} animated - Animer le scroll
      */
     scrollToNote(note, animated = false) {
@@ -214,13 +214,13 @@ class Viewport {
     }
 
     /**
-     * ✅ COMPLET: Animation de scroll smooth
+     * âœ… COMPLET: Animation de scroll smooth
      * @param {number} deltaX - Delta X en pixels
      * @param {number} deltaY - Delta Y en pixels
-     * @param {number} duration - Durée en ms
+     * @param {number} duration - DurÃ©e en ms
      */
     animateScroll(deltaX, deltaY, duration = 300) {
-        // Annuler animation précédente
+        // Annuler animation prÃ©cÃ©dente
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
         }
@@ -252,7 +252,7 @@ class Viewport {
             
             this.emitChange();
             
-            // Continuer animation si pas terminée
+            // Continuer animation si pas terminÃ©e
             if (progress < 1) {
                 this.animationFrameId = requestAnimationFrame(animate);
             } else {
@@ -269,7 +269,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Active/désactive l'auto-scroll
+     * Active/dÃ©sactive l'auto-scroll
      * @param {boolean} enabled - Activer
      */
     setAutoScroll(enabled) {
@@ -277,7 +277,7 @@ class Viewport {
     }
 
     /**
-     * ✅ COMPLET: Met à jour le scroll pour suivre la lecture
+     * âœ… COMPLET: Met Ã  jour le scroll pour suivre la lecture
      * @param {number} timeMs - Temps actuel en ms
      */
     followPlayhead(timeMs) {
@@ -291,7 +291,7 @@ class Viewport {
             this.scrollX(deltaX);
         }
         
-        // Scroll si le playhead est hors vue à gauche
+        // Scroll si le playhead est hors vue Ã  gauche
         if (x < this.autoScrollMargin) {
             const deltaX = this.autoScrollMargin - x;
             this.scrollX(deltaX);
@@ -303,7 +303,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Zoom centré sur un point
+     * Zoom centrÃ© sur un point
      * @param {number} x - Position X du centre
      * @param {number} y - Position Y du centre
      * @param {number} factorX - Facteur zoom horizontal
@@ -378,7 +378,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * ✅ COMPLET: Ajuste la vue pour montrer toutes les notes
+     * âœ… COMPLET: Ajuste la vue pour montrer toutes les notes
      * @param {Array} notes - Liste des notes
      * @param {number} padding - Padding en pixels
      */
@@ -407,7 +407,7 @@ class Viewport {
         minNote = Math.max(0, minNote - noteMargin);
         maxNote = Math.min(127, maxNote + noteMargin);
         
-        // Calculer le zoom nécessaire
+        // Calculer le zoom nÃ©cessaire
         const timeSpan = maxTime - minTime;
         const noteSpan = maxNote - minNote + 1;
         
@@ -432,7 +432,7 @@ class Viewport {
             Math.min(this.coordSystem.maxZoomY, zoomY)
         );
         
-        // Centrer sur la région
+        // Centrer sur la rÃ©gion
         const centerTime = (minTime + maxTime) / 2;
         const centerNote = (minNote + maxNote) / 2;
         
@@ -443,15 +443,15 @@ class Viewport {
     }
 
     /**
-     * ✅ NOUVEAU: Centre sur une région spécifique
-     * @param {number} startTime - Temps début
+     * âœ… NOUVEAU: Centre sur une rÃ©gion spÃ©cifique
+     * @param {number} startTime - Temps dÃ©but
      * @param {number} endTime - Temps fin
      * @param {number} minNote - Note minimum
      * @param {number} maxNote - Note maximum
      * @param {number} padding - Padding
      */
     focusRegion(startTime, endTime, minNote, maxNote, padding = 50) {
-        // Calculer le zoom nécessaire
+        // Calculer le zoom nÃ©cessaire
         const timeSpan = endTime - startTime;
         const noteSpan = maxNote - minNote + 1;
         
@@ -490,9 +490,9 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Convertit des coordonnées canvas en coordonnées monde
-     * @param {number} screenX - X écran
-     * @param {number} screenY - Y écran
+     * Convertit des coordonnÃ©es canvas en coordonnÃ©es monde
+     * @param {number} screenX - X Ã©cran
+     * @param {number} screenY - Y Ã©cran
      * @returns {Object} {time, note}
      */
     screenToWorld(screenX, screenY) {
@@ -503,7 +503,7 @@ class Viewport {
     }
 
     /**
-     * Convertit des coordonnées monde en coordonnées canvas
+     * Convertit des coordonnÃ©es monde en coordonnÃ©es canvas
      * @param {number} time - Temps
      * @param {number} note - Note
      * @returns {Object} {x, y}
@@ -522,14 +522,14 @@ class Viewport {
     /**
      * Fonction d'easing cubic
      * @param {number} t - Progress (0-1)
-     * @returns {number} Valeur easée
+     * @returns {number} Valeur easÃ©e
      */
     easeInOutCubic(t) {
         return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
 
     /**
-     * ✅ COMPLET: Émet un événement de changement
+     * âœ… COMPLET: Ã‰met un Ã©vÃ©nement de changement
      */
     emitChange() {
         if (this.onViewChanged) {
@@ -556,8 +556,8 @@ class Viewport {
     }
 
     /**
-     * Sérialise l'état
-     * @returns {Object} État sérialisé
+     * SÃ©rialise l'Ã©tat
+     * @returns {Object} Ã‰tat sÃ©rialisÃ©
      */
     serialize() {
         return {
@@ -569,8 +569,8 @@ class Viewport {
     }
 
     /**
-     * Restaure l'état
-     * @param {Object} data - Données sérialisées
+     * Restaure l'Ã©tat
+     * @param {Object} data - DonnÃ©es sÃ©rialisÃ©es
      */
     deserialize(data) {
         this.width = data.width;
@@ -592,6 +592,23 @@ class Viewport {
         
         this.onViewChanged = null;
     }
+
+    // ========================================================================
+    // MÉTHODES MANQUANTES AJOUTÉES v3.1.0
+    // ========================================================================
+    
+    pan(deltaX, deltaY) {
+        this.scrollX(-deltaX);
+        this.scrollY(-deltaY);
+    }
+    
+    setZoom(zoomX, zoomY = null) {
+        this.setZoomX(zoomX);
+        if (zoomY !== null) {
+            this.setZoomY(zoomY);
+        }
+    }
+
 }
 
 // ============================================================================
@@ -601,3 +618,4 @@ class Viewport {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Viewport;
 }
+window.Viewport = Viewport;

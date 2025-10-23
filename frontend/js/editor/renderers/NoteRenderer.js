@@ -562,3 +562,4 @@ class NoteRenderer {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = NoteRenderer;
 }
+window.NoteRenderer = NoteRenderer;

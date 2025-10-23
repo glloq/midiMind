@@ -1,11 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.2.0 - IMPROVED RECONNECTION
-// Date: 2025-10-22
+// Version: v3.3.0 - COMPLETE WITH ALL MISSING METHODS
+// Date: 2025-10-23
 // ============================================================================
-// AMÉLIORATIONS v3.2.0:
+// CORRECTIONS v3.3.0:
+// ✓ Ajout de sendCommand() pour tous les contrôleurs
+// ✓ Ajout de uploadFile() pour FileService
+// ✓ Ajout des méthodes de routing (listDevices, setChannelRouting, etc.)
 // ✓ Reconnexion automatique améliorée avec backoff exponentiel
-// ✓ Meilleure gestion des erreurs de connexion
 // ✓ Heartbeat pour détecter les connexions mortes
 // ✓ File d'attente de messages en cas de déconnexion
 // ============================================================================
@@ -40,6 +42,10 @@ class BackendService {
         // File d'attente des messages
         this.messageQueue = [];
         this.maxQueueSize = 100;
+        
+        // Compteur de requêtes pour les IDs
+        this.requestId = 0;
+        this.pendingRequests = new Map();
         
         this.logger.info('BackendService', 'Service initialized');
     }
@@ -230,6 +236,19 @@ class BackendService {
                 return;
             }
             
+            // Gérer les réponses aux requêtes
+            if (data.requestId && this.pendingRequests.has(data.requestId)) {
+                const { resolve, reject } = this.pendingRequests.get(data.requestId);
+                this.pendingRequests.delete(data.requestId);
+                
+                if (data.error) {
+                    reject(new Error(data.error));
+                } else {
+                    resolve(data);
+                }
+                return;
+            }
+            
             // Émettre le message via l'eventBus
             this.eventBus.emit('backend:message', data);
             
@@ -269,6 +288,145 @@ class BackendService {
     }
     
     /**
+     * Envoie une commande au backend et attend la réponse
+     * @param {string} command - Nom de la commande
+     * @param {Object} params - Paramètres de la commande
+     * @returns {Promise<Object>} Réponse du backend
+     */
+    async sendCommand(command, params = {}) {
+        return new Promise((resolve, reject) => {
+            if (!this.isConnected()) {
+                reject(new Error('Not connected to backend'));
+                return;
+            }
+            
+            const requestId = ++this.requestId;
+            
+            // Enregistrer la requête en attente
+            this.pendingRequests.set(requestId, { resolve, reject });
+            
+            // Timeout après 30 secondes
+            setTimeout(() => {
+                if (this.pendingRequests.has(requestId)) {
+                    this.pendingRequests.delete(requestId);
+                    reject(new Error('Command timeout'));
+                }
+            }, 30000);
+            
+            // Envoyer la commande
+            this.send({
+                type: 'command',
+                command,
+                params,
+                requestId
+            });
+        });
+    }
+    
+    /**
+     * Upload un fichier au backend
+     * @param {File} file - Fichier à uploader
+     * @param {Function} progressCallback - Callback pour la progression
+     * @returns {Promise<Object>} Réponse du backend
+     */
+    async uploadFile(file, progressCallback = null) {
+        return new Promise((resolve, reject) => {
+            if (!this.isConnected()) {
+                reject(new Error('Not connected to backend'));
+                return;
+            }
+            
+            const reader = new FileReader();
+            
+            reader.onload = async (event) => {
+                try {
+                    const data = event.target.result;
+                    const base64Data = btoa(
+                        new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    
+                    const response = await this.sendCommand('upload_file', {
+                        filename: file.name,
+                        data: base64Data,
+                        size: file.size,
+                        type: file.type
+                    });
+                    
+                    resolve(response);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Error reading file'));
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
+    // ========================================================================
+    // MÉTHODES DE ROUTING
+    // ========================================================================
+    
+    /**
+     * Liste les devices MIDI disponibles
+     */
+    async listDevices() {
+        return this.sendCommand('list_devices');
+    }
+    
+    /**
+     * Obtient la configuration de routing actuelle
+     */
+    async getRouting() {
+        return this.sendCommand('get_routing');
+    }
+    
+    /**
+     * Configure le routing d'un canal
+     */
+    async setChannelRouting(channelId, deviceId) {
+        return this.sendCommand('set_channel_routing', { channelId, deviceId });
+    }
+    
+    /**
+     * Définit le volume d'un canal
+     */
+    async setChannelVolume(channelId, volume) {
+        return this.sendCommand('set_channel_volume', { channelId, volume });
+    }
+    
+    /**
+     * Définit le panoramique d'un canal
+     */
+    async setChannelPan(channelId, pan) {
+        return this.sendCommand('set_channel_pan', { channelId, pan });
+    }
+    
+    /**
+     * Active/désactive le mute d'un canal
+     */
+    async muteChannel(channelId, muted) {
+        return this.sendCommand('mute_channel', { channelId, muted });
+    }
+    
+    /**
+     * Active/désactive le solo d'un canal
+     */
+    async soloChannel(channelId, soloed) {
+        return this.sendCommand('solo_channel', { channelId, soloed });
+    }
+    
+    /**
+     * Définit la transposition d'un canal
+     */
+    async setChannelTranspose(channelId, semitones) {
+        return this.sendCommand('set_channel_transpose', { channelId, semitones });
+    }
+    
+    /**
      * Vide la file d'attente des messages
      */
     flushMessageQueue() {
@@ -292,6 +450,12 @@ class BackendService {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
+        
+        // Rejeter toutes les requêtes en attente
+        for (const [requestId, { reject }] of this.pendingRequests.entries()) {
+            reject(new Error('Disconnected'));
+        }
+        this.pendingRequests.clear();
         
         if (this.ws) {
             this.ws.close(1000, 'Client disconnect');
@@ -332,3 +496,4 @@ class BackendService {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = BackendService;
 }
+window.BackendService = BackendService;

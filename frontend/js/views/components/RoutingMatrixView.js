@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/components/RoutingMatrixView.js
+// Fichier: frontend/js/views/RoutingMatrixView.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // Description:
@@ -533,3 +533,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.RoutingMatrixView = RoutingMatrixView;  // ← AJOUTÉ
 }
+window.RoutingMatrixView = RoutingMatrixView;

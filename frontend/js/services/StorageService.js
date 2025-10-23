@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/services/StorageService.js
+// Fichier: frontend/js/services/StorageService.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -604,3 +604,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.StorageService = StorageService;
 }
+window.StorageService = StorageService;

@@ -4,16 +4,17 @@
 // Date: 2025-10-10
 // ============================================================================
 // Description:
-//   Contrôleur du Loop Recorder avec NotificationManager intégré.
-//   Remplace tous les alerts/prompts par des notifications toast élégantes.
+//   ContrÃƒÂ´leur du Loop Recorder avec NotificationManager intÃƒÂ©grÃƒÂ©.
+//   Remplace tous les alerts/prompts par des notifications toast ÃƒÂ©lÃƒÂ©gantes.
 //
 // Changelog v3.0.0:
-//   - Intégration NotificationManager
-//   - Remplacement alerts → toast notifications
-//   - Remplacement prompts → dialogs personnalisés
-//   - Amélioration feedback utilisateur
+//   - IntÃƒÂ©gration NotificationManager
+//   - Remplacement alerts Ã¢â€ â€™ toast notifications
+//   - Remplacement prompts Ã¢â€ â€™ dialogs personnalisÃƒÂ©s
+//   - AmÃƒÂ©lioration feedback utilisateur
 //   - Messages plus descriptifs
 // ============================================================================
+
 
 /**
  * @class LoopController
@@ -28,7 +29,7 @@ class LoopController {
         this.keyboardController = null;
         this.notificationManager = null;
         
-        // Métronome
+        // MÃƒÂ©tronome
         this.metronomeEnabled = false;
         this.countInBars = 1;
         this.countInCounter = 0;
@@ -44,7 +45,7 @@ class LoopController {
     // ========================================================================
 
     /**
-     * Initialise le contrôleur
+     * Initialise le contrÃƒÂ´leur
      */
     init(model, view, metronome, keyboardController) {
         this.model = model;
@@ -64,10 +65,10 @@ class LoopController {
     }
 
     /**
-     * Attache les événements du modèle
+     * Attache les ÃƒÂ©vÃƒÂ©nements du modÃƒÂ¨le
      */
     attachModelEvents() {
-        // Loop créé
+        // Loop crÃƒÂ©ÃƒÂ©
         this.model.on('loop:created', (loop) => {
             this.view.updateLayers(loop.layers);
             this.notificationManager.success(
@@ -165,7 +166,7 @@ class LoopController {
     }
 
     /**
-     * Attache les événements du clavier
+     * Attache les ÃƒÂ©vÃƒÂ©nements du clavier
      */
     attachKeyboardEvents() {
         if (!this.keyboardController) {
@@ -173,7 +174,7 @@ class LoopController {
             return;
         }
 
-        // Écouter les notes du clavier pour enregistrement
+        // Ãƒâ€°couter les notes du clavier pour enregistrement
         this.eventBus.on('keyboard:note', (event) => {
             if (this.model.isRecording) {
                 this.model.recordEvent(event);
@@ -228,7 +229,7 @@ class LoopController {
     }
 
     /**
-     * Démarre la boucle de mise à jour
+     * DÃƒÂ©marre la boucle de mise ÃƒÂ  jour
      */
     startUpdateLoop() {
         this.updateTimer = setInterval(() => {
@@ -242,7 +243,7 @@ class LoopController {
     }
 
     // ========================================================================
-    // CONTRÔLES PRINCIPAUX
+    // CONTRÃƒâ€LES PRINCIPAUX
     // ========================================================================
 
     /**
@@ -257,10 +258,10 @@ class LoopController {
     }
 
     /**
-     * Démarre l'enregistrement
+     * DÃƒÂ©marre l'enregistrement
      */
     startRecording() {
-        // Créer une boucle si nécessaire
+        // CrÃƒÂ©er une boucle si nÃƒÂ©cessaire
         if (!this.model.currentLoop) {
             const bars = parseInt(document.getElementById('loopBars')?.value || 4);
             const tempo = parseInt(document.getElementById('loopTempo')?.value || 120);
@@ -274,7 +275,7 @@ class LoopController {
         const instrument = this.keyboardController?.currentInstrument || null;
         const mode = document.getElementById('recordMode')?.value || 'overdub';
 
-        // Count-in si activé
+        // Count-in si activÃƒÂ©
         const countInEnabled = document.getElementById('countInEnabled')?.checked || false;
         if (countInEnabled && this.countInBars > 0 && !this.model.isPlaying) {
             this.startCountIn(() => {
@@ -294,7 +295,7 @@ class LoopController {
     }
 
     /**
-     * Arrête l'enregistrement
+     * ArrÃƒÂªte l'enregistrement
      */
     stopRecording() {
         this.model.stopRecording();
@@ -316,7 +317,7 @@ class LoopController {
      */
     play() {
         if (!this.model.currentLoop) {
-            // Créer un loop vide si nécessaire
+            // CrÃƒÂ©er un loop vide si nÃƒÂ©cessaire
             const bars = parseInt(document.getElementById('loopBars')?.value || 4);
             const tempo = parseInt(document.getElementById('loopTempo')?.value || 120);
             const timeSignature = document.getElementById('loopTimeSignature')?.value || '4/4';
@@ -326,7 +327,7 @@ class LoopController {
 
         this.model.playLoop();
 
-        // Démarrer le métronome si activé
+        // DÃƒÂ©marrer le mÃƒÂ©tronome si activÃƒÂ©
         if (this.metronomeEnabled) {
             this.startMetronome();
         }
@@ -341,7 +342,7 @@ class LoopController {
     }
 
     /**
-     * Arrête la lecture
+     * ArrÃƒÂªte la lecture
      */
     stop() {
         this.model.stopLoop();
@@ -387,7 +388,7 @@ class LoopController {
     // ========================================================================
 
     /**
-     * Démarre le count-in
+     * DÃƒÂ©marre le count-in
      */
     startCountIn(callback) {
         this.isCountingIn = true;
@@ -401,7 +402,7 @@ class LoopController {
         // Afficher le count-in
         this.view.showCountIn(this.countInCounter);
 
-        // Métronome pour le count-in
+        // MÃƒÂ©tronome pour le count-in
         if (this.metronomeEnabled) {
             this.metronome.start(loop.tempo, numerator);
         }
@@ -416,13 +417,13 @@ class LoopController {
                     this.metronome.playAccent();
                 }
             } else {
-                // Count-in terminé
+                // Count-in terminÃƒÂ©
                 this.view.hideCountIn();
                 clearInterval(this.countInInterval);
                 this.countInInterval = null;
                 this.isCountingIn = false;
                 
-                // Exécuter le callback
+                // ExÃƒÂ©cuter le callback
                 callback();
             }
         }, barDuration);
@@ -446,18 +447,18 @@ class LoopController {
     }
 
     // ========================================================================
-    // MÉTRONOME
+    // MÃƒâ€°TRONOME
     // ========================================================================
 
     /**
-     * Toggle métronome
+     * Toggle mÃƒÂ©tronome
      */
     toggleMetronome() {
         this.setMetronome(!this.metronomeEnabled);
     }
 
     /**
-     * Active/désactive le métronome
+     * Active/dÃƒÂ©sactive le mÃƒÂ©tronome
      */
     setMetronome(enabled) {
         this.metronomeEnabled = enabled;
@@ -468,7 +469,7 @@ class LoopController {
             this.stopMetronome();
         }
         
-        // Mettre à jour l'UI
+        // Mettre ÃƒÂ  jour l'UI
         const checkbox = document.getElementById('metronomeEnabled');
         if (checkbox) {
             checkbox.checked = enabled;
@@ -481,7 +482,7 @@ class LoopController {
     }
 
     /**
-     * Définit le volume du métronome
+     * DÃƒÂ©finit le volume du mÃƒÂ©tronome
      */
     setMetronomeVolume(volume) {
         if (this.metronome) {
@@ -490,7 +491,7 @@ class LoopController {
     }
 
     /**
-     * Démarre le métronome
+     * DÃƒÂ©marre le mÃƒÂ©tronome
      */
     startMetronome() {
         if (!this.metronome || !this.model.currentLoop) return;
@@ -502,7 +503,7 @@ class LoopController {
     }
 
     /**
-     * Arrête le métronome
+     * ArrÃƒÂªte le mÃƒÂ©tronome
      */
     stopMetronome() {
         if (this.metronome) {
@@ -511,11 +512,11 @@ class LoopController {
     }
 
     // ========================================================================
-    // PARAMÈTRES DE LOOP
+    // PARAMÃƒË†TRES DE LOOP
     // ========================================================================
 
     /**
-     * Crée un nouveau loop
+     * CrÃƒÂ©e un nouveau loop
      */
     createNewLoop() {
         const bars = parseInt(document.getElementById('loopBars')?.value || 4);
@@ -527,7 +528,7 @@ class LoopController {
     }
 
     /**
-     * Modifie les paramètres du loop
+     * Modifie les paramÃƒÂ¨tres du loop
      */
     updateLoopSettings(settings) {
         if (!this.model.currentLoop) return;
@@ -560,7 +561,7 @@ class LoopController {
     }
 
     /**
-     * Définit le mode d'enregistrement
+     * DÃƒÂ©finit le mode d'enregistrement
      */
     setRecordMode(mode) {
         this.model.recordMode = mode;
@@ -568,7 +569,7 @@ class LoopController {
     }
 
     /**
-     * Active/désactive la quantification
+     * Active/dÃƒÂ©sactive la quantification
      */
     setQuantize(enabled, resolution) {
         this.model.setQuantize(enabled, resolution);
@@ -599,7 +600,7 @@ class LoopController {
     }
 
     /**
-     * Définit le volume d'un layer
+     * DÃƒÂ©finit le volume d'un layer
      */
     setLayerVolume(layerId, volume) {
         this.model.setLayerVolume(layerId, parseInt(volume));
@@ -661,7 +662,7 @@ class LoopController {
                     { details: fileName }
                 );
             } else {
-                // Fallback: télécharger le JSON
+                // Fallback: tÃƒÂ©lÃƒÂ©charger le JSON
                 const blob = new Blob([JSON.stringify(midiJson, null, 2)], 
                     { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -697,14 +698,14 @@ class LoopController {
             return;
         }
 
-        // Utiliser prompt natif pour le nom (peut être amélioré avec modal custom)
+        // Utiliser prompt natif pour le nom (peut ÃƒÂªtre amÃƒÂ©liorÃƒÂ© avec modal custom)
         const name = prompt('Loop name:', this.model.currentLoop.name);
         if (!name) return;
 
         try {
             this.model.currentLoop.name = name;
             await this.model.saveLoop();
-            // La notification de succès est gérée par l'événement loop:saved
+            // La notification de succÃƒÂ¨s est gÃƒÂ©rÃƒÂ©e par l'ÃƒÂ©vÃƒÂ©nement loop:saved
         } catch (error) {
             console.error('Error saving loop:', error);
             this.notificationManager.error(
@@ -727,7 +728,7 @@ class LoopController {
                 return;
             }
 
-            // Afficher une liste simple (peut être amélioré avec modal custom)
+            // Afficher une liste simple (peut ÃƒÂªtre amÃƒÂ©liorÃƒÂ© avec modal custom)
             const loopNames = list.loops.map((l, i) => 
                 `${i+1}. ${l.name} (${l.bars} bars, ${l.layers.length} layers)`
             ).join('\n');
@@ -758,7 +759,7 @@ class LoopController {
             // Charger le loop
             this.stop();
             await this.model.loadLoop(selectedLoop.id);
-            // La notification de succès est gérée par l'événement loop:loaded
+            // La notification de succÃƒÂ¨s est gÃƒÂ©rÃƒÂ©e par l'ÃƒÂ©vÃƒÂ©nement loop:loaded
             
         } catch (error) {
             console.error('Error loading loop:', error);
@@ -803,6 +804,9 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.LoopController = LoopController;
 }
+
+
+window.LoopController = LoopController;
 
 // ============================================================================
 // FIN DU FICHIER LoopController.js v3.0.0

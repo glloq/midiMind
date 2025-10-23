@@ -164,7 +164,7 @@ if (typeof window !== 'undefined') {
     window.Logger = Logger;
     console.log('✓ Logger class exposed globally');
 }
-
+window.Logger = Logger;
 // ============================================================================
 // FIN DU FICHIER Logger.js v3.0.1
 // ============================================================================

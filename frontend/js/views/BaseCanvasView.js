@@ -168,3 +168,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.BaseCanvasView = BaseCanvasView;  // ← AJOUTÉ
 }
+window.BaseCanvasView = BaseCanvasView;

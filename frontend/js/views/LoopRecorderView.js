@@ -829,7 +829,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.LoopRecorderView = LoopRecorderView;
 }
-
+window.LoopRecorderView = LoopRecorderView;
 // ============================================================================
 // FIN DU FICHIER LoopRecorderView.js v3.0.0
 // ============================================================================

@@ -225,3 +225,5 @@ class DebugConsole {
         this.log('system', 'Logs exportés');
     }
 }
+
+window.DebugConsole = DebugConsole;

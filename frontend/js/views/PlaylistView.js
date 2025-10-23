@@ -1,41 +1,42 @@
 // ============================================================================
 // Fichier: frontend/js/views/PlaylistView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Vue dédiée à l'affichage et la gestion de l'interface des playlists.
-//   Interface complète avec liste de playlists, fichiers, contrôles
+//   Vue dÃ©diÃ©e Ã  l'affichage et la gestion de l'interface des playlists.
+//   Interface complÃ¨te avec liste de playlists, fichiers, contrÃ´les
 //   (shuffle/repeat/auto-advance) et queue de lecture temporaire.
 //
-// Fonctionnalités:
-//   - Affichage liste playlists sauvegardées
+// FonctionnalitÃ©s:
+//   - Affichage liste playlists sauvegardÃ©es
 //   - Affichage fichiers de la playlist courante
-//   - Contrôles lecture (shuffle, repeat, auto-advance)
+//   - ContrÃ´les lecture (shuffle, repeat, auto-advance)
 //   - Queue de lecture temporaire avec drag & drop
 //   - Indicateurs visuels (fichier en cours, queue active)
-//   - Statistiques (durée totale, nombre fichiers)
-//   - Menu contextuel (édition, suppression)
-//   - Drag & Drop pour réorganisation
+//   - Statistiques (durÃ©e totale, nombre fichiers)
+//   - Menu contextuel (Ã©dition, suppression)
+//   - Drag & Drop pour rÃ©organisation
 //
 // Structure HTML:
 //   playlist-view-container
-//   ├── playlist-header (titre + contrôles)
-//   ├── playlist-layout
-//   │   ├── playlist-sidebar.left (liste playlists)
-//   │   ├── playlist-main (fichiers playlist)
-//   │   └── playlist-sidebar.right (queue)
-//   └── playlist-footer (statistiques)
+//   â”œâ”€â”€ playlist-header (titre + contrÃ´les)
+//   â”œâ”€â”€ playlist-layout
+//   â”‚   â”œâ”€â”€ playlist-sidebar.left (liste playlists)
+//   â”‚   â”œâ”€â”€ playlist-main (fichiers playlist)
+//   â”‚   â””â”€â”€ playlist-sidebar.right (queue)
+//   â””â”€â”€ playlist-footer (statistiques)
 //
 // Auteur: MidiMind Team
 // ============================================================================
+
 
 class PlaylistView extends BaseView {
     constructor(containerId, eventBus) {
         super(containerId, eventBus);
         
-        // État de la vue
+        // Ã‰tat de la vue
         this.viewState = {
             currentPlaylist: null,
             currentFile: null,
@@ -55,7 +56,7 @@ class PlaylistView extends BaseView {
             queueCollapsible: true
         };
         
-        // Cache des éléments DOM pour performance
+        // Cache des Ã©lÃ©ments DOM pour performance
         this.cachedElements = {
             playlistsList: null,
             currentPlaylistContent: null,
@@ -65,7 +66,7 @@ class PlaylistView extends BaseView {
         };
         
         this.logger = window.logger || console;
-        this.logger.info('PlaylistView', '🎵 PlaylistView v1.0.0 initialized');
+        this.logger.info('PlaylistView', 'ðŸŽµ PlaylistView v1.0.0 initialized');
     }
     
     // ========================================================================
@@ -125,7 +126,7 @@ class PlaylistView extends BaseView {
             <div class="playlist-header-content">
                 <div class="header-left">
                     <h2 class="playlist-title">
-                        <span class="icon">🎵</span>
+                        <span class="icon">ðŸŽµ</span>
                         Playlists
                     </h2>
                 </div>
@@ -137,17 +138,17 @@ class PlaylistView extends BaseView {
                 <div class="header-right">
                     <button class="btn btn-primary" 
                             onclick="app.playlistController.openPlaylistEditor()"
-                            title="Créer une nouvelle playlist">
-                        <span class="icon">➕</span>
+                            title="CrÃ©er une nouvelle playlist">
+                        <span class="icon">âž•</span>
                         Nouvelle Playlist
                     </button>
                     
                     <button class="btn btn-secondary" 
                             onclick="app.playlistController.toggleQueue()"
                             title="Afficher/Masquer la queue">
-                        <span class="icon">📋</span>
+                        <span class="icon">ðŸ“‹</span>
                         Queue
-                        ${state.queueVisible ? '▼' : '▶'}
+                        ${state.queueVisible ? 'â–¼' : 'â–¶'}
                     </button>
                 </div>
             </div>
@@ -155,7 +156,7 @@ class PlaylistView extends BaseView {
     }
     
     // ========================================================================
-    // CONTRÔLES (Shuffle / Repeat / Auto-advance)
+    // CONTRÃ”LES (Shuffle / Repeat / Auto-advance)
     // ========================================================================
     
     renderControls(state) {
@@ -170,8 +171,8 @@ class PlaylistView extends BaseView {
                 <button class="btn-control ${shuffleMode ? 'active' : ''}"
                         data-control="shuffle"
                         onclick="app.playlistController.toggleShuffle()"
-                        title="Mode aléatoire">
-                    <span class="icon">🔀</span>
+                        title="Mode alÃ©atoire">
+                    <span class="icon">ðŸ”€</span>
                     <span class="label">Shuffle</span>
                 </button>
                 
@@ -179,7 +180,7 @@ class PlaylistView extends BaseView {
                 <button class="btn-control ${repeatMode !== 'none' ? 'active' : ''}"
                         data-control="repeat"
                         onclick="app.playlistController.cycleRepeat()"
-                        title="Mode répétition: ${repeatMode}">
+                        title="Mode rÃ©pÃ©tition: ${repeatMode}">
                     <span class="icon">${this.getRepeatIcon(repeatMode)}</span>
                     <span class="label">${this.getRepeatLabel(repeatMode)}</span>
                 </button>
@@ -189,7 +190,7 @@ class PlaylistView extends BaseView {
                         data-control="auto-advance"
                         onclick="app.playlistController.toggleAutoAdvance()"
                         title="Avance automatique">
-                    <span class="icon">⏭️</span>
+                    <span class="icon">â­ï¸</span>
                     <span class="label">Auto</span>
                 </button>
                 
@@ -199,9 +200,9 @@ class PlaylistView extends BaseView {
     
     getRepeatIcon(mode) {
         switch(mode) {
-            case 'one': return '🔂';
-            case 'all': return '🔁';
-            default: return '↻';
+            case 'one': return 'ðŸ”‚';
+            case 'all': return 'ðŸ”';
+            default: return 'â†»';
         }
     }
     
@@ -249,7 +250,7 @@ class PlaylistView extends BaseView {
                  onclick="app.playlistController.loadPlaylist('${playlist.id}')">
                 
                 <div class="playlist-item-icon">
-                    ${isActive ? '▶️' : '🎵'}
+                    ${isActive ? 'â–¶ï¸' : 'ðŸŽµ'}
                 </div>
                 
                 <div class="playlist-item-info">
@@ -258,20 +259,20 @@ class PlaylistView extends BaseView {
                     </div>
                     <div class="playlist-item-meta">
                         <span class="file-count">${fileCount} fichier${fileCount > 1 ? 's' : ''}</span>
-                        ${duration ? `<span class="duration">• ${duration}</span>` : ''}
+                        ${duration ? `<span class="duration">â€¢ ${duration}</span>` : ''}
                     </div>
                 </div>
                 
                 <div class="playlist-item-actions">
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.playlistController.editPlaylist('${playlist.id}')"
-                            title="Éditer">
-                        ✏️
+                            title="Ã‰diter">
+                        âœï¸
                     </button>
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.playlistController.deletePlaylist('${playlist.id}')"
                             title="Supprimer">
-                        🗑️
+                        ðŸ—‘ï¸
                     </button>
                 </div>
                 
@@ -282,11 +283,11 @@ class PlaylistView extends BaseView {
     renderEmptyPlaylists() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">📁</div>
+                <div class="empty-icon">ðŸ“</div>
                 <p class="empty-message">Aucune playlist</p>
                 <button class="btn btn-sm btn-primary" 
                         onclick="app.playlistController.openPlaylistEditor()">
-                    Créer une playlist
+                    CrÃ©er une playlist
                 </button>
             </div>
         `;
@@ -309,19 +310,19 @@ class PlaylistView extends BaseView {
         return `
             <div class="current-playlist-container">
                 
-                <!-- En-tête playlist -->
+                <!-- En-tÃªte playlist -->
                 <div class="current-playlist-header">
                     <h3 class="playlist-name">${this.escapeHtml(playlist.name)}</h3>
                     <div class="playlist-actions">
                         <button class="btn btn-sm" 
                                 onclick="app.playlistController.editPlaylist('${playlist.id}')"
-                                title="Éditer cette playlist">
-                            ✏️ Éditer
+                                title="Ã‰diter cette playlist">
+                            âœï¸ Ã‰diter
                         </button>
                         <button class="btn btn-sm" 
                                 onclick="app.playlistController.clearCurrentPlaylist()"
                                 title="Vider la playlist">
-                            🗑️ Vider
+                            ðŸ—‘ï¸ Vider
                         </button>
                     </div>
                 </div>
@@ -345,12 +346,12 @@ class PlaylistView extends BaseView {
     renderNoPlaylist() {
         return `
             <div class="no-playlist-state">
-                <div class="empty-icon">🎵</div>
-                <h3>Aucune playlist sélectionnée</h3>
-                <p>Créez ou sélectionnez une playlist pour commencer</p>
+                <div class="empty-icon">ðŸŽµ</div>
+                <h3>Aucune playlist sÃ©lectionnÃ©e</h3>
+                <p>CrÃ©ez ou sÃ©lectionnez une playlist pour commencer</p>
                 <button class="btn btn-primary" 
                         onclick="app.playlistController.openPlaylistEditor()">
-                    ➕ Créer une playlist
+                    âž• CrÃ©er une playlist
                 </button>
             </div>
         `;
@@ -359,7 +360,7 @@ class PlaylistView extends BaseView {
     renderEmptyPlaylist() {
         return `
             <div class="empty-playlist-state">
-                <div class="empty-icon">📭</div>
+                <div class="empty-icon">ðŸ“­</div>
                 <p>Cette playlist est vide</p>
                 <button class="btn btn-sm btn-primary" 
                         onclick="app.playlistController.editPlaylist('${this.viewState.currentPlaylist?.id}')">
@@ -384,13 +385,13 @@ class PlaylistView extends BaseView {
                  ondblclick="app.playlistController.playFileAt(${index})">
                 
                 <!-- Handle drag -->
-                <div class="file-drag-handle" title="Glisser pour réorganiser">
-                    ⋮⋮
+                <div class="file-drag-handle" title="Glisser pour rÃ©organiser">
+                    â‹®â‹®
                 </div>
                 
-                <!-- Numéro -->
+                <!-- NumÃ©ro -->
                 <div class="file-number">
-                    ${isPlaying ? '▶️' : (index + 1)}
+                    ${isPlaying ? 'â–¶ï¸' : (index + 1)}
                 </div>
                 
                 <!-- Infos -->
@@ -400,13 +401,13 @@ class PlaylistView extends BaseView {
                     </div>
                     ${this.config.showMetadata && file.metadata ? `
                         <div class="file-metadata">
-                            ${file.metadata.trackCount ? `<span>🎹 ${file.metadata.trackCount} pistes</span>` : ''}
-                            ${file.metadata.bpm ? `<span>🥁 ${file.metadata.bpm} BPM</span>` : ''}
+                            ${file.metadata.trackCount ? `<span>ðŸŽ¹ ${file.metadata.trackCount} pistes</span>` : ''}
+                            ${file.metadata.bpm ? `<span>ðŸ¥ ${file.metadata.bpm} BPM</span>` : ''}
                         </div>
                     ` : ''}
                 </div>
                 
-                <!-- Durée -->
+                <!-- DurÃ©e -->
                 ${this.config.showDurations && duration ? `
                     <div class="file-duration">${duration}</div>
                 ` : ''}
@@ -416,17 +417,17 @@ class PlaylistView extends BaseView {
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.playlistController.playFileAt(${index})"
                             title="Lire">
-                        ▶️
+                        â–¶ï¸
                     </button>
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.playlistController.addToQueue('${file.id}')"
-                            title="Ajouter à la queue">
-                        ➕
+                            title="Ajouter Ã  la queue">
+                        âž•
                     </button>
                     <button class="btn-icon" 
                             onclick="event.stopPropagation(); app.playlistController.removeFileFromPlaylist('${this.viewState.currentPlaylist?.id}', '${file.id}')"
                             title="Retirer de la playlist">
-                        ✖️
+                        âœ–ï¸
                     </button>
                 </div>
                 
@@ -448,7 +449,7 @@ class PlaylistView extends BaseView {
                 <!-- Header queue -->
                 <div class="queue-header">
                     <h3>
-                        <span class="icon">📋</span>
+                        <span class="icon">ðŸ“‹</span>
                         Queue
                         ${isPlayingQueue ? '<span class="playing-badge">En cours</span>' : ''}
                     </h3>
@@ -461,11 +462,11 @@ class PlaylistView extends BaseView {
                         <button class="btn btn-sm btn-primary" 
                                 onclick="app.playlistController.playQueue()"
                                 ${isPlayingQueue ? 'disabled' : ''}>
-                            ▶️ Lire la queue
+                            â–¶ï¸ Lire la queue
                         </button>
                         <button class="btn btn-sm btn-danger" 
                                 onclick="app.playlistController.clearQueue()">
-                            🗑️ Vider
+                            ðŸ—‘ï¸ Vider
                         </button>
                     </div>
                 ` : ''}
@@ -483,7 +484,7 @@ class PlaylistView extends BaseView {
                 <!-- Stats queue -->
                 ${queue.length > 0 ? `
                     <div class="queue-stats">
-                        <span>Durée totale: ${this.formatDuration(this.calculateTotalDuration(queue))}</span>
+                        <span>DurÃ©e totale: ${this.formatDuration(this.calculateTotalDuration(queue))}</span>
                     </div>
                 ` : ''}
                 
@@ -494,7 +495,7 @@ class PlaylistView extends BaseView {
     renderEmptyQueue() {
         return `
             <div class="empty-queue-state">
-                <div class="empty-icon">📭</div>
+                <div class="empty-icon">ðŸ“­</div>
                 <p>La queue est vide</p>
                 <small>Ajoutez des fichiers depuis la playlist</small>
             </div>
@@ -521,7 +522,7 @@ class PlaylistView extends BaseView {
                 <button class="btn-icon" 
                         onclick="app.playlistController.removeFromQueue(${index})"
                         title="Retirer de la queue">
-                    ✖️
+                    âœ–ï¸
                 </button>
                 
             </div>
@@ -552,7 +553,7 @@ class PlaylistView extends BaseView {
                 </div>
                 
                 <div class="stat-item">
-                    <span class="stat-label">Durée totale</span>
+                    <span class="stat-label">DurÃ©e totale</span>
                     <span class="stat-value">${this.formatDuration(totalDuration)}</span>
                 </div>
                 
@@ -566,22 +567,22 @@ class PlaylistView extends BaseView {
     }
     
     // ========================================================================
-    // MÉTHODES DE MISE À JOUR DYNAMIQUE
+    // MÃ‰THODES DE MISE Ã€ JOUR DYNAMIQUE
     // ========================================================================
     
     /**
-     * Met à jour le fichier en cours de lecture
+     * Met Ã  jour le fichier en cours de lecture
      */
     updateCurrentFile(file, index) {
         this.viewState.currentFile = file;
         
-        // Mettre à jour visuellement
+        // Mettre Ã  jour visuellement
         const items = this.container?.querySelectorAll('.playlist-file-item');
         items?.forEach((item, i) => {
             if (i === index) {
                 item.classList.add('playing');
                 const number = item.querySelector('.file-number');
-                if (number) number.textContent = '▶️';
+                if (number) number.textContent = 'â–¶ï¸';
             } else {
                 item.classList.remove('playing');
                 const number = item.querySelector('.file-number');
@@ -591,7 +592,7 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Met à jour l'état du bouton shuffle
+     * Met Ã  jour l'Ã©tat du bouton shuffle
      */
     updateShuffleButton(enabled) {
         this.viewState.shuffleMode = enabled;
@@ -607,7 +608,7 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Met à jour l'état du bouton repeat
+     * Met Ã  jour l'Ã©tat du bouton repeat
      */
     updateRepeatButton(mode) {
         this.viewState.repeatMode = mode;
@@ -625,12 +626,12 @@ class PlaylistView extends BaseView {
             if (icon) icon.textContent = this.getRepeatIcon(mode);
             if (label) label.textContent = this.getRepeatLabel(mode);
             
-            btn.title = `Mode répétition: ${mode}`;
+            btn.title = `Mode rÃ©pÃ©tition: ${mode}`;
         }
     }
     
     /**
-     * Met à jour l'état du bouton auto-advance
+     * Met Ã  jour l'Ã©tat du bouton auto-advance
      */
     updateAutoAdvanceButton(enabled) {
         this.viewState.autoAdvance = enabled;
@@ -646,7 +647,7 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Met à jour le statut de la queue
+     * Met Ã  jour le statut de la queue
      */
     updateQueueStatus(count) {
         const badge = this.container?.querySelector('.queue-count');
@@ -682,7 +683,7 @@ class PlaylistView extends BaseView {
      */
     showPlaybackComplete() {
         // Animation ou notification visuelle
-        this.logger.info('PlaylistView', '✅ Playback complete');
+        this.logger.info('PlaylistView', 'âœ… Playback complete');
     }
     
     // ========================================================================
@@ -708,7 +709,7 @@ class PlaylistView extends BaseView {
         const sourceIndex = this.viewState.draggedItem;
         
         if (sourceIndex !== null && sourceIndex !== targetIndex) {
-            // Appeler controller pour réorganiser
+            // Appeler controller pour rÃ©organiser
             if (window.app?.playlistController) {
                 window.app.playlistController.reorderFiles(sourceIndex, targetIndex);
             }
@@ -728,7 +729,7 @@ class PlaylistView extends BaseView {
     // ========================================================================
     
     /**
-     * Rafraîchit uniquement le panel queue
+     * RafraÃ®chit uniquement le panel queue
      */
     refreshQueuePanel() {
         const queuePanel = this.container?.querySelector('.queue-panel-container');
@@ -741,14 +742,14 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Calcule durée totale d'une liste de fichiers
+     * Calcule durÃ©e totale d'une liste de fichiers
      */
     calculateTotalDuration(files) {
         return files.reduce((sum, file) => sum + (file.duration || 0), 0);
     }
     
     /**
-     * Formate une durée en ms vers HH:MM:SS
+     * Formate une durÃ©e en ms vers HH:MM:SS
      */
     formatDuration(ms) {
         if (!ms || ms === 0) return '00:00';
@@ -768,7 +769,7 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Échappe HTML
+     * Ã‰chappe HTML
      */
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -777,7 +778,7 @@ class PlaylistView extends BaseView {
     }
     
     /**
-     * Toggle visibilité queue
+     * Toggle visibilitÃ© queue
      */
     toggleQueueVisibility() {
         this.viewState.queueVisible = !this.viewState.queueVisible;
@@ -806,3 +807,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PlaylistView = PlaylistView;
 }
+
+window.PlaylistView = PlaylistView;

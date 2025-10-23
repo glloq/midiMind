@@ -1,53 +1,54 @@
 // ============================================================================
 // Fichier: frontend/js/models/StateModel.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Modèle d'état global de l'application (Single Source of Truth).
-//   Gère l'état central : page courante, fichier/playlist en cours,
-//   état de lecture, paramètres utilisateur, statistiques de session.
+//   ModÃ¨le d'Ã©tat global de l'application (Single Source of Truth).
+//   GÃ¨re l'Ã©tat central : page courante, fichier/playlist en cours,
+//   Ã©tat de lecture, paramÃ¨tres utilisateur, statistiques de session.
 //
-// Fonctionnalités:
-//   - État global application (navigation, sélection, lecture)
-//   - Validation automatique des données
-//   - Propriétés calculées (computed properties)
-//   - Watchers pour réactivité
+// FonctionnalitÃ©s:
+//   - Ã‰tat global application (navigation, sÃ©lection, lecture)
+//   - Validation automatique des donnÃ©es
+//   - PropriÃ©tÃ©s calculÃ©es (computed properties)
+//   - Watchers pour rÃ©activitÃ©
 //   - Persistence automatique (localStorage)
 //   - Gestion session et statistiques
-//   - Export/Import état complet
+//   - Export/Import Ã©tat complet
 //
 // Architecture:
 //   StateModel extends BaseModel
-//   - Validation avec règles personnalisées
+//   - Validation avec rÃ¨gles personnalisÃ©es
 //   - Computed properties automatiques
-//   - Watchers sur changements d'état
-//   - Sérialisation/désérialisation
+//   - Watchers sur changements d'Ã©tat
+//   - SÃ©rialisation/dÃ©sÃ©rialisation
 //
 // Auteur: MidiMind Team
 // ============================================================================
+
 
 class StateModel extends BaseModel {
     constructor(eventBus) {
         super(eventBus);
         
-        // Configuration du modèle
+        // Configuration du modÃ¨le
         this.config.autoValidate = true;
         this.config.persistOnChange = true;
         
-        // État initial de l'application avec valeurs par défaut
+        // Ã‰tat initial de l'application avec valeurs par dÃ©faut
         this.initialize({
             // Navigation et interface
             currentPage: 'home',
             previousPage: null,
             
-            // Sélection de contenu
+            // SÃ©lection de contenu
             currentFile: null,
             currentPlaylist: null,
             selectorMode: 'file', // 'file' ou 'playlist'
             
-            // État de lecture
+            // Ã‰tat de lecture
             isPlaying: false,
             isPaused: false,
             progress: 0,
@@ -61,7 +62,7 @@ class StateModel extends BaseModel {
             viewMode: 'normal', // 'normal', 'compact', 'minimal'
             debugMode: false,
             
-            // Paramètres utilisateur
+            // ParamÃ¨tres utilisateur
             settings: {
                 // Lecture
                 pauseBetweenTracks: 3,
@@ -98,7 +99,7 @@ class StateModel extends BaseModel {
                 timeFormat: '24h'
             },
             
-            // État temporaire/cache
+            // Ã‰tat temporaire/cache
             lastFileAccess: null,
             recentFiles: [],
             recentPlaylists: [],
@@ -114,21 +115,21 @@ class StateModel extends BaseModel {
             }
         });
         
-        // Configurer les règles de validation
+        // Configurer les rÃ¨gles de validation
         this.setupValidation();
         
-        // Configurer les propriétés calculées
+        // Configurer les propriÃ©tÃ©s calculÃ©es
         this.setupComputedProperties();
         
         // Configurer les observateurs
         this.setupWatchers();
         
-        // Charger les paramètres persistants
+        // Charger les paramÃ¨tres persistants
         this.loadPersistedState();
     }
 
     /**
-     * Configurer les règles de validation
+     * Configurer les rÃ¨gles de validation
      */
     setupValidation() {
         // Validation de la page courante
@@ -140,11 +141,11 @@ class StateModel extends BaseModel {
             return true;
         });
         
-        // Validation du mode sélecteur
+        // Validation du mode sÃ©lecteur
         this.addValidationRule('selectorMode', (value) => {
             const validModes = ['file', 'playlist'];
             if (!validModes.includes(value)) {
-                return 'Mode sélecteur invalide. Modes valides: file, playlist';
+                return 'Mode sÃ©lecteur invalide. Modes valides: file, playlist';
             }
             return true;
         });
@@ -152,7 +153,7 @@ class StateModel extends BaseModel {
         // Validation du niveau de zoom
         this.addValidationRule('zoomLevel', (value) => {
             if (typeof value !== 'number' || value < 25 || value > 500) {
-                return 'Le niveau de zoom doit être entre 25 et 500';
+                return 'Le niveau de zoom doit Ãªtre entre 25 et 500';
             }
             return true;
         });
@@ -160,7 +161,7 @@ class StateModel extends BaseModel {
         // Validation du volume
         this.addValidationRule('volume', (value) => {
             if (typeof value !== 'number' || value < 0 || value > 100) {
-                return 'Le volume doit être entre 0 et 100';
+                return 'Le volume doit Ãªtre entre 0 et 100';
             }
             return true;
         });
@@ -168,24 +169,24 @@ class StateModel extends BaseModel {
         // Validation du taux de lecture
         this.addValidationRule('playbackRate', (value) => {
             if (typeof value !== 'number' || value < 0.25 || value > 3.0) {
-                return 'Le taux de lecture doit être entre 0.25 et 3.0';
+                return 'Le taux de lecture doit Ãªtre entre 0.25 et 3.0';
             }
             return true;
         });
         
-        // Validation des paramètres
+        // Validation des paramÃ¨tres
         this.addValidationRule('settings', (settings) => {
             if (!settings || typeof settings !== 'object') {
-                return 'Les paramètres doivent être un objet';
+                return 'Les paramÃ¨tres doivent Ãªtre un objet';
             }
             
-            // Validation des paramètres spécifiques
+            // Validation des paramÃ¨tres spÃ©cifiques
             const validations = [
                 () => settings.pauseBetweenTracks >= 0 && settings.pauseBetweenTracks <= 30 || 'Pause entre pistes: 0-30s',
-                () => settings.startDelay >= 0 && settings.startDelay <= 5000 || 'Délai de démarrage: 0-5000ms',
-                () => settings.noteDisplayWindow >= 5 && settings.noteDisplayWindow <= 120 || 'Fenêtre d\'affichage: 5-120s',
-                () => settings.visualizerRefreshRate >= 1 && settings.visualizerRefreshRate <= 120 || 'Taux de rafraîchissement: 1-120fps',
-                () => settings.maxConcurrentNotes >= 16 && settings.maxConcurrentNotes <= 512 || 'Notes simultanées max: 16-512'
+                () => settings.startDelay >= 0 && settings.startDelay <= 5000 || 'DÃ©lai de dÃ©marrage: 0-5000ms',
+                () => settings.noteDisplayWindow >= 5 && settings.noteDisplayWindow <= 120 || 'FenÃªtre d\'affichage: 5-120s',
+                () => settings.visualizerRefreshRate >= 1 && settings.visualizerRefreshRate <= 120 || 'Taux de rafraÃ®chissement: 1-120fps',
+                () => settings.maxConcurrentNotes >= 16 && settings.maxConcurrentNotes <= 512 || 'Notes simultanÃ©es max: 16-512'
             ];
             
             for (const validation of validations) {
@@ -200,15 +201,15 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Configurer les propriétés calculées
+     * Configurer les propriÃ©tÃ©s calculÃ©es
      */
     setupComputedProperties() {
-        // Calculer si du contenu est sélectionné
+        // Calculer si du contenu est sÃ©lectionnÃ©
         this.addComputed('hasSelection', (data) => {
             return !!(data.currentFile || data.currentPlaylist);
         });
         
-        // Calculer l'état de lecture complet
+        // Calculer l'Ã©tat de lecture complet
         this.addComputed('playbackState', (data) => {
             return {
                 isActive: data.isPlaying || data.isPaused,
@@ -233,7 +234,7 @@ class StateModel extends BaseModel {
             };
         });
         
-        // Calculer l'état de l'interface
+        // Calculer l'Ã©tat de l'interface
         this.addComputed('uiState', (data) => {
             return {
                 theme: data.settings.darkMode ? 'dark' : 'light',
@@ -288,7 +289,7 @@ class StateModel extends BaseModel {
             this.updatePlaybackCapabilities();
         });
         
-        // Observer les changements d'état de lecture
+        // Observer les changements d'Ã©tat de lecture
         this.watch('isPlaying', (isPlaying) => {
             if (isPlaying) {
                 this.incrementStat('filesPlayed');
@@ -297,7 +298,7 @@ class StateModel extends BaseModel {
             this.emitEvent('playback:state:changed', { isPlaying, isPaused: this.get('isPaused') });
         });
         
-        // Observer les changements de paramètres
+        // Observer les changements de paramÃ¨tres
         this.watch('settings', (newSettings, oldSettings) => {
             this.handleSettingsChange(newSettings, oldSettings);
         });
@@ -308,10 +309,10 @@ class StateModel extends BaseModel {
         });
     }
 
-    // ===== MÉTHODES PUBLIQUES =====
+    // ===== MÃ‰THODES PUBLIQUES =====
 
     /**
-     * Sélectionner un fichier MIDI (désélectionne la playlist)
+     * SÃ©lectionner un fichier MIDI (dÃ©sÃ©lectionne la playlist)
      * @param {Object} file - Objet fichier MIDI
      */
     setCurrentFile(file) {
@@ -323,7 +324,7 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Sélectionner une playlist (désélectionne le fichier)
+     * SÃ©lectionner une playlist (dÃ©sÃ©lectionne le fichier)
      * @param {Object} playlist - Objet playlist
      */
     setCurrentPlaylist(playlist) {
@@ -344,8 +345,8 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Mettre à jour l'état de lecture
-     * @param {Object} playbackState - Nouvel état
+     * Mettre Ã  jour l'Ã©tat de lecture
+     * @param {Object} playbackState - Nouvel Ã©tat
      */
     setPlaybackState(playbackState) {
         this.update({
@@ -358,8 +359,8 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Mettre à jour un paramètre
-     * @param {string} key - Clé du paramètre
+     * Mettre Ã  jour un paramÃ¨tre
+     * @param {string} key - ClÃ© du paramÃ¨tre
      * @param {*} value - Nouvelle valeur
      */
     setSetting(key, value) {
@@ -369,8 +370,8 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Mettre à jour plusieurs paramètres
-     * @param {Object} newSettings - Nouveaux paramètres
+     * Mettre Ã  jour plusieurs paramÃ¨tres
+     * @param {Object} newSettings - Nouveaux paramÃ¨tres
      */
     updateSettings(newSettings) {
         const settings = { ...this.get('settings'), ...newSettings };
@@ -379,8 +380,8 @@ class StateModel extends BaseModel {
 
     /**
      * Incrementer une statistique
-     * @param {string} statKey - Clé de la statistique
-     * @param {number} amount - Montant à ajouter (défaut: 1)
+     * @param {string} statKey - ClÃ© de la statistique
+     * @param {number} amount - Montant Ã  ajouter (dÃ©faut: 1)
      */
     incrementStat(statKey, amount = 1) {
         const stats = { ...this.get('stats') };
@@ -389,7 +390,7 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Réinitialiser les statistiques de session
+     * RÃ©initialiser les statistiques de session
      */
     resetSessionStats() {
         this.set('stats', {
@@ -403,8 +404,8 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Obtenir l'état complet de lecture
-     * @returns {Object} État de lecture calculé
+     * Obtenir l'Ã©tat complet de lecture
+     * @returns {Object} Ã‰tat de lecture calculÃ©
      */
     getPlaybackState() {
         return this.get('_computed_playbackState');
@@ -412,39 +413,39 @@ class StateModel extends BaseModel {
 
     /**
      * Obtenir les informations de session
-     * @returns {Object} Informations de session calculées
+     * @returns {Object} Informations de session calculÃ©es
      */
     getSessionInfo() {
         return this.get('_computed_sessionInfo');
     }
 
     /**
-     * Obtenir l'état de l'interface
-     * @returns {Object} État UI calculé
+     * Obtenir l'Ã©tat de l'interface
+     * @returns {Object} Ã‰tat UI calculÃ©
      */
     getUIState() {
         return this.get('_computed_uiState');
     }
 
     /**
-     * Obtenir les métriques de performance
-     * @returns {Object} Métriques de performance
+     * Obtenir les mÃ©triques de performance
+     * @returns {Object} MÃ©triques de performance
      */
     getPerformanceMetrics() {
         return this.get('_computed_performance');
     }
 
     /**
-     * Exporter l'état pour sauvegarde
-     * @returns {Object} État sérialisé
+     * Exporter l'Ã©tat pour sauvegarde
+     * @returns {Object} Ã‰tat sÃ©rialisÃ©
      */
     exportState() {
         return this.serialize(['settings', 'recentFiles', 'recentPlaylists', 'stats']);
     }
 
     /**
-     * Importer un état sauvegardé
-     * @param {Object} savedState - État à importer
+     * Importer un Ã©tat sauvegardÃ©
+     * @param {Object} savedState - Ã‰tat Ã  importer
      */
     importState(savedState) {
         if (savedState.data) {
@@ -452,22 +453,22 @@ class StateModel extends BaseModel {
         }
     }
 
-    // ===== MÉTHODES PRIVÉES =====
+    // ===== MÃ‰THODES PRIVÃ‰ES =====
 
     /**
-     * Ajouter un fichier aux récents
-     * @param {Object} file - Fichier à ajouter
+     * Ajouter un fichier aux rÃ©cents
+     * @param {Object} file - Fichier Ã  ajouter
      */
     addToRecentFiles(file) {
         const recentFiles = [...this.get('recentFiles')];
         
-        // Supprimer s'il existe déjà
+        // Supprimer s'il existe dÃ©jÃ 
         const existingIndex = recentFiles.findIndex(f => f.id === file.id);
         if (existingIndex > -1) {
             recentFiles.splice(existingIndex, 1);
         }
         
-        // Ajouter en première position
+        // Ajouter en premiÃ¨re position
         recentFiles.unshift({
             id: file.id,
             name: file.name,
@@ -475,7 +476,7 @@ class StateModel extends BaseModel {
             lastAccess: new Date().toISOString()
         });
         
-        // Limiter à 10 fichiers récents
+        // Limiter Ã  10 fichiers rÃ©cents
         if (recentFiles.length > 10) {
             recentFiles.splice(10);
         }
@@ -485,26 +486,26 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Ajouter une playlist aux récentes
-     * @param {Object} playlist - Playlist à ajouter
+     * Ajouter une playlist aux rÃ©centes
+     * @param {Object} playlist - Playlist Ã  ajouter
      */
     addToRecentPlaylists(playlist) {
         const recentPlaylists = [...this.get('recentPlaylists')];
         
-        // Supprimer s'il existe déjà
+        // Supprimer s'il existe dÃ©jÃ 
         const existingIndex = recentPlaylists.findIndex(p => p.id === playlist.id);
         if (existingIndex > -1) {
             recentPlaylists.splice(existingIndex, 1);
         }
         
-        // Ajouter en première position
+        // Ajouter en premiÃ¨re position
         recentPlaylists.unshift({
             id: playlist.id,
             name: playlist.name,
             lastAccess: new Date().toISOString()
         });
         
-        // Limiter à 5 playlists récentes
+        // Limiter Ã  5 playlists rÃ©centes
         if (recentPlaylists.length > 5) {
             recentPlaylists.splice(5);
         }
@@ -513,7 +514,7 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Mettre à jour les capacités de lecture
+     * Mettre Ã  jour les capacitÃ©s de lecture
      */
     updatePlaybackCapabilities() {
         const hasFile = !!this.get('currentFile');
@@ -527,12 +528,12 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Gérer les changements de paramètres
-     * @param {Object} newSettings - Nouveaux paramètres
-     * @param {Object} oldSettings - Anciens paramètres
+     * GÃ©rer les changements de paramÃ¨tres
+     * @param {Object} newSettings - Nouveaux paramÃ¨tres
+     * @param {Object} oldSettings - Anciens paramÃ¨tres
      */
     handleSettingsChange(newSettings, oldSettings) {
-        // Détecter les changements critiques
+        // DÃ©tecter les changements critiques
         const criticalChanges = [];
         
         if (newSettings.darkMode !== oldSettings?.darkMode) {
@@ -552,12 +553,12 @@ class StateModel extends BaseModel {
             });
         }
         
-        // Sauvegarder si auto-save activé
+        // Sauvegarder si auto-save activÃ©
         if (newSettings.autoSaveSettings) {
             this.persistState();
         }
         
-        // Émettre événement global
+        // Ã‰mettre Ã©vÃ©nement global
         this.emitEvent('settings:changed', {
             settings: newSettings,
             criticalChanges
@@ -565,7 +566,7 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Charger l'état persistant
+     * Charger l'Ã©tat persistant
      */
     loadPersistedState() {
         try {
@@ -575,29 +576,29 @@ class StateModel extends BaseModel {
                 this.importState(parsedState);
             }
         } catch (error) {
-            console.warn('Erreur lors du chargement de l\'état:', error);
+            console.warn('Erreur lors du chargement de l\'Ã©tat:', error);
         }
     }
 
     /**
-     * Sauvegarder l'état persistant
+     * Sauvegarder l'Ã©tat persistant
      */
     persistState() {
         try {
             const stateToSave = this.exportState();
             localStorage.setItem('midimind_state', JSON.stringify(stateToSave));
         } catch (error) {
-            console.warn('Erreur lors de la sauvegarde de l\'état:', error);
+            console.warn('Erreur lors de la sauvegarde de l\'Ã©tat:', error);
         }
     }
 
     /**
-     * Estimer l'usage mémoire
-     * @returns {Object} Estimation de la mémoire
+     * Estimer l'usage mÃ©moire
+     * @returns {Object} Estimation de la mÃ©moire
      */
     estimateMemoryUsage() {
         const base = 50; // MB de base
-        const perFile = 2; // MB par fichier récent
+        const perFile = 2; // MB par fichier rÃ©cent
         const perPlaylist = 0.5; // MB par playlist
         
         return {
@@ -611,7 +612,7 @@ class StateModel extends BaseModel {
 
     /**
      * Calculer la charge de rendu
-     * @param {Object} data - Données du modèle
+     * @param {Object} data - DonnÃ©es du modÃ¨le
      * @returns {number} Charge de rendu (0-1)
      */
     calculateRenderingLoad(data) {
@@ -628,7 +629,7 @@ class StateModel extends BaseModel {
 
     /**
      * Calculer la charge MIDI
-     * @param {Object} data - Données du modèle
+     * @param {Object} data - DonnÃ©es du modÃ¨le
      * @returns {number} Charge MIDI (0-1)
      */
     calculateMidiLoad(data) {
@@ -644,8 +645,8 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Générer des recommandations de performance
-     * @param {Object} data - Données du modèle
+     * GÃ©nÃ©rer des recommandations de performance
+     * @param {Object} data - DonnÃ©es du modÃ¨le
      * @returns {Array} Liste de recommandations
      */
     generatePerformanceRecommendations(data) {
@@ -654,24 +655,24 @@ class StateModel extends BaseModel {
         if (data.zoomLevel > 200) {
             recommendations.push({
                 type: 'warning',
-                message: 'Niveau de zoom élevé - peut affecter les performances',
-                action: 'Réduire le zoom à 150% ou moins'
+                message: 'Niveau de zoom Ã©levÃ© - peut affecter les performances',
+                action: 'RÃ©duire le zoom Ã  150% ou moins'
             });
         }
         
         if (data.settings.visualizerRefreshRate > 60) {
             recommendations.push({
                 type: 'info',
-                message: 'Taux de rafraîchissement élevé détecté',
-                action: 'Réduire à 60fps pour de meilleures performances'
+                message: 'Taux de rafraÃ®chissement Ã©levÃ© dÃ©tectÃ©',
+                action: 'RÃ©duire Ã  60fps pour de meilleures performances'
             });
         }
         
         if (data.settings.maxConcurrentNotes > 256) {
             recommendations.push({
                 type: 'warning',
-                message: 'Limite de notes simultanées élevée',
-                action: 'Réduire à 256 notes maximum'
+                message: 'Limite de notes simultanÃ©es Ã©levÃ©e',
+                action: 'RÃ©duire Ã  256 notes maximum'
             });
         }
         
@@ -681,7 +682,7 @@ class StateModel extends BaseModel {
     /**
      * Formater un temps en secondes
      * @param {number} seconds - Temps en secondes
-     * @returns {string} Temps formaté (MM:SS)
+     * @returns {string} Temps formatÃ© (MM:SS)
      */
     formatTime(seconds) {
         if (typeof seconds !== 'number' || isNaN(seconds)) {
@@ -694,9 +695,9 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Formater une durée en millisecondes
-     * @param {number} ms - Durée en millisecondes
-     * @returns {string} Durée formatée
+     * Formater une durÃ©e en millisecondes
+     * @param {number} ms - DurÃ©e en millisecondes
+     * @returns {string} DurÃ©e formatÃ©e
      */
     formatDuration(ms) {
         const seconds = Math.floor(ms / 1000);
@@ -731,3 +732,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.StateModel = StateModel;
 }
+
+// Export par défaut
+window.StateModel = StateModel;

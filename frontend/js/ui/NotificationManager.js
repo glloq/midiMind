@@ -238,7 +238,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.NotificationManager = NotificationManager;
 }
-
+window.NotificationManager = NotificationManager;
 // ============================================================================
 // FIN DU FICHIER NotificationManager.js
 // ============================================================================

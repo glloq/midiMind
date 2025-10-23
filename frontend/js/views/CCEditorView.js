@@ -690,3 +690,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.CCEditorView = CCEditorView;  // ← AJOUTÉ
 }
+window.CCEditorView = CCEditorView;

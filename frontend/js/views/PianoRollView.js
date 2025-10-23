@@ -1,51 +1,53 @@
 // ============================================================================
 // Fichier: frontend/js/views/PianoRollView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Vue piano roll pour l'édition graphique des notes MIDI.
+//   Vue piano roll pour l'Ã©dition graphique des notes MIDI.
 //   Affichage en grille avec timeline, notes rectangulaires,
-//   clavier piano vertical, et outils d'édition.
+//   clavier piano vertical, et outils d'Ã©dition.
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Affichage notes en grille temporelle
 //   - Clavier piano vertical (88 touches)
 //   - Timeline avec mesures et temps
 //   - Zoom horizontal et vertical
-//   - Pan (défilement) fluide
-//   - Sélection multiple notes (rectangle)
-//   - Édition notes (déplacer, redimensionner)
+//   - Pan (dÃ©filement) fluide
+//   - SÃ©lection multiple notes (rectangle)
+//   - Ã‰dition notes (dÃ©placer, redimensionner)
 //   - Outils : Select, Pencil, Eraser
 //   - Snap to grid configurable
-//   - Affichage vélocité (couleur)
+//   - Affichage vÃ©locitÃ© (couleur)
 //
 // Architecture:
 //   PianoRollView extends BaseCanvasView
-//   - CoordinateSystem : Conversions pixels ↔ temps/pitch
+//   - CoordinateSystem : Conversions pixels â†” temps/pitch
 //   - Viewport : Gestion zoom/pan
-//   - NoteRenderer : Rendu notes optimisé
+//   - NoteRenderer : Rendu notes optimisÃ©
 //   - GridRenderer : Grille et mesures
 //
 // Auteur: MidiMind Team
 // ============================================================================
+
+
 class PianoRollView extends BaseCanvasView {
     constructor(canvas, model) {
         super(canvas);
         this.model = model;
         
-        // Configuration spécifique
+        // Configuration spÃ©cifique
         this.noteHeight = 12;
         this.pixelsPerMs = 0.1;
     }
     /**
-     * Rendu optimisé avec JsonMidi timeline
+     * Rendu optimisÃ© avec JsonMidi timeline
      */
     render() {
         if (!this.editorModel || !this.editorModel.data) return;
         
-        // Accès direct à la timeline JsonMidi
+        // AccÃ¨s direct Ã  la timeline JsonMidi
         const notes = this.editorModel.data.timeline.filter(e => e.type === 'noteOn');
         
         this.clearCanvas();
@@ -54,7 +56,7 @@ class PianoRollView extends BaseCanvasView {
         
         // Dessiner chaque note
         notes.forEach(note => {
-            // Vérifier si note visible dans viewport
+            // VÃ©rifier si note visible dans viewport
             if (!this.isNoteVisible(note)) return;
             
             const x = this.timeToX(note.time);
@@ -62,7 +64,7 @@ class PianoRollView extends BaseCanvasView {
             const width = this.timeToX(note.time + note.duration) - x;
             const height = this.noteHeight;
             
-            // Style basé sur vélocité
+            // Style basÃ© sur vÃ©locitÃ©
             this.ctx.fillStyle = this.getNoteColor(note.velocity);
             this.ctx.fillRect(x, y, width, height);
             
@@ -89,12 +91,12 @@ class PianoRollView extends BaseCanvasView {
         const time = this.xToTime(point.x);
         const note = this.yToNote(point.y);
         
-        // Quantifier si activé
+        // Quantifier si activÃ©
         const quantizedTime = this.editorModel.state.snap 
             ? this.quantizeTime(time) 
             : time;
         
-        // Ajouter via EditorModel (qui gère JsonMidi)
+        // Ajouter via EditorModel (qui gÃ¨re JsonMidi)
         this.editorModel.addNote(
             quantizedTime,
             this.currentChannel,
@@ -143,7 +145,7 @@ class PianoRollView extends BaseCanvasView {
             const x = this.timeToX(time);
             
             if (x >= 0 && x <= this.width) {
-                // Ligne plus épaisse tous les 4 temps
+                // Ligne plus Ã©paisse tous les 4 temps
                 if ((time / gridInterval) % 4 === 0) {
                     this.ctx.strokeStyle = '#3a3a3a';
                     this.ctx.lineWidth = 1.5;
@@ -194,7 +196,7 @@ class PianoRollView extends BaseCanvasView {
             const width = note.duration * this.pixelsPerMs;
             const height = this.noteHeight - 2;
             
-            // Vérifier si visible
+            // VÃ©rifier si visible
             if (x + width < 0 || x > this.width || 
                 y + height < 0 || y > this.height) {
                 return;
@@ -209,14 +211,14 @@ class PianoRollView extends BaseCanvasView {
             this.ctx.fillStyle = isSelected ? '#667eea' : channelColor;
             this.ctx.fillRect(x, y, width, height);
             
-            // Border pour les notes sélectionnées
+            // Border pour les notes sÃ©lectionnÃ©es
             if (isSelected) {
                 this.ctx.strokeStyle = '#fff';
                 this.ctx.lineWidth = 2;
                 this.ctx.strokeRect(x, y, width, height);
             }
             
-            // Barre de vélocité
+            // Barre de vÃ©locitÃ©
             if (this.model.state.velocityView) {
                 const velocityHeight = (note.velocity / 127) * height;
                 this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -234,7 +236,7 @@ class PianoRollView extends BaseCanvasView {
                 this.ctx.fillText(noteName, x + 4, y + height / 2);
             }
             
-            // Poignée de redimensionnement (si sélectionnée)
+            // PoignÃ©e de redimensionnement (si sÃ©lectionnÃ©e)
             if (isSelected && width > 10) {
                 this.ctx.fillStyle = '#fff';
                 this.ctx.fillRect(x + width - 4, y + height / 2 - 2, 4, 4);
@@ -243,7 +245,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Dessine le rectangle de sélection
+     * Dessine le rectangle de sÃ©lection
      */
     drawSelectionRect() {
         if (!this.selectionRect) return;
@@ -261,7 +263,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Dessine le highlight de la note survolée
+     * Dessine le highlight de la note survolÃ©e
      */
     drawHoverHighlight(note) {
         const x = this.timeToX(note.time);
@@ -309,7 +311,7 @@ class PianoRollView extends BaseCanvasView {
         let tooltipX = x;
         let tooltipY = y - tooltipHeight - 5;
         
-        // Ajuster si hors écran
+        // Ajuster si hors Ã©cran
         if (tooltipX + tooltipWidth > this.width) {
             tooltipX = this.width - tooltipWidth;
         }
@@ -329,7 +331,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Attache les événements
+     * Attache les Ã©vÃ©nements
      */
     attachEvents() {
         this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -355,16 +357,16 @@ class PianoRollView extends BaseCanvasView {
         switch (tool) {
             case 'select':
                 if (clickedNote) {
-                    // Vérifier si on clique sur la poignée de redimensionnement
+                    // VÃ©rifier si on clique sur la poignÃ©e de redimensionnement
                     if (this.isResizeHandle(clickedNote, x, y)) {
                         this.resizingNote = clickedNote;
                     } else {
-                        // Sélection de note
+                        // SÃ©lection de note
                         if (e.shiftKey) {
-                            // Ajouter à la sélection
+                            // Ajouter Ã  la sÃ©lection
                             this.model.selectNotes([clickedNote.id], true);
                         } else if (!this.model.state.selectedNotes.has(clickedNote.id)) {
-                            // Nouvelle sélection
+                            // Nouvelle sÃ©lection
                             this.model.selectNotes([clickedNote.id]);
                         }
                         
@@ -372,7 +374,7 @@ class PianoRollView extends BaseCanvasView {
                         this.dragStart = { x, y };
                     }
                 } else {
-                    // Démarrer sélection rectangle
+                    // DÃ©marrer sÃ©lection rectangle
                     this.isSelecting = true;
                     this.selectionRect = { x, y, width: 0, height: 0 };
                     
@@ -384,7 +386,7 @@ class PianoRollView extends BaseCanvasView {
                 
             case 'pencil':
                 if (!clickedNote) {
-                    // Créer une nouvelle note
+                    // CrÃ©er une nouvelle note
                     const time = this.xToTime(x);
                     const note = this.yToNote(y);
                     const duration = this.snapEnabled ? this.snapResolution : 500;
@@ -411,7 +413,7 @@ class PianoRollView extends BaseCanvasView {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // Mise à jour de la position du curseur dans la status bar
+        // Mise Ã  jour de la position du curseur dans la status bar
         const time = Math.round(this.xToTime(x));
         const note = this.yToNote(y);
         const noteName = this.getNoteName(note);
@@ -435,7 +437,7 @@ class PianoRollView extends BaseCanvasView {
             const deltaNotes = -Math.round(deltaY / this.noteHeight);
             
             if (Math.abs(deltaTime) >= 10 || Math.abs(deltaNotes) >= 1) {
-                // Déplacer les notes sélectionnées
+                // DÃ©placer les notes sÃ©lectionnÃ©es
                 this.moveSelectedNotes(deltaTime, deltaNotes);
                 this.dragStart = { x, y };
             }
@@ -455,12 +457,12 @@ class PianoRollView extends BaseCanvasView {
             }
         }
         
-        // Sélection rectangle
+        // SÃ©lection rectangle
         if (this.isSelecting && this.selectionRect) {
             this.selectionRect.width = x - this.selectionRect.x;
             this.selectionRect.height = y - this.selectionRect.y;
             
-            // Sélectionner les notes dans le rectangle
+            // SÃ©lectionner les notes dans le rectangle
             this.selectNotesInRect();
             this.invalidate();
         }
@@ -470,7 +472,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Gestion du relâchement de souris
+     * Gestion du relÃ¢chement de souris
      */
     onMouseUp(e) {
         this.isDragging = false;
@@ -515,7 +517,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Trouve une note aux coordonnées données
+     * Trouve une note aux coordonnÃ©es donnÃ©es
      */
     findNoteAt(x, y) {
         const timeline = this.model.getFilteredTimeline();
@@ -538,7 +540,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Vérifie si on clique sur la poignée de redimensionnement
+     * VÃ©rifie si on clique sur la poignÃ©e de redimensionnement
      */
     isResizeHandle(note, x, y) {
         const noteX = this.timeToX(note.time);
@@ -554,7 +556,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Déplace les notes sélectionnées
+     * DÃ©place les notes sÃ©lectionnÃ©es
      */
     moveSelectedNotes(deltaTime, deltaNotes) {
         const selectedIds = Array.from(this.model.state.selectedNotes);
@@ -584,7 +586,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Sélectionne les notes dans le rectangle de sélection
+     * SÃ©lectionne les notes dans le rectangle de sÃ©lection
      */
     selectNotesInRect() {
         if (!this.selectionRect) return;
@@ -601,7 +603,7 @@ class PianoRollView extends BaseCanvasView {
             const noteWidth = note.duration * this.pixelsPerMs;
             const noteHeight = this.noteHeight - 2;
             
-            // Vérifier intersection
+            // VÃ©rifier intersection
             if (this.rectsIntersect(
                 rect,
                 { x: noteX, y: noteY, width: noteWidth, height: noteHeight }
@@ -614,7 +616,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Normalise un rectangle (gère width/height négatifs)
+     * Normalise un rectangle (gÃ¨re width/height nÃ©gatifs)
      */
     normalizeRect(rect) {
         const x = rect.width < 0 ? rect.x + rect.width : rect.x;
@@ -626,7 +628,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Vérifie l'intersection de deux rectangles
+     * VÃ©rifie l'intersection de deux rectangles
      */
     rectsIntersect(r1, r2) {
         return !(r1.x + r1.width < r2.x || 
@@ -636,7 +638,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Met à jour le curseur selon le contexte
+     * Met Ã  jour le curseur selon le contexte
      */
     updateCursor(x, y, hoveredNote) {
         let cursor = 'default';
@@ -707,5 +709,8 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-    window.PianoRollView = PianoRollView;  // ← AJOUTÉ
+    window.PianoRollView = PianoRollView;  // â† AJOUTÃ‰
 }
+
+// Export par défaut
+window.PianoRollView = PianoRollView;

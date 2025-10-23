@@ -4,10 +4,11 @@
 // Date: 2025-10-20
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// âœ… Fixed initialization order (logger before startConnectionMonitor)
-// âœ… Added _fullyInitialized pattern
-// âœ… Protected logger calls throughout
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fixed initialization order (logger before startConnectionMonitor)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Added _fullyInitialized pattern
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Protected logger calls throughout
 // ============================================================================
+
 
 class SystemController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
@@ -23,7 +24,7 @@ class SystemController extends BaseController {
         // Backend service
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // Configuration systÃ¨me par dÃ©faut
+        // Configuration systÃƒÆ’Ã‚Â¨me par dÃƒÆ’Ã‚Â©faut
         this.defaultConfig = {
             audioConfig: {
                 bufferSize: 256,
@@ -54,7 +55,7 @@ class SystemController extends BaseController {
             }
         };
         
-        // Ã‰tat systÃ¨me
+        // ÃƒÆ’Ã¢â‚¬Â°tat systÃƒÆ’Ã‚Â¨me
         this.systemHealth = 'good';
         this.currentPreset = 'balanced';
         this.showAdvanced = false;
@@ -72,10 +73,10 @@ class SystemController extends BaseController {
     }
 
     /**
-     * Configuration des Ã©vÃ©nements
+     * Configuration des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
      */
     bindEvents() {
-        // Ã‰couter les changements d'instruments pour mettre Ã  jour les latences
+        // ÃƒÆ’Ã¢â‚¬Â°couter les changements d'instruments pour mettre ÃƒÆ’Ã‚Â  jour les latences
         this.eventBus.on('instrument:connected', (data) => {
             this.updateInstrumentLatencies();
             this.refreshSystemView();
@@ -86,12 +87,12 @@ class SystemController extends BaseController {
             this.refreshSystemView();
         });
         
-        // Ã‰couter les demandes de mise Ã  jour des stats
+        // ÃƒÆ’Ã¢â‚¬Â°couter les demandes de mise ÃƒÆ’Ã‚Â  jour des stats
         this.eventBus.on('system:request_stats_update', () => {
             this.updateSystemStats();
         });
         
-        // Ã‰couter les changements de page
+        // ÃƒÆ’Ã¢â‚¬Â°couter les changements de page
         this.eventBus.on('navigation:page_changed', (data) => {
             if (data.page === 'system') {
                 this.onSystemPageActive();
@@ -100,18 +101,18 @@ class SystemController extends BaseController {
             }
         });
         
-        // Ã‰couter les changements de performance
+        // ÃƒÆ’Ã¢â‚¬Â°couter les changements de performance
         this.eventBus.on('performance:fps_update', (data) => {
             this.updateFPSStats(data.fps);
         });
         
         if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'âœ“ Events bound');
+            this.logger.info('SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Events bound');
         }
     }
 
 /**
- * Méthode init() publique appelée par Application.js
+ * MÃƒÂ©thode init() publique appelÃƒÂ©e par Application.js
  */
 init() {
     if (this.logger && this.logger.info) {
@@ -121,12 +122,12 @@ init() {
     // S'assurer que la vue est rendue
     this.refreshSystemView();
     
-    // Charger la configuration système
+    // Charger la configuration systÃƒÂ¨me
     this.initializeSystemConfig();
 }
 
 /**
- * Rafraîchit la vue système
+ * RafraÃƒÂ®chit la vue systÃƒÂ¨me
  */
 refreshSystemView() {
     if (!this.view) {
@@ -142,7 +143,7 @@ refreshSystemView() {
 }
 
     /**
-     * Initialise la configuration systÃ¨me
+     * Initialise la configuration systÃƒÆ’Ã‚Â¨me
      */
     initializeSystemConfig() {
         if (this.logger && this.logger.info) {
@@ -160,12 +161,12 @@ refreshSystemView() {
         this.bindEvents();
         
         if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'âœ“ System config initialized');
+            this.logger.info('SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ System config initialized');
         }
     }
 
     /**
-     * Charge la configuration sauvegardÃ©e
+     * Charge la configuration sauvegardÃƒÆ’Ã‚Â©e
      */
     loadConfig() {
         try {
@@ -196,28 +197,11 @@ refreshSystemView() {
     }
 
     /**
-     * RafraÃ®chit la vue systÃ¨me
+     * RafraÃƒÆ’Ã‚Â®chit la vue systÃƒÆ’Ã‚Â¨me
      */
-    refreshSystemView() {
-        if (!this.view || typeof this.view.render !== 'function') {
-            return;
-        }
-        
-        const data = {
-            systemHealth: this.systemHealth,
-            audioConfig: this.defaultConfig.audioConfig,
-            visualizerConfig: this.defaultConfig.visualizerConfig,
-            interfaceConfig: this.defaultConfig.interfaceConfig,
-            advancedConfig: this.defaultConfig.advancedConfig,
-            backend: this.getBackendData(),
-            backendConnected: this.backend?.isConnected() || false
-        };
-        
-        this.view.render(data);
-    }
 
     /**
-     * Obtient les donnÃ©es du backend
+     * Obtient les donnÃƒÆ’Ã‚Â©es du backend
      */
     getBackendData() {
         if (!this.backend) {
@@ -236,10 +220,10 @@ refreshSystemView() {
     }
 
     /**
-     * VÃ©rifie pÃ©riodiquement la connexion
+     * VÃƒÆ’Ã‚Â©rifie pÃƒÆ’Ã‚Â©riodiquement la connexion
      */
     startConnectionMonitor() {
-        // ArrÃªter monitor existant
+        // ArrÃƒÆ’Ã‚Âªter monitor existant
         this.stopConnectionMonitor();
         
         this.connectionMonitorTimer = setInterval(async () => {
@@ -259,7 +243,7 @@ refreshSystemView() {
     }
 
     /**
-     * ArrÃªte le monitoring de connexion
+     * ArrÃƒÆ’Ã‚Âªte le monitoring de connexion
      */
     stopConnectionMonitor() {
         if (this.connectionMonitorTimer) {
@@ -281,7 +265,7 @@ refreshSystemView() {
         
         try {
             if (this.logger && this.logger.info) {
-                this.logger.info('SystemController', 'ðŸ”„ Attempting reconnection...');
+                this.logger.info('SystemController', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Å¾ Attempting reconnection...');
             }
             
             this.eventBus.emit('notification:show', {
@@ -290,7 +274,7 @@ refreshSystemView() {
                 duration: 2000
             });
             
-            // DÃ©connecter proprement d'abord
+            // DÃƒÆ’Ã‚Â©connecter proprement d'abord
             if (typeof this.backend.disconnect === 'function') {
                 this.backend.disconnect();
             }
@@ -304,16 +288,16 @@ refreshSystemView() {
             }
             
             if (this.logger && this.logger.info) {
-                this.logger.info('SystemController', 'âœ“ Reconnection successful');
+                this.logger.info('SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Reconnection successful');
             }
             
             this.eventBus.emit('notification:show', {
-                message: 'ReconnectÃ© avec succÃ¨s !',
+                message: 'ReconnectÃƒÆ’Ã‚Â© avec succÃƒÆ’Ã‚Â¨s !',
                 type: 'success',
                 duration: 3000
             });
             
-            // RafraÃ®chir Ã©tat systÃ¨me
+            // RafraÃƒÆ’Ã‚Â®chir ÃƒÆ’Ã‚Â©tat systÃƒÆ’Ã‚Â¨me
             await this.refreshSystemStatus();
             
         } catch (error) {
@@ -321,7 +305,7 @@ refreshSystemView() {
                 this.logger.error('SystemController', 'Reconnection failed:', error);
             }
             this.eventBus.emit('notification:show', {
-                message: 'Ã‰chec de reconnexion: ' + error.message,
+                message: 'ÃƒÆ’Ã¢â‚¬Â°chec de reconnexion: ' + error.message,
                 type: 'error',
                 duration: 5000
             });
@@ -329,7 +313,7 @@ refreshSystemView() {
     }
 
     /**
-     * RafraÃ®chit le statut systÃ¨me
+     * RafraÃƒÆ’Ã‚Â®chit le statut systÃƒÆ’Ã‚Â¨me
      */
     async refreshSystemStatus() {
         if (this.logger && this.logger.info) {
@@ -340,7 +324,7 @@ refreshSystemView() {
     }
 
     /**
-     * Met Ã  jour les statistiques systÃ¨me
+     * Met ÃƒÆ’Ã‚Â  jour les statistiques systÃƒÆ’Ã‚Â¨me
      */
     async updateSystemStats() {
         // Update stats logic here
@@ -348,15 +332,15 @@ refreshSystemView() {
     }
 
     /**
-     * DÃ©marre le monitoring temps rÃ©el
+     * DÃƒÆ’Ã‚Â©marre le monitoring temps rÃƒÆ’Ã‚Â©el
      */
     startStatsMonitoring() {
         if (this.statsMonitoringInterval) {
-            return; // DÃ©jÃ  dÃ©marrÃ©
+            return; // DÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â  dÃƒÆ’Ã‚Â©marrÃƒÆ’Ã‚Â©
         }
         
         if (this.logger && this.logger.debug) {
-            this.logger.debug('SystemController', 'ðŸ“Š Starting stats monitoring');
+            this.logger.debug('SystemController', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Starting stats monitoring');
         }
         
         // Update toutes les secondes
@@ -366,7 +350,7 @@ refreshSystemView() {
     }
 
     /**
-     * ArrÃªte le monitoring
+     * ArrÃƒÆ’Ã‚Âªte le monitoring
      */
     stopStatsMonitoring() {
         if (this.statsMonitoringInterval) {
@@ -374,13 +358,13 @@ refreshSystemView() {
             this.statsMonitoringInterval = null;
             
             if (this.logger && this.logger.debug) {
-                this.logger.debug('SystemController', 'â¸ï¸ Stats monitoring stopped');
+                this.logger.debug('SystemController', 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â Stats monitoring stopped');
             }
         }
     }
 
     /**
-     * Met Ã  jour les latences des instruments
+     * Met ÃƒÆ’Ã‚Â  jour les latences des instruments
      */
     updateInstrumentLatencies() {
         if (this.logger && this.logger.debug) {
@@ -390,7 +374,7 @@ refreshSystemView() {
     }
 
     /**
-     * Callback quand la page systÃ¨me devient active
+     * Callback quand la page systÃƒÆ’Ã‚Â¨me devient active
      */
     onSystemPageActive() {
         if (this.logger && this.logger.info) {
@@ -401,7 +385,7 @@ refreshSystemView() {
     }
 
     /**
-     * Callback quand la page systÃ¨me devient inactive
+     * Callback quand la page systÃƒÆ’Ã‚Â¨me devient inactive
      */
     onSystemPageInactive() {
         if (this.logger && this.logger.info) {
@@ -411,7 +395,7 @@ refreshSystemView() {
     }
 
     /**
-     * Met Ã  jour les stats FPS
+     * Met ÃƒÆ’Ã‚Â  jour les stats FPS
      */
     updateFPSStats(fps) {
         // Update FPS logic
@@ -436,7 +420,7 @@ refreshSystemView() {
     }
 
     /**
-     * Nettoie les ressources du contrÃ´leur
+     * Nettoie les ressources du contrÃƒÆ’Ã‚Â´leur
      */
     destroy() {
         this.stopStatsMonitoring();
@@ -456,6 +440,9 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.SystemController = SystemController;
 }
+
+// Export par dÃ©faut
+window.SystemController = SystemController;
 
 // ============================================================================
 // FIN DU FICHIER SystemController.js v3.0.1-FIXED

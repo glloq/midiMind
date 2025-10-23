@@ -250,3 +250,4 @@ class VisualizerController {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = VisualizerController;
 }
+window.VisualizerController = VisualizerController;

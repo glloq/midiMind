@@ -518,3 +518,4 @@ class KeyboardView {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = KeyboardView;
 }
+window.MetronomeEngine = MetronomeEngine;

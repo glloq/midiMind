@@ -1,31 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Version: v3.0.6 - MINIMAL (Constructor fixed + basic functions only)
-// Date: 2025-10-19
+// Version: v3.1.07 - FIXED (Methods inside class)
+// Date: 2025-10-23
 // ============================================================================
-// SIMPLIFICATION: Seulement les fonctions de base
-// - Lister fichiers
-// - Charger un fichier
-// - Supprimer un fichier
-// - Pas de cache complexe
-// - Pas de favoris/tags
+// CORRECTIONS v3.1.07:
+// ✓ Toutes les méthodes sont maintenant DANS la classe
+// ✓ Suppression du code hors classe
+// ✓ Méthodes get/set/update/getAll correctement placées
 // ============================================================================
+
 
 class FileModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✅ FIX: Correct super() call
+        // ✓ FIX: Correct super() call
         super({}, {
             persistKey: 'filemodel',
             eventPrefix: 'file',
             autoPersist: true
         });
         
-        // ✅ FIX: Assign immediately
+        // ✓ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // ✅ FIX: Initialize data directly
+        // ✓ FIX: Initialize data directly
         this.data = {
             files: [],
             currentPath: '/midi',
@@ -33,7 +32,7 @@ class FileModel extends BaseModel {
             recentFiles: []
         };
         
-        this.logger.info('FileModel', '✓ Model initialized (minimal version)');
+        this.logger.info('FileModel', '✓ Model initialized v3.1.07');
     }
     
     // ========================================================================
@@ -243,6 +242,44 @@ class FileModel extends BaseModel {
         this.set('selectedFile', null);
         this.eventBus.emit('file:deselected');
     }
+    
+    // ========================================================================
+    // MÉTHODES HÉRITÉES/OVERRIDES
+    // ========================================================================
+    
+    /**
+     * Override get() depuis BaseModel si nécessaire
+     */
+    get(key) {
+        return this.data[key];
+    }
+    
+    /**
+     * Override set() depuis BaseModel si nécessaire
+     */
+    set(key, value) {
+        this.data[key] = value;
+        if (this.eventBus) {
+            this.eventBus.emit('file:' + key + '-changed', value);
+        }
+    }
+    
+    /**
+     * Override update() depuis BaseModel si nécessaire
+     */
+    update(updates) {
+        Object.assign(this.data, updates);
+        if (this.eventBus) {
+            this.eventBus.emit('file:updated', updates);
+        }
+    }
+    
+    /**
+     * Récupère tous les fichiers
+     */
+    getAll() {
+        return this.data.files || [];
+    }
 }
 
 // ============================================================================
@@ -256,3 +293,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.FileModel = FileModel;
 }
+
+// Export par défaut
+window.FileModel = FileModel;

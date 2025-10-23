@@ -655,3 +655,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.Notifications = Notifications;
 }
+window.Notifications = Notifications;

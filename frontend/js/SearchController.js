@@ -327,4 +327,3 @@ class SearchController extends BaseController {
 if (typeof window !== 'undefined') {
     window.SearchController = SearchController;
 }
-window.SearchController = SearchController;

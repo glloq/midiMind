@@ -770,3 +770,4 @@ class KeyboardShortcuts {
         };
     }
 }
+window.KeyboardShortcuts = KeyboardShortcuts;

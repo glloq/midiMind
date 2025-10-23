@@ -253,3 +253,4 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.TimelineRenderer = TimelineRenderer;
 }
+window.TimelineRenderer = TimelineRenderer;

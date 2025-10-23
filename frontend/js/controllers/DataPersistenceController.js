@@ -1,21 +1,21 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/DataPersistenceController.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Contrôleur de persistance des données de l'application.
-//   Gère la sauvegarde/chargement automatique des sessions, presets,
+//   ContrÃ´leur de persistance des donnÃ©es de l'application.
+//   GÃ¨re la sauvegarde/chargement automatique des sessions, presets,
 //   playlists, et configurations utilisateur.
 //
-// Fonctionnalités:
-//   - Sauvegarde automatique périodique
+// FonctionnalitÃ©s:
+//   - Sauvegarde automatique pÃ©riodique
 //   - Gestion sessions (save/restore/clear)
 //   - Presets sauvegardables (routing, filtres, settings)
-//   - Export/Import données (JSON)
+//   - Export/Import donnÃ©es (JSON)
 //   - Synchronisation avec backend
-//   - Gestion versions de données
+//   - Gestion versions de donnÃ©es
 //   - Migration automatique anciennes versions
 //   - Backup et restore
 //
@@ -28,6 +28,8 @@
 // Auteur: MidiMind Team
 // ============================================================================
         // ===== DATA PERSISTENCE CONTROLLER =====
+
+
         class DataPersistenceController extends BaseController {
             constructor(eventBus, models, views, notifications, debugConsole) {
                 super(eventBus, models, views, notifications, debugConsole);
@@ -59,7 +61,7 @@
                     const compressedData = this.compressData(data);
                     localStorage.setItem(this.storageKey, compressedData);
                     
-                    this.logDebug('system', 'Données sauvegardées automatiquement');
+                    this.logDebug('system', 'DonnÃ©es sauvegardÃ©es automatiquement');
                 } catch (error) {
                     this.logDebug('system', `Erreur sauvegarde: ${error.message}`);
                 }
@@ -74,18 +76,18 @@
                     
                     // Validation de version
                     if (data.version !== '2.0.0') {
-                        this.logDebug('system', 'Version incompatible, données ignorées');
+                        this.logDebug('system', 'Version incompatible, donnÃ©es ignorÃ©es');
                         return false;
                     }
                     
-                    // Restaurer les données
+                    // Restaurer les donnÃ©es
                     this.getModel('state').data = { ...this.getModel('state').data, ...data.state };
                     this.getModel('file').data = data.files;
                     this.getModel('instrument').data = data.instruments;
                     this.getModel('playlist').data = data.playlists;
                     
-                    this.logDebug('system', `Données chargées (${this.formatDate(data.timestamp)})`);
-                    this.showNotification('Données précédentes restaurées', 'success');
+                    this.logDebug('system', `DonnÃ©es chargÃ©es (${this.formatDate(data.timestamp)})`);
+                    this.showNotification('DonnÃ©es prÃ©cÃ©dentes restaurÃ©es', 'success');
                     
                     return true;
                 } catch (error) {
@@ -113,8 +115,8 @@
                     a.click();
                     URL.revokeObjectURL(url);
                     
-                    this.logDebug('system', 'Données exportées');
-                    this.showNotification('Sauvegarde exportée avec succès', 'success');
+                    this.logDebug('system', 'DonnÃ©es exportÃ©es');
+                    this.showNotification('Sauvegarde exportÃ©e avec succÃ¨s', 'success');
                 } catch (error) {
                     this.logDebug('system', `Erreur export: ${error.message}`);
                     this.showNotification('Erreur lors de l\'export', 'error');
@@ -134,21 +136,21 @@
                             }
                             
                             // Confirmer l'import
-                            if (!confirm('Importer cette sauvegarde ? Cela remplacera les données actuelles.')) {
+                            if (!confirm('Importer cette sauvegarde ? Cela remplacera les donnÃ©es actuelles.')) {
                                 return;
                             }
                             
-                            // Restaurer les données
+                            // Restaurer les donnÃ©es
                             this.getModel('state').data = { ...this.getModel('state').data, ...data.state };
                             this.getModel('file').data = data.files;
                             this.getModel('instrument').data = data.instruments;
                             this.getModel('playlist').data = data.playlists;
                             
-                            // Rafraîchir l'interface
+                            // RafraÃ®chir l'interface
                             app.navigationController.refreshPageView(app.navigationController.getCurrentPage());
                             
-                            this.logDebug('system', 'Données importées avec succès');
-                            this.showNotification('Sauvegarde importée avec succès', 'success');
+                            this.logDebug('system', 'DonnÃ©es importÃ©es avec succÃ¨s');
+                            this.showNotification('Sauvegarde importÃ©e avec succÃ¨s', 'success');
                         } catch (error) {
                             this.logDebug('system', `Erreur parsing import: ${error.message}`);
                             this.showNotification('Fichier de sauvegarde invalide', 'error');
@@ -162,10 +164,10 @@
             }
 
             clearData() {
-                if (confirm('Supprimer toutes les données stockées ? Cette action est irréversible.')) {
+                if (confirm('Supprimer toutes les donnÃ©es stockÃ©es ? Cette action est irrÃ©versible.')) {
                     localStorage.removeItem(this.storageKey);
-                    this.logDebug('system', 'Données supprimées');
-                    this.showNotification('Données supprimées', 'info');
+                    this.logDebug('system', 'DonnÃ©es supprimÃ©es');
+                    this.showNotification('DonnÃ©es supprimÃ©es', 'info');
                 }
             }
 
@@ -188,3 +190,6 @@
                 return new Date(isoString).toLocaleString('fr-FR');
             }
         }
+
+// Export par défaut
+window.DataPersistenceController = DataPersistenceController;

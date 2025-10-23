@@ -563,7 +563,7 @@ Alerts: ${this.alerts.length}
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PerformanceMonitor;
 }
-
+window.PerformanceMonitor = PerformanceMonitor;
 // ============================================================================
 // EXEMPLE D'UTILISATION
 // ============================================================================

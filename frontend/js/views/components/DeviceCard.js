@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/components/DeviceCard.js
+// Fichier: frontend/js/views/components/DeviceCard.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -962,3 +962,4 @@ class DeviceCard {
         }
     }
 }
+window.DeviceCard = DeviceCard;

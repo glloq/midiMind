@@ -318,4 +318,4 @@ const MidiUtils = {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MidiUtils;
 }
-};
+window.MidiUtils = MidiUtils;

@@ -797,3 +797,5 @@ if (typeof window !== 'undefined') {
     window.ApiClient = ApiClient;
     window.ApiError = ApiError;
 }
+
+window.ApiClient = ApiClient;

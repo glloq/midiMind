@@ -626,3 +626,4 @@ class SelectionManager {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SelectionManager;
 }
+window.SelectionManager = SelectionManager;

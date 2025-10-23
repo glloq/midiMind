@@ -285,3 +285,4 @@ class MidiFilterController {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MidiFilterController;
 }
+window.MidiFilterController = MidiFilterController;

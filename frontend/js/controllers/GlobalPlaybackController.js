@@ -1,46 +1,47 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/GlobalPlaybackController.js
-// Version: v3.0.1 - CORRIGÉ (Intégration PlaybackModel)
+// Version: v3.0.1 - CORRIGÃ‰ (IntÃ©gration PlaybackModel)
 // Date: 2025-10-09
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
-//   Contrôleur global singleton de lecture MIDI.
-//   Utilise PlaybackModel v3.0.1 pour l'état et l'interpolation.
-//   Architecture corrigée selon audit du 2025-10-09.
+//   ContrÃ´leur global singleton de lecture MIDI.
+//   Utilise PlaybackModel v3.0.1 pour l'Ã©tat et l'interpolation.
+//   Architecture corrigÃ©e selon audit du 2025-10-09.
 //
 // CORRECTIONS v3.0.1:
-//   ✅ Intégration complète de PlaybackModel
-//   ✅ Délégation état et interpolation à PlaybackModel
-//   ✅ Suppression code dupliqué
-//   ✅ Loop/Repeat via PlaybackModel
-//   ✅ Architecture cohérente avec autres Controllers
-//   ✅ Réduction de ~175 lignes de code (46%)
+//   âœ… IntÃ©gration complÃ¨te de PlaybackModel
+//   âœ… DÃ©lÃ©gation Ã©tat et interpolation Ã  PlaybackModel
+//   âœ… Suppression code dupliquÃ©
+//   âœ… Loop/Repeat via PlaybackModel
+//   âœ… Architecture cohÃ©rente avec autres Controllers
+//   âœ… RÃ©duction de ~175 lignes de code (46%)
 //
-// Responsabilités:
+// ResponsabilitÃ©s:
 //   - Singleton global de lecture (une seule instance)
 //   - Gestion chargement fichiers/MidiJSON
-//   - Coordination backend ↔ PlaybackModel
+//   - Coordination backend â†” PlaybackModel
 //   - Gestion playlist et navigation
 //   - Gestion routing instruments
-//   - Gestion métronome
-//   - Cache et préchargement
+//   - Gestion mÃ©tronome
+//   - Cache et prÃ©chargement
 //   - Statistiques lecture
 //
 // Architecture:
 //   GlobalPlaybackController (singleton)
-//   ├── PlaybackModel v3.0.1 (état + interpolation)
-//   ├── BackendService (commandes MIDI)
-//   ├── EventBus (événements)
-//   └── FileModel (fichiers)
+//   â”œâ”€â”€ PlaybackModel v3.0.1 (Ã©tat + interpolation)
+//   â”œâ”€â”€ BackendService (commandes MIDI)
+//   â”œâ”€â”€ EventBus (Ã©vÃ©nements)
+//   â””â”€â”€ FileModel (fichiers)
 //
 // Design Patterns:
 //   - Singleton (instance unique)
 //   - Delegation (vers PlaybackModel)
-//   - Observer (événements)
+//   - Observer (Ã©vÃ©nements)
 //
 // Auteur: midiMind Team
 // ============================================================================
+
 
 class GlobalPlaybackController {
     // ========================================================================
@@ -63,21 +64,21 @@ class GlobalPlaybackController {
     // ========================================================================
     
     constructor(eventBus, backend, fileModel, logger) {
-        // Vérifier singleton
+        // VÃ©rifier singleton
         if (GlobalPlaybackController.instance) {
             return GlobalPlaybackController.instance;
         }
         
-        // Dépendances
+        // DÃ©pendances
         this.eventBus = eventBus;
         this.backend = backend;
         this.fileModel = fileModel;
         this.logger = logger;
         
-        // ✅ NOUVEAU: Instancier PlaybackModel pour l'état
+        // âœ… NOUVEAU: Instancier PlaybackModel pour l'Ã©tat
         this.playbackModel = new PlaybackModel(eventBus, backend, logger);
         
-        // ✅ NOUVEAU: Activer interpolation locale
+        // âœ… NOUVEAU: Activer interpolation locale
         this.playbackModel.config.interpolationEnabled = true;
         
         // Fichier en cours
@@ -101,7 +102,7 @@ class GlobalPlaybackController {
         // Routing
         this.routing = new Map(); // channel -> instrumentId
         
-        // Métronome
+        // MÃ©tronome
         this.metronome = {
             enabled: false,
             volume: 80,
@@ -133,9 +134,9 @@ class GlobalPlaybackController {
             syncInterval: 1000
         };
         
-        this.logger.info('GlobalPlaybackController', '✓ Initialized v3.0.1 with PlaybackModel');
+        this.logger.info('GlobalPlaybackController', 'âœ“ Initialized v3.0.1 with PlaybackModel');
         
-        // Connecter événements PlaybackModel
+        // Connecter Ã©vÃ©nements PlaybackModel
         this.connectPlaybackModelEvents();
         
         // Synchronisation backend
@@ -145,15 +146,15 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS - ✅ NOUVEAU: Connexion PlaybackModel
+    // Ã‰VÃ‰NEMENTS - âœ… NOUVEAU: Connexion PlaybackModel
     // ========================================================================
     
     connectPlaybackModelEvents() {
-        // Réémettre événements PlaybackModel vers application
+        // RÃ©Ã©mettre Ã©vÃ©nements PlaybackModel vers application
         this.playbackModel.eventBus.on('playback:state-changed', (data) => {
             this.eventBus.emit('playback:state-changed', data);
             
-            // Actions selon l'état
+            // Actions selon l'Ã©tat
             if (data.newState === 'PLAYING') {
                 this.stats.startTime = Date.now();
             } else if (data.oldState === 'PLAYING') {
@@ -162,7 +163,7 @@ class GlobalPlaybackController {
         });
         
         this.playbackModel.eventBus.on('playback:position-changed', (data) => {
-            // Émettre comme playback:time-update pour compatibilité
+            // Ã‰mettre comme playback:time-update pour compatibilitÃ©
             this.eventBus.emit('playback:time-update', {
                 time: data.position,
                 duration: this.playbackModel.get('duration'),
@@ -174,7 +175,7 @@ class GlobalPlaybackController {
         
         this.playbackModel.eventBus.on('playback:loop-triggered', (data) => {
             this.logger.debug('GlobalPlaybackController', 
-                `Loop triggered: ${data.from}ms → ${data.to}ms`);
+                `Loop triggered: ${data.from}ms â†’ ${data.to}ms`);
             
             this.eventBus.emit('playback:loop-triggered', data);
         });
@@ -189,7 +190,7 @@ class GlobalPlaybackController {
             this.eventBus.emit('playback:repeat-changed', data);
         });
         
-        // Détecter fin de fichier
+        // DÃ©tecter fin de fichier
         this.playbackModel.watch('position', (newPos) => {
             const duration = this.playbackModel.get('duration');
             
@@ -204,12 +205,12 @@ class GlobalPlaybackController {
     // ========================================================================
     
     setupBackendSync() {
-        // Écouter mises à jour backend
+        // Ã‰couter mises Ã  jour backend
         this.eventBus.on('backend:playback-update', (data) => {
             this.playbackModel.updateFromBackend(data);
         });
         
-        // Synchronisation périodique
+        // Synchronisation pÃ©riodique
         setInterval(() => {
             if (this.playbackModel.isPlaying()) {
                 this.syncWithBackend();
@@ -243,14 +244,14 @@ class GlobalPlaybackController {
         } = options;
         
         try {
-            // Récupérer fichier
+            // RÃ©cupÃ©rer fichier
             const file = await this.fileModel.get(fileId);
             
             if (!file) {
                 throw new Error('File not found');
             }
             
-            // Convertir en MidiJSON si nécessaire
+            // Convertir en MidiJSON si nÃ©cessaire
             if (!file.midiJson) {
                 throw new Error('File has no MidiJSON data');
             }
@@ -258,7 +259,7 @@ class GlobalPlaybackController {
             // Charger dans PlaybackModel
             await this.loadMidiJson(file.midiJson, { autoPlay, seekTo });
             
-            // Mettre à jour fichier courant
+            // Mettre Ã  jour fichier courant
             this.currentFile = {
                 id: fileId,
                 name: file.name,
@@ -273,7 +274,7 @@ class GlobalPlaybackController {
             
             this.stats.filesPlayed++;
             
-            // Précharger suivant si auto-advance
+            // PrÃ©charger suivant si auto-advance
             if (this.playlist.autoAdvance && this.config.autoPreload) {
                 this.preloadNextFile();
             }
@@ -296,15 +297,15 @@ class GlobalPlaybackController {
         } = options;
         
         try {
-            // Arrêter lecture en cours
+            // ArrÃªter lecture en cours
             if (this.playbackModel.isPlaying()) {
                 await this.stop();
             }
             
-            // Extraire métadonnées
+            // Extraire mÃ©tadonnÃ©es
             const metadata = midiJson.metadata || {};
             
-            // ✅ Mise à jour via PlaybackModel
+            // âœ… Mise Ã  jour via PlaybackModel
             this.playbackModel.update({
                 currentFileName: metadata.name || 'Unknown',
                 duration: metadata.duration || 0,
@@ -323,7 +324,7 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend load failed');
             }
             
-            // Synchroniser état backend
+            // Synchroniser Ã©tat backend
             if (response.data) {
                 this.playbackModel.updateFromBackend(response.data);
             }
@@ -334,7 +335,7 @@ class GlobalPlaybackController {
                 tracks: this.playbackModel.get('trackCount')
             });
             
-            // Auto-play si demandé
+            // Auto-play si demandÃ©
             if (autoPlay) {
                 await this.play();
             }
@@ -349,7 +350,7 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // CONTRÔLE LECTURE - ✅ SIMPLIFIÉ (Délégation PlaybackModel)
+    // CONTRÃ”LE LECTURE - âœ… SIMPLIFIÃ‰ (DÃ©lÃ©gation PlaybackModel)
     // ========================================================================
     
     async play() {
@@ -370,10 +371,10 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend play failed');
             }
             
-            // ✅ Utilise PlaybackModel pour état
+            // âœ… Utilise PlaybackModel pour Ã©tat
             this.playbackModel.set('state', 'PLAYING');
             
-            // ✅ PlaybackModel démarre son interpolation automatiquement
+            // âœ… PlaybackModel dÃ©marre son interpolation automatiquement
             // (via watch('state') dans PlaybackModel)
             
             this.eventBus.emit('playback:started', {
@@ -383,7 +384,7 @@ class GlobalPlaybackController {
                 file: this.currentFile.name
             });
             
-            // Démarrer métronome si activé
+            // DÃ©marrer mÃ©tronome si activÃ©
             if (this.metronome.enabled) {
                 this.startMetronome();
             }
@@ -413,10 +414,10 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend pause failed');
             }
             
-            // ✅ Utilise PlaybackModel pour état
+            // âœ… Utilise PlaybackModel pour Ã©tat
             this.playbackModel.set('state', 'PAUSED');
             
-            // ✅ PlaybackModel arrête son interpolation automatiquement
+            // âœ… PlaybackModel arrÃªte son interpolation automatiquement
             
             this.updatePlaytimeStats();
             
@@ -425,7 +426,7 @@ class GlobalPlaybackController {
                 duration: this.playbackModel.get('duration')
             });
             
-            // Arrêter métronome
+            // ArrÃªter mÃ©tronome
             this.stopMetronome();
             
             return true;
@@ -448,7 +449,7 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend stop failed');
             }
             
-            // ✅ Utilise PlaybackModel pour état
+            // âœ… Utilise PlaybackModel pour Ã©tat
             this.playbackModel.update({
                 state: 'STOPPED',
                 position: 0
@@ -460,7 +461,7 @@ class GlobalPlaybackController {
                 duration: this.playbackModel.get('duration')
             });
             
-            // Arrêter métronome
+            // ArrÃªter mÃ©tronome
             this.stopMetronome();
             
             return true;
@@ -487,11 +488,11 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend seek failed');
             }
             
-            // ✅ Met à jour via PlaybackModel
+            // âœ… Met Ã  jour via PlaybackModel
             this.playbackModel.set('position', timeMs);
             
             // PlaybackModel calculera automatiquement le progress
-            // et émettra 'playback:position-changed'
+            // et Ã©mettra 'playback:position-changed'
             
             this.stats.seeks++;
             
@@ -535,7 +536,7 @@ class GlobalPlaybackController {
                 throw new Error(response.error || 'Backend tempo failed');
             }
             
-            // ✅ Met à jour via PlaybackModel
+            // âœ… Met Ã  jour via PlaybackModel
             this.playbackModel.set('tempo', percent / 100);
             
             this.stats.tempoChanges++;
@@ -564,12 +565,12 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // LOOP CONTROL - ✅ SIMPLIFIÉ (Délégation PlaybackModel)
+    // LOOP CONTROL - âœ… SIMPLIFIÃ‰ (DÃ©lÃ©gation PlaybackModel)
     // ========================================================================
     
     setLoop(enabled, start = 0, end = 0) {
         if (enabled) {
-            // ✅ Délègue à PlaybackModel
+            // âœ… DÃ©lÃ¨gue Ã  PlaybackModel
             this.playbackModel.setLoopPoints(
                 start, 
                 end || this.playbackModel.get('duration')
@@ -578,7 +579,7 @@ class GlobalPlaybackController {
             this.playbackModel.set('loopEnabled', false);
         }
         
-        // PlaybackModel émettra 'playback:loop-changed'
+        // PlaybackModel Ã©mettra 'playback:loop-changed'
     }
     
     toggleLoop() {
@@ -587,13 +588,13 @@ class GlobalPlaybackController {
     }
     
     setRepeatMode(mode) {
-        // ✅ Nouvelle fonctionnalité de PlaybackModel v3.0.1
+        // âœ… Nouvelle fonctionnalitÃ© de PlaybackModel v3.0.1
         this.playbackModel.setRepeatMode(mode); // none, one, all
         this.playlist.repeat = mode;
     }
     
     // ========================================================================
-    // MÉTRONOME
+    // MÃ‰TRONOME
     // ========================================================================
     
     setMetronome(enabled) {
@@ -611,12 +612,12 @@ class GlobalPlaybackController {
     }
     
     startMetronome() {
-        // TODO: Implémenter métronome
+        // TODO: ImplÃ©menter mÃ©tronome
         this.logger.debug('GlobalPlaybackController', 'Metronome started');
     }
     
     stopMetronome() {
-        // TODO: Implémenter métronome
+        // TODO: ImplÃ©menter mÃ©tronome
         this.logger.debug('GlobalPlaybackController', 'Metronome stopped');
     }
     
@@ -648,7 +649,7 @@ class GlobalPlaybackController {
         this.playlist.currentIndex = nextIndex;
         const nextFile = this.playlist.files[nextIndex];
         
-        // Charger et jouer si nécessaire
+        // Charger et jouer si nÃ©cessaire
         await this.loadFile(nextFile.id, { autoPlay: wasPlaying });
         
         return true;
@@ -662,14 +663,14 @@ class GlobalPlaybackController {
         
         const wasPlaying = this.playbackModel.isPlaying();
         
-        // Si on est au début du fichier, aller au précédent
-        // Sinon, revenir au début
+        // Si on est au dÃ©but du fichier, aller au prÃ©cÃ©dent
+        // Sinon, revenir au dÃ©but
         if (this.playbackModel.get('position') > 3000) {
             await this.seek(0);
             return true;
         }
         
-        // Calculer index précédent
+        // Calculer index prÃ©cÃ©dent
         let prevIndex = this.playlist.currentIndex - 1;
         
         if (prevIndex < 0) {
@@ -683,7 +684,7 @@ class GlobalPlaybackController {
         this.playlist.currentIndex = prevIndex;
         const prevFile = this.playlist.files[prevIndex];
         
-        // Charger et jouer si nécessaire
+        // Charger et jouer si nÃ©cessaire
         await this.loadFile(prevFile.id, { autoPlay: wasPlaying });
         
         return true;
@@ -707,7 +708,7 @@ class GlobalPlaybackController {
             return;
         }
         
-        // Auto-advance si activé
+        // Auto-advance si activÃ©
         if (this.playlist.autoAdvance && this.playlist.files.length > 0) {
             await this.next();
         } else {
@@ -742,7 +743,7 @@ class GlobalPlaybackController {
             if (index < this.playlist.currentIndex) {
                 this.playlist.currentIndex--;
             } else if (index === this.playlist.currentIndex) {
-                // Fichier courant supprimé
+                // Fichier courant supprimÃ©
                 this.playlist.currentIndex = -1;
             }
             
@@ -799,7 +800,7 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // CACHE & PRÉCHARGEMENT
+    // CACHE & PRÃ‰CHARGEMENT
     // ========================================================================
     
     async preloadNextFile() {
@@ -838,12 +839,12 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // GETTERS D'ÉTAT - ✅ SIMPLIFIÉ (Délégation PlaybackModel)
+    // GETTERS D'Ã‰TAT - âœ… SIMPLIFIÃ‰ (DÃ©lÃ©gation PlaybackModel)
     // ========================================================================
     
     getState() {
         return {
-            // État PlaybackModel
+            // Ã‰tat PlaybackModel
             status: this.playbackModel.get('state'),
             position: this.playbackModel.get('position'),
             duration: this.playbackModel.get('duration'),
@@ -852,7 +853,7 @@ class GlobalPlaybackController {
             transpose: this.playbackModel.get('transpose'),
             volume: this.playbackModel.get('volume'),
             
-            // État local
+            // Ã‰tat local
             file: this.currentFile,
             playlist: {
                 ...this.playlist,
@@ -864,27 +865,27 @@ class GlobalPlaybackController {
     }
     
     getCurrentTime() {
-        return this.playbackModel.get('position'); // ✅ Délègue
+        return this.playbackModel.get('position'); // âœ… DÃ©lÃ¨gue
     }
     
     getDuration() {
-        return this.playbackModel.get('duration'); // ✅ Délègue
+        return this.playbackModel.get('duration'); // âœ… DÃ©lÃ¨gue
     }
     
     getProgress() {
-        return this.playbackModel.get('progress'); // ✅ Délègue
+        return this.playbackModel.get('progress'); // âœ… DÃ©lÃ¨gue
     }
     
     isPlaying() {
-        return this.playbackModel.get('state') === 'PLAYING'; // ✅ Délègue
+        return this.playbackModel.get('state') === 'PLAYING'; // âœ… DÃ©lÃ¨gue
     }
     
     isPaused() {
-        return this.playbackModel.get('state') === 'PAUSED'; // ✅ Délègue
+        return this.playbackModel.get('state') === 'PAUSED'; // âœ… DÃ©lÃ¨gue
     }
     
     isStopped() {
-        return this.playbackModel.get('state') === 'STOPPED'; // ✅ Délègue
+        return this.playbackModel.get('state') === 'STOPPED'; // âœ… DÃ©lÃ¨gue
     }
     
     getCurrentFile() {
@@ -933,7 +934,7 @@ class GlobalPlaybackController {
     destroy() {
         this.logger.info('GlobalPlaybackController', 'Destroying...');
         
-        // Arrêter lecture
+        // ArrÃªter lecture
         this.stop().catch(() => {});
         
         // Nettoyer PlaybackModel
@@ -944,10 +945,10 @@ class GlobalPlaybackController {
         // Nettoyer cache
         this.clearCache();
         
-        // Réinitialiser singleton
+        // RÃ©initialiser singleton
         GlobalPlaybackController.instance = null;
         
-        this.logger.info('GlobalPlaybackController', '✓ Destroyed');
+        this.logger.info('GlobalPlaybackController', 'âœ“ Destroyed');
     }
 }
 
@@ -962,3 +963,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.GlobalPlaybackController = GlobalPlaybackController;
 }
+
+window.GlobalPlaybackController = GlobalPlaybackController;

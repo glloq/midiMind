@@ -593,3 +593,4 @@ class CCRenderer {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CCRenderer;
 }
+window.CCRenderer = CCRenderer;

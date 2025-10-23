@@ -408,7 +408,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.InstrumentController = InstrumentController;
 }
-
+window.InstrumentController = InstrumentController;
 // ============================================================================
 // FIN DU FICHIER InstrumentController.js v3.0.1-FIXED
 // ============================================================================

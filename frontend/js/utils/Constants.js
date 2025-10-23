@@ -447,7 +447,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.Constants = Constants;
 }
-
+window.Constants = Constants;
 // ============================================================================
 // LOG STATS AU CHARGEMENT (DEBUG)
 // ============================================================================

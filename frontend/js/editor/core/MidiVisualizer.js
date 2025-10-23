@@ -32,6 +32,7 @@
 // Auteur: MidiMind Team
 // ============================================================================
 
+
 class MidiVisualizer {
     constructor(canvas, config = {}, eventBus = null, debugConsole = null) {
         this.canvas = canvas;
@@ -285,7 +286,7 @@ class MidiVisualizer {
      */
     render() {
         if (!this.midiData) {
-            this.renderEngine.clear();
+            this.renderEngine.clearCanvas();
             return;
         }
         
@@ -699,7 +700,10 @@ class MidiVisualizer {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MidiVisualizer;
-}-e 
+}
 if (typeof window !== 'undefined') {
     window.MidiVisualizer = MidiVisualizer;
 }
+
+// Export par défaut
+window.MidiVisualizer = MidiVisualizer;

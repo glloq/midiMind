@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/src/utils/MidiJsonConverter.js
+// Fichier: frontend/js/core/MidiJsonConverter.js
 // Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.1.0 - 2025-10-14
 // ============================================================================
@@ -792,7 +792,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.MidiJsonConverter = MidiJsonConverter;
 }
-
+window.MidiJsonConverter = MidiJsonConverter;
 // ============================================================================
 // FIN DU FICHIER MidiJsonConverter.js
 // ============================================================================

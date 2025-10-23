@@ -2,32 +2,34 @@
 // Fichier: frontend/js/controllers/PlaylistController.js
 // Version: v3.0.3 - COMPLETE
 // Date: 2025-10-10
-// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
-//   ContrÃ´leur principal de gestion des playlists
-//   Coordonne PlaylistModel, PlaylistView et gÃ¨re les interactions
+//   ContrÃƒÂ´leur principal de gestion des playlists
+//   Coordonne PlaylistModel, PlaylistView et gÃƒÂ¨re les interactions
 //
-// FonctionnalitÃ©s:
-//   âœ“ Gestion CRUD playlists (Create, Read, Update, Delete)
-//   âœ“ Navigation (next, previous, jump)
-//   âœ“ Queue temporaire
-//   âœ“ Modes lecture (shuffle, repeat, auto-advance)
-//   âœ“ Import/Export playlists (M3U, PLS, XSPF, JSON)
-//   âœ“ Drag & Drop
-//   âœ“ Historique de lecture
+// FonctionnalitÃƒÂ©s:
+//   Ã¢Å“â€œ Gestion CRUD playlists (Create, Read, Update, Delete)
+//   Ã¢Å“â€œ Navigation (next, previous, jump)
+//   Ã¢Å“â€œ Queue temporaire
+//   Ã¢Å“â€œ Modes lecture (shuffle, repeat, auto-advance)
+//   Ã¢Å“â€œ Import/Export playlists (M3U, PLS, XSPF, JSON)
+//   Ã¢Å“â€œ Drag & Drop
+//   Ã¢Å“â€œ Historique de lecture
 //
 // Architecture:
-//   HÃ©rite de BaseController
-//   Utilise PlaylistModel pour la logique mÃ©tier
+//   HÃƒÂ©rite de BaseController
+//   Utilise PlaylistModel pour la logique mÃƒÂ©tier
 //   Coordonne avec PlaylistView pour l'affichage
 //
 // Auteur: midiMind Team
 // ============================================================================
 
 /**
- * PlaylistController - ContrÃ´leur de gestion des playlists
+ * PlaylistController - ContrÃƒÂ´leur de gestion des playlists
  * @extends BaseController
+import BaseController from './BaseController.js';
+
  */
 class PlaylistController extends BaseController {
     
@@ -36,9 +38,9 @@ class PlaylistController extends BaseController {
     // ========================================================================
     
     /**
-     * Construit le contrÃ´leur de playlist
-     * @param {EventBus} eventBus - Bus d'Ã©vÃ©nements global
-     * @param {Object} models - Objet contenant tous les modÃ¨les
+     * Construit le contrÃƒÂ´leur de playlist
+     * @param {EventBus} eventBus - Bus d'ÃƒÂ©vÃƒÂ©nements global
+     * @param {Object} models - Objet contenant tous les modÃƒÂ¨les
      * @param {Object} views - Objet contenant toutes les vues
      * @param {NotificationManager} notifications - Gestionnaire de notifications
      * @param {DebugConsole} debugConsole - Console de debug
@@ -46,17 +48,17 @@ class PlaylistController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Nom du contrÃ´leur
+        // Nom du contrÃƒÂ´leur
         this.name = 'PlaylistController';
         
-        // RÃ©fÃ©rences aux modÃ¨les
+        // RÃƒÂ©fÃƒÂ©rences aux modÃƒÂ¨les
         this.playlistModel = models?.playlist || null;
         this.fileModel = models?.file || null;
         
-        // RÃ©fÃ©rence Ã  la vue
+        // RÃƒÂ©fÃƒÂ©rence ÃƒÂ  la vue
         this.view = views?.playlist || null;
         
-        // Ã‰tat du contrÃ´leur
+        // Ãƒâ€°tat du contrÃƒÂ´leur
         this.state = {
             currentPlaylist: null,
             currentFile: null,
@@ -108,13 +110,13 @@ class PlaylistController extends BaseController {
             errors: 0
         };
         
-        // Import/Export handler (sera ajoutÃ© par mixin)
+        // Import/Export handler (sera ajoutÃƒÂ© par mixin)
         this.importExport = null;
         
         // Logger
         this.logger = window.logger || console;
         
-        this.logger.info('PlaylistController', 'ðŸŽµ PlaylistController v3.0.3 initialized');
+        this.logger.info('PlaylistController', 'Ã°Å¸Å½Âµ PlaylistController v3.0.3 initialized');
     }
     
 
@@ -123,30 +125,30 @@ class PlaylistController extends BaseController {
     // ========================================================================
     
     initialize() {
-        this.logDebug('playlist', 'ðŸŽµ Initializing PlaylistController v3.0.2');
+        this.logDebug('playlist', 'Ã°Å¸Å½Âµ Initializing PlaylistController v3.0.2');
         
         this.bindEvents();
         this.loadSavedState();
         
         this.state.isInitialized = true;
         
-        this.logDebug('playlist', 'âœ“ PlaylistController initialized with auto-advance & queue');
+        this.logDebug('playlist', 'Ã¢Å“â€œ PlaylistController initialized with auto-advance & queue');
     }
     
     /**
-     * Injection du PlaybackController (appelÃ©e par Application)
+     * Injection du PlaybackController (appelÃƒÂ©e par Application)
      */
     setPlaybackController(playbackController) {
         this.playbackController = playbackController;
-        this.logDebug('playlist', 'âœ“ PlaybackController linked');
+        this.logDebug('playlist', 'Ã¢Å“â€œ PlaybackController linked');
     }
     
     // ========================================================================
-    // Ã‰VÃ‰NEMENTS
+    // Ãƒâ€°VÃƒâ€°NEMENTS
     // ========================================================================
     
     bindEvents() {
-        // Ã‰vÃ©nements PlaylistModel
+        // Ãƒâ€°vÃƒÂ©nements PlaylistModel
         this.eventBus.on('playlist:created', (data) => this.onPlaylistCreated(data));
         this.eventBus.on('playlist:loaded', (data) => this.onPlaylistLoaded(data));
         this.eventBus.on('playlist:updated', (data) => this.onPlaylistUpdated(data));
@@ -158,10 +160,10 @@ class PlaylistController extends BaseController {
         this.eventBus.on('playlist:jump', (data) => this.onJump(data));
         this.eventBus.on('playlist:ended', () => this.onPlaylistEnded());
         
-        // Auto-advance âœ… NOUVEAU
+        // Auto-advance Ã¢Å“â€¦ NOUVEAU
         this.eventBus.on('playlist:auto-advance', (data) => this.onAutoAdvance(data));
         
-        // Queue management âœ… NOUVEAU
+        // Queue management Ã¢Å“â€¦ NOUVEAU
         this.eventBus.on('playlist:queue-added', (data) => this.onQueueAdded(data));
         this.eventBus.on('playlist:queue-removed', (data) => this.onQueueRemoved(data));
         this.eventBus.on('playlist:queue-cleared', () => this.onQueueCleared());
@@ -173,12 +175,12 @@ class PlaylistController extends BaseController {
         this.eventBus.on('playlist:repeat-changed', (data) => this.onRepeatChanged(data));
         this.eventBus.on('playlist:auto-advance-changed', (data) => this.onAutoAdvanceChanged(data));
         
-        // Ã‰vÃ©nements Playback (pour coordination)
+        // Ãƒâ€°vÃƒÂ©nements Playback (pour coordination)
         this.eventBus.on('playback:started', () => this.onPlaybackStarted());
         this.eventBus.on('playback:stopped', () => this.onPlaybackStopped());
         this.eventBus.on('playback:finished', () => this.onPlaybackFinished());
         
-        this.logDebug('playlist', 'âœ“ Events bound');
+        this.logDebug('playlist', 'Ã¢Å“â€œ Events bound');
     }
     
     // ========================================================================
@@ -186,7 +188,7 @@ class PlaylistController extends BaseController {
     // ========================================================================
     
     /**
-     * CrÃ©e une nouvelle playlist
+     * CrÃƒÂ©e une nouvelle playlist
      */
     async createPlaylist(name, files = []) {
         if (!name || !name.trim()) {
@@ -246,7 +248,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Met Ã  jour une playlist
+     * Met ÃƒÂ  jour une playlist
      */
     async updatePlaylist(playlistId, updates) {
         try {
@@ -290,7 +292,7 @@ class PlaylistController extends BaseController {
                 this.showSuccess('Playlist deleted');
             }
             
-            // Si c'Ã©tait la playlist courante, la dÃ©charger
+            // Si c'ÃƒÂ©tait la playlist courante, la dÃƒÂ©charger
             if (this.state.currentPlaylist?.id === playlistId) {
                 this.state.currentPlaylist = null;
             }
@@ -307,7 +309,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Ajoute un fichier Ã  une playlist
+     * Ajoute un fichier ÃƒÂ  une playlist
      */
     async addFileToPlaylist(playlistId, fileId) {
         try {
@@ -392,7 +394,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Fichier prÃ©cÃ©dent
+     * Fichier prÃƒÂ©cÃƒÂ©dent
      */
     async previous() {
         if (!this.playlistModel) {
@@ -425,7 +427,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Sauter Ã  un index
+     * Sauter ÃƒÂ  un index
      */
     async jumpTo(index) {
         if (!this.playlistModel) {
@@ -458,11 +460,11 @@ class PlaylistController extends BaseController {
     }
     
     // ========================================================================
-    // QUEUE MANAGEMENT - âœ… NOUVEAU
+    // QUEUE MANAGEMENT - Ã¢Å“â€¦ NOUVEAU
     // ========================================================================
     
     /**
-     * Ajoute un fichier Ã  la queue
+     * Ajoute un fichier ÃƒÂ  la queue
      */
     addToQueue(fileId) {
         if (!this.playlistModel) {
@@ -488,7 +490,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Ajoute plusieurs fichiers Ã  la queue
+     * Ajoute plusieurs fichiers ÃƒÂ  la queue
      */
     addMultipleToQueue(fileIds) {
         if (!this.playlistModel) {
@@ -593,7 +595,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * RÃ©ordonne la queue (drag & drop)
+     * RÃƒÂ©ordonne la queue (drag & drop)
      */
     reorderQueue(fromIndex, toIndex) {
         if (!this.playlistModel) {
@@ -604,7 +606,7 @@ class PlaylistController extends BaseController {
         const success = this.playlistModel.reorderQueue(fromIndex, toIndex);
         
         if (success) {
-            this.logDebug('playlist', `Queue reordered: ${fromIndex} â†’ ${toIndex}`);
+            this.logDebug('playlist', `Queue reordered: ${fromIndex} Ã¢â€ â€™ ${toIndex}`);
             this.refreshQueueView();
         }
         
@@ -629,7 +631,7 @@ class PlaylistController extends BaseController {
     // ========================================================================
     
     /**
-     * Active/dÃ©sactive le shuffle
+     * Active/dÃƒÂ©sactive le shuffle
      */
     toggleShuffle() {
         if (!this.playlistModel) return false;
@@ -672,7 +674,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Cycle entre les modes repeat (none â†’ one â†’ all â†’ none)
+     * Cycle entre les modes repeat (none Ã¢â€ â€™ one Ã¢â€ â€™ all Ã¢â€ â€™ none)
      */
     cycleRepeatMode() {
         if (!this.playlistModel) return;
@@ -684,7 +686,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Active/dÃ©sactive l'auto-advance
+     * Active/dÃƒÂ©sactive l'auto-advance
      */
     toggleAutoAdvance() {
         if (!this.playlistModel) return false;
@@ -702,7 +704,7 @@ class PlaylistController extends BaseController {
     }
     
     // ========================================================================
-    // CALLBACKS Ã‰VÃ‰NEMENTS PLAYLISTMODEL
+    // CALLBACKS Ãƒâ€°VÃƒâ€°NEMENTS PLAYLISTMODEL
     // ========================================================================
     
     onPlaylistCreated(data) {
@@ -774,7 +776,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Auto-advance âœ… NOUVEAU
+     * Auto-advance Ã¢Å“â€¦ NOUVEAU
      */
     async onAutoAdvance(data) {
         this.logDebug('playlist', `Auto-advance to: ${data.file?.name || data.file?.id}`);
@@ -787,7 +789,7 @@ class PlaylistController extends BaseController {
                 await this.playbackController.loadFile(data.file.id);
                 await this.playbackController.play();
                 
-                this.logDebug('playlist', 'âœ“ Auto-advance completed');
+                this.logDebug('playlist', 'Ã¢Å“â€œ Auto-advance completed');
                 
             } catch (error) {
                 this.logDebug('error', `Auto-advance failed: ${error.message}`);
@@ -802,7 +804,7 @@ class PlaylistController extends BaseController {
   
   
     // ========================================================================
-    // CALLBACKS QUEUE âœ… NOUVEAU
+    // CALLBACKS QUEUE Ã¢Å“â€¦ NOUVEAU
     // ========================================================================
     
     onQueueAdded(data) {
@@ -892,13 +894,13 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Fin de lecture d'un fichier - dÃ©clenche auto-advance
+     * Fin de lecture d'un fichier - dÃƒÂ©clenche auto-advance
      */
     onPlaybackFinished() {
         this.logDebug('playlist', 'Playback finished - triggering auto-advance check');
         
-        // Le PlaylistModel Ã©coute dÃ©jÃ  'playback:finished' et gÃ¨re l'auto-advance
-        // Ici on peut juste mettre Ã  jour l'UI si nÃ©cessaire
+        // Le PlaylistModel ÃƒÂ©coute dÃƒÂ©jÃƒÂ  'playback:finished' et gÃƒÂ¨re l'auto-advance
+        // Ici on peut juste mettre ÃƒÂ  jour l'UI si nÃƒÂ©cessaire
         
         if (this.view && this.view.showPlaybackComplete) {
             this.view.showPlaybackComplete();
@@ -910,7 +912,7 @@ class PlaylistController extends BaseController {
     // ========================================================================
     
     /**
-     * RafraÃ®chit la vue complÃ¨te
+     * RafraÃƒÂ®chit la vue complÃƒÂ¨te
      */
     refreshView() {
         if (!this.view) return;
@@ -930,11 +932,11 @@ class PlaylistController extends BaseController {
             this.view.render(data);
         }
         
-        this.logDebug('playlist', 'âœ“ View refreshed');
+        this.logDebug('playlist', 'Ã¢Å“â€œ View refreshed');
     }
     
     /**
-     * RafraÃ®chit uniquement la vue de la queue
+     * RafraÃƒÂ®chit uniquement la vue de la queue
      */
     refreshQueueView() {
         if (!this.view || !this.view.renderQueue) return;
@@ -951,7 +953,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Sauvegarde l'Ã©tat
+     * Sauvegarde l'ÃƒÂ©tat
      */
     saveState() {
         if (!this.playlistModel) return;
@@ -965,14 +967,14 @@ class PlaylistController extends BaseController {
         
         try {
             localStorage.setItem('midiMind_playlistState', JSON.stringify(state));
-            this.logDebug('playlist', 'âœ“ State saved');
+            this.logDebug('playlist', 'Ã¢Å“â€œ State saved');
         } catch (error) {
             this.logDebug('error', `Failed to save state: ${error.message}`);
         }
     }
     
     /**
-     * Charge l'Ã©tat sauvegardÃ©
+     * Charge l'ÃƒÂ©tat sauvegardÃƒÂ©
      */
     loadSavedState() {
         try {
@@ -993,13 +995,13 @@ class PlaylistController extends BaseController {
                     this.playlistModel.setAutoAdvance(state.autoAdvance);
                 }
                 
-                // Charger la playlist si nÃ©cessaire
+                // Charger la playlist si nÃƒÂ©cessaire
                 if (state.currentPlaylistId) {
                     this.loadPlaylist(state.currentPlaylistId).catch(() => {});
                 }
             }
             
-            this.logDebug('playlist', 'âœ“ State restored');
+            this.logDebug('playlist', 'Ã¢Å“â€œ State restored');
             
         } catch (error) {
             this.logDebug('error', `Failed to load state: ${error.message}`);
@@ -1023,7 +1025,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Retourne l'Ã©tat complet
+     * Retourne l'ÃƒÂ©tat complet
      */
     getState() {
         return {
@@ -1044,7 +1046,7 @@ class PlaylistController extends BaseController {
      * Exporte une playlist
      * @param {string} playlistId - ID playlist
      * @param {string} format - 'json'|'m3u'|'m3u8'|'pls'|'xspf'
-     * @returns {string} Contenu exportÃ©
+     * @returns {string} Contenu exportÃƒÂ©
      */
     export(playlistId, format = 'json') {
         const playlist = this.controller.playlistModel.getPlaylistById(playlistId);
@@ -1153,7 +1155,7 @@ class PlaylistController extends BaseController {
     // =============================================
     
     /**
-     * TÃ©lÃ©charge une playlist
+     * TÃƒÂ©lÃƒÂ©charge une playlist
      * @param {string} playlistId - ID playlist
      * @param {string} format - Format d'export
      */
@@ -1161,11 +1163,11 @@ class PlaylistController extends BaseController {
         const content = this.export(playlistId, format);
         const playlist = this.controller.playlistModel.getPlaylistById(playlistId);
         
-        // CrÃ©er blob
+        // CrÃƒÂ©er blob
         const blob = new Blob([content], { type: this.getMimeType(format) });
         const url = URL.createObjectURL(blob);
         
-        // CrÃ©er lien download
+        // CrÃƒÂ©er lien download
         const a = document.createElement('a');
         a.href = url;
         a.download = `${playlist.name}.${format}`;
@@ -1173,7 +1175,7 @@ class PlaylistController extends BaseController {
         a.click();
         document.body.removeChild(a);
         
-        // LibÃ©rer URL
+        // LibÃƒÂ©rer URL
         setTimeout(() => URL.revokeObjectURL(url), 100);
         
         this.logger.info('PlaylistExport', `Downloaded: ${playlist.name}.${format}`);
@@ -1216,15 +1218,15 @@ class PlaylistController extends BaseController {
     destroy() {
         this.logDebug('playlist', 'Destroying PlaylistController...');
         
-        // Sauvegarder l'Ã©tat
+        // Sauvegarder l'ÃƒÂ©tat
         this.saveState();
         
-        // Nettoyer les rÃ©fÃ©rences
+        // Nettoyer les rÃƒÂ©fÃƒÂ©rences
         this.playbackController = null;
         this.state.currentPlaylist = null;
         this.state.currentFile = null;
         
-        this.logDebug('playlist', 'âœ“ PlaylistController destroyed');
+        this.logDebug('playlist', 'Ã¢Å“â€œ PlaylistController destroyed');
     }
 
 }
@@ -1248,3 +1250,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PlaylistController = PlaylistController;
 }
+
+window.PlaylistController = PlaylistController;

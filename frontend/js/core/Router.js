@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/core/Router.js
+// Fichier: frontend/js/core/Router.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -745,3 +745,4 @@ class Router {
         return [...this.state.history];
     }
 }
+window.Router = Router;

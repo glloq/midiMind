@@ -2,15 +2,16 @@
 // Fichier: frontend/js/controllers/KeyboardController.js
 // Version: v3.1.0 - ADAPTED FOR MIDI.SEND
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// ✓ Utilisation de midi.send pour playback direct
-// ✓ Récupération instruments via devices.list / latency.list
-// ✓ Support note_mappings personnalisés
-// ✓ SUPPRESSION COMPLÈTE : enregistrement + loops
-// ✓ Affichage notes entrantes DÉSACTIVÉ
+// âœ“ Utilisation de midi.send pour playback direct
+// âœ“ RÃ©cupÃ©ration instruments via devices.list / latency.list
+// âœ“ Support note_mappings personnalisÃ©s
+// âœ“ SUPPRESSION COMPLÃˆTE : enregistrement + loops
+// âœ“ Affichage notes entrantes DÃ‰SACTIVÃ‰
 // ============================================================================
+
 
 class KeyboardController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
@@ -18,20 +19,20 @@ class KeyboardController extends BaseController {
         
         // Configuration
         this.mode = PerformanceConfig.keyboard.mode || 'monitor';
-        this.enableRecording = false;  // ✓ DÉSACTIVÉ
-        this.enableLoopRecorder = false;  // ✓ DÉSACTIVÉ
+        this.enableRecording = false;  // âœ“ DÃ‰SACTIVÃ‰
+        this.enableLoopRecorder = false;  // âœ“ DÃ‰SACTIVÃ‰
         this.enablePlayback = PerformanceConfig.keyboard.enablePlayback || true;
-        this.showIncomingNotes = false;  // ✓ DÉSACTIVÉ
+        this.showIncomingNotes = false;  // âœ“ DÃ‰SACTIVÃ‰
         
-        // Instrument sélectionné
+        // Instrument sÃ©lectionnÃ©
         this.selectedInstrument = null;
         this.instrumentProfile = null;
-        this.noteRange = { min: 21, max: 108 };  // 88 touches par défaut
-        this.noteMapping = null;  // Mapping personnalisé si existe
+        this.noteRange = { min: 21, max: 108 };  // 88 touches par dÃ©faut
+        this.noteMapping = null;  // Mapping personnalisÃ© si existe
         
         // Notes actives
-        this.activeNotes = new Map();  // note → { velocity, timestamp }
-        this.pressedKeys = new Set();  // Touches clavier PC enfoncées
+        this.activeNotes = new Map();  // note â†’ { velocity, timestamp }
+        this.pressedKeys = new Set();  // Touches clavier PC enfoncÃ©es
         
         // Devices disponibles
         this.availableDevices = [];
@@ -46,7 +47,7 @@ class KeyboardController extends BaseController {
             errors: 0
         };
         
-        this.logDebug('keyboard', `✓ KeyboardController initialized (mode: ${this.mode})`);
+        this.logDebug('keyboard', `âœ“ KeyboardController initialized (mode: ${this.mode})`);
         
         this.initialize();
     }
@@ -63,7 +64,7 @@ class KeyboardController extends BaseController {
     }
     
     attachEvents() {
-        // Sélection instrument
+        // SÃ©lection instrument
         this.eventBus.on('keyboard:select-instrument', async (data) => {
             await this.selectInstrument(data.instrumentId);
         });
@@ -73,10 +74,10 @@ class KeyboardController extends BaseController {
             this.currentVelocity = data.velocity;
         });
         
-        // ✓ SUPPRIMÉ : événements d'enregistrement
-        // ✓ SUPPRIMÉ : événements de loop recorder
+        // âœ“ SUPPRIMÃ‰ : Ã©vÃ©nements d'enregistrement
+        // âœ“ SUPPRIMÃ‰ : Ã©vÃ©nements de loop recorder
         
-        // ✓ DÉSACTIVÉ : Affichage notes entrantes
+        // âœ“ DÃ‰SACTIVÃ‰ : Affichage notes entrantes
         // this.eventBus.on('midi:noteOn', ...) 
         // this.eventBus.on('midi:noteOff', ...)
         
@@ -85,7 +86,7 @@ class KeyboardController extends BaseController {
     }
     
     attachKeyboardEvents() {
-        // Mapping clavier PC → notes MIDI
+        // Mapping clavier PC â†’ notes MIDI
         this.keyboardMap = this.createKeyboardMap();
         
         document.addEventListener('keydown', (e) => {
@@ -99,7 +100,7 @@ class KeyboardController extends BaseController {
     }
     
     createKeyboardMap() {
-        // Mapping touches PC → notes MIDI (2 octaves)
+        // Mapping touches PC â†’ notes MIDI (2 octaves)
         return {
             // Octave basse (touches QWERTY)
             'a': 60,  // C4
@@ -132,23 +133,23 @@ class KeyboardController extends BaseController {
     
     async loadAvailableDevices() {
         try {
-            // Essayer latency.list d'abord (instruments configurés)
+            // Essayer latency.list d'abord (instruments configurÃ©s)
             let response = await this.backend.sendCommand('latency.list');
             
             if (response.success && response.devices) {
                 this.availableDevices = response.devices;
-                this.logDebug('keyboard', `✓ Loaded ${response.devices.length} devices from latency.list`);
+                this.logDebug('keyboard', `âœ“ Loaded ${response.devices.length} devices from latency.list`);
             } else {
                 // Fallback sur devices.list
                 response = await this.backend.sendCommand('devices.list');
                 
                 if (response.success && response.devices) {
                     this.availableDevices = response.devices;
-                    this.logDebug('keyboard', `✓ Loaded ${response.devices.length} devices from devices.list`);
+                    this.logDebug('keyboard', `âœ“ Loaded ${response.devices.length} devices from devices.list`);
                 }
             }
             
-            // Émettre événement
+            // Ã‰mettre Ã©vÃ©nement
             this.eventBus.emit('keyboard:devices-loaded', {
                 devices: this.availableDevices
             });
@@ -160,12 +161,12 @@ class KeyboardController extends BaseController {
     }
     
     // ========================================================================
-    // SÉLECTION INSTRUMENT
+    // SÃ‰LECTION INSTRUMENT
     // ========================================================================
     
     async selectInstrument(instrumentId) {
         if (!instrumentId) {
-            // Désélection
+            // DÃ©sÃ©lection
             this.selectedInstrument = null;
             this.instrumentProfile = null;
             this.noteRange = { min: 21, max: 108 };
@@ -179,7 +180,7 @@ class KeyboardController extends BaseController {
         this.selectedInstrument = instrumentId;
         
         try {
-            // Récupérer profil instrument
+            // RÃ©cupÃ©rer profil instrument
             const response = await this.backend.sendCommand('instruments.getProfile', {
                 instrument_id: instrumentId
             });
@@ -213,7 +214,7 @@ class KeyboardController extends BaseController {
                     this.noteMapping = null;
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('keyboard:instrument-selected', {
                     instrumentId,
                     profile: this.instrumentProfile,
@@ -221,7 +222,7 @@ class KeyboardController extends BaseController {
                     hasCustomMapping: this.noteMapping !== null
                 });
                 
-                this.showNotification(`Instrument sélectionné: ${response.profile.name}`, 'success');
+                this.showNotification(`Instrument sÃ©lectionnÃ©: ${response.profile.name}`, 'success');
                 
             } else {
                 throw new Error(response.error || 'Failed to get profile');
@@ -231,7 +232,7 @@ class KeyboardController extends BaseController {
             this.logDebug('keyboard', `Error loading instrument: ${error.message}`, 'error');
             this.showNotification('Erreur chargement instrument', 'error');
             
-            // Réinitialiser
+            // RÃ©initialiser
             this.selectedInstrument = null;
             this.instrumentProfile = null;
         }
@@ -248,11 +249,11 @@ class KeyboardController extends BaseController {
         }
         
         if (!this.selectedInstrument) {
-            this.showNotification('Sélectionnez un instrument', 'warning');
+            this.showNotification('SÃ©lectionnez un instrument', 'warning');
             return;
         }
         
-        // Vérifier si note jouable
+        // VÃ©rifier si note jouable
         if (!this.isNotePlayable(note)) {
             this.logDebug('keyboard', `Note ${note} not playable (out of range or not mapped)`, 'warn');
             return;
@@ -262,7 +263,7 @@ class KeyboardController extends BaseController {
         const finalVelocity = velocity !== null ? velocity : this.currentVelocity;
         
         try {
-            // ✓ UTILISER midi.send pour noteOn
+            // âœ“ UTILISER midi.send pour noteOn
             const response = await this.backend.sendCommand('midi.send', {
                 device_id: this.selectedInstrument,
                 message: {
@@ -282,7 +283,7 @@ class KeyboardController extends BaseController {
                 
                 this.stats.notesPlayed++;
                 
-                // Émettre événement pour mise à jour UI
+                // Ã‰mettre Ã©vÃ©nement pour mise Ã  jour UI
                 this.eventBus.emit('keyboard:note-on', {
                     note,
                     velocity: finalVelocity
@@ -305,13 +306,13 @@ class KeyboardController extends BaseController {
             return;
         }
         
-        // Vérifier si note active
+        // VÃ©rifier si note active
         if (!this.activeNotes.has(note)) {
             return;
         }
         
         try {
-            // ✓ UTILISER midi.send pour noteOff
+            // âœ“ UTILISER midi.send pour noteOff
             const response = await this.backend.sendCommand('midi.send', {
                 device_id: this.selectedInstrument,
                 message: {
@@ -323,7 +324,7 @@ class KeyboardController extends BaseController {
             });
             
             if (response.success) {
-                // Calculer durée
+                // Calculer durÃ©e
                 const noteInfo = this.activeNotes.get(note);
                 const duration = Date.now() - noteInfo.timestamp;
                 this.stats.totalDuration += duration;
@@ -331,7 +332,7 @@ class KeyboardController extends BaseController {
                 // Retirer des notes actives
                 this.activeNotes.delete(note);
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('keyboard:note-off', {
                     note,
                     duration
@@ -354,17 +355,17 @@ class KeyboardController extends BaseController {
     // ========================================================================
     
     isNotePlayable(note) {
-        // Si mapping personnalisé, vérifier si note existe dans mapping
+        // Si mapping personnalisÃ©, vÃ©rifier si note existe dans mapping
         if (this.noteMapping) {
             return this.noteMapping.has(note);
         }
         
-        // Sinon, vérifier range
+        // Sinon, vÃ©rifier range
         return note >= this.noteRange.min && note <= this.noteRange.max;
     }
     
     getPlayableNotes() {
-        // Si mapping personnalisé, retourner liste des notes mappées
+        // Si mapping personnalisÃ©, retourner liste des notes mappÃ©es
         if (this.noteMapping) {
             return Array.from(this.noteMapping.keys()).sort((a, b) => a - b);
         }
@@ -397,12 +398,12 @@ class KeyboardController extends BaseController {
         
         const key = e.key.toLowerCase();
         
-        // Vérifier si touche mappée
+        // VÃ©rifier si touche mappÃ©e
         if (!this.keyboardMap[key]) {
             return;
         }
         
-        // Éviter répétition
+        // Ã‰viter rÃ©pÃ©tition
         if (this.pressedKeys.has(key)) {
             return;
         }
@@ -428,20 +429,20 @@ class KeyboardController extends BaseController {
         
         const note = this.keyboardMap[key];
         
-        // Arrêter note
+        // ArrÃªter note
         this.stopNote(note);
         
         e.preventDefault();
     }
     
     // ========================================================================
-    // PANIC (arrêter toutes les notes)
+    // PANIC (arrÃªter toutes les notes)
     // ========================================================================
     
     async panic() {
         this.logDebug('keyboard', 'PANIC: stopping all notes');
         
-        // Arrêter toutes les notes actives
+        // ArrÃªter toutes les notes actives
         const notes = Array.from(this.activeNotes.keys());
         
         for (const note of notes) {
@@ -451,7 +452,7 @@ class KeyboardController extends BaseController {
         this.activeNotes.clear();
         this.pressedKeys.clear();
         
-        this.showNotification('Toutes les notes arrêtées', 'info');
+        this.showNotification('Toutes les notes arrÃªtÃ©es', 'info');
     }
     
     // ========================================================================
@@ -467,7 +468,7 @@ class KeyboardController extends BaseController {
             playableNotes: this.getPlayableNotes().length,
             activeNotes: this.activeNotes.size,
             currentVelocity: this.currentVelocity,
-            enableRecording: false,  // ✓ Toujours false
+            enableRecording: false,  // âœ“ Toujours false
             enablePlayback: this.enablePlayback
         };
     }
@@ -487,29 +488,29 @@ class KeyboardController extends BaseController {
     }
     
     // ========================================================================
-    // MÉTHODES SUPPRIMÉES (enregistrement + loops)
+    // MÃ‰THODES SUPPRIMÃ‰ES (enregistrement + loops)
     // ========================================================================
     
-    // ✓ SUPPRIMÉ : startRecording()
-    // ✓ SUPPRIMÉ : stopRecording()
-    // ✓ SUPPRIMÉ : saveRecording()
-    // ✓ SUPPRIMÉ : startLoop()
-    // ✓ SUPPRIMÉ : stopLoop()
-    // ✓ SUPPRIMÉ : clearLoop()
+    // âœ“ SUPPRIMÃ‰ : startRecording()
+    // âœ“ SUPPRIMÃ‰ : stopRecording()
+    // âœ“ SUPPRIMÃ‰ : saveRecording()
+    // âœ“ SUPPRIMÃ‰ : startLoop()
+    // âœ“ SUPPRIMÃ‰ : stopLoop()
+    // âœ“ SUPPRIMÃ‰ : clearLoop()
     
     // ========================================================================
     // DESTRUCTION
     // ========================================================================
     
     destroy() {
-        // Arrêter toutes les notes
+        // ArrÃªter toutes les notes
         this.panic();
         
         // Nettoyer
         this.activeNotes.clear();
         this.pressedKeys.clear();
         
-        this.logDebug('keyboard', '✓ KeyboardController destroyed');
+        this.logDebug('keyboard', 'âœ“ KeyboardController destroyed');
         
         super.destroy();
     }
@@ -526,3 +527,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.KeyboardController = KeyboardController;
 }
+
+// Export par défaut
+window.KeyboardController = KeyboardController;

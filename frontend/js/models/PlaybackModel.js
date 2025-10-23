@@ -1,27 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaybackModel.js
-// Version: v3.0.1 - FIXED CONSTRUCTOR ONLY
-// Date: 2025-10-19
+// Version: v3.1.02 - FIXED (Methods inside class)
+// Date: 2025-10-23
 // ============================================================================
-// CORRECTION: Uniquement le constructeur (super call)
-// RIEN D'AUTRE N'EST MODIFIÉ - Tout ton code reste identique
+// CORRECTIONS v3.1.02:
+// ✓ Toutes les méthodes sont maintenant DANS la classe
+// ✓ Suppression du code hors classe
+// ✓ Méthodes get/set/update/setLoopPoints/watch correctement placées
 // ============================================================================
 
 class PlaybackModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✅ FIX: Correct super() call
+        // ✓ FIX: Correct super() call
         super({}, {
             persistKey: 'playbackmodel',
             eventPrefix: 'playback',
             autoPersist: false
         });
         
-        // ✅ FIX: Assign immediately
+        // ✓ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // ✅ FIX: Initialize data directly (pas d'appel à this.initialize())
+        // ✓ FIX: Initialize data directly
         this.data = {
             // État de lecture
             state: 'STOPPED', // PLAYING, PAUSED, STOPPED
@@ -70,7 +72,7 @@ class PlaybackModel extends BaseModel {
             loopCheckInterval: 100
         };
         
-        this.logger.info('PlaybackModel', '✓ Model initialized');
+        this.logger.info('PlaybackModel', '✓ Model initialized v3.1.02');
     }
     
     // ========================================================================
@@ -297,6 +299,55 @@ class PlaybackModel extends BaseModel {
     }
     
     // ========================================================================
+    // MÉTHODES AJOUTÉES POUR COMPATIBILITÉ (maintenant DANS la classe)
+    // ========================================================================
+    
+    /**
+     * Override get() depuis BaseModel si nécessaire
+     */
+    get(key) {
+        return this.data[key];
+    }
+    
+    /**
+     * Override set() depuis BaseModel si nécessaire
+     * Supporte options { silent: true/false }
+     */
+    set(key, value, options = {}) {
+        this.data[key] = value;
+        if (!options.silent && this.eventBus) {
+            this.eventBus.emit('playback:' + key + '-changed', value);
+        }
+    }
+    
+    /**
+     * Override update() depuis BaseModel si nécessaire
+     * Supporte options { silent: true/false }
+     */
+    update(updates, options = {}) {
+        Object.assign(this.data, updates);
+        if (!options.silent && this.eventBus) {
+            this.eventBus.emit('playback:updated', updates);
+        }
+    }
+    
+    /**
+     * Alias pour setLoop pour compatibilité
+     */
+    setLoopPoints(start, end) {
+        this.setLoop(true, start, end);
+    }
+    
+    /**
+     * Surveille les changements d'une clé
+     */
+    watch(key, callback) {
+        if (this.eventBus) {
+            this.eventBus.on('playback:' + key + '-changed', callback);
+        }
+    }
+    
+    // ========================================================================
     // NETTOYAGE
     // ========================================================================
     
@@ -322,3 +373,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PlaybackModel = PlaybackModel;
 }
+
+// Export par défaut
+window.PlaybackModel = PlaybackModel;

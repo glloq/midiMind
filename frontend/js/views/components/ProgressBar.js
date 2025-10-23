@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/components/ProgressBar.js
+// Fichier: frontend/js/views/components/ProgressBar.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -519,3 +519,4 @@ class ProgressBar {
         }
     }
 }
+window.ProgressBar = ProgressBar;

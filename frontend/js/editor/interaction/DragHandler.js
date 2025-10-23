@@ -460,3 +460,4 @@ class DragHandler {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { DragHandler };
 }
+window.DragHandler = DragHandler;

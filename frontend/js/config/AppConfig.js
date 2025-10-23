@@ -268,3 +268,4 @@ AppConfig.set = function(path, newValue) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AppConfig;
 }
+window.AppConfig = AppConfig;

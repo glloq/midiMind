@@ -7,7 +7,7 @@
 
             bindEvents() {
                 this.eventBus.on('debug:toggled', (data) => {
-                    this.logDebug('system', `Debug panel ${data.active ? 'ouvert' : 'fermé'}`);
+                    this.logDebug('system', `Debug panel ${data.active ? 'ouvert' : 'fermÃ©'}`);
                 });
             }
 
@@ -19,3 +19,6 @@
                 this.debugConsole.toggleFilter(filter);
             }
         }
+
+// Export par défaut
+window.DebugController = DebugController;

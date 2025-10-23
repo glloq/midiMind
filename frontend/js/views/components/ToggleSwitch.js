@@ -1,5 +1,5 @@
 // ============================================================================
-// Fichier: frontend/scripts/views/components/ToggleSwitch.js
+// Fichier: frontend/js/views/components/ToggleSwitch.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -662,3 +662,4 @@ class ToggleSwitch {
         }
     }
 }
+window.ToggleSwitch = ToggleSwitch;

@@ -1,22 +1,22 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/ModalController.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Contrôleur de gestion des fenêtres modales de l'application.
-//   Gère l'ouverture, fermeture, validation et construction de contenu
-//   des modales (édition instruments, playlists, paramètres, etc.).
+//   ContrÃƒÂ´leur de gestion des fenÃƒÂªtres modales de l'application.
+//   GÃƒÂ¨re l'ouverture, fermeture, validation et construction de contenu
+//   des modales (ÃƒÂ©dition instruments, playlists, paramÃƒÂ¨tres, etc.).
 //
-// Fonctionnalités:
-//   - Création modales dynamiques (Alert, Confirm, Prompt, Custom)
+// FonctionnalitÃƒÂ©s:
+//   - CrÃƒÂ©ation modales dynamiques (Alert, Confirm, Prompt, Custom)
 //   - Gestion pile de modales (stack)
-//   - Validation données avant fermeture
-//   - Callbacks personnalisés (onOpen, onClose, onValidate)
-//   - Modales prédéfinies (instruments, playlists, settings)
+//   - Validation donnÃƒÂ©es avant fermeture
+//   - Callbacks personnalisÃƒÂ©s (onOpen, onClose, onValidate)
+//   - Modales prÃƒÂ©dÃƒÂ©finies (instruments, playlists, settings)
 //   - Formulaires avec validation
-//   - Templates réutilisables
+//   - Templates rÃƒÂ©utilisables
 //   - Animation d'ouverture/fermeture
 //
 // Architecture:
@@ -50,7 +50,7 @@ class ModalController extends BaseController {
             },
             playlistEditor: {
                 id: 'playlistEditorModal',
-                title: 'Éditeur de playlist',
+                title: 'Ãƒâ€°diteur de playlist',
                 size: 'large',
                 closable: true,
                 backdrop: true
@@ -64,7 +64,7 @@ class ModalController extends BaseController {
             },
             systemConfig: {
                 id: 'systemConfigModal',
-                title: 'Configuration système',
+                title: 'Configuration systÃƒÂ¨me',
                 size: 'extra-large',
                 closable: true,
                 backdrop: true
@@ -92,13 +92,13 @@ class ModalController extends BaseController {
             }
         };
 
-	    // État interne playlist editor
+	    // Ãƒâ€°tat interne playlist editor
         this._draggedPlaylistItem = null;	
 		
-        // État des modales
+        // Ãƒâ€°tat des modales
         this.modalState = {
             activeModals: new Set(),
-            modalStack: [], // Pour gérer l'empilement
+            modalStack: [], // Pour gÃƒÂ©rer l'empilement
             currentFocus: null,
             lastActiveElement: null
         };
@@ -123,10 +123,10 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Configuration des événements
+     * Configuration des ÃƒÂ©vÃƒÂ©nements
      */
     bindEvents() {
-        // Écouter les événements de modales
+        // Ãƒâ€°couter les ÃƒÂ©vÃƒÂ©nements de modales
         this.eventBus.on('modal:open', (data) => {
             this.open(data.modalId, data.options);
         });
@@ -139,32 +139,32 @@ class ModalController extends BaseController {
             this.confirm(data.message, data.callback, data.options);
         });
         
-        // Écouter les changements d'instruments pour les modales
+        // Ãƒâ€°couter les changements d'instruments pour les modales
         this.eventBus.on('instrument:updated', () => {
             this.invalidateCache(['channelSettings', 'instrumentConfig']);
         });
         
-        // Écouter les changements de fichiers pour les modales
+        // Ãƒâ€°couter les changements de fichiers pour les modales
         this.eventBus.on('file:added', () => {
             this.invalidateCache(['playlistEditor']);
         });
     }
 
     /**
-     * Initialise le système de modales
+     * Initialise le systÃƒÂ¨me de modales
      */
     initializeModals() {
-        // Créer les conteneurs de modales
+        // CrÃƒÂ©er les conteneurs de modales
         this.createModalContainers();
         
-        // Configurer les événements globaux
+        // Configurer les ÃƒÂ©vÃƒÂ©nements globaux
         this.setupGlobalEvents();
         
-        this.logDebug('modals', 'Système de modales initialisé');
+        this.logDebug('modals', 'SystÃƒÂ¨me de modales initialisÃƒÂ©');
     }
 
     /**
-     * Crée les conteneurs HTML pour toutes les modales
+     * CrÃƒÂ©e les conteneurs HTML pour toutes les modales
      */
     createModalContainers() {
         const existingContainer = document.getElementById('modal-container');
@@ -178,14 +178,14 @@ class ModalController extends BaseController {
         
         document.body.appendChild(container);
         
-        this.logDebug('modals', 'Conteneurs de modales créés');
+        this.logDebug('modals', 'Conteneurs de modales crÃƒÂ©ÃƒÂ©s');
     }
 
     /**
-     * Configure les événements globaux pour les modales
+     * Configure les ÃƒÂ©vÃƒÂ©nements globaux pour les modales
      */
     setupGlobalEvents() {
-        // Gestion de la touche Échap
+        // Gestion de la touche Ãƒâ€°chap
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && this.animationConfig.closeOnEscape) {
                 this.closeTopModal();
@@ -214,27 +214,27 @@ class ModalController extends BaseController {
             return false;
         }
         
-        // Vérifier si la modale est déjà ouverte
+        // VÃƒÂ©rifier si la modale est dÃƒÂ©jÃƒÂ  ouverte
         if (this.modalState.activeModals.has(modalId)) {
-            this.logDebug('modals', `Modale déjà ouverte: ${modalId}`);
+            this.logDebug('modals', `Modale dÃƒÂ©jÃƒÂ  ouverte: ${modalId}`);
             return false;
         }
         
         try {
             this.logDebug('modals', `Ouverture modale: ${modalId}`);
             
-            // Sauvegarder l'élément actuellement focalisé
+            // Sauvegarder l'ÃƒÂ©lÃƒÂ©ment actuellement focalisÃƒÂ©
             this.modalState.lastActiveElement = document.activeElement;
             
-            // Générer le contenu de la modale
+            // GÃƒÂ©nÃƒÂ©rer le contenu de la modale
             const content = await this.generateModalContent(modalId, options);
             
-            // Mettre à jour la modale
+            // Mettre ÃƒÂ  jour la modale
             const modalElement = document.getElementById(modalConfig.id);
             if (modalElement) {
                 this.updateModalContent(modalElement, content, modalConfig.title);
                 
-                // Ajouter à la pile des modales actives
+                // Ajouter ÃƒÂ  la pile des modales actives
                 this.modalState.activeModals.add(modalId);
                 this.modalState.modalStack.push(modalId);
                 
@@ -244,7 +244,7 @@ class ModalController extends BaseController {
                 // Configurer le focus
                 this.setupModalFocus(modalElement);
                 
-                // Émettre l'événement d'ouverture
+                // Ãƒâ€°mettre l'ÃƒÂ©vÃƒÂ©nement d'ouverture
                 this.eventBus.emit('modal:opened', { modalId, options });
                 
                 return true;
@@ -260,7 +260,7 @@ class ModalController extends BaseController {
 
     /**
      * Ferme une modale
-     * @param {string} modalId - ID de la modale à fermer
+     * @param {string} modalId - ID de la modale ÃƒÂ  fermer
      */
     async close(modalId) {
         if (!this.modalState.activeModals.has(modalId)) {
@@ -279,11 +279,11 @@ class ModalController extends BaseController {
                 this.modalState.activeModals.delete(modalId);
                 this.modalState.modalStack = this.modalState.modalStack.filter(id => id !== modalId);
                 
-                // Restaurer le focus si c'était la dernière modale
+                // Restaurer le focus si c'ÃƒÂ©tait la derniÃƒÂ¨re modale
                 if (this.modalState.activeModals.size === 0) {
                     this.restoreFocus();
                 } else {
-                    // Redonner le focus à la modale précédente
+                    // Redonner le focus ÃƒÂ  la modale prÃƒÂ©cÃƒÂ©dente
                     const prevModalId = this.modalState.modalStack[this.modalState.modalStack.length - 1];
                     if (prevModalId) {
                         const prevModal = document.getElementById(this.modals[prevModalId].id);
@@ -291,9 +291,9 @@ class ModalController extends BaseController {
                     }
                 }
                 
-                this.logDebug('modals', `Modale fermée: ${modalId}`);
+                this.logDebug('modals', `Modale fermÃƒÂ©e: ${modalId}`);
                 
-                // Émettre l'événement de fermeture
+                // Ãƒâ€°mettre l'ÃƒÂ©vÃƒÂ©nement de fermeture
                 this.eventBus.emit('modal:closed', { modalId });
                 
                 return true;
@@ -324,7 +324,7 @@ class ModalController extends BaseController {
         modalIds.forEach(modalId => this.close(modalId));
     }
 
-    // ===== MODALES SPÉCIALISÉES =====
+    // ===== MODALES SPÃƒâ€°CIALISÃƒâ€°ES =====
 
     /**
      * Affiche une modale de confirmation
@@ -395,23 +395,23 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Ouvre l'éditeur de playlist
-     * @param {string} playlistId - ID de la playlist (optionnel pour création)
+     * Ouvre l'ÃƒÂ©diteur de playlist
+     * @param {string} playlistId - ID de la playlist (optionnel pour crÃƒÂ©ation)
      */
     openPlaylistEditor(playlistId = null) {
         return this.open('playlistEditor', { playlistId });
     }
 
-    // ===== GÉNÉRATION DE CONTENU =====
+    // ===== GÃƒâ€°NÃƒâ€°RATION DE CONTENU =====
 
     /**
-     * Génère le contenu d'une modale
+     * GÃƒÂ©nÃƒÂ¨re le contenu d'une modale
      * @param {string} modalId - ID de la modale
      * @param {Object} options - Options pour le contenu
      * @returns {Promise<string>} - Contenu HTML
      */
     async generateModalContent(modalId, options) {
-        // Vérifier le cache
+        // VÃƒÂ©rifier le cache
         const cacheKey = `${modalId}_${JSON.stringify(options)}`;
         if (this.contentCache.has(cacheKey)) {
             return this.contentCache.get(cacheKey);
@@ -481,8 +481,8 @@ class ModalController extends BaseController {
         return `
             <div class="channel-settings">
                 <div class="file-info">
-                    <h4>📁 ${file.name}</h4>
-                    <p>${file.tracks?.length || 0} piste(s) • ${file.duration?.toFixed(1) || 0}s</p>
+                    <h4>Ã°Å¸â€œÂ ${file.name}</h4>
+                    <p>${file.tracks?.length || 0} piste(s) Ã¢â‚¬Â¢ ${file.duration?.toFixed(1) || 0}s</p>
                 </div>
                 
                 <div class="channel-assignment">
@@ -523,7 +523,7 @@ class ModalController extends BaseController {
         return `
             <div class="instrument-config">
                 <div class="instrument-header">
-                    <h4>🎼 ${instrument.name}</h4>
+                    <h4>Ã°Å¸Å½Â¼ ${instrument.name}</h4>
                     <span class="instrument-type">${instrument.type}</span>
                 </div>
                 
@@ -539,7 +539,7 @@ class ModalController extends BaseController {
                     </div>
                     
                     <div class="config-section">
-                        <h5>Avancé</h5>
+                        <h5>AvancÃƒÂ©</h5>
                         ${this.buildAdvancedSection(instrument)}
                     </div>
                 </div>
@@ -549,7 +549,7 @@ class ModalController extends BaseController {
                         Annuler
                     </button>
                     <button class="btn btn-warning" onclick="app.modalController.calibrateInstrument('${options.instrumentId}')">
-                        📊 Calibrer
+                        Ã°Å¸â€œÅ  Calibrer
                     </button>
                     <button class="btn btn-primary" onclick="app.modalController.saveInstrumentConfig('${options.instrumentId}')">
                         Sauvegarder
@@ -560,8 +560,8 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Construit le contenu de l'éditeur de playlist
-     * @param {Object} options - Options d'édition
+     * Construit le contenu de l'ÃƒÂ©diteur de playlist
+     * @param {Object} options - Options d'ÃƒÂ©dition
      * @returns {string} - HTML du contenu
      */
     buildPlaylistEditorContent(options) {
@@ -589,14 +589,14 @@ class ModalController extends BaseController {
                 
                 <div class="playlist-content">
                     <div class="available-files">
-                        <h5>📁 Fichiers disponibles</h5>
+                        <h5>Ã°Å¸â€œÂ Fichiers disponibles</h5>
                         <div class="file-list" id="availableFilesList">
                             ${this.buildAvailableFilesList(availableFiles, playlist?.files || [])}
                         </div>
                     </div>
                     
                     <div class="playlist-files">
-                        <h5>📋 Playlist</h5>
+                        <h5>Ã°Å¸â€œâ€¹ Playlist</h5>
                         <div class="file-list sortable" id="playlistFilesList">
                             ${this.buildPlaylistFilesList(playlist?.files || [], availableFiles)}
                         </div>
@@ -608,7 +608,7 @@ class ModalController extends BaseController {
                         Annuler
                     </button>
                     <button class="btn btn-primary" onclick="app.modalController.savePlaylist('${options.playlistId || ''}')">
-                        ${playlist ? 'Modifier' : 'Créer'}
+                        ${playlist ? 'Modifier' : 'CrÃƒÂ©er'}
                     </button>
                 </div>
             </div>
@@ -622,13 +622,13 @@ class ModalController extends BaseController {
      */
     buildConfirmationContent(options) {
         const typeIcons = {
-            success: '✅',
-            warning: '⚠️',
-            error: '❌',
-            info: 'ℹ️'
+            success: 'Ã¢Å“â€¦',
+            warning: 'Ã¢Å¡Â Ã¯Â¸Â',
+            error: 'Ã¢ÂÅ’',
+            info: 'Ã¢â€žÂ¹Ã¯Â¸Â'
         };
         
-        const icon = typeIcons[options.type] || '❓';
+        const icon = typeIcons[options.type] || 'Ã¢Ââ€œ';
         
         return `
             <div class="confirmation-content">
@@ -654,13 +654,13 @@ class ModalController extends BaseController {
      */
     buildInformationContent(options) {
         const typeIcons = {
-            success: '✅',
-            warning: '⚠️',
-            error: '❌',
-            info: 'ℹ️'
+            success: 'Ã¢Å“â€¦',
+            warning: 'Ã¢Å¡Â Ã¯Â¸Â',
+            error: 'Ã¢ÂÅ’',
+            info: 'Ã¢â€žÂ¹Ã¯Â¸Â'
         };
         
-        const icon = typeIcons[options.type] || 'ℹ️';
+        const icon = typeIcons[options.type] || 'Ã¢â€žÂ¹Ã¯Â¸Â';
         
         return `
             <div class="information-content">
@@ -684,12 +684,12 @@ class ModalController extends BaseController {
     buildErrorContent(options) {
         return `
             <div class="error-content">
-                <div class="error-icon">❌</div>
+                <div class="error-icon">Ã¢ÂÅ’</div>
                 <div class="error-message">${options.error}</div>
                 
                 ${options.exception && options.showDetails ? `
                     <details class="error-details">
-                        <summary>Détails techniques</summary>
+                        <summary>DÃƒÂ©tails techniques</summary>
                         <pre class="error-stack">${options.exception.stack || options.exception.message}</pre>
                     </details>
                 ` : ''}
@@ -719,7 +719,7 @@ class ModalController extends BaseController {
                             <h3 class="modal-title">${config.title}</h3>
                             ${config.closable ? `
                                 <button class="modal-close" onclick="app.modalController.close('${modalId}')" aria-label="Fermer">
-                                    ×
+                                    Ãƒâ€”
                                 </button>
                             ` : ''}
                         </div>
@@ -735,8 +735,8 @@ class ModalController extends BaseController {
     // ===== UTILITAIRES =====
 
     /**
-     * Met à jour le contenu d'une modale
-     * @param {HTMLElement} modalElement - Élément de la modale
+     * Met ÃƒÂ  jour le contenu d'une modale
+     * @param {HTMLElement} modalElement - Ãƒâ€°lÃƒÂ©ment de la modale
      * @param {string} content - Nouveau contenu
      * @param {string} title - Nouveau titre
      */
@@ -755,7 +755,7 @@ class ModalController extends BaseController {
 
     /**
      * Anime l'ouverture d'une modale
-     * @param {HTMLElement} modalElement - Élément de la modale
+     * @param {HTMLElement} modalElement - Ãƒâ€°lÃƒÂ©ment de la modale
      * @returns {Promise} - Promise d'animation
      */
     animateModalOpen(modalElement) {
@@ -780,7 +780,7 @@ class ModalController extends BaseController {
 
     /**
      * Anime la fermeture d'une modale
-     * @param {HTMLElement} modalElement - Élément de la modale
+     * @param {HTMLElement} modalElement - Ãƒâ€°lÃƒÂ©ment de la modale
      * @returns {Promise} - Promise d'animation
      */
     animateModalClose(modalElement) {
@@ -801,10 +801,10 @@ class ModalController extends BaseController {
 
     /**
      * Configure le focus pour une modale
-     * @param {HTMLElement} modalElement - Élément de la modale
+     * @param {HTMLElement} modalElement - Ãƒâ€°lÃƒÂ©ment de la modale
      */
     setupModalFocus(modalElement) {
-        // Trouver le premier élément focalisable
+        // Trouver le premier ÃƒÂ©lÃƒÂ©ment focalisable
         const focusable = modalElement.querySelector('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
         if (focusable) {
             focusable.focus();
@@ -812,7 +812,7 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Restaure le focus après fermeture des modales
+     * Restaure le focus aprÃƒÂ¨s fermeture des modales
      */
     restoreFocus() {
         if (this.modalState.lastActiveElement) {
@@ -822,8 +822,8 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Gère la navigation au clavier (Tab)
-     * @param {KeyboardEvent} event - Événement clavier
+     * GÃƒÂ¨re la navigation au clavier (Tab)
+     * @param {KeyboardEvent} event - Ãƒâ€°vÃƒÂ©nement clavier
      */
     handleTabKey(event) {
         const topModalId = this.modalState.modalStack[this.modalState.modalStack.length - 1];
@@ -854,7 +854,7 @@ class ModalController extends BaseController {
 
     /**
      * Invalide le cache pour certaines modales
-     * @param {Array<string>} modalIds - IDs des modales à invalider
+     * @param {Array<string>} modalIds - IDs des modales ÃƒÂ  invalider
      */
     invalidateCache(modalIds = []) {
         modalIds.forEach(modalId => {
@@ -867,15 +867,15 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Méthodes de construction pour sections spécifiques
+     * MÃƒÂ©thodes de construction pour sections spÃƒÂ©cifiques
      */ /**
-     * ✅ IMPLÉMENTÉ - Construit la liste des fichiers disponibles
+     * Ã¢Å“â€¦ IMPLÃƒâ€°MENTÃƒâ€° - Construit la liste des fichiers disponibles
      * @param {Array} availableFiles - Tous les fichiers
-     * @param {Array} playlistFiles - Fichiers déjà dans la playlist
+     * @param {Array} playlistFiles - Fichiers dÃƒÂ©jÃƒÂ  dans la playlist
      * @returns {string} HTML
      */
     buildAvailableFilesList(availableFiles, playlistFiles) {
-        // Extraire IDs des fichiers déjà dans playlist
+        // Extraire IDs des fichiers dÃƒÂ©jÃƒÂ  dans playlist
         const playlistFileIds = (playlistFiles || []).map(f => f.id || f);
         
         // Filtrer les fichiers disponibles
@@ -886,7 +886,7 @@ class ModalController extends BaseController {
         if (filtered.length === 0) {
             return `
                 <div class="empty-file-list">
-                    <p>📭 Tous les fichiers sont déjà dans la playlist</p>
+                    <p>Ã°Å¸â€œÂ­ Tous les fichiers sont dÃƒÂ©jÃƒÂ  dans la playlist</p>
                 </div>
             `;
         }
@@ -896,13 +896,13 @@ class ModalController extends BaseController {
             <div class="file-search-box">
                 <input type="text" 
                        class="file-search-input" 
-                       placeholder="🔍 Rechercher un fichier..."
+                       placeholder="Ã°Å¸â€Â Rechercher un fichier..."
                        onkeyup="app.modalController.filterAvailableFiles(this.value)">
             </div>
             <div class="available-files-list" data-available-files>
         `;
         
-        // Générer items
+        // GÃƒÂ©nÃƒÂ©rer items
         filtered.forEach(file => {
             const duration = this.formatDuration(file.duration || 0);
             const metadata = file.metadata || {};
@@ -912,23 +912,23 @@ class ModalController extends BaseController {
                      data-file-id="${file.id}"
                      data-file-name="${this.escapeHtml(file.name || file.filename)}">
                     
-                    <div class="file-item-icon">🎵</div>
+                    <div class="file-item-icon">Ã°Å¸Å½Âµ</div>
                     
                     <div class="file-item-info">
                         <div class="file-item-name" title="${this.escapeHtml(file.name || file.filename)}">
                             ${this.escapeHtml(file.name || file.filename)}
                         </div>
                         <div class="file-item-meta">
-                            ${duration ? `<span>⏱️ ${duration}</span>` : ''}
-                            ${metadata.trackCount ? `<span>🎹 ${metadata.trackCount} pistes</span>` : ''}
-                            ${metadata.bpm ? `<span>🥁 ${metadata.bpm} BPM</span>` : ''}
+                            ${duration ? `<span>Ã¢ÂÂ±Ã¯Â¸Â ${duration}</span>` : ''}
+                            ${metadata.trackCount ? `<span>Ã°Å¸Å½Â¹ ${metadata.trackCount} pistes</span>` : ''}
+                            ${metadata.bpm ? `<span>Ã°Å¸Â¥Â ${metadata.bpm} BPM</span>` : ''}
                         </div>
                     </div>
                     
                     <button class="btn-add-file" 
                             onclick="app.modalController.addFileToEditingPlaylist('${file.id}')"
-                            title="Ajouter à la playlist">
-                        ➕
+                            title="Ajouter ÃƒÂ  la playlist">
+                        Ã¢Å¾â€¢
                     </button>
                     
                 </div>
@@ -941,7 +941,7 @@ class ModalController extends BaseController {
     }
     
     /**
-     * ✅ IMPLÉMENTÉ - Construit la liste des fichiers dans la playlist
+     * Ã¢Å“â€¦ IMPLÃƒâ€°MENTÃƒâ€° - Construit la liste des fichiers dans la playlist
      * @param {Array} playlistFiles - Fichiers de la playlist (IDs ou objets)
      * @param {Array} allFiles - Tous les fichiers disponibles
      * @returns {string} HTML
@@ -950,20 +950,20 @@ class ModalController extends BaseController {
         if (!playlistFiles || playlistFiles.length === 0) {
             return `
                 <div class="empty-playlist-editor">
-                    <div class="empty-icon">📭</div>
+                    <div class="empty-icon">Ã°Å¸â€œÂ­</div>
                     <p>La playlist est vide</p>
                     <small>Ajoutez des fichiers depuis la liste de gauche</small>
                 </div>
             `;
         }
         
-        // Résoudre les fichiers (si IDs uniquement, récupérer objets complets)
+        // RÃƒÂ©soudre les fichiers (si IDs uniquement, rÃƒÂ©cupÃƒÂ©rer objets complets)
         const resolvedFiles = playlistFiles.map(fileOrId => {
             if (typeof fileOrId === 'string') {
                 // C'est un ID, chercher le fichier complet
                 return allFiles.find(f => f.id === fileOrId) || { id: fileOrId, name: 'Unknown' };
             }
-            return fileOrId; // C'est déjà un objet
+            return fileOrId; // C'est dÃƒÂ©jÃƒÂ  un objet
         });
         
         let html = '<div class="playlist-files-list sortable" data-playlist-files>';
@@ -981,8 +981,8 @@ class ModalController extends BaseController {
                      ondrop="app.modalController.onPlaylistFileDrop(event, ${index})"
                      ondragend="app.modalController.onPlaylistFileDragEnd(event)">
                     
-                    <div class="file-drag-handle" title="Glisser pour réorganiser">
-                        ⋮⋮
+                    <div class="file-drag-handle" title="Glisser pour rÃƒÂ©organiser">
+                        Ã¢â€¹Â®Ã¢â€¹Â®
                     </div>
                     
                     <div class="file-item-number">${index + 1}</div>
@@ -997,7 +997,7 @@ class ModalController extends BaseController {
                     <button class="btn-remove-file" 
                             onclick="app.modalController.removeFileFromEditingPlaylist(${index})"
                             title="Retirer de la playlist">
-                        ✖️
+                        Ã¢Å“â€“Ã¯Â¸Â
                     </button>
                     
                 </div>
@@ -1011,8 +1011,8 @@ class ModalController extends BaseController {
         html += `
             <div class="playlist-editor-stats">
                 <span>${resolvedFiles.length} fichier${resolvedFiles.length > 1 ? 's' : ''}</span>
-                <span>•</span>
-                <span>Durée totale: ${this.formatDuration(totalDuration)}</span>
+                <span>Ã¢â‚¬Â¢</span>
+                <span>DurÃƒÂ©e totale: ${this.formatDuration(totalDuration)}</span>
             </div>
         `;
         
@@ -1020,82 +1020,21 @@ class ModalController extends BaseController {
     }
     
     /**
-     * ✅ IMPLÉMENTÉ COMPLET - Sauvegarde la playlist éditée
-     * @param {string} playlistId - ID playlist (vide si création)
+     * Ã¢Å“â€¦ IMPLÃƒâ€°MENTÃƒâ€° COMPLET - Sauvegarde la playlist ÃƒÂ©ditÃƒÂ©e
+     * @param {string} playlistId - ID playlist (vide si crÃƒÂ©ation)
      */
-    savePlaylist(playlistId) {
-        this.logDebug('modals', `Saving playlist: ${playlistId || 'new'}`);
-        
-        // Récupérer les valeurs du formulaire
-        const nameInput = document.getElementById('playlistName');
-        const descInput = document.getElementById('playlistDescription');
-        const filesContainer = document.querySelector('[data-playlist-files]');
-        
-        if (!nameInput) {
-            this.showError('Playlist editor not found');
-            return;
-        }
-        
-        const name = nameInput.value.trim();
-        const description = descInput ? descInput.value.trim() : '';
-        
-        // Validation
-        if (!name) {
-            this.showError('Le nom de la playlist est requis');
-            nameInput.focus();
-            return;
-        }
-        
-        // Récupérer la liste des fichiers dans l'ordre actuel
-        const fileItems = filesContainer ? 
-            filesContainer.querySelectorAll('.modal-file-item') : [];
-        
-        const fileIds = Array.from(fileItems).map(item => 
-            item.getAttribute('data-file-id')
-        );
-        
-        // Appeler le PlaylistController
-        const controller = window.app?.playlistController;
-        if (!controller) {
-            this.showError('PlaylistController not available');
-            return;
-        }
-        
-        try {
-            if (playlistId) {
-                // Mise à jour playlist existante
-                controller.updatePlaylist(playlistId, {
-                    name: name,
-                    description: description,
-                    files: fileIds
-                });
-                this.showSuccess(`Playlist "${name}" mise à jour`);
-            } else {
-                // Création nouvelle playlist
-                controller.createPlaylist(name, fileIds);
-                this.showSuccess(`Playlist "${name}" créée`);
-            }
-            
-            // Fermer la modale
-            this.close('playlistEditor');
-            
-        } catch (error) {
-            this.showError(`Erreur: ${error.message}`);
-            this.logDebug('error', error);
-        }
-    }
     
     // ========================================================================
-    // NOUVELLES MÉTHODES - Gestion des fichiers dans l'éditeur
+    // NOUVELLES MÃƒâ€°THODES - Gestion des fichiers dans l'ÃƒÂ©diteur
     // ========================================================================
     
     /**
-     * Ajoute un fichier à la playlist en cours d'édition
+     * Ajoute un fichier ÃƒÂ  la playlist en cours d'ÃƒÂ©dition
      */
     addFileToEditingPlaylist(fileId) {
         this.logDebug('modals', `Adding file ${fileId} to editing playlist`);
         
-        // Récupérer le fichier depuis fileModel
+        // RÃƒÂ©cupÃƒÂ©rer le fichier depuis fileModel
         const fileModel = this.getModel('file');
         const file = fileModel?.getFileById?.(fileId) || 
                      fileModel?.get('files')?.find(f => f.id === fileId);
@@ -1105,7 +1044,7 @@ class ModalController extends BaseController {
             return;
         }
         
-        // Ajouter à la liste de droite
+        // Ajouter ÃƒÂ  la liste de droite
         const playlistContainer = document.querySelector('[data-playlist-files]');
         const availableContainer = document.querySelector('[data-available-files]');
         
@@ -1119,7 +1058,7 @@ class ModalController extends BaseController {
             availableItem.remove();
         }
         
-        // Ajouter à la playlist
+        // Ajouter ÃƒÂ  la playlist
         const index = playlistContainer.querySelectorAll('.modal-file-item').length;
         const duration = this.formatDuration(file.duration || 0);
         
@@ -1130,7 +1069,7 @@ class ModalController extends BaseController {
         newItem.setAttribute('draggable', 'true');
         
         newItem.innerHTML = `
-            <div class="file-drag-handle" title="Glisser pour réorganiser">⋮⋮</div>
+            <div class="file-drag-handle" title="Glisser pour rÃƒÂ©organiser">Ã¢â€¹Â®Ã¢â€¹Â®</div>
             <div class="file-item-number">${index + 1}</div>
             <div class="file-item-info">
                 <div class="file-item-name">${this.escapeHtml(file.name || file.filename)}</div>
@@ -1139,11 +1078,11 @@ class ModalController extends BaseController {
             <button class="btn-remove-file" 
                     onclick="app.modalController.removeFileFromEditingPlaylist(${index})"
                     title="Retirer de la playlist">
-                ✖️
+                Ã¢Å“â€“Ã¯Â¸Â
             </button>
         `;
         
-        // Ajouter événements drag
+        // Ajouter ÃƒÂ©vÃƒÂ©nements drag
         newItem.ondragstart = (e) => this.onPlaylistFileDragStart(e, index);
         newItem.ondragover = (e) => this.onPlaylistFileDragOver(e);
         newItem.ondrop = (e) => this.onPlaylistFileDrop(e, index);
@@ -1151,21 +1090,21 @@ class ModalController extends BaseController {
         
         playlistContainer.appendChild(newItem);
         
-        // Mettre à jour les numéros
+        // Mettre ÃƒÂ  jour les numÃƒÂ©ros
         this.updatePlaylistFileNumbers();
         
-        // Vérifier si liste disponible vide
+        // VÃƒÂ©rifier si liste disponible vide
         if (availableContainer && availableContainer.querySelectorAll('.modal-file-item').length === 0) {
             availableContainer.innerHTML = `
                 <div class="empty-file-list">
-                    <p>📭 Tous les fichiers sont dans la playlist</p>
+                    <p>Ã°Å¸â€œÂ­ Tous les fichiers sont dans la playlist</p>
                 </div>
             `;
         }
     }
     
     /**
-     * Retire un fichier de la playlist en cours d'édition
+     * Retire un fichier de la playlist en cours d'ÃƒÂ©dition
      */
     removeFileFromEditingPlaylist(index) {
         this.logDebug('modals', `Removing file at index ${index}`);
@@ -1183,19 +1122,19 @@ class ModalController extends BaseController {
         // Retirer l'item
         itemToRemove.remove();
         
-        // Mettre à jour les numéros
+        // Mettre ÃƒÂ  jour les numÃƒÂ©ros
         this.updatePlaylistFileNumbers();
         
-        // Rajouter à la liste disponible si elle existe
+        // Rajouter ÃƒÂ  la liste disponible si elle existe
         const availableContainer = document.querySelector('[data-available-files]');
         if (availableContainer && fileId) {
-            // Récupérer le fichier complet
+            // RÃƒÂ©cupÃƒÂ©rer le fichier complet
             const fileModel = this.getModel('file');
             const file = fileModel?.getFileById?.(fileId) || 
                          fileModel?.get('files')?.find(f => f.id === fileId);
             
             if (file) {
-                // Supprimer l'empty state si présent
+                // Supprimer l'empty state si prÃƒÂ©sent
                 const emptyState = availableContainer.querySelector('.empty-file-list');
                 if (emptyState) emptyState.remove();
                 
@@ -1209,18 +1148,18 @@ class ModalController extends BaseController {
                 newItem.setAttribute('data-file-name', file.name || file.filename);
                 
                 newItem.innerHTML = `
-                    <div class="file-item-icon">🎵</div>
+                    <div class="file-item-icon">Ã°Å¸Å½Âµ</div>
                     <div class="file-item-info">
                         <div class="file-item-name">${this.escapeHtml(file.name || file.filename)}</div>
                         <div class="file-item-meta">
-                            ${duration ? `<span>⏱️ ${duration}</span>` : ''}
-                            ${metadata.trackCount ? `<span>🎹 ${metadata.trackCount} pistes</span>` : ''}
+                            ${duration ? `<span>Ã¢ÂÂ±Ã¯Â¸Â ${duration}</span>` : ''}
+                            ${metadata.trackCount ? `<span>Ã°Å¸Å½Â¹ ${metadata.trackCount} pistes</span>` : ''}
                         </div>
                     </div>
                     <button class="btn-add-file" 
                             onclick="app.modalController.addFileToEditingPlaylist('${fileId}')"
-                            title="Ajouter à la playlist">
-                        ➕
+                            title="Ajouter ÃƒÂ  la playlist">
+                        Ã¢Å¾â€¢
                     </button>
                 `;
                 
@@ -1230,7 +1169,7 @@ class ModalController extends BaseController {
     }
     
     /**
-     * Met à jour les numéros des fichiers dans la playlist
+     * Met ÃƒÂ  jour les numÃƒÂ©ros des fichiers dans la playlist
      */
     updatePlaylistFileNumbers() {
         const playlistContainer = document.querySelector('[data-playlist-files]');
@@ -1244,7 +1183,7 @@ class ModalController extends BaseController {
                 numberEl.textContent = index + 1;
             }
             
-            // Mettre à jour le onclick du bouton remove
+            // Mettre ÃƒÂ  jour le onclick du bouton remove
             const removeBtn = item.querySelector('.btn-remove-file');
             if (removeBtn) {
                 removeBtn.setAttribute('onclick', 
@@ -1255,7 +1194,7 @@ class ModalController extends BaseController {
     }
     
     // ========================================================================
-    // NOUVELLES MÉTHODES - Drag & Drop
+    // NOUVELLES MÃƒâ€°THODES - Drag & Drop
     // ========================================================================
     
     onPlaylistFileDragStart(event, index) {
@@ -1279,7 +1218,7 @@ class ModalController extends BaseController {
             return;
         }
         
-        // Réorganiser les items
+        // RÃƒÂ©organiser les items
         const playlistContainer = document.querySelector('[data-playlist-files]');
         if (!playlistContainer) return;
         
@@ -1287,11 +1226,11 @@ class ModalController extends BaseController {
         const [movedItem] = items.splice(sourceIndex, 1);
         items.splice(targetIndex, 0, movedItem);
         
-        // Réafficher dans le nouvel ordre
+        // RÃƒÂ©afficher dans le nouvel ordre
         playlistContainer.innerHTML = '';
         items.forEach(item => playlistContainer.appendChild(item));
         
-        // Mettre à jour les numéros
+        // Mettre ÃƒÂ  jour les numÃƒÂ©ros
         this.updatePlaylistFileNumbers();
     }
     
@@ -1301,7 +1240,7 @@ class ModalController extends BaseController {
     }
     
     // ========================================================================
-    // NOUVELLES MÉTHODES - Utilitaires
+    // NOUVELLES MÃƒâ€°THODES - Utilitaires
     // ========================================================================
     
     /**
@@ -1325,7 +1264,7 @@ class ModalController extends BaseController {
     }
     
     /**
-     * Formate une durée en ms
+     * Formate une durÃƒÂ©e en ms
      */
     formatDuration(ms) {
         if (!ms) return '00:00';
@@ -1338,7 +1277,7 @@ class ModalController extends BaseController {
     }
     
     /**
-     * Échappe HTML
+     * Ãƒâ€°chappe HTML
      */
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -1347,7 +1286,7 @@ class ModalController extends BaseController {
     }
     
     // ========================================================================
-    // MÉTHODES EXISTANTES CONSERVÉES (le reste du code original)
+    // MÃƒâ€°THODES EXISTANTES CONSERVÃƒâ€°ES (le reste du code original)
     // ========================================================================
     
     saveChannelSettings(fileId) {
@@ -1402,54 +1341,24 @@ class ModalController extends BaseController {
 	
 	
     buildDefaultContent(modalId, options) { 
-        return `<div>Contenu par défaut pour ${modalId}</div>`; 
+        return `<div>Contenu par dÃƒÂ©faut pour ${modalId}</div>`; 
     }
 
     /**
      * Actions des modales
      */
-    saveChannelSettings(fileId) {
-        this.logDebug('modals', `Sauvegarde config canaux: ${fileId}`);
-        this.close('channelSettings');
-    }
     
-    saveInstrumentConfig(instrumentId) {
-        this.logDebug('modals', `Sauvegarde config instrument: ${instrumentId}`);
-        this.close('instrumentConfig');
-    }
     
-    calibrateInstrument(instrumentId) {
-        this.logDebug('modals', `Calibration instrument: ${instrumentId}`);
-        window.app?.instrumentController?.calibrateInstrument(instrumentId);
-    }
     
     savePlaylist(playlistId) {
         this.logDebug('modals', `Sauvegarde playlist: ${playlistId || 'nouvelle'}`);
         this.close('playlistEditor');
     }
     
-    handleConfirmation(confirmed, callbackId) {
-        this.logDebug('modals', `Confirmation: ${confirmed}`);
-        this.close('confirmation');
-        // Exécuter le callback si confirmé
-        if (confirmed && window[callbackId]) {
-            window[callbackId]();
-        }
-    }
 
     /**
-     * Nettoie les ressources du contrôleur
+     * Nettoie les ressources du contrÃƒÂ´leur
      */
-    destroy() {
-        this.closeAll();
-        this.contentCache.clear();
-        this.eventHandlers.clear();
-        
-        const container = document.getElementById('modal-container');
-        if (container) {
-            container.remove();
-        }
-    }
 }
 
 // ============================================================================
@@ -1463,4 +1372,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.ModalController = ModalController;
 }
-	
+
+window.ModalController = ModalController;

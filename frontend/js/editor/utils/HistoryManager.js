@@ -507,3 +507,4 @@ class HistoryManager {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = HistoryManager;
 }
+window.HistoryManager = HistoryManager;
