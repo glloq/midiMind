@@ -1,13 +1,13 @@
 // ===== NAVIGATION CONTROLLER - Contrôleur de navigation et gestion des pages =====
 // ================================================================================
-// Gère toute la navigation de l'application :
-// - Affichage et transition entre les pages (home, files, instruments, keyboard, system)
-// - Gestion de l'historique et navigation (back/forward)
-// - Mise à jour dynamique du contenu des pages
-// - Coordination entre les vues et contrôleurs
-// - Gestion des états de navigation et URL
-// - Animation des transitions entre pages
-// - Raccourcis clavier pour la navigation
+// Fichier: frontend/js/controllers/NavigationController.js
+// Version: v3.7.0 - CORRECTION IDS PAGES
+// Date: 2025-10-24
+// ================================================================================
+// CORRECTIONS v3.7.0:
+// ✅ IDs de pages corrigés pour correspondre au HTML (home, editor, routing, etc.)
+// ✅ Ajout gestion display:none/block pour affichage correct des pages
+// ✅ Correction getView() pour mapper correctement les vues
 // ================================================================================
 
 class NavigationController extends BaseController {
@@ -20,47 +20,61 @@ class NavigationController extends BaseController {
         this.navigationHistory = ['home'];
         this.historyIndex = 0;
         
-        // Configuration des pages
+        // Configuration des pages - IDS CORRIGES
         this.pages = {
             home: {
-                id: 'home-page',
+                id: 'home',  // ✅ Correspond à <div id="home">
                 title: '🏠 Accueil',
                 icon: '🏠',
                 shortcut: 'h',
                 requiresData: true,
-                cacheable: false
+                cacheable: false,
+                viewKey: 'home'  // Clé pour récupérer la vue
             },
-            files: {
-                id: 'files-page', 
-                title: '📁 Fichiers',
-                icon: '📁',
-                shortcut: 'f',
+            editor: {
+                id: 'editor',  // ✅ Correspond à <div id="editor">
+                title: '✏️ Éditeur',
+                icon: '✏️',
+                shortcut: 'e',
                 requiresData: true,
-                cacheable: true
+                cacheable: false,
+                viewKey: 'editor'
             },
-            instruments: {
-                id: 'instruments-page',
-                title: '🎼 Instruments', 
-                icon: '🎼',
-                shortcut: 'i',
+            routing: {
+                id: 'routing',  // ✅ Correspond à <div id="routing">
+                title: '🔀 Routage',
+                icon: '🔀',
+                shortcut: 'r',
                 requiresData: true,
-                cacheable: true
+                cacheable: true,
+                viewKey: 'routing'
             },
             keyboard: {
-                id: 'keyboard-page',
+                id: 'keyboard',  // ✅ Correspond à <div id="keyboard">
                 title: '🎹 Clavier',
-                icon: '🎹', 
+                icon: '🎹',
                 shortcut: 'k',
                 requiresData: true,
-                cacheable: false
+                cacheable: false,
+                viewKey: 'keyboard'
+            },
+            instruments: {
+                id: 'instruments',  // ✅ Correspond à <div id="instruments">
+                title: '🎸 Instruments',
+                icon: '🎸',
+                shortcut: 'i',
+                requiresData: true,
+                cacheable: true,
+                viewKey: 'instrument'  // Note: la vue s'appelle 'instrument' pas 'instruments'
             },
             system: {
-                id: 'system-page',
+                id: 'system',  // ✅ Correspond à <div id="system">
                 title: '⚙️ Système',
                 icon: '⚙️',
                 shortcut: 's',
                 requiresData: true,
-                cacheable: true
+                cacheable: true,
+                viewKey: 'system'
             }
         };
         
@@ -79,7 +93,7 @@ class NavigationController extends BaseController {
         // Configuration des animations
         this.animationConfig = {
             enableTransitions: true,
-            slideDirection: 'horizontal', // horizontal, vertical, fade
+            slideDirection: 'horizontal',
             parallax: false,
             preloadNext: true
         };
@@ -111,7 +125,7 @@ class NavigationController extends BaseController {
         
         // Écouter les événements de données
         this.eventBus.on('file:added', () => {
-            this.invalidatePageCache(['home', 'files']);
+            this.invalidatePageCache(['home', 'editor']);
         });
         
         this.eventBus.on('instrument:updated', () => {
@@ -119,7 +133,7 @@ class NavigationController extends BaseController {
         });
         
         this.eventBus.on('playlist:updated', () => {
-            this.invalidatePageCache(['home', 'files']);
+            this.invalidatePageCache(['home', 'editor']);
         });
     }
 
@@ -133,10 +147,28 @@ class NavigationController extends BaseController {
         // Gérer l'historique du navigateur
         this.setupBrowserHistory();
         
+        // Gérer les clics sur la navigation
+        this.setupNavigationLinks();
+        
         // Afficher la page d'accueil
         this.showPage('home', { skipHistory: true });
         
         this.logDebug('navigation', 'Système de navigation initialisé');
+    }
+
+    /**
+     * Configure les liens de navigation
+     */
+    setupNavigationLinks() {
+        document.querySelectorAll('.nav-item').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = link.getAttribute('data-page');
+                if (page) {
+                    this.showPage(page);
+                }
+            });
+        });
     }
 
     /**
@@ -265,6 +297,7 @@ class NavigationController extends BaseController {
             
         } catch (error) {
             this.logDebug('navigation', `Erreur navigation: ${error.message}`);
+            console.error('Navigation error:', error);
             this.showNotification('Erreur de navigation', 'error');
             return false;
             
@@ -287,7 +320,13 @@ class NavigationController extends BaseController {
         const targetPageElement = document.getElementById(pageConfig.id);
         
         if (!currentPageElement || !targetPageElement) {
-            this.logDebug('navigation', 'Éléments de page manquants');
+            this.logDebug('navigation', `Éléments de page manquants: ${pageKey}`);
+            console.error('Missing page elements:', { 
+                currentId: this.pages[this.currentPage].id,
+                targetId: pageConfig.id,
+                currentExists: !!currentPageElement,
+                targetExists: !!targetPageElement
+            });
             return false;
         }
         
@@ -300,6 +339,7 @@ class NavigationController extends BaseController {
                 await this.animatePageOut(currentPageElement, animationDirection);
             } else {
                 currentPageElement.classList.remove('active');
+                currentPageElement.style.display = 'none';
             }
             
             // Mettre à jour le contenu de la page cible
@@ -309,6 +349,7 @@ class NavigationController extends BaseController {
             if (this.animationConfig.enableTransitions) {
                 await this.animatePageIn(targetPageElement, animationDirection);
             } else {
+                targetPageElement.style.display = 'block';
                 targetPageElement.classList.add('active');
             }
             
@@ -316,6 +357,7 @@ class NavigationController extends BaseController {
             
         } catch (error) {
             this.logDebug('navigation', `Erreur transition: ${error.message}`);
+            console.error('Transition error:', error);
             return false;
         }
     }
@@ -339,6 +381,7 @@ class NavigationController extends BaseController {
             
             animation.onfinish = () => {
                 pageElement.classList.remove('active');
+                pageElement.style.display = 'none';
                 resolve();
             };
         });
@@ -353,6 +396,7 @@ class NavigationController extends BaseController {
     animatePageIn(pageElement, direction) {
         return new Promise((resolve) => {
             // Préparer l'élément
+            pageElement.style.display = 'block';
             pageElement.style.opacity = '0';
             pageElement.style.transform = 'translateX(20%)';
             pageElement.classList.add('active');
@@ -409,10 +453,12 @@ class NavigationController extends BaseController {
      * @returns {Promise<string>} - Contenu HTML généré
      */
     async generatePageContent(pageKey) {
-        const view = this.getView(pageKey);
+        const pageConfig = this.pages[pageKey];
+        const view = this.getView(pageConfig.viewKey);
         
         if (!view) {
-            this.logDebug('navigation', `Vue manquante pour: ${pageKey}`);
+            this.logDebug('navigation', `Vue manquante pour: ${pageKey} (viewKey: ${pageConfig.viewKey})`);
+            console.warn(`View not found for page ${pageKey}, viewKey: ${pageConfig.viewKey}`);
             return this.getErrorPageContent(pageKey);
         }
         
@@ -428,6 +474,7 @@ class NavigationController extends BaseController {
             
         } catch (error) {
             this.logDebug('navigation', `Erreur génération contenu ${pageKey}: ${error.message}`);
+            console.error(`Error generating content for ${pageKey}:`, error);
             return this.getErrorPageContent(pageKey, error);
         }
     }
@@ -442,15 +489,18 @@ class NavigationController extends BaseController {
         const fileModel = this.getModel('file');
         const instrumentModel = this.getModel('instrument');
         const playlistModel = this.getModel('playlist');
+        const editorModel = this.getModel('editor');
+        const routingModel = this.getModel('routing');
+        const systemModel = this.getModel('system');
         
         // Données communes à toutes les pages
         const commonData = {
             currentPage: pageKey,
-            currentFile: stateModel.get('currentFile'),
-            currentPlaylist: stateModel.get('currentPlaylist'),
-            selectorMode: stateModel.get('selectorMode') || 'file',
-            isPlaying: stateModel.get('isPlaying') || false,
-            settings: stateModel.get('settings') || {}
+            currentFile: stateModel?.get('currentFile'),
+            currentPlaylist: stateModel?.get('currentPlaylist'),
+            selectorMode: stateModel?.get('selectorMode') || 'file',
+            isPlaying: stateModel?.get('isPlaying') || false,
+            settings: stateModel?.get('settings') || {}
         };
         
         // Données spécifiques par page
@@ -458,46 +508,54 @@ class NavigationController extends BaseController {
             case 'home':
                 return {
                     ...commonData,
-                    recentFiles: fileModel.getRecentFiles(),
-                    connectedInstruments: instrumentModel.getConnectedInstruments(),
-                    playlists: playlistModel.get('playlists') || [],
+                    recentFiles: fileModel?.getRecentFiles() || [],
+                    connectedInstruments: instrumentModel?.getConnectedInstruments() || [],
+                    playlists: playlistModel?.get('playlists') || [],
                     systemStats: this.getSystemStats()
                 };
                 
-            case 'files':
+            case 'editor':
                 return {
                     ...commonData,
-                    files: fileModel.getFilesInCurrentPath(),
-                    currentPath: fileModel.get('currentPath'),
-                    selectedFiles: fileModel.get('selectedFiles') || [],
-                    selectedFolders: fileModel.get('selectedFolders') || [],
-                    playlists: playlistModel.get('playlists') || []
+                    currentFile: stateModel?.get('currentFile'),
+                    tracks: editorModel?.get('tracks') || [],
+                    selectedNotes: editorModel?.get('selectedNotes') || [],
+                    zoom: editorModel?.get('zoom') || 1.0,
+                    mode: editorModel?.get('mode') || 'select'
+                };
+                
+            case 'routing':
+                return {
+                    ...commonData,
+                    routingMatrix: routingModel?.get('matrix') || [],
+                    inputDevices: routingModel?.get('inputDevices') || [],
+                    outputDevices: routingModel?.get('outputDevices') || []
                 };
                 
             case 'instruments':
                 return {
                     ...commonData,
-                    instruments: instrumentModel.get('instruments') || [],
-                    connectedCount: instrumentModel.getConnectedInstruments().length,
-                    discoveryInProgress: instrumentModel.get('discoveryInProgress') || false
+                    instruments: instrumentModel?.get('instruments') || [],
+                    connectedCount: instrumentModel?.getConnectedInstruments()?.length || 0,
+                    discoveryInProgress: instrumentModel?.get('discoveryInProgress') || false
                 };
                 
             case 'keyboard':
                 return {
                     ...commonData,
-                    connectedInstruments: instrumentModel.getConnectedInstruments(),
-                    selectedInstrument: stateModel.get('selectedKeyboardInstrument'),
-                    velocity: stateModel.get('keyboardVelocity') || 64,
-                    keyboardView: stateModel.get('keyboardView') || { start: 48, end: 84 },
-                    speakerMode: stateModel.get('speakerMode') || false
+                    connectedInstruments: instrumentModel?.getConnectedInstruments() || [],
+                    selectedInstrument: stateModel?.get('selectedKeyboardInstrument'),
+                    velocity: stateModel?.get('keyboardVelocity') || 64,
+                    keyboardView: stateModel?.get('keyboardView') || { start: 48, end: 84 },
+                    speakerMode: stateModel?.get('speakerMode') || false
                 };
                 
             case 'system':
                 return {
                     ...commonData,
-                    systemConfig: stateModel.get('systemConfig'),
+                    systemConfig: systemModel?.get('config') || stateModel?.get('systemConfig'),
                     systemHealth: this.getSystemHealth(),
-                    connectedInstruments: instrumentModel.getConnectedInstruments(),
+                    connectedInstruments: instrumentModel?.getConnectedInstruments() || [],
                     systemStats: this.getSystemStats()
                 };
                 
@@ -691,12 +749,12 @@ ${error.stack ? '\n' + error.stack : ''}
      */
     updateNavigationUI() {
         // Mettre à jour les liens de navigation actifs
-        document.querySelectorAll('.nav-link').forEach(link => {
+        document.querySelectorAll('.nav-item').forEach(link => {
             link.classList.remove('active');
         });
         
         // Trouver et activer le lien correspondant
-        const activeLink = document.querySelector(`.nav-link[onclick*="${this.currentPage}"]`);
+        const activeLink = document.querySelector(`.nav-item[data-page="${this.currentPage}"]`);
         if (activeLink) {
             activeLink.classList.add('active');
         }
@@ -704,7 +762,7 @@ ${error.stack ? '\n' + error.stack : ''}
         // Mettre à jour le titre de la page
         const pageConfig = this.pages[this.currentPage];
         if (pageConfig) {
-            document.title = `${pageConfig.title} - MIDI Orchestrion`;
+            document.title = `${pageConfig.title} - MIDI Mind`;
         }
     }
 
@@ -715,9 +773,12 @@ ${error.stack ? '\n' + error.stack : ''}
     handleModelChange(data) {
         // Invalider le cache des pages concernées selon le modèle modifié
         const cacheInvalidationMap = {
-            'FileModel': ['home', 'files'],
+            'FileModel': ['home', 'editor'],
             'InstrumentModel': ['home', 'instruments', 'keyboard'],
-            'PlaylistModel': ['home', 'files'],
+            'PlaylistModel': ['home', 'editor'],
+            'EditorModel': ['editor'],
+            'RoutingModel': ['routing'],
+            'SystemModel': ['system'],
             'StateModel': [this.currentPage] // Toujours rafraîchir la page actuelle
         };
         
@@ -759,8 +820,8 @@ ${error.stack ? '\n' + error.stack : ''}
         const fileModel = this.getModel('file');
         const instrumentModel = this.getModel('instrument');
         
-        const hasFiles = (fileModel.get('files') || []).length > 0;
-        const hasInstruments = (instrumentModel.get('instruments') || []).length > 0;
+        const hasFiles = (fileModel?.get('files') || []).length > 0;
+        const hasInstruments = (instrumentModel?.get('instruments') || []).length > 0;
         
         if (hasFiles && hasInstruments) return 'good';
         if (hasFiles || hasInstruments) return 'warning';
@@ -794,5 +855,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.NavigationController = NavigationController;
 }
-
-window.NavigationController = NavigationController;
