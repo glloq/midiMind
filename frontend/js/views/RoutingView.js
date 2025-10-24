@@ -75,6 +75,15 @@ class RoutingView extends BaseView {
     // RENDERING PRINCIPAL
     // ========================================================================
     
+    buildTemplate(data = {}) {
+        const tempDiv = document.createElement("div");
+        const oldContainer = this.container;
+        this.container = tempDiv;
+        this.render();
+        this.container = oldContainer;
+        return tempDiv.innerHTML;
+    }
+
     render() {
         if (!this.container) return;
         

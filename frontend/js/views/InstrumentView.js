@@ -136,6 +136,15 @@ class InstrumentView extends BaseView {
     // RENDU PRINCIPAL
     // ========================================================================
     
+    buildTemplate(data = {}) {
+        const tempDiv = document.createElement("div");
+        const oldContainer = this.container;
+        this.container = tempDiv;
+        this.render();
+        this.container = oldContainer;
+        return tempDiv.innerHTML;
+    }
+
     render(data = {}) {
         if (!this.container) {
             if (this.logger && this.logger.warn) {

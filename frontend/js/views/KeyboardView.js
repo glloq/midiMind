@@ -143,6 +143,30 @@ class KeyboardView extends BaseView {
     // RENDERING PRINCIPAL
     // ========================================================================
     
+    buildTemplate(data = {}) {
+        return `
+            <div class="keyboard-page">
+                <div class="page-header">
+                    <h2>🎹 Clavier MIDI</h2>
+                    <p class="page-description">Jouez des notes MIDI avec votre clavier ou souris</p>
+                </div>
+                ${this.renderWarningBanner()}
+                <div class="keyboard-controls">
+                    ${this.renderInstrumentSelector()}
+                    ${this.renderNoteRangeDisplay()}
+                    ${this.renderVelocityControl()}
+                    ${this.renderActions()}
+                </div>
+                <div class="keyboard-canvas-wrapper">
+                    <canvas id="keyboard-canvas" class="keyboard-canvas"></canvas>
+                </div>
+                ${this.renderLegend()}
+                ${this.renderKeyboardMapping()}
+                ${this.renderStats()}
+            </div>
+        `;
+    }
+
     render() {
         if (!this.container) return;
         
