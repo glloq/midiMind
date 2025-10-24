@@ -1,8 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/views/KeyboardView.js
-// Version: v3.1.2 - FIXED INITIALIZATION ORDER
+// Version: v3.1.3 - FIXED INITIALIZE TIMING
 // Date: 2025-10-24
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// CORRECTIONS v3.1.3:
+// ✅ CRITIQUE: Override initialize() to init properties BEFORE render
+// ✅ CRITIQUE: Fixed race condition - BaseView calls initialize() in constructor
+// ✅ Properties initialized in initialize() if not already set
+// ✅ Ensures stats, noteRange, devices exist before any render
 // ============================================================================
 // CORRECTIONS v3.1.2:
 // ✅ CRITIQUE: Fixed constructor parameter order (BaseView only takes 2 params)
@@ -76,8 +82,56 @@ class KeyboardView extends BaseView {
     // ========================================================================
     
     /**
-     * Hook appelé par BaseView.initialize() APRÈS le constructeur
-     * C'est ici qu'on fait le premier rendu si nécessaire
+     * OVERRIDE de BaseView.initialize()
+     * Cette méthode est appelée par BaseView constructor AVANT que notre
+     * constructor ait fini. On doit donc s'assurer que tout est initialisé.
+     */
+    initialize() {
+        // CRITIQUE: Initialiser les propriétés ICI si elles n'existent pas encore
+        // car cette méthode est appelée PENDANT super() avant que notre constructor
+        // ait pu les initialiser
+        
+        if (!this.stats) {
+            this.stats = {
+                notesPlayed: 0,
+                activeNotes: 0,
+                errors: 0
+            };
+        }
+        
+        if (!this.noteRange) {
+            this.noteRange = { min: 21, max: 108 };
+        }
+        
+        if (!this.devices) {
+            this.devices = [];
+        }
+        
+        if (!this.activeNotes) {
+            this.activeNotes = new Set();
+        }
+        
+        // S'assurer que autoRender est désactivé
+        this.config.autoRender = false;
+        
+        // Appeler la méthode parent, mais maintenant tout est prêt
+        // Note: on ne peut pas appeler super.initialize() car BaseView
+        // va vérifier autoRender qui est maintenant false
+        if (!this.container) {
+            console.error(`[${this.config.name}] Container not found`);
+            return;
+        }
+        
+        // Hook personnalisé
+        if (typeof this.onInitialize === 'function') {
+            this.onInitialize();
+        }
+        
+        // Ne PAS rendre automatiquement - le controller le fera
+    }
+    
+    /**
+     * Hook appelé par initialize() APRÈS que tout soit prêt
      */
     onInitialize() {
         // À ce stade, toutes les propriétés sont initialisées
