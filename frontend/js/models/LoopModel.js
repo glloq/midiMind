@@ -1,36 +1,35 @@
 // ============================================================================
 // Fichier: frontend/js/models/LoopModel.js
-// Version: v3.0.1 - CORRIGÃ‰ (Harmonisation avec EventBus global)
+// Version: v3.0.1 - CORRIGÉ (Harmonisation avec EventBus global)
 // Date: 2025-10-14
-// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
-//   ModÃ¨le de gestion des boucles et enregistrement MIDI
+//   Modèle de gestion des boucles et enregistrement MIDI
 //   
 // CORRECTIONS v3.0.1:
-//   âœ… HÃ©ritage de BaseModel au lieu de EventEmitter
-//   âœ… Utilisation de EventBus global (this.eventBus.emit)
-//   âœ… Signature constructeur standardisÃ©e (eventBus, backend, logger)
-//   âœ… IntÃ©gration BackendService pour persistence
-//   âœ… CohÃ©rence avec les autres modÃ¨les
+//   ✅ Héritage de BaseModel au lieu de EventEmitter
+//   ✅ Utilisation de EventBus global (this.eventBus.emit)
+//   ✅ Signature constructeur standardisée (eventBus, backend, logger)
+//   ✅ Intégration BackendService pour persistence
+//   ✅ Cohérence avec les autres modèles
 //
 // Auteur: midiMind Team
 // ============================================================================
-
 
 class LoopModel extends BaseModel {
     constructor(eventBus, backend, logger) {
         super(eventBus, logger);
         
-        // DÃ©pendances
+        // Dépendances
         this.backend = backend;
         this.logger = logger;
         
-        // Loops stockÃ©s
+        // Loops stockés
         this.loops = new Map();
         this.currentLoop = null;
         
-        // Ã‰tat enregistrement
+        // État enregistrement
         this.isRecording = false;
         this.recordBuffer = [];
         this.recordStartTime = 0;
@@ -50,19 +49,19 @@ class LoopModel extends BaseModel {
         this.lastEventTime = 0;
         this.playbackInterval = 10; // ms (100 Hz)
         
-        this.logger.info('LoopModel', 'âœ“ Model initialized v3.0.1');
+        this.logger.info('LoopModel', '✓ Model initialized v3.0.1');
     }
 
     // ========================================================================
-    // CRÃ‰ATION DE LOOP
+    // CRÉATION DE LOOP
     // ========================================================================
 
     /**
-     * CrÃ©e une nouvelle boucle
+     * Crée une nouvelle boucle
      * @param {number} bars - Nombre de mesures
      * @param {number} tempo - Tempo en BPM
      * @param {string} timeSignature - Signature temporelle (ex: "4/4")
-     * @returns {Object} Loop crÃ©Ã©
+     * @returns {Object} Loop créé
      */
     createLoop(bars = 4, tempo = 120, timeSignature = "4/4") {
         const [numerator, denominator] = timeSignature.split('/').map(Number);
@@ -85,7 +84,7 @@ class LoopModel extends BaseModel {
         this.loops.set(loop.id, loop);
         this.currentLoop = loop;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus au lieu de emit
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus au lieu de emit
         this.eventBus.emit('loop:created', loop);
 
         this.logger.info('LoopModel', `Loop created: ${loop.name}`);
@@ -98,7 +97,7 @@ class LoopModel extends BaseModel {
     // ========================================================================
 
     /**
-     * DÃ©marre l'enregistrement
+     * Démarre l'enregistrement
      * @param {number} channel - Canal MIDI
      * @param {string} instrumentId - ID de l'instrument
      * @param {string} mode - Mode d'enregistrement ('overdub', 'replace', 'merge')
@@ -115,7 +114,7 @@ class LoopModel extends BaseModel {
         this.recordBuffer = [];
         this.recordStartTime = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('recording:started', { 
             loopId: this.currentLoop.id,
             channel,
@@ -127,8 +126,8 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * Enregistre un Ã©vÃ©nement MIDI
-     * @param {Object} event - Ã‰vÃ©nement MIDI
+     * Enregistre un événement MIDI
+     * @param {Object} event - Événement MIDI
      */
     recordEvent(event) {
         if (!this.isRecording) return;
@@ -147,19 +146,19 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * ArrÃªte l'enregistrement
+     * Arrête l'enregistrement
      */
     stopRecording() {
         if (!this.isRecording) return;
 
         this.isRecording = false;
 
-        // Quantifier si activÃ©
+        // Quantifier si activé
         if (this.quantizeOnRecord) {
             this.quantizeBuffer();
         }
 
-        // CrÃ©er ou mettre Ã  jour le layer
+        // Créer ou mettre à jour le layer
         const existingLayer = this.currentLoop.layers.find(
             l => l.channel === this.recordChannel
         );
@@ -196,7 +195,7 @@ class LoopModel extends BaseModel {
         this.recordBuffer = [];
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('recording:stopped', {
             loopId: this.currentLoop.id,
             eventCount: eventCount
@@ -221,10 +220,10 @@ class LoopModel extends BaseModel {
 
     /**
      * Fusionne le buffer avec un layer existant
-     * @param {Object} layer - Layer Ã  fusionner
+     * @param {Object} layer - Layer à fusionner
      */
     mergeBufferToLayer(layer) {
-        // Ajouter les nouveaux Ã©vÃ©nements
+        // Ajouter les nouveaux événements
         layer.events.push(...this.recordBuffer);
         
         // Retrier par temps
@@ -269,12 +268,12 @@ class LoopModel extends BaseModel {
         this.loopStartTime = Date.now();
         this.lastEventTime = 0;
 
-        // DÃ©marrer le timer de playback
+        // Démarrer le timer de playback
         this.playbackTimer = setInterval(() => {
             this.updatePlayback();
         }, this.playbackInterval);
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:playing', {
             loopId: loop.id,
             duration: loop.duration
@@ -296,7 +295,7 @@ class LoopModel extends BaseModel {
             this.playbackTimer = null;
         }
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:paused', {
             loopId: this.currentLoop.id,
             position: this.loopPosition
@@ -306,7 +305,7 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * ArrÃªte la lecture
+     * Arrête la lecture
      */
     stopLoop() {
         this.isPlaying = false;
@@ -317,7 +316,7 @@ class LoopModel extends BaseModel {
             this.playbackTimer = null;
         }
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:stopped', {
             loopId: this.currentLoop?.id
         });
@@ -326,7 +325,7 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * Met Ã  jour le playback
+     * Met à jour le playback
      * @private
      */
     updatePlayback() {
@@ -335,9 +334,9 @@ class LoopModel extends BaseModel {
         const elapsed = Date.now() - this.loopStartTime;
         this.loopPosition = elapsed % this.currentLoop.duration;
 
-        // VÃ©rifier si on a bouclÃ©
+        // Vérifier si on a bouclé
         if (elapsed > this.lastEventTime && this.loopPosition < this.playbackInterval) {
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+            // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:cycle', {
                 loopId: this.currentLoop.id
             });
@@ -345,7 +344,7 @@ class LoopModel extends BaseModel {
 
         this.lastEventTime = elapsed;
 
-        // Jouer les Ã©vÃ©nements
+        // Jouer les événements
         this.currentLoop.layers.forEach(layer => {
             if (layer.muted || (this.hasSoloLayers() && !layer.solo)) {
                 return;
@@ -356,7 +355,7 @@ class LoopModel extends BaseModel {
                 const timeDiff = Math.abs(this.loopPosition - eventTime);
 
                 if (timeDiff < this.playbackInterval) {
-                    // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+                    // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
                     this.eventBus.emit('loop:event', {
                         ...event,
                         volume: layer.volume
@@ -367,7 +366,7 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * VÃ©rifie si des layers sont en solo
+     * Vérifie si des layers sont en solo
      * @private
      */
     hasSoloLayers() {
@@ -382,7 +381,7 @@ class LoopModel extends BaseModel {
     /**
      * Mute/unmute un layer
      * @param {string} layerId - ID du layer
-     * @param {boolean} muted - Ã‰tat muted (optionnel, toggle si non fourni)
+     * @param {boolean} muted - État muted (optionnel, toggle si non fourni)
      */
     muteLayer(layerId, muted) {
         if (!this.currentLoop) return;
@@ -392,7 +391,7 @@ class LoopModel extends BaseModel {
 
         layer.muted = muted !== undefined ? muted : !layer.muted;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:muted', {
             layerId,
             muted: layer.muted
@@ -404,7 +403,7 @@ class LoopModel extends BaseModel {
     /**
      * Solo un layer
      * @param {string} layerId - ID du layer
-     * @param {boolean} solo - Ã‰tat solo (optionnel, toggle si non fourni)
+     * @param {boolean} solo - État solo (optionnel, toggle si non fourni)
      */
     soloLayer(layerId, solo) {
         if (!this.currentLoop) return;
@@ -414,7 +413,7 @@ class LoopModel extends BaseModel {
 
         layer.solo = solo !== undefined ? solo : !layer.solo;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:solo', {
             layerId,
             solo: layer.solo
@@ -436,7 +435,7 @@ class LoopModel extends BaseModel {
 
         layer.volume = Math.max(0, Math.min(127, volume));
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:volume-changed', {
             layerId,
             volume: layer.volume
@@ -458,7 +457,7 @@ class LoopModel extends BaseModel {
         this.currentLoop.layers.splice(index, 1);
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:cleared', { layerId });
 
         this.logger.info('LoopModel', `Layer ${layerId} cleared`);
@@ -473,7 +472,7 @@ class LoopModel extends BaseModel {
         this.currentLoop.layers = [];
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+        // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:cleared', {
             loopId: this.currentLoop.id
         });
@@ -482,7 +481,7 @@ class LoopModel extends BaseModel {
     }
 
     // ========================================================================
-    // PERSISTENCE - âœ… NOUVEAU v3.0.1 (IntÃ©gration BackendService)
+    // PERSISTENCE - ✅ NOUVEAU v3.0.1 (Intégration BackendService)
     // ========================================================================
 
     /**
@@ -507,12 +506,12 @@ class LoopModel extends BaseModel {
                 throw new Error(response.error || 'Failed to save loop');
             }
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+            // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:saved', {
                 loop: loop
             });
 
-            this.logger.info('LoopModel', `âœ“ Loop saved: ${loop.name}`);
+            this.logger.info('LoopModel', `✓ Loop saved: ${loop.name}`);
 
             return response.data;
 
@@ -543,12 +542,12 @@ class LoopModel extends BaseModel {
             this.loops.set(loop.id, loop);
             this.currentLoop = loop;
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+            // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:loaded', {
                 loop: loop
             });
 
-            this.logger.info('LoopModel', `âœ“ Loop loaded: ${loop.name}`);
+            this.logger.info('LoopModel', `✓ Loop loaded: ${loop.name}`);
 
             return loop;
 
@@ -560,7 +559,7 @@ class LoopModel extends BaseModel {
 
     /**
      * Liste les loops disponibles
-     * @param {number} limit - Nombre maximum de rÃ©sultats
+     * @param {number} limit - Nombre maximum de résultats
      * @param {number} offset - Offset pour pagination
      */
     async listLoops(limit = 50, offset = 0) {
@@ -604,10 +603,10 @@ class LoopModel extends BaseModel {
                 this.currentLoop = null;
             }
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
+            // ✅ CORRIGÉ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:deleted', { loopId });
 
-            this.logger.info('LoopModel', `âœ“ Loop deleted: ${loopId}`);
+            this.logger.info('LoopModel', `✓ Loop deleted: ${loopId}`);
 
             return true;
 
@@ -670,8 +669,8 @@ class LoopModel extends BaseModel {
 
     /**
      * Configure la quantization
-     * @param {boolean} enabled - Activer/dÃ©sactiver
-     * @param {number} resolution - RÃ©solution en ms
+     * @param {boolean} enabled - Activer/désactiver
+     * @param {number} resolution - Résolution en ms
      */
     setQuantize(enabled, resolution = 480) {
         this.quantizeOnRecord = enabled;
@@ -686,7 +685,7 @@ class LoopModel extends BaseModel {
     // ========================================================================
 
     /**
-     * RÃ©cupÃ¨re le loop actuel
+     * Récupère le loop actuel
      * @returns {Object|null}
      */
     getCurrentLoop() {
@@ -694,7 +693,7 @@ class LoopModel extends BaseModel {
     }
 
     /**
-     * RÃ©cupÃ¨re l'Ã©tat complet
+     * Récupère l'état complet
      * @returns {Object}
      */
     getState() {

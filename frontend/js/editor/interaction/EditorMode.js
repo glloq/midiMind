@@ -1,29 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/editor/interaction/EditorMode.js
-// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.0 - COMPLET ET CORRIGÃƒâ€°
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - COMPLET ET CORRIGÉ
 // Date: 2025-10-14
 // ============================================================================
 // CORRECTIONS v3.1.0:
-// Ã¢Å“â€¦ eraseNoteAt() - ComplÃƒÂ©tÃƒÂ©e avec feedback
-// Ã¢Å“â€¦ createNoteAt() - ComplÃƒÂ©tÃƒÂ©e avec snap et historique
-// Ã¢Å“â€¦ finishDrawNote() - AmÃƒÂ©liorÃƒÂ©e avec snap grid
-// Ã¢Å“â€¦ updateCursor() - Tous les cas gÃƒÂ©rÃƒÂ©s
-// Ã¢Å“â€¦ ResizeHandler - Classe complÃƒÂ¨te ajoutÃƒÂ©e
-// Ã¢Å“â€¦ Meilleure intÃƒÂ©gration HistoryManager
-// Ã¢Å“â€¦ Feedback visuel amÃƒÂ©liorÃƒÂ©
+// ✅ eraseNoteAt() - Complétée avec feedback
+// ✅ createNoteAt() - Complétée avec snap et historique
+// ✅ finishDrawNote() - Améliorée avec snap grid
+// ✅ updateCursor() - Tous les cas gérés
+// ✅ ResizeHandler - Classe complète ajoutée
+// ✅ Meilleure intégration HistoryManager
+// ✅ Feedback visuel amélioré
 // ============================================================================
 // Description:
-//   Gestionnaire des modes d'ÃƒÂ©dition (Select, Pencil, Eraser, etc.).
-//   Chaque mode a un comportement diffÃƒÂ©rent pour les interactions souris.
+//   Gestionnaire des modes d'édition (Select, Pencil, Eraser, etc.).
+//   Chaque mode a un comportement différent pour les interactions souris.
 //
-// FonctionnalitÃƒÂ©s:
-//   - Mode Select : SÃƒÂ©lection et dÃƒÂ©placement notes
-//   - Mode Pencil : CrÃƒÂ©ation nouvelles notes
+// Fonctionnalités:
+//   - Mode Select : Sélection et déplacement notes
+//   - Mode Pencil : Création nouvelles notes
 //   - Mode Eraser : Suppression notes
-//   - Mode Velocity : Ãƒâ€°dition vÃƒÂ©locitÃƒÂ©
+//   - Mode Velocity : Édition vélocité
 //   - Changement mode (toolbar, raccourcis)
-//   - Curseur adaptÃƒÂ© au mode
+//   - Curseur adapté au mode
 //   - Feedback visuel mode actif
 //
 // Architecture:
@@ -31,11 +31,10 @@
 //   ResizeHandler (classe auxiliaire)
 //   PlaybackMode (classe mode lecture)
 //   - Pattern Strategy pour comportements
-//   - Ãƒâ€°tat partagÃƒÂ© (selection, viewport)
+//   - État partagé (selection, viewport)
 //
 // Auteur: MidiMind Team
 // ============================================================================
-
 
 class EditorMode {
     constructor(visualizer) {
@@ -47,11 +46,11 @@ class EditorMode {
         this.dragHandler = new DragHandler(visualizer);
         this.resizeHandler = new ResizeHandler(visualizer);
         
-        // Ãƒâ€°tat
+        // État
         this.isActive = false;
         this.currentTool = 'select';
         
-        // CrÃƒÂ©ation de note
+        // Création de note
         this.isDrawingNote = false;
         this.drawingNote = null;
         this.drawStartPos = null;
@@ -61,7 +60,7 @@ class EditorMode {
     }
 
     // ========================================================================
-    // ACTIVATION / DÃƒâ€°SACTIVATION
+    // ACTIVATION / DÉSACTIVATION
     // ========================================================================
 
     activate() {
@@ -146,29 +145,29 @@ class EditorMode {
         }
         
         // Outil Select
-        // 1. VÃƒÂ©rifier si on resize
+        // 1. Vérifier si on resize
         if (this.resizeHandler.isOverHandle(adjustedX, adjustedY)) {
             this.resizeHandler.startResize(adjustedX, adjustedY);
             return;
         }
         
-        // 2. VÃƒÂ©rifier si on clique sur une note
+        // 2. Vérifier si on clique sur une note
         const note = this.selection.findNoteAt(adjustedX, adjustedY);
         
         if (note) {
             if (shiftKey) {
-                // Shift + clic = toggle sÃƒÂ©lection
+                // Shift + clic = toggle sélection
                 this.selection.toggle(note.id);
             } else if (this.selection.isSelected(note.id)) {
-                // Clic sur note dÃƒÂ©jÃƒÂ  sÃƒÂ©lectionnÃƒÂ©e = drag
+                // Clic sur note déjà sélectionnée = drag
                 this.dragHandler.startDrag(adjustedX, adjustedY, note);
             } else {
-                // Clic sur note non sÃƒÂ©lectionnÃƒÂ©e
+                // Clic sur note non sélectionnée
                 this.selection.select(note.id, ctrlKey);
                 this.dragHandler.startDrag(adjustedX, adjustedY, note);
             }
         } else {
-            // Clic dans le vide = rectangle de sÃƒÂ©lection
+            // Clic dans le vide = rectangle de sélection
             if (!ctrlKey) {
                 this.selection.clear();
             }
@@ -198,13 +197,13 @@ class EditorMode {
             return;
         }
         
-        // Rectangle de sÃƒÂ©lection
+        // Rectangle de sélection
         if (this.selection.isDrawingRect) {
             this.selection.updateRectSelection(adjustedX, adjustedY);
             return;
         }
         
-        // Mise ÃƒÂ  jour du curseur
+        // Mise à jour du curseur
         this.updateCursor(adjustedX, adjustedY, y);
     }
 
@@ -239,7 +238,7 @@ class EditorMode {
     }
 
     onMouseLeave(e) {
-        // Annuler les opÃƒÂ©rations en cours si la souris sort
+        // Annuler les opérations en cours si la souris sort
         if (this.dragHandler.isDragging) {
             // Ne pas annuler automatiquement, attendre mouseup
         }
@@ -249,7 +248,7 @@ class EditorMode {
         const { x, y } = this.getCanvasCoords(e);
         const { adjustedX, adjustedY } = this.getAdjustedCoords(x, y);
         
-        // Double-clic pour crÃƒÂ©er une note (si outil select)
+        // Double-clic pour créer une note (si outil select)
         if (this.currentTool === 'select') {
             this.createNoteAt(adjustedX, adjustedY);
         }
@@ -286,7 +285,7 @@ class EditorMode {
             return;
         }
         
-        // Delete - supprimer sÃƒÂ©lection
+        // Delete - supprimer sélection
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             const selectedNotes = this.selection.getSelectedNotes();
@@ -296,7 +295,7 @@ class EditorMode {
             }
         }
         
-        // Escape - annuler opÃƒÂ©ration en cours
+        // Escape - annuler opération en cours
         if (e.key === 'Escape') {
             e.preventDefault();
             if (this.isDrawingNote) {
@@ -320,7 +319,7 @@ class EditorMode {
     // ========================================================================
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: DÃƒÂ©marre le dessin d'une note
+     * ✅ COMPLÉTÉ: Démarre le dessin d'une note
      */
     startDrawNote(x, y) {
         this.isDrawingNote = true;
@@ -329,14 +328,14 @@ class EditorMode {
         const time = this.visualizer.coordSystem.xToTime(x);
         const note = this.visualizer.coordSystem.yToNote(y);
         
-        // Snap initial si activÃƒÂ©
+        // Snap initial si activé
         const snappedTime = this.visualizer.config.snapToGrid ?
             this.visualizer.coordSystem.snapTimeToGrid(time) : time;
         
         this.drawingNote = {
             time: snappedTime,
             note: note,
-            duration: 100, // DurÃƒÂ©e initiale
+            duration: 100, // Durée initiale
             velocity: 100,
             channel: 0
         };
@@ -345,7 +344,7 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: Met ÃƒÂ  jour le dessin de la note
+     * ✅ COMPLÉTÉ: Met à jour le dessin de la note
      */
     updateDrawNote(x, y) {
         if (!this.isDrawingNote || !this.drawingNote) return;
@@ -353,13 +352,13 @@ class EditorMode {
         const endTime = this.visualizer.coordSystem.xToTime(x);
         let duration = endTime - this.drawingNote.time;
         
-        // Snap duration si activÃƒÂ©
+        // Snap duration si activé
         if (this.visualizer.config.snapToGrid) {
             const gridSize = this.visualizer.config.gridSize || 100;
             duration = Math.round(duration / gridSize) * gridSize;
         }
         
-        // DurÃƒÂ©e minimum
+        // Durée minimum
         duration = Math.max(50, duration);
         
         this.drawingNote.duration = duration;
@@ -367,12 +366,12 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ CORRIGÃƒâ€°: Finalise la crÃƒÂ©ation de la note
+     * ✅ CORRIGÉ: Finalise la création de la note
      */
     finishDrawNote() {
         if (!this.isDrawingNote || !this.drawingNote) return;
         
-        // Snap final si nÃƒÂ©cessaire
+        // Snap final si nécessaire
         if (this.visualizer.config.snapToGrid) {
             const gridSize = this.visualizer.config.gridSize || 100;
             this.drawingNote.time = this.visualizer.coordSystem.snapTimeToGrid(
@@ -399,13 +398,13 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ CORRIGÃƒâ€°: Efface la note ÃƒÂ  la position donnÃƒÂ©e
+     * ✅ CORRIGÉ: Efface la note à la position donnée
      */
     eraseNoteAt(x, y) {
         const note = this.selection.findNoteAt(x, y);
         
         if (note) {
-            // Feedback visuel immÃƒÂ©diat
+            // Feedback visuel immédiat
             this.visualizer.renderEngine.requestRedraw();
             
             // Supprimer la note
@@ -422,19 +421,19 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ CORRIGÃƒâ€°: CrÃƒÂ©e une note ÃƒÂ  la position donnÃƒÂ©e
+     * ✅ CORRIGÉ: Crée une note à la position donnée
      */
     createNoteAt(x, y) {
         let time = this.visualizer.coordSystem.xToTime(x);
         const note = this.visualizer.coordSystem.yToNote(y);
         
-        // Snap si activÃƒÂ©
+        // Snap si activé
         if (this.visualizer.config.snapToGrid) {
             const gridSize = this.visualizer.config.gridSize || 100;
             time = this.visualizer.coordSystem.snapTimeToGrid(time, gridSize);
         }
         
-        // DurÃƒÂ©e par dÃƒÂ©faut snappÃƒÂ©e
+        // Durée par défaut snappée
         let duration = 500;
         if (this.visualizer.config.snapToGrid) {
             const gridSize = this.visualizer.config.gridSize || 100;
@@ -462,7 +461,7 @@ class EditorMode {
     }
 
     /**
-     * Duplique la sÃƒÂ©lection
+     * Duplique la sélection
      */
     duplicateSelection() {
         const selectedNotes = this.selection.getSelectedNotes();
@@ -473,21 +472,21 @@ class EditorMode {
         selectedNotes.forEach(note => {
             const newNote = {
                 ...note,
-                time: note.time + 1000 // DÃƒÂ©caler d'1 seconde
+                time: note.time + 1000 // Décaler d'1 seconde
             };
-            delete newNote.id; // Laisser addNote gÃƒÂ©nÃƒÂ©rer un nouvel ID
+            delete newNote.id; // Laisser addNote générer un nouvel ID
             
             this.visualizer.addNote(newNote);
             newNoteIds.push(newNote.id);
         });
         
-        // SÃƒÂ©lectionner les nouvelles notes
+        // Sélectionner les nouvelles notes
         this.selection.clear();
         this.selection.selectMultiple(newNoteIds);
     }
 
     /**
-     * DÃƒÂ©place la sÃƒÂ©lection avec les touches du clavier
+     * Déplace la sélection avec les touches du clavier
      */
     moveSelectionWithKeys(key, shiftKey) {
         const step = shiftKey ? 10 : 1;
@@ -513,7 +512,7 @@ class EditorMode {
                 break;
         }
         
-        // DÃƒÂ©placer toutes les notes sÃƒÂ©lectionnÃƒÂ©es
+        // Déplacer toutes les notes sélectionnées
         selectedNotes.forEach(note => {
             note.time = Math.max(0, note.time + deltaTime);
             note.note = Math.max(0, Math.min(127, note.note + deltaPitch));
@@ -543,10 +542,10 @@ class EditorMode {
             ctx.restore();
         }
         
-        // Rectangle de sÃƒÂ©lection
+        // Rectangle de sélection
         this.selection.renderSelectionRect(ctx);
         
-        // PoignÃƒÂ©es de resize
+        // Poignées de resize
         this.resizeHandler.renderHandles(ctx, this.selection);
         
         // Ghost notes pendant drag
@@ -558,7 +557,7 @@ class EditorMode {
     // ========================================================================
 
     /**
-     * Ã¢Å“â€¦ OK: Obtient les coordonnÃƒÂ©es canvas depuis l'ÃƒÂ©vÃƒÂ©nement
+     * ✅ OK: Obtient les coordonnées canvas depuis l'événement
      */
     getCanvasCoords(e) {
         const rect = this.canvas.getBoundingClientRect();
@@ -569,7 +568,7 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ OK: Ajuste les coordonnÃƒÂ©es pour les UI offsets
+     * ✅ OK: Ajuste les coordonnées pour les UI offsets
      */
     getAdjustedCoords(x, y) {
         const offsets = this.visualizer.renderEngine.getUIOffsets();
@@ -580,7 +579,7 @@ class EditorMode {
     }
 
     /**
-     * Ã¢Å“â€¦ CORRIGÃƒâ€°: Met ÃƒÂ  jour le curseur selon le contexte
+     * ✅ CORRIGÉ: Met à jour le curseur selon le contexte
      */
     updateCursor(x, y, canvasY) {
         let cursor = 'default';
@@ -623,7 +622,7 @@ class EditorMode {
 // ============================================================================
 
 /**
- * Ã¢Å“â€¦ NOUVELLE CLASSE COMPLÃƒË†TE
+ * ✅ NOUVELLE CLASSE COMPLÈTE
  * Gestionnaire du redimensionnement des notes
  */
 class ResizeHandler {
@@ -632,14 +631,14 @@ class ResizeHandler {
         this.coordSystem = visualizer.coordSystem;
         this.selection = visualizer.selection;
         
-        // Ãƒâ€°tat du resize
+        // État du resize
         this.isResizing = false;
         this.resizeStartX = 0;
         this.resizedNote = null;
         this.initialDuration = 0;
         this.resizeDirection = null; // 'left' ou 'right'
         
-        // Taille de la poignÃƒÂ©e
+        // Taille de la poignée
         this.handleSize = 8;
     }
 
@@ -648,7 +647,7 @@ class ResizeHandler {
     // ========================================================================
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: DÃƒÂ©marre le resize
+     * ✅ COMPLÉTÉ: Démarre le resize
      */
     startResize(x, y) {
         const note = this.findResizableNote(x, y);
@@ -671,7 +670,7 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: Met ÃƒÂ  jour le resize
+     * ✅ COMPLÉTÉ: Met à jour le resize
      */
     updateResize(x, snapToGrid = false) {
         if (!this.isResizing || !this.resizedNote) return;
@@ -683,13 +682,13 @@ class ResizeHandler {
             // Redimensionner depuis la droite
             let newDuration = this.initialDuration + deltaTime;
             
-            // Snap si activÃƒÂ©
+            // Snap si activé
             if (snapToGrid) {
                 const gridSize = this.visualizer.config.gridSize || 100;
                 newDuration = Math.round(newDuration / gridSize) * gridSize;
             }
             
-            // DurÃƒÂ©e minimum
+            // Durée minimum
             newDuration = Math.max(50, newDuration);
             
             this.resizedNote.duration = newDuration;
@@ -699,14 +698,14 @@ class ResizeHandler {
             let newTime = this.resizedNote.time + deltaTime;
             let newDuration = this.initialDuration - deltaTime;
             
-            // Snap si activÃƒÂ©
+            // Snap si activé
             if (snapToGrid) {
                 const gridSize = this.visualizer.config.gridSize || 100;
                 newTime = Math.round(newTime / gridSize) * gridSize;
                 newDuration = Math.round(newDuration / gridSize) * gridSize;
             }
             
-            // DurÃƒÂ©e minimum
+            // Durée minimum
             newDuration = Math.max(50, newDuration);
             
             this.resizedNote.time = Math.max(0, newTime);
@@ -717,7 +716,7 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: Finalise le resize
+     * ✅ COMPLÉTÉ: Finalise le resize
      */
     finishResize() {
         if (!this.isResizing) return;
@@ -766,14 +765,14 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ NOUVEAU: Annule le resize
+     * ✅ NOUVEAU: Annule le resize
      */
     cancelResize() {
         if (!this.isResizing || !this.resizedNote) return;
         
         console.log('[ResizeHandler] Cancelled resizing');
         
-        // Restaurer durÃƒÂ©e initiale
+        // Restaurer durée initiale
         this.resizedNote.duration = this.initialDuration;
         
         this.isResizing = false;
@@ -786,7 +785,7 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ COMPLÃƒâ€°TÃƒâ€°: VÃƒÂ©rifie si on est sur une poignÃƒÂ©e
+     * ✅ COMPLÉTÉ: Vérifie si on est sur une poignée
      */
     isOverHandle(x, y) {
         const selectedNotes = this.selection.getSelectedNotes();
@@ -794,13 +793,13 @@ class ResizeHandler {
         for (const note of selectedNotes) {
             const rect = this.coordSystem.noteToRect(note);
             
-            // VÃƒÂ©rifier poignÃƒÂ©e gauche
+            // Vérifier poignée gauche
             if (Math.abs(x - rect.x) < this.handleSize && 
                 y >= rect.y && y <= rect.y + rect.height) {
                 return true;
             }
             
-            // VÃƒÂ©rifier poignÃƒÂ©e droite
+            // Vérifier poignée droite
             if (Math.abs(x - (rect.x + rect.width)) < this.handleSize && 
                 y >= rect.y && y <= rect.y + rect.height) {
                 return true;
@@ -811,7 +810,7 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ NOUVEAU: Trouve la note redimensionnable
+     * ✅ NOUVEAU: Trouve la note redimensionnable
      */
     findResizableNote(x, y) {
         const selectedNotes = this.selection.getSelectedNotes();
@@ -819,7 +818,7 @@ class ResizeHandler {
         for (const note of selectedNotes) {
             const rect = this.coordSystem.noteToRect(note);
             
-            // VÃƒÂ©rifier si dans la zone de resize
+            // Vérifier si dans la zone de resize
             if ((Math.abs(x - rect.x) < this.handleSize || 
                  Math.abs(x - (rect.x + rect.width)) < this.handleSize) && 
                 y >= rect.y && y <= rect.y + rect.height) {
@@ -831,7 +830,7 @@ class ResizeHandler {
     }
 
     /**
-     * Ã¢Å“â€¦ NOUVEAU: Rend les poignÃƒÂ©es de resize
+     * ✅ NOUVEAU: Rend les poignées de resize
      */
     renderHandles(ctx, selection) {
         const selectedNotes = selection.getSelectedNotes();
@@ -846,7 +845,7 @@ class ResizeHandler {
         selectedNotes.forEach(note => {
             const rect = this.coordSystem.noteToRect(note);
             
-            // PoignÃƒÂ©e gauche
+            // Poignée gauche
             ctx.fillRect(
                 rect.x - this.handleSize / 2,
                 rect.y,
@@ -860,7 +859,7 @@ class ResizeHandler {
                 rect.height
             );
             
-            // PoignÃƒÂ©e droite
+            // Poignée droite
             ctx.fillRect(
                 rect.x + rect.width - this.handleSize / 2,
                 rect.y,
@@ -885,7 +884,7 @@ class ResizeHandler {
 // ============================================================================
 
 /**
- * Ã¢Å“â€¦ COMPLÃƒË†TE: Mode lecture (dÃƒÂ©jÃƒÂ  OK dans le code existant)
+ * ✅ COMPLÈTE: Mode lecture (déjà OK dans le code existant)
  */
 class PlaybackMode {
     constructor(visualizer) {
@@ -896,9 +895,46 @@ class PlaybackMode {
         this.listeners = new Map();
     }
 
+    activate() {
+        if (this.isActive) return;
+        
+        console.log('[PlaybackMode] Activating...');
+        
+        this.attachEventListeners();
+        this.isActive = true;
+        
+        this.visualizer.emit('mode:playback:activated');
+    }
 
+    deactivate() {
+        if (!this.isActive) return;
+        
+        console.log('[PlaybackMode] Deactivating...');
+        
+        this.detachEventListeners();
+        this.isActive = false;
+        
+        this.visualizer.emit('mode:playback:deactivated');
+    }
 
+    attachEventListeners() {
+        const handlers = {
+            click: (e) => this.onClick(e),
+            wheel: (e) => this.onWheel(e)
+        };
+        
+        for (const [event, handler] of Object.entries(handlers)) {
+            this.canvas.addEventListener(event, handler, { passive: event !== 'wheel' });
+            this.listeners.set(event, handler);
+        }
+    }
 
+    detachEventListeners() {
+        for (const [event, handler] of this.listeners.entries()) {
+            this.canvas.removeEventListener(event, handler);
+        }
+        this.listeners.clear();
+    }
 
     onClick(e) {
         const rect = this.canvas.getBoundingClientRect();
@@ -912,7 +948,27 @@ class PlaybackMode {
         this.visualizer.emit('playback:seek', { time });
     }
 
+    onWheel(e) {
+        e.preventDefault();
+        
+        const delta = e.deltaY;
+        
+        if (e.ctrlKey) {
+            // Zoom
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const factor = delta > 0 ? 0.9 : 1.1;
+            this.visualizer.viewport.zoomAt(x, y, factor, 1.0);
+        } else {
+            // Scroll
+            this.visualizer.viewport.scrollY(delta);
+        }
+    }
 
+    render(ctx) {
+        // Le playhead est déjà rendu par le visualizer
+    }
 }
 
 

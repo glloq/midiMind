@@ -1,34 +1,34 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/ValidationController.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   ContrÃ´leur de validation des donnÃ©es utilisateur.
-//   Fournit validation pour formulaires, paramÃ¨tres, fichiers, etc.
+//   Contrôleur de validation des données utilisateur.
+//   Fournit validation pour formulaires, paramètres, fichiers, etc.
 //
-// FonctionnalitÃ©s:
+// Fonctionnalités:
 //   - Validation formulaires (champs requis, formats)
-//   - Validation types de donnÃ©es (string, number, email, etc.)
+//   - Validation types de données (string, number, email, etc.)
 //   - Validation plages de valeurs (min, max, range)
 //   - Validation fichiers (extension, taille, type MIME)
-//   - Validation paramÃ¨tres systÃ¨me (audio, MIDI, rÃ©seau)
-//   - RÃ¨gles personnalisÃ©es (regex, callback)
+//   - Validation paramètres système (audio, MIDI, réseau)
+//   - Règles personnalisées (regex, callback)
 //   - Messages d'erreur personnalisables
-//   - Validation asynchrone (vÃ©rification backend)
+//   - Validation asynchrone (vérification backend)
 //
 // Architecture:
 //   ValidationController extends BaseController
 //   - Utilise Validator (utils/)
-//   - RÃ¨gles de validation rÃ©utilisables
-//   - Cache des rÃ©sultats de validation
+//   - Règles de validation réutilisables
+//   - Cache des résultats de validation
 //
 // Auteur: MidiMind Team
 // ============================================================================
         // ===== VALIDATION CONTROLLER =====
-
-
+		
+		
         class ValidationController extends BaseController {
             constructor(eventBus, models, views, notifications, debugConsole) {
                 super(eventBus, models, views, notifications, debugConsole);
@@ -141,7 +141,7 @@
             checkSystemIntegrity() {
                 const issues = [];
                 
-                // VÃ©rifier les fichiers orphelins
+                // Vérifier les fichiers orphelins
                 const files = this.getModel('file').get('files');
                 const playlists = this.getModel('playlist').get('playlists');
                 
@@ -153,7 +153,7 @@
                     });
                 });
                 
-                // VÃ©rifier les assignations d'instruments
+                // Vérifier les assignations d'instruments
                 files.forEach(file => {
                     if (file.assignments) {
                         Object.values(file.assignments).forEach(instId => {
@@ -165,15 +165,15 @@
                 });
                 
                 if (issues.length > 0) {
-                    this.logDebug('system', `ProblÃ¨mes d'intÃ©gritÃ© dÃ©tectÃ©s: ${issues.length}`);
+                    this.logDebug('system', `Problèmes d'intégrité détectés: ${issues.length}`);
                     issues.forEach(issue => this.logDebug('system', issue));
                 } else {
-                    this.logDebug('system', 'IntÃ©gritÃ© systÃ¨me OK');
+                    this.logDebug('system', 'Intégrité système OK');
                 }
                 
                 return issues;
             }
         }
-
-// Export par défaut
+		
+		// Export par défaut
 window.ValidationController = ValidationController;

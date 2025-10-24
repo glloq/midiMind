@@ -1,14 +1,14 @@
 // ============================================================================
-// Fichier: frontend/js/views/CCEditorView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// 📄 Fichier: frontend/js/views/CCEditorView.js
+// 🎹 Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
-// Description:
+// 📝 Description:
 //   Vue éditeur Control Changes (CC) MIDI pour l'automation.
 //   Affichage courbes CC avec édition graphique (points, lignes, courbes).
 //
-// Fonctionnalités:
+// ✨ Fonctionnalités:
 //   - Affichage courbes CC (0-127)
 //   - Sélection type CC (Volume, Pan, Modulation, etc.)
 //   - Édition points de contrôle
@@ -18,13 +18,13 @@
 //   - Snap temporel configurable
 //   - Copier/coller sections CC
 //
-// Architecture:
+// 🏗️ Architecture:
 //   CCEditorView extends BaseCanvasView
 //   - CCRenderer : Rendu courbes optimisé
 //   - DragHandler : Édition interactive
 //   - Synchronisation avec PianoRollView
 //
-// Auteur: MidiMind Team
+// 👤 Auteur: MidiMind Team
 // ============================================================================
 
 class CCEditorView {

@@ -1,34 +1,33 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PianoRollController.js
-// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   ContrÃƒÂ´leur de logique mÃƒÂ©tier du piano roll (ÃƒÂ©dition graphique des notes).
-//   GÃƒÂ¨re la sÃƒÂ©lection, ÃƒÂ©dition, crÃƒÂ©ation, suppression de notes MIDI.
+//   Contrôleur de logique métier du piano roll (édition graphique des notes).
+//   Gère la sélection, édition, création, suppression de notes MIDI.
 //
-// FonctionnalitÃƒÂ©s:
-//   - SÃƒÂ©lection notes (simple, multiple, rectangle)
-//   - Ãƒâ€°dition notes (dÃƒÂ©placer, redimensionner)
-//   - CrÃƒÂ©ation notes (pencil tool)
+// Fonctionnalités:
+//   - Sélection notes (simple, multiple, rectangle)
+//   - Édition notes (déplacer, redimensionner)
+//   - Création notes (pencil tool)
 //   - Suppression notes (eraser tool)
 //   - Copier/Coller notes
 //   - Quantization (snap to grid)
 //   - Transpose (pitch shift)
-//   - VÃƒÂ©locitÃƒÂ© batch (modifier plusieurs notes)
+//   - Vélocité batch (modifier plusieurs notes)
 //   - Undo/Redo complet
 //
 // Architecture:
 //   PianoRollController extends BaseController
-//   - Utilise EditorModel pour donnÃƒÂ©es
+//   - Utilise EditorModel pour données
 //   - Utilise PianoRollView pour rendu
 //   - HistoryManager pour undo/redo
-//   - SelectionManager pour sÃƒÂ©lection
+//   - SelectionManager pour sélection
 //
 // Auteur: MidiMind Team
 // ============================================================================
-
 
 class PianoRollController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
@@ -39,7 +38,7 @@ class PianoRollController extends BaseController {
         this.syncManager = new MidiSyncManager(eventBus, debugConsole);
         this.renderer = new PianoRollRenderer();
         
-        // Ãƒâ€°tat du contrÃƒÂ´leur
+        // État du contrôleur
         this.channelStates = {};
         this.selectedNotes = new Set();
         this.midiData = null;
@@ -47,7 +46,7 @@ class PianoRollController extends BaseController {
         this.currentTime = 0;
         this.playbackPosition = 0;
         
-        // SystÃƒÂ¨me de visualisation avancÃƒÂ©
+        // Système de visualisation avancé
         this.visualizer = {
             zoom: 1.0,
             scrollPosition: 0,
@@ -62,7 +61,7 @@ class PianoRollController extends BaseController {
         this.noteCache = new Map();
         this.lastRenderTime = 0;
         
-        // MÃƒÂ©triques de performance
+        // Métriques de performance
         this.performanceStats = {
             notesRendered: 0,
             renderTime: 0,
@@ -72,12 +71,12 @@ class PianoRollController extends BaseController {
     }
 
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements de changement d'ÃƒÂ©tat
+        // Événements de changement d'état
         this.eventBus.on('statemodel:changed', (data) => {
             this.handleStateChange(data);
         });
         
-        // Ãƒâ€°vÃƒÂ©nements MIDI spÃƒÂ©cifiques
+        // Événements MIDI spécifiques
         this.eventBus.on('midi:file_added', (data) => {
             this.onMidiFileAdded(data);
         });
@@ -86,7 +85,7 @@ class PianoRollController extends BaseController {
             this.loadMidiFile(data.file, data.midiData);
         });
         
-        // Ãƒâ€°vÃƒÂ©nements de synchronisation
+        // Événements de synchronisation
         this.eventBus.on('sync:offsets_updated', (data) => {
             this.updateSyncOffsets(data);
         });
@@ -99,7 +98,7 @@ class PianoRollController extends BaseController {
             this.onSyncPlaybackStopped();
         });
         
-        // Ãƒâ€°vÃƒÂ©nements d'interface
+        // Événements d'interface
         this.eventBus.on('pianoroll:zoom', (data) => {
             this.setZoom(data.zoom);
         });
@@ -114,7 +113,7 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * GÃƒÂ¨re les changements d'ÃƒÂ©tat global
+     * Gère les changements d'état global
      */
     handleStateChange(data) {
         switch (data.key) {
@@ -146,7 +145,7 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * Charge un fichier MIDI avec ses donnÃƒÂ©es parsÃƒÂ©es
+     * Charge un fichier MIDI avec ses données parsées
      */
     loadMidiFile(file, midiData) {
         if (!file || !midiData) {
@@ -156,22 +155,22 @@ class PianoRollController extends BaseController {
 
         this.debugConsole.log('pianoroll', `Chargement fichier: ${file.name}`);
         
-        // Stocker les donnÃƒÂ©es
+        // Stocker les données
         this.midiData = midiData;
         
-        // Initialiser les ÃƒÂ©tats des canaux avec les vraies donnÃƒÂ©es
+        // Initialiser les états des canaux avec les vraies données
         this.initializeChannelStates();
         
-        // PrÃƒÂ©parer la synchronisation
+        // Préparer la synchronisation
         this.syncManager.prepareSyncForFile(midiData);
         
         // Initialiser le cache de rendu
         this.initializeRenderCache();
         
-        // RafraÃƒÂ®chir l'affichage
+        // Rafraîchir l'affichage
         this.refreshDisplay();
         
-        // Ãƒâ€°mettre les ÃƒÂ©vÃƒÂ©nements pour les autres composants
+        // Émettre les événements pour les autres composants
         this.eventBus.emit('pianoroll:file_loaded', {
             file,
             midiData,
@@ -179,24 +178,24 @@ class PianoRollController extends BaseController {
         });
         
         this.debugConsole.log('pianoroll', 
-            `Fichier chargÃƒÂ©: ${midiData.tracks.length} pistes, ${midiData.allNotes.length} notes, ${midiData.duration.toFixed(1)}s`);
+            `Fichier chargé: ${midiData.tracks.length} pistes, ${midiData.allNotes.length} notes, ${midiData.duration.toFixed(1)}s`);
     }
 
     /**
-     * Initialise les ÃƒÂ©tats des canaux avec les vraies donnÃƒÂ©es MIDI
+     * Initialise les états des canaux avec les vraies données MIDI
      */
     initializeChannelStates() {
         this.channelStates = {};
         
         if (!this.midiData) return;
         
-        // Analyser tous les canaux utilisÃƒÂ©s
+        // Analyser tous les canaux utilisés
         const usedChannels = new Set();
         this.midiData.tracks.forEach(track => {
             usedChannels.add(track.channel);
         });
         
-        // CrÃƒÂ©er les ÃƒÂ©tats pour chaque canal utilisÃƒÂ©
+        // Créer les états pour chaque canal utilisé
         usedChannels.forEach(channel => {
             const trackData = this.midiData.tracks.find(t => t.channel === channel);
             
@@ -208,7 +207,7 @@ class PianoRollController extends BaseController {
                 selected: false,
                 visible: true,
                 
-                // DonnÃƒÂ©es du canal
+                // Données du canal
                 name: trackData?.name || `Canal ${channel + 1}`,
                 instrument: trackData?.instrument || 'Piano',
                 noteCount: trackData?.notes.length || 0,
@@ -217,7 +216,7 @@ class PianoRollController extends BaseController {
                 // Synchronisation
                 syncOffset: 0,
                 latencyCompensation: 0,
-                instrumentId: null, // Ãƒâ‚¬ assigner lors du routage
+                instrumentId: null, // À assigner lors du routage
                 
                 // Visualisation
                 color: this.getChannelColor(channel),
@@ -245,7 +244,7 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * GÃƒÂ©nÃƒÂ¨re une couleur pour un canal
+     * Génère une couleur pour un canal
      */
     getChannelColor(channel) {
         const colors = [
@@ -260,14 +259,14 @@ class PianoRollController extends BaseController {
      * Optimise l'ordre de rendu des canaux
      */
     optimizeRenderOrder() {
-        // Trier les canaux par prioritÃƒÂ© de rendu (notes plus nombreuses en premier)
+        // Trier les canaux par priorité de rendu (notes plus nombreuses en premier)
         this.renderOrder = Object.keys(this.channelStates)
             .map(Number)
             .sort((a, b) => {
                 const stateA = this.channelStates[a];
                 const stateB = this.channelStates[b];
                 
-                // PrioritÃƒÂ© aux canaux avec beaucoup de notes
+                // Priorité aux canaux avec beaucoup de notes
                 if (stateA.renderPriority === 'high' && stateB.renderPriority !== 'high') return -1;
                 if (stateB.renderPriority === 'high' && stateA.renderPriority !== 'high') return 1;
                 
@@ -285,7 +284,7 @@ class PianoRollController extends BaseController {
         
         if (!this.midiData) return;
         
-        // PrÃƒÂ©-calculer les positions de rendu pour les notes frÃƒÂ©quentes
+        // Pré-calculer les positions de rendu pour les notes fréquentes
         this.midiData.tracks.forEach(track => {
             if (track.notes.length > 100) {
                 // Cache les notes par segments temporels
@@ -297,7 +296,7 @@ class PianoRollController extends BaseController {
             }
         });
         
-        this.debugConsole.log('pianoroll', `Cache initialisÃƒÂ©: ${this.noteCache.size} segments`);
+        this.debugConsole.log('pianoroll', `Cache initialisé: ${this.noteCache.size} segments`);
     }
 
     /**
@@ -327,39 +326,39 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * PrÃƒÂ©-traite les notes pour le rendu
+     * Pré-traite les notes pour le rendu
      */
     preprocessNotes(notes) {
         return notes.map(note => ({
             ...note,
-            // PrÃƒÂ©-calculer les coordonnÃƒÂ©es de rendu
+            // Pré-calculer les coordonnées de rendu
             renderX: this.timeToPixel(note.startTime),
             renderY: this.noteToPixel(note.pitch),
             renderWidth: this.durationToPixel(note.duration),
             renderHeight: 8, // Hauteur standard d'une note
-            // PrÃƒÂ©-calculer la couleur
+            // Pré-calculer la couleur
             color: this.velocityToColor(note.velocity),
             opacity: this.velocityToOpacity(note.velocity)
         }));
     }
 
-    // ===== CONTRÃƒâ€LES DES CANAUX =====
+    // ===== CONTRÔLES DES CANAUX =====
 
     /**
-     * Active/dÃƒÂ©sactive le mute d'un canal
+     * Active/désactive le mute d'un canal
      */
     toggleChannelMute(channel) {
         if (this.channelStates[channel]) {
             this.channelStates[channel].muted = !this.channelStates[channel].muted;
             
-            // Si on mute, arrÃƒÂªter les notes en cours
+            // Si on mute, arrêter les notes en cours
             if (this.channelStates[channel].muted && this.isPlaying) {
                 this.stopChannelNotes(channel);
             }
             
             this.refreshChannelDisplay(channel);
             
-            const state = this.channelStates[channel].muted ? 'mutÃƒÂ©' : 'audible';
+            const state = this.channelStates[channel].muted ? 'muté' : 'audible';
             this.debugConsole.log('pianoroll', `Canal ${channel} ${state}`);
             
             this.eventBus.emit('pianoroll:channel_muted', {
@@ -370,7 +369,7 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * Active/dÃƒÂ©sactive le solo d'un canal
+     * Active/désactive le solo d'un canal
      */
     toggleChannelSolo(channel) {
         if (!this.channelStates[channel]) return;
@@ -379,21 +378,21 @@ class PianoRollController extends BaseController {
         
         // Si on active le solo
         if (!wasSolo) {
-            // DÃƒÂ©sactiver tous les autres solos
+            // Désactiver tous les autres solos
             Object.keys(this.channelStates).forEach(ch => {
                 this.channelStates[ch].solo = false;
             });
             // Activer ce canal
             this.channelStates[channel].solo = true;
         } else {
-            // DÃƒÂ©sactiver le solo
+            // Désactiver le solo
             this.channelStates[channel].solo = false;
         }
         
         this.refreshDisplay();
         
         this.debugConsole.log('pianoroll', 
-            `Canal ${channel} solo ${this.channelStates[channel].solo ? 'activÃƒÂ©' : 'dÃƒÂ©sactivÃƒÂ©'}`);
+            `Canal ${channel} solo ${this.channelStates[channel].solo ? 'activé' : 'désactivé'}`);
         
         this.eventBus.emit('pianoroll:channel_solo', {
             channel,
@@ -416,15 +415,15 @@ class PianoRollController extends BaseController {
     }
 
     /**
-     * SÃƒÂ©lectionne un canal pour l'affichage
+     * Sélectionne un canal pour l'affichage
      */
     selectChannel(channel) {
-        // DÃƒÂ©sÃƒÂ©lectionner tous les canaux
+        // Désélectionner tous les canaux
         Object.keys(this.channelStates).forEach(ch => {
             this.channelStates[ch].selected = false;
         });
         
-        // SÃƒÂ©lectionner le canal spÃƒÂ©cifiÃƒÂ© (-1 = tous)
+        // Sélectionner le canal spécifié (-1 = tous)
         if (channel >= 0 && this.channelStates[channel]) {
             this.channelStates[channel].selected = true;
         }
@@ -433,10 +432,10 @@ class PianoRollController extends BaseController {
         this.refreshDisplay();
         
         this.debugConsole.log('pianoroll', 
-            `Canal sÃƒÂ©lectionnÃƒÂ©: ${channel >= 0 ? channel : 'tous'}`);
+            `Canal sélectionné: ${channel >= 0 ? channel : 'tous'}`);
     }
 
-    // ===== MÃƒâ€°THODES DE RENDU ET CONVERSION =====
+    // ===== MÉTHODES DE RENDU ET CONVERSION =====
 
     timeToPixel(time) {
         return time * 100 * this.visualizer.zoom; // 100 pixels par seconde
@@ -465,7 +464,7 @@ class PianoRollController extends BaseController {
         this.playbackPosition = this.currentTime;
         this.updateVisualizerPosition();
         
-        // Mettre ÃƒÂ  jour le cache si nÃƒÂ©cessaire
+        // Mettre à jour le cache si nécessaire
         this.invalidateRenderCacheIfNeeded();
     }
 
@@ -473,7 +472,7 @@ class PianoRollController extends BaseController {
         // Calculer la position du curseur de lecture
         const cursorX = this.timeToPixel(this.playbackPosition);
         
-        // Auto-scroll si nÃƒÂ©cessaire
+        // Auto-scroll si nécessaire
         if (this.shouldAutoScroll(cursorX)) {
             this.visualizer.scrollPosition = cursorX - 200; // Garde le curseur visible
         }
@@ -486,14 +485,14 @@ class PianoRollController extends BaseController {
     }
 
     shouldAutoScroll(cursorX) {
-        const viewportWidth = 800; // Largeur de la vue (ÃƒÂ  adapter)
+        const viewportWidth = 800; // Largeur de la vue (à adapter)
         const leftEdge = this.visualizer.scrollPosition;
         const rightEdge = leftEdge + viewportWidth;
         
         return cursorX < leftEdge || cursorX > rightEdge - 100;
     }
 
-    // ===== MÃƒâ€°THODES UTILITAIRES =====
+    // ===== MÉTHODES UTILITAIRES =====
 
     clearMidiData() {
         this.midiData = null;
@@ -503,14 +502,14 @@ class PianoRollController extends BaseController {
         this.selectedNotes.clear();
         
         this.refreshDisplay();
-        this.debugConsole.log('pianoroll', 'DonnÃƒÂ©es MIDI effacÃƒÂ©es');
+        this.debugConsole.log('pianoroll', 'Données MIDI effacées');
     }
 
     refreshDisplay() {
         // Invalider le cache de rendu
         this.renderCache.clear();
         
-        // DÃƒÂ©clencher le rendu
+        // Déclencher le rendu
         this.eventBus.emit('pianoroll:refresh_required', {
             channelStates: this.channelStates,
             visualizer: this.visualizer,
@@ -533,7 +532,7 @@ class PianoRollController extends BaseController {
         }
     }
 
-    // ===== MÃƒâ€°THODES DE CONTRÃƒâ€LE DE LECTURE =====
+    // ===== MÉTHODES DE CONTRÔLE DE LECTURE =====
 
     stopAllNotes() {
         this.eventBus.emit('midi:stop_all_notes');
@@ -558,12 +557,12 @@ class PianoRollController extends BaseController {
         // Analyser le nouveau fichier pour des optimisations
         if (data.midiData) {
             this.debugConsole.log('pianoroll', 
-                `Nouveau fichier MIDI analysÃƒÂ©: ${data.file.name}`);
+                `Nouveau fichier MIDI analysé: ${data.file.name}`);
         }
     }
 
     updateSyncOffsets(data) {
-        // Mettre ÃƒÂ  jour les offsets de synchronisation
+        // Mettre à jour les offsets de synchronisation
         Object.keys(this.channelStates).forEach(channel => {
             const instrumentId = this.channelStates[channel].instrumentId;
             if (instrumentId && data.offsets[instrumentId]) {
@@ -571,10 +570,10 @@ class PianoRollController extends BaseController {
             }
         });
         
-        this.debugConsole.log('pianoroll', 'Offsets de synchronisation mis ÃƒÂ  jour');
+        this.debugConsole.log('pianoroll', 'Offsets de synchronisation mis à jour');
     }
 
-    // ===== MÃƒâ€°THODES DE ZOOM ET NAVIGATION =====
+    // ===== MÉTHODES DE ZOOM ET NAVIGATION =====
 
     setZoom(zoom) {
         this.visualizer.zoom = Math.max(0.1, Math.min(5.0, zoom));
@@ -600,11 +599,17 @@ class PianoRollController extends BaseController {
     }
 
 
+    setChannelVolume(channel, volume) {
+        if (this.channelStates[channel]) {
+            this.channelStates[channel].volume = Math.max(0, Math.min(1, volume));
+            this.logDebug('midi', `Canal ${channel} volume: ${Math.round(volume * 100)}%`);
+        }
+    }
 
     setSyncOffset(channel, offsetMs) {
         if (this.channelStates[channel]) {
             this.channelStates[channel].syncOffset = offsetMs;
-            this.logDebug('midi', `Canal ${channel} dÃƒÂ©calage: ${offsetMs}ms`);
+            this.logDebug('midi', `Canal ${channel} décalage: ${offsetMs}ms`);
         }
     }
 
@@ -612,16 +617,16 @@ class PianoRollController extends BaseController {
     updatePlayback() {
         if (!this.midiData || !this.isPlaying) return;
         
-        // Calculer quelles notes doivent ÃƒÂªtre jouÃƒÂ©es maintenant
+        // Calculer quelles notes doivent être jouées maintenant
         const activeNotes = this.getActiveNotes(this.currentTime);
         
-        // Envoyer les messages MIDI avec les dÃƒÂ©lais de synchro
+        // Envoyer les messages MIDI avec les délais de synchro
         this.sendMidiMessages(activeNotes);
         
-        // Mettre ÃƒÂ  jour l'affichage du piano
+        // Mettre à jour l'affichage du piano
         this.updatePianoDisplay(activeNotes);
         
-        // RafraÃƒÂ®chir le rendu si nÃƒÂ©cessaire
+        // Rafraîchir le rendu si nécessaire
         if (this.shouldRefreshDisplay()) {
             this.refreshDisplay();
         }
@@ -629,7 +634,7 @@ class PianoRollController extends BaseController {
 
     getActiveNotes(currentTime) {
         const activeNotes = [];
-        const tolerance = 0.05; // 50ms de tolÃƒÂ©rance
+        const tolerance = 0.05; // 50ms de tolérance
         
         if (this.midiData) {
             this.midiData.tracks.forEach(track => {
@@ -637,7 +642,7 @@ class PianoRollController extends BaseController {
                 if (!channelState || channelState.muted) return;
                 
                 track.notes.forEach(note => {
-                    // Appliquer le dÃƒÂ©calage de synchronisation
+                    // Appliquer le décalage de synchronisation
                     const adjustedStartTime = note.startTime + (channelState.syncOffset / 1000);
                     const adjustedEndTime = note.endTime + (channelState.syncOffset / 1000);
                     
@@ -659,7 +664,7 @@ class PianoRollController extends BaseController {
     }
 
     sendMidiMessages(activeNotes) {
-        // Simulation d'envoi MIDI - ici vous intÃƒÂ©greriez votre systÃƒÂ¨me MIDI rÃƒÂ©el
+        // Simulation d'envoi MIDI - ici vous intégreriez votre système MIDI réel
         activeNotes.forEach(note => {
             const instruments = this.getModel('instrument').get('instruments');
             const assignments = this.getModel('state').get('currentFile')?.assignments || {};
@@ -669,14 +674,14 @@ class PianoRollController extends BaseController {
                 const instrument = instruments.find(i => i.id === assignedInstrumentId);
                 if (instrument && instrument.connected) {
                     // Ici vous enverriez le vrai message MIDI
-                    this.logDebug('midi', `Ã¢â€ â€™ ${instrument.name}: Note ${note.pitch} V${note.velocity}`);
+                    this.logDebug('midi', `→ ${instrument.name}: Note ${note.pitch} V${note.velocity}`);
                 }
             }
         });
     }
 
     updatePianoDisplay(activeNotes) {
-        // RÃƒÂ©initialiser toutes les touches
+        // Réinitialiser toutes les touches
         document.querySelectorAll('.piano-key-display').forEach(key => {
             const isBlack = key.classList.contains('black-key');
             key.style.background = isBlack ? '#2c3e50' : '#ecf0f1';
@@ -692,8 +697,13 @@ class PianoRollController extends BaseController {
         });
     }
 
+    stopAllNotes() {
+        // Arrêter toutes les notes en cours
+        this.updatePianoDisplay([]);
+        this.logDebug('midi', 'Toutes les notes arrêtées');
+    }
 
-    // Gestion des sÃƒÂ©lections de notes
+    // Gestion des sélections de notes
     selectNote(noteId) {
         if (this.selectedNotes.has(noteId)) {
             this.selectedNotes.delete(noteId);
@@ -719,18 +729,38 @@ class PianoRollController extends BaseController {
 
     showNoteMenu(event, noteId) {
         event.preventDefault();
-        // Ici vous pourriez afficher un menu contextuel pour ÃƒÂ©diter la note
+        // Ici vous pourriez afficher un menu contextuel pour éditer la note
         console.log('Menu note:', noteId);
     }
 
-    // MÃƒÂ©thodes d'affichage
+    // Méthodes d'affichage
+    refreshDisplay() {
+        if (!this.midiData || !app.navigationController || app.navigationController.getCurrentPage() !== 'home') {
+            return;
+        }
+        
+        const state = this.getModel('state');
+        const settings = state.get('settings') || {};
+        const viewWindow = settings.noteDisplayWindow || 30;
+        
+        const canvas = document.getElementById('midiVisualizerCanvas');
+        if (canvas) {
+            const pianoRollHTML = this.renderer.renderPianoRoll(
+                this.midiData,
+                this.currentTime,
+                viewWindow,
+                this.channelStates
+            );
+            canvas.innerHTML = pianoRollHTML;
+        }
+    }
 
     shouldRefreshDisplay() {
-        // RafraÃƒÂ®chir quand la position change significativement
+        // Rafraîchir quand la position change significativement
         return Math.abs(this.currentTime - (this.lastRefreshTime || 0)) > 0.5;
     }
 
-    // ContrÃƒÂ´les de zoom
+    // Contrôles de zoom
     zoomIn() {
         const currentZoom = this.renderer.getZoom();
         this.renderer.setZoom(currentZoom * 1.2);
@@ -745,7 +775,7 @@ class PianoRollController extends BaseController {
         this.logDebug('system', `Zoom: ${this.renderer.getZoom().toFixed(0)} px/s`);
     }
 
-    // MÃƒÂ©thodes publiques pour l'intÃƒÂ©gration
+    // Méthodes publiques pour l'intégration
     getMidiData() {
         return this.midiData;
     }

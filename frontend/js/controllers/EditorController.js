@@ -1,48 +1,47 @@
 // ============================================================================
-// Fichier: frontend/js/controllers/EditorController.js
-// Version: v3.1.03 - CORRIGÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° COMPLET
+// Fichier: frontend/scripts/controllers/EditorController.js
+// Version: v3.0.3 - CORRIGÉ COMPLET
 // Date: 2025-10-09
-// Projet: midiMind v3.0 - SystÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨me d'Orchestration MIDI
+// Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // Description:
-//   ContrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´leur complet de l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur MIDI avec intÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gration EditorModel v3.1.02
-//   GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re le visualizer, routing, et toutes les opÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rations d'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dition
+//   Contrôleur complet de l'éditeur MIDI avec intégration EditorModel v3.0.2
+//   Gère le visualizer, routing, et toutes les opérations d'édition
 // 
-// CORRECTIONS v3.1.03:
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Cut() dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨gue maintenant ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  EditorModel
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thodes getCurrentPasteTime() et reloadVisualizer() ajoutÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Transformations ajoutÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es (quantize, transpose, scaleVelocity)
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Callbacks Visualizer simplifiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s (pas de redondance)
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Synchronisation propre EditorModel ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Visualizer
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Tous les ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements bindÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s correctement
+// CORRECTIONS v3.0.3:
+//   ✅ Cut() délègue maintenant à EditorModel
+//   ✅ Méthodes getCurrentPasteTime() et reloadVisualizer() ajoutées
+//   ✅ Transformations ajoutées (quantize, transpose, scaleVelocity)
+//   ✅ Callbacks Visualizer simplifiés (pas de redondance)
+//   ✅ Synchronisation propre EditorModel ↔ Visualizer
+//   ✅ Tous les événements bindés correctement
 // ============================================================================
-
 
 class EditorController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences aux modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨les
+        // Références aux modèles
         this.editorModel = models.editor;  // EditorModel
         this.fileModel = models.file;      // FileModel
         this.routingModel = models.routing; // RoutingModel
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences aux vues
+        // Références aux vues
         this.view = views.editor;          // EditorView
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence au visualizer (sera crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© dans initVisualizer)
+        // Référence au visualizer (sera créé dans initVisualizer)
         this.visualizer = null;
         
-        // Fichier actuellement ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ditÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
+        // Fichier actuellement édité
         this.currentFile = null;
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence au backend service
+        // Référence au backend service
         this.backend = window.backendService;
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence au routing manager
+        // Référence au routing manager
         this.routingManager = null;
         
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat de l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur
+        // État de l'éditeur
         this.editorState = {
             isLoading: false,
             hasUnsavedChanges: false,
@@ -72,7 +71,7 @@ class EditorController extends BaseController {
                 this.routingModel,
                 this.backend
             );
-            this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ RoutingManager initialized');
+            this.logDebug('editor', '✓ RoutingManager initialized');
         } else {
             this.logDebug('warning', 'RoutingManager not available');
         }
@@ -81,12 +80,12 @@ class EditorController extends BaseController {
 		}, 100);
     }
     /**
- * MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode init() publique appelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e par Application.js
+ * Méthode init() publique appelée par Application.js
  */
 init() {
     this.logDebug('editor', 'EditorController.init() called');
     
-    // S'assurer que la vue est initialisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e
+    // S'assurer que la vue est initialisée
     if (this.view && typeof this.view.init === 'function') {
         this.view.init();
     }
@@ -99,7 +98,7 @@ init() {
 }
 	
     bindEvents() {
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements d'actions d'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dition
+        // Événements d'actions d'édition
         this.eventBus.on('editor:action:undo', () => this.undo());
         this.eventBus.on('editor:action:redo', () => this.redo());
         this.eventBus.on('editor:action:copy', () => this.copy());
@@ -108,17 +107,17 @@ init() {
         this.eventBus.on('editor:action:save', () => this.saveChanges());
         this.eventBus.on('editor:action:delete', () => this.deleteSelected());
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements de transformations
+        // ✅ NOUVEAU: Événements de transformations
         this.eventBus.on('editor:action:quantize', (data) => this.quantize(data.division));
         this.eventBus.on('editor:action:transpose', (data) => this.transpose(data.semitones));
         this.eventBus.on('editor:action:velocity', (data) => this.scaleVelocity(data.factor));
         
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements de routing
+        // Événements de routing
         this.eventBus.on('routing:assigned', (data) => this.onRoutingAssigned(data));
         this.eventBus.on('routing:unassigned', (data) => this.onRoutingUnassigned(data));
         this.eventBus.on('routing:changed', () => this.onRoutingChanged());
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CORRIGÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°couter EditorModel directement (pas de redondance)
+        // ✅ CORRIGÉ: Écouter EditorModel directement (pas de redondance)
         if (this.editorModel) {
             this.eventBus.on('editor:modified', (data) => {
                 this.editorState.hasUnsavedChanges = data.isModified;
@@ -131,7 +130,7 @@ init() {
                 this.showSuccess('File saved');
             });
             
-            // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°couter les ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements de transformation
+            // ✅ NOUVEAU: Écouter les événements de transformation
             this.eventBus.on('editor:quantized', (data) => {
                 this.logDebug('editor', `Quantized ${data.count} notes to 1/${data.gridValue}`);
             });
@@ -145,7 +144,7 @@ init() {
             });
         }
         
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements du visualizer (seront attachÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s aprÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ation)
+        // Événements du visualizer (seront attachés après création)
         // Voir attachVisualizerEvents()
     }
     
@@ -181,21 +180,21 @@ initVisualizer(canvas) {
         }
     };
     
-    // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er le visualizer
+    // Créer le visualizer
     this.visualizer = new MidiVisualizer(canvas, config);
     
     // CRITIQUE: Injecter dans la vue
     if (this.view) {
         this.view.setVisualizer(this.visualizer);
-        console.log('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Visualizer injected into EditorView');
+        console.log('✅ Visualizer injected into EditorView');
     }
     
-    console.log('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Visualizer initialized');
+    console.log('✅ Visualizer initialized');
     return this.visualizer;
 }
     
     /**
-     * Attache les ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements du visualizer
+     * Attache les événements du visualizer
      */
     attachVisualizerEvents() {
         if (!this.visualizer) return;
@@ -227,8 +226,8 @@ initVisualizer(canvas) {
     // ========================================================================
     
     /**
-     * Charge un fichier MIDI dans l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur
-     * MÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°THODE PRINCIPALE appelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e depuis HomeController ou navigation
+     * Charge un fichier MIDI dans l'éditeur
+     * MÉTHODE PRINCIPALE appelée depuis HomeController ou navigation
      */
     async loadFile(file) {
         if (!this.visualizer) {
@@ -249,10 +248,10 @@ initVisualizer(canvas) {
         try {
             this.logDebug('editor', `Loading file: ${file.name}`);
             
-            // Obtenir les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es MidiJSON
+            // Obtenir les données MidiJSON
             let midiJson = file.midiJson;
             
-            // Si pas de MidiJSON, convertir depuis les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es brutes
+            // Si pas de MidiJSON, convertir depuis les données brutes
             if (!midiJson && file.data) {
                 midiJson = await this.convertMidiToJson(file);
             }
@@ -264,18 +263,18 @@ initVisualizer(canvas) {
             // Charger dans EditorModel
             if (this.editorModel) {
                 await this.editorModel.load(midiJson, file.id, file.path);
-                this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Loaded in EditorModel');
+                this.logDebug('editor', '✓ Loaded in EditorModel');
             }
             
             // Charger dans le visualizer
             this.visualizer.loadMidiData(midiJson);
-            this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Loaded in Visualizer');
+            this.logDebug('editor', '✓ Loaded in Visualizer');
             
             // Initialiser le routing pour ce fichier
             await this.initializeRouting(midiJson);
-            this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Routing initialized');
+            this.logDebug('editor', '✓ Routing initialized');
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la vue
+            // Mettre à jour la vue
             if (this.view) {
                 this.view.updateFileInfo(file);
             }
@@ -283,7 +282,7 @@ initVisualizer(canvas) {
             this.editorState.isLoading = false;
             this.editorState.hasUnsavedChanges = false;
             
-            this.logDebug('editor', `ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ File loaded: ${file.name}`);
+            this.logDebug('editor', `✓ File loaded: ${file.name}`);
             this.eventBus.emit('editor:file:loaded', { file, midiJson });
             
             this.showSuccess(`File "${file.name}" loaded in editor`);
@@ -351,7 +350,7 @@ initVisualizer(canvas) {
     }
     
     // ========================================================================
-    // OPÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°RATIONS D'ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°DITION - UNDO/REDO
+    // OPÉRATIONS D'ÉDITION - UNDO/REDO
     // ========================================================================
     
     /**
@@ -366,7 +365,7 @@ initVisualizer(canvas) {
         const success = this.editorModel.undo();
         
         if (success) {
-            // Recharger les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es dans le visualizer
+            // Recharger les données dans le visualizer
             this.reloadVisualizer();
             
             this.logDebug('editor', 'Undo performed');
@@ -388,7 +387,7 @@ initVisualizer(canvas) {
         const success = this.editorModel.redo();
         
         if (success) {
-            // Recharger les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es dans le visualizer
+            // Recharger les données dans le visualizer
             this.reloadVisualizer();
             
             this.logDebug('editor', 'Redo performed');
@@ -399,11 +398,11 @@ initVisualizer(canvas) {
     }
     
     // ========================================================================
-    // OPÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°RATIONS D'ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°DITION - COPY/CUT/PASTE ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CORRIGÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°
+    // OPÉRATIONS D'ÉDITION - COPY/CUT/PASTE ✅ CORRIGÉ
     // ========================================================================
     
     /**
-     * Copy - Copie les notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+     * Copy - Copie les notes sélectionnées
      */
     copy() {
         if (!this.editorModel) {
@@ -411,7 +410,7 @@ initVisualizer(canvas) {
             return;
         }
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©guer entiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨rement ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  EditorModel
+        // ✅ Déléguer entièrement à EditorModel
         const success = this.editorModel.copy();
         
         if (success) {
@@ -423,7 +422,7 @@ initVisualizer(canvas) {
     }
     
 /**
- * Cut notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+ * Cut notes sélectionnées
  */
 cut() {
     this.copy();
@@ -431,8 +430,21 @@ cut() {
 }
 
 /**
- * Copy notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+ * Copy notes sélectionnées
  */
+copy() {
+    const selectedNotes = this.editorModel.getSelectedNotes();
+    
+    if (selectedNotes.length === 0) {
+        this.showError('No notes selected');
+        return;
+    }
+    
+    // Déléguer au model
+    this.editorModel.copySelection();
+    
+    this.showSuccess(`Copied ${selectedNotes.length} notes`);
+}
 
 /**
  * Paste notes depuis clipboard
@@ -445,13 +457,13 @@ paste(targetTime = null) {
     }
     
     try {
-        // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©guer au model
+        // Déléguer au model
         const pastedNotes = this.editorModel.paste(targetTime);
         
-        // SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionner les notes collÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+        // Sélectionner les notes collées
         this.editorModel.selectNotes(pastedNotes.map(n => n.id));
         
-        // RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chir visualizer
+        // Rafraîchir visualizer
         this.reloadVisualizer();
         
         this.showSuccess(`Pasted ${pastedNotes.length} notes`);
@@ -462,7 +474,7 @@ paste(targetTime = null) {
 }
 
 /**
- * Supprime la sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lection
+ * Supprime la sélection
  */
 deleteSelection() {
     const selectedNotes = this.editorModel.getSelectedNotes();
@@ -477,9 +489,20 @@ deleteSelection() {
     this.showSuccess(`Deleted ${selectedNotes.length} notes`);
 }
 
+/**
+ * Recharge le visualizer après édition
+ * @private
+ */
+reloadVisualizer() {
+    if (this.visualizer && this.visualizer.reload) {
+        this.visualizer.reload();
+    }
+}
+
+
     /**
-     * Ajoute une nouvelle note
-     * @param {Object} noteData - DonnÃ©es de la note {pitch, start, duration, velocity, channel}
+     * Ajoute une note
+     * @param {Object} noteData - Données de la note
      */
     addNote(noteData) {
         if (!this.editorModel) {
@@ -500,7 +523,7 @@ deleteSelection() {
     
     /**
      * Supprime une note par ID
-     * @param {string} noteId - ID de la note Ã  supprimer
+     * @param {string} noteId - ID de la note à supprimer
      */
     deleteNote(noteId) {
         if (!this.editorModel) {
@@ -520,9 +543,9 @@ deleteSelection() {
     }
     
     /**
-     * Met Ã  jour une note existante
+     * Met à jour une note existante
      * @param {string} noteId - ID de la note
-     * @param {Object} updates - PropriÃ©tÃ©s Ã  mettre Ã  jour
+     * @param {Object} updates - Propriétés à mettre à jour
      */
     updateNote(noteId, updates) {
         if (!this.editorModel) {
@@ -540,19 +563,12 @@ deleteSelection() {
             return false;
         }
     }
-
-
-/**
- * Recharge le visualizer aprÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dition
- * @private
- */
-
-
+    
     // ========================================================================
     // TRANSFORMATIONS 
     // ========================================================================
  /**
- * Quantize les notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+ * Quantize les notes sélectionnées
  * @param {number} grid - Grille (1, 2, 4, 8, 16, 32, 64)
  * @param {number} strength - Force 0-100%
  */
@@ -569,7 +585,7 @@ quantize(grid = 16, strength = 100) {
     const quantizeUnit = (ppq * 4) / grid; // 4 = noire
     
     const transformedNotes = selectedNotes.map(note => {
-        // Position quantizÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e
+        // Position quantizée
         const quantizedTime = Math.round(note.time / quantizeUnit) * quantizeUnit;
         
         // Appliquer strength (0-100%)
@@ -588,8 +604,8 @@ quantize(grid = 16, strength = 100) {
 }
     
   /**
- * Transpose les notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
- * @param {number} semitones - Nombre de demi-tons (-12 ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  +12)
+ * Transpose les notes sélectionnées
+ * @param {number} semitones - Nombre de demi-tons (-12 à +12)
  */
 transpose(semitones) {
     if (semitones === 0) return;
@@ -613,8 +629,8 @@ transpose(semitones) {
 }
 
 /**
- * Scale vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©locitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© des notes sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
- * @param {number} factor - Facteur (0.1 ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  2.0)
+ * Scale vélocité des notes sélectionnées
+ * @param {number} factor - Facteur (0.1 à 2.0)
  */
 scaleVelocity(factor) {
     if (factor === 1.0) return;
@@ -661,14 +677,14 @@ scaleVelocity(factor) {
     }
     
     // ========================================================================
-    // UTILITAIRES ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU
+    // UTILITAIRES ✅ NOUVEAU
     // ========================================================================
     
     /**
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU: Obtient le temps de destination pour paste
+     * ✅ NOUVEAU: Obtient le temps de destination pour paste
      */
     getCurrentPasteTime() {
-        // PrioritÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© 1: Position du curseur dans le visualizer
+        // Priorité 1: Position du curseur dans le visualizer
         if (this.visualizer && this.visualizer.getCursorPosition) {
             const cursorPos = this.visualizer.getCursorPosition();
             if (cursorPos !== null) {
@@ -676,17 +692,17 @@ scaleVelocity(factor) {
             }
         }
         
-        // PrioritÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© 2: Position du playhead
+        // Priorité 2: Position du playhead
         if (this.editorState.currentTime > 0) {
             return this.editorState.currentTime;
         }
         
-        // Par dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©faut: dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©but (0ms)
+        // Par défaut: début (0ms)
         return 0;
     }
     
     /**
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU: Recharge les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es dans le visualizer
+     * ✅ NOUVEAU: Recharge les données dans le visualizer
      */
     reloadVisualizer() {
         if (!this.visualizer || !this.editorModel) return;
@@ -724,7 +740,7 @@ scaleVelocity(factor) {
             this.editorState.hasUnsavedChanges = false;
             this.updateModifiedState();
             
-            this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Changes saved');
+            this.logDebug('editor', '✓ Changes saved');
             this.showSuccess('Changes saved');
             
         } catch (error) {
@@ -750,7 +766,7 @@ scaleVelocity(factor) {
             this.editorState.hasUnsavedChanges = false;
             this.updateModifiedState();
             
-            this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ File saved as new');
+            this.logDebug('editor', '✓ File saved as new');
             this.showSuccess(`File saved as "${title}"`);
             
         } catch (error) {
@@ -760,7 +776,7 @@ scaleVelocity(factor) {
     }
     
 	
-	//verifie si sauvegardÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© avant de quitter l'editor
+	//verifie si sauvegardé avant de quitter l'editor
 setupBeforeUnloadHandler() {
   this.beforeUnloadHandler = (event) => {
     if (this.editorState.hasUnsavedChanges) {
@@ -793,7 +809,7 @@ async close(options = {}) {
    
 
    // ========================================================================
-    // CALLBACKS DU VISUALIZER ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ SIMPLIFIÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°
+    // CALLBACKS DU VISUALIZER ✅ SIMPLIFIÉ
     // ========================================================================
     
     onDataLoaded(data) {
@@ -801,13 +817,13 @@ async close(options = {}) {
     }
     
     /**
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ SIMPLIFIÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°: DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨gue uniquement ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  EditorModel
-     * EditorModel ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©mettra 'editor:modified' tout seul
+     * ✅ SIMPLIFIÉ: Délègue uniquement à EditorModel
+     * EditorModel émettra 'editor:modified' tout seul
      */
     onNoteAdded(data) {
         if (this.editorModel) {
             this.editorModel.addNote(data.note);
-            // C'est tout ! EditorModel gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re le reste
+            // C'est tout ! EditorModel gère le reste
         }
         
         this.eventBus.emit('editor:note:added', data);
@@ -817,7 +833,7 @@ async close(options = {}) {
         if (this.editorModel) {
             const noteIds = data.notes.map(n => n.id);
             this.editorModel.deleteNotes(noteIds);
-            // EditorModel ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©mettra 'editor:modified'
+            // EditorModel émettra 'editor:modified'
         }
         
         this.eventBus.emit('editor:notes:deleted', data);
@@ -829,7 +845,7 @@ async close(options = {}) {
             data.notes.forEach(note => {
                 this.editorModel.updateNote(note.id, note);
             });
-            // EditorModel ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©mettra 'editor:modified'
+            // EditorModel émettra 'editor:modified'
         }
         
         this.eventBus.emit('editor:notes:modified', data);
@@ -878,7 +894,7 @@ async close(options = {}) {
     onRoutingChanged() {
         this.logDebug('routing', 'Routing configuration changed');
         
-        // RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chir l'affichage du routing
+        // Rafraîchir l'affichage du routing
         if (this.view && this.view.routingMatrix) {
             this.view.routingMatrix.refresh();
         }
@@ -915,7 +931,7 @@ async close(options = {}) {
     // ========================================================================
     
     /**
-     * Retourne l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur
+     * Retourne l'état de l'éditeur
      */
     getState() {
         return {
@@ -941,7 +957,7 @@ async close(options = {}) {
     }
     
     /**
-     * Retourne les stats de l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur
+     * Retourne les stats de l'éditeur
      */
     getStats() {
         if (!this.editorModel) return null;
@@ -958,18 +974,18 @@ async close(options = {}) {
     destroy() {
         this.logDebug('editor', 'Destroying EditorController...');
         
-        // Sauvegarder si modifiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
+        // Sauvegarder si modifié
         if (this.editorState.hasUnsavedChanges) {
             this.saveChanges().catch(() => {});
         }
         
-        // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©truire le visualizer
+        // Détruire le visualizer
         if (this.visualizer) {
             this.visualizer.destroy();
             this.visualizer = null;
         }
         
-        // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©truire l'EditorModel
+        // Détruire l'EditorModel
         if (this.editorModel) {
             this.editorModel.destroy();
         }
@@ -979,10 +995,10 @@ async close(options = {}) {
             this.routingManager = null;
         }
         
-        // Nettoyer les rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences
+        // Nettoyer les références
         this.currentFile = null;
         
-        this.logDebug('editor', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ EditorController destroyed');
+        this.logDebug('editor', '✓ EditorController destroyed');
     }
 }
 
@@ -996,3 +1012,4 @@ if (typeof module !== 'undefined' && module.exports) {
 
 if (typeof window !== 'undefined') {
     window.EditorController = EditorController;
+}

@@ -2,15 +2,14 @@
 // Fichier: frontend/js/views/RoutingView.js
 // Version: v3.1.0 - SIMPLIFIED
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// Ã¢Å“â€œ Interface simplifiÃƒÂ©e (pas de matrice complexe)
-// Ã¢Å“â€œ Mode simple uniquement (1Ã¢â€ â€™1)
-// Ã¢Å“â€œ Stats visibles
-// Ã¢Å“â€œ Actions basiques
+// ✓ Interface simplifiée (pas de matrice complexe)
+// ✓ Mode simple uniquement (1→1)
+// ✓ Stats visibles
+// ✓ Actions basiques
 // ============================================================================
-
 
 class RoutingView extends BaseView {
     constructor(container, eventBus, debugConsole) {
@@ -22,20 +21,20 @@ class RoutingView extends BaseView {
         // Composants
         this.routingMatrix = null;
         
-        // DonnÃƒÂ©es
+        // Données
         this.channels = [];
         this.instruments = [];
         this.routes = [];
         this.presets = [];
         
         // Logger initialization
-        this.logger = window.logger || console;
+        this.logger = window.Logger || console;
         
         // Mark as fully initialized
         this._fullyInitialized = true;
         
         if (this.logger && this.logger.info) {
-            this.logger.info('RoutingView', 'Ã¢Å“â€œ RoutingView initialized (simple mode)');
+            this.logger.info('RoutingView', '✓ RoutingView initialized (simple mode)');
         }
         
         // Now that all properties are set, do initial render
@@ -79,17 +78,17 @@ class RoutingView extends BaseView {
     render() {
         if (!this.container) return;
         
-        // VÃƒÂ©rifier mode performance
+        // Vérifier mode performance
         if (!PerformanceConfig.routing.allowComplexRouting) {
             this.renderSimpleRouting();
         } else {
-            // Mode avancÃƒÂ© (dÃƒÂ©sactivÃƒÂ© par dÃƒÂ©faut)
+            // Mode avancé (désactivé par défaut)
             this.renderAdvancedRouting();
         }
     }
     
     // ========================================================================
-    // MODE SIMPLE (1Ã¢â€ â€™1)
+    // MODE SIMPLE (1→1)
     // ========================================================================
     
     renderSimpleRouting() {
@@ -97,21 +96,21 @@ class RoutingView extends BaseView {
             <div class="routing-page-simple">
                 <!-- Header -->
                 <div class="page-header">
-                    <h2>Ã°Å¸â€â‚¬ Routage MIDI (Mode Simple)</h2>
+                    <h2>🔀 Routage MIDI (Mode Simple)</h2>
                     <p class="page-description">
-                        Assignez chaque canal MIDI ÃƒÂ  un instrument (routing 1Ã¢â€ â€™1)
+                        Assignez chaque canal MIDI à un instrument (routing 1→1)
                     </p>
                 </div>
                 
                 <!-- Info Banner -->
                 <div class="info-banner">
-                    Ã¢â€žÂ¹Ã¯Â¸Â Mode performance : Routing simple uniquement (1 canal Ã¢â€ â€™ 1 instrument)
+                    ℹ️ Mode performance : Routing simple uniquement (1 canal → 1 instrument)
                 </div>
                 
                 <!-- Stats Cards -->
                 <div class="routing-stats">
                     <div class="stat-card">
-                        <div class="stat-icon">Ã°Å¸Å½Â¹</div>
+                        <div class="stat-icon">🎹</div>
                         <div class="stat-content">
                             <span class="stat-label">Canaux actifs</span>
                             <span class="stat-value" id="stat-channels">0</span>
@@ -119,15 +118,15 @@ class RoutingView extends BaseView {
                     </div>
                     
                     <div class="stat-card">
-                        <div class="stat-icon">Ã°Å¸Å½Â¸</div>
+                        <div class="stat-icon">🎸</div>
                         <div class="stat-content">
-                            <span class="stat-label">Instruments connectÃƒÂ©s</span>
+                            <span class="stat-label">Instruments connectés</span>
                             <span class="stat-value" id="stat-instruments">0</span>
                         </div>
                     </div>
                     
                     <div class="stat-card">
-                        <div class="stat-icon">Ã°Å¸â€â€”</div>
+                        <div class="stat-icon">🔗</div>
                         <div class="stat-content">
                             <span class="stat-label">Routes actives</span>
                             <span class="stat-value" id="stat-routes">0</span>
@@ -135,9 +134,9 @@ class RoutingView extends BaseView {
                     </div>
                     
                     <div class="stat-card">
-                        <div class="stat-icon">Ã°Å¸â€œÅ </div>
+                        <div class="stat-icon">📊</div>
                         <div class="stat-content">
-                            <span class="stat-label">Canaux non assignÃƒÂ©s</span>
+                            <span class="stat-label">Canaux non assignés</span>
                             <span class="stat-value" id="stat-unassigned">0</span>
                         </div>
                     </div>
@@ -153,26 +152,26 @@ class RoutingView extends BaseView {
                     <div class="actions-group">
                         <h4>Actions</h4>
                         <button class="btn btn-secondary" id="btn-refresh-routing">
-                            Ã°Å¸â€â€ž RafraÃƒÂ®chir
+                            🔄 Rafraîchir
                         </button>
                         <button class="btn btn-secondary" id="btn-export-routing">
-                            Ã°Å¸â€™Â¾ Exporter
+                            💾 Exporter
                         </button>
                         <button class="btn btn-secondary" id="btn-import-routing">
-                            Ã°Å¸â€œâ€š Importer
+                            📂 Importer
                         </button>
                     </div>
                     
                     <div class="actions-group">
                         <h4>Presets</h4>
                         <select class="preset-select" id="preset-select">
-                            <option value="">-- SÃƒÂ©lectionner preset --</option>
+                            <option value="">-- Sélectionner preset --</option>
                         </select>
                         <button class="btn btn-secondary" id="btn-save-preset">
-                            Ã°Å¸â€™Â¾ Sauvegarder preset
+                            💾 Sauvegarder preset
                         </button>
                         <button class="btn btn-secondary" id="btn-load-preset">
-                            Ã°Å¸â€œâ€š Charger preset
+                            📂 Charger preset
                         </button>
                     </div>
                 </div>
@@ -187,21 +186,21 @@ class RoutingView extends BaseView {
         // Attacher listeners
         this.attachEventListeners();
         
-        // Mettre ÃƒÂ  jour stats
+        // Mettre à jour stats
         this.updateStats();
     }
     
     // ========================================================================
-    // MODE AVANCÃƒâ€° (dÃƒÂ©sactivÃƒÂ© par dÃƒÂ©faut)
+    // MODE AVANCÉ (désactivé par défaut)
     // ========================================================================
     
     renderAdvancedRouting() {
         const html = `
             <div class="routing-page-advanced">
                 <div class="info-banner warning">
-                    Ã¢Å¡Â Ã¯Â¸Â Mode avancÃƒÂ© dÃƒÂ©sactivÃƒÂ© en mode performance
+                    ⚠️ Mode avancé désactivé en mode performance
                 </div>
-                <p>Pour activer le mode avancÃƒÂ©, modifiez PerformanceConfig.routing.allowComplexRouting</p>
+                <p>Pour activer le mode avancé, modifiez PerformanceConfig.routing.allowComplexRouting</p>
             </div>
         `;
         
@@ -225,7 +224,7 @@ class RoutingView extends BaseView {
             this.logDebug('routing', 'RoutingMatrix class not loaded - showing fallback', 'warn');
             matrixContainer.innerHTML = `
                 <div class="info-banner warning">
-                    Ã¢Å¡Â Ã¯Â¸Â RoutingMatrix component not loaded. Please ensure RoutingMatrix.js is included.
+                    ⚠️ RoutingMatrix component not loaded. Please ensure RoutingMatrix.js is included.
                 </div>
                 <div class="routing-list-fallback">
                     <h4>Routing Configuration</h4>
@@ -235,7 +234,7 @@ class RoutingView extends BaseView {
             return;
         }
         
-        // CrÃƒÂ©er composant RoutingMatrix
+        // Créer composant RoutingMatrix
         this.routingMatrix = new RoutingMatrix(matrixContainer, {
             mode: 'simple',
             channels: this.channels,
@@ -302,22 +301,22 @@ class RoutingView extends BaseView {
     // ========================================================================
     
     handleRouteChange(channel, instrumentId) {
-        this.logDebug('routing', `Route changed: CH${channel} Ã¢â€ â€™ ${instrumentId || 'none'}`);
+        this.logDebug('routing', `Route changed: CH${channel} → ${instrumentId || 'none'}`);
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         this.eventBus.emit('routing:route-changed', {
             channel,
             instrumentId
         });
         
-        // Mettre ÃƒÂ  jour stats
+        // Mettre à jour stats
         this.updateStats();
     }
     
     handleTestRoute(channel, instrumentId) {
-        this.logDebug('routing', `Testing route: CH${channel} Ã¢â€ â€™ ${instrumentId}`);
+        this.logDebug('routing', `Testing route: CH${channel} → ${instrumentId}`);
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement de test
+        // Émettre événement de test
         this.eventBus.emit('routing:test-route', {
             channel,
             instrumentId
@@ -331,7 +330,7 @@ class RoutingView extends BaseView {
     refresh() {
         this.logDebug('routing', 'Refreshing routing view');
         
-        // RÃƒÂ©initialiser matrice avec donnÃƒÂ©es actuelles
+        // Réinitialiser matrice avec données actuelles
         if (this.routingMatrix) {
             this.routingMatrix.setChannels(this.channels);
             this.routingMatrix.setInstruments(this.instruments);
@@ -342,7 +341,7 @@ class RoutingView extends BaseView {
     
     exportRouting() {
         if (!this.routingMatrix) {
-            alert('Aucune route ÃƒÂ  exporter');
+            alert('Aucune route à exporter');
             return;
         }
         
@@ -355,7 +354,7 @@ class RoutingView extends BaseView {
             exported: new Date().toISOString()
         };
         
-        // TÃƒÂ©lÃƒÂ©charger fichier JSON
+        // Télécharger fichier JSON
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -384,7 +383,7 @@ class RoutingView extends BaseView {
                     if (data.routes && this.routingMatrix) {
                         this.routingMatrix.setRoutes(data.routes);
                         this.logDebug('routing', 'Routing imported');
-                        alert('Routage importÃƒÂ© avec succÃƒÂ¨s');
+                        alert('Routage importé avec succès');
                     }
                 } catch (error) {
                     alert('Erreur lors de l\'import: ' + error.message);
@@ -398,7 +397,7 @@ class RoutingView extends BaseView {
     
     savePreset() {
         if (!this.routingMatrix) {
-            alert('Aucune route ÃƒÂ  sauvegarder');
+            alert('Aucune route à sauvegarder');
             return;
         }
         
@@ -416,14 +415,14 @@ class RoutingView extends BaseView {
         
         this.presets.push(preset);
         
-        // Mettre ÃƒÂ  jour dropdown
+        // Mettre à jour dropdown
         this.updatePresetsDropdown();
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         this.eventBus.emit('routing:preset-saved', { preset });
         
         this.logDebug('routing', `Preset saved: ${name}`);
-        alert('Preset sauvegardÃƒÂ©');
+        alert('Preset sauvegardé');
     }
     
     loadPreset() {
@@ -431,25 +430,25 @@ class RoutingView extends BaseView {
         const presetId = select?.value;
         
         if (!presetId) {
-            alert('SÃƒÂ©lectionnez un preset');
+            alert('Sélectionnez un preset');
             return;
         }
         
         const preset = this.presets.find(p => p.id === presetId);
         
         if (!preset) {
-            alert('Preset non trouvÃƒÂ©');
+            alert('Preset non trouvé');
             return;
         }
         
         if (this.routingMatrix) {
             this.routingMatrix.setRoutes(preset.routes);
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             this.eventBus.emit('routing:preset-loaded', { preset });
             
             this.logDebug('routing', `Preset loaded: ${preset.name}`);
-            alert('Preset chargÃƒÂ©');
+            alert('Preset chargé');
         }
     }
     
@@ -513,7 +512,7 @@ class RoutingView extends BaseView {
         
         const unassigned = this.channels.length - activeChannels;
         
-        // Mettre ÃƒÂ  jour UI
+        // Mettre à jour UI
         this.updateStatValue('stat-channels', this.channels.length);
         this.updateStatValue('stat-instruments', connectedInstruments);
         this.updateStatValue('stat-routes', activeRoutes);
@@ -531,7 +530,7 @@ class RoutingView extends BaseView {
         const select = this.container.querySelector('#preset-select');
         if (!select) return;
         
-        select.innerHTML = '<option value="">-- SÃƒÂ©lectionner preset --</option>';
+        select.innerHTML = '<option value="">-- Sélectionner preset --</option>';
         
         this.presets.forEach(preset => {
             const option = document.createElement('option');

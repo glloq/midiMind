@@ -1,59 +1,49 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
-// Version: 3.0.5 - Phase 2 - Avec PrioritÃ©s
+// Version: 3.0.5 - Phase 2 - Avec Priorités
 // Date: 2025-10-09
 // ============================================================================
-// Description:
-//   Event Bus centralisÃ© avec systÃ¨me de prioritÃ©s pour optimisation latence.
-//
-// NouveautÃ©s Phase 2:
-//   âœ… PrioritÃ©s d'Ã©vÃ©nements (HIGH/NORMAL/LOW)
-//   âœ… Files d'attente sÃ©parÃ©es par prioritÃ©
-//   âœ… Traitement asynchrone optimisÃ©
-//   âœ… Throttling et debouncing intÃ©grÃ©s
-//   âœ… MÃ©triques de performance
-//
 // Auteur: midiMind Team
 // ============================================================================
 
 /**
  * @enum EventPriority
- * @description Niveaux de prioritÃ© des Ã©vÃ©nements
+ * @description Niveaux de priorité des événements
  */
 const EventPriority = {
-    HIGH: 'high',       // TraitÃ© immÃ©diatement (ex: MIDI messages)
-    NORMAL: 'normal',   // TraitÃ© normalement (ex: UI updates)
-    LOW: 'low'          // TraitÃ© quand le systÃ¨me est libre (ex: stats)
+    HIGH: 'high',       // Traité immédiatement (ex: MIDI messages)
+    NORMAL: 'normal',   // Traité normalement (ex: UI updates)
+    LOW: 'low'          // Traité quand le système est libre (ex: stats)
 };
 
 /**
  * @class EventBus
- * @description Bus d'Ã©vÃ©nements centralisÃ© avec gestion de prioritÃ©s
+ * @description Bus d'événements centralisé avec gestion de priorités
  * 
  * Architecture Phase 2:
  * ```
- * emit(event, data, priority) â†’
- *   â†“
- * [Dispatcher avec prioritÃ©s]
- *   â†“
- * â”Œâ”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”
- * â”‚HIGH â”‚ NORMAL â”‚ LOW â”‚ (Files d'attente)
- * â””â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”˜
- *   â†“      â†“       â†“
- * Listeners (triÃ©s par prioritÃ©)
+ * emit(event, data, priority) →
+ *   ↓
+ * [Dispatcher avec priorités]
+ *   ↓
+ * ┌─────┬────────┬─────┐
+ * │HIGH │ NORMAL │ LOW │ (Files d'attente)
+ * └─────┴────────┴─────┘
+ *   ↓      ↓       ↓
+ * Listeners (triés par priorité)
  * ```
  * 
  * Objectifs:
- * - Latence < 5ms pour Ã©vÃ©nements HIGH
- * - Latence < 20ms pour Ã©vÃ©nements NORMAL
- * - Latence < 100ms pour Ã©vÃ©nements LOW
+ * - Latence < 5ms pour événements HIGH
+ * - Latence < 20ms pour événements NORMAL
+ * - Latence < 100ms pour événements LOW
  */
 class EventBus {
     constructor() {
-        // Listeners organisÃ©s par Ã©vÃ©nement
+        // Listeners organisés par événement
         this.listeners = new Map();
         
-        // Files d'attente par prioritÃ©
+        // Files d'attente par priorité
         this.queues = {
             [EventPriority.HIGH]: [],
             [EventPriority.NORMAL]: [],
@@ -69,7 +59,7 @@ class EventBus {
             processingInterval: 10  // ms
         };
         
-        // MÃ©triques
+        // Métriques
         this.metrics = {
             eventsEmitted: 0,
             eventsProcessed: 0,
@@ -105,9 +95,9 @@ class EventBus {
     // ========================================================================
     
     init() {
-        console.log('ðŸ”„ EventBus v3.0.5 initialized with priorities');
+        console.log('🔄 EventBus v3.0.5 initialized with priorities');
         
-        // DÃ©marrer le traitement des queues
+        // Démarrer le traitement des queues
         this.startProcessing();
     }
     
@@ -131,11 +121,11 @@ class EventBus {
     // ========================================================================
     
     /**
-     * Enregistre un listener pour un Ã©vÃ©nement
-     * @param {string} eventName - Nom de l'Ã©vÃ©nement
-     * @param {Function} callback - Fonction Ã  appeler
+     * Enregistre un listener pour un événement
+     * @param {string} eventName - Nom de l'événement
+     * @param {Function} callback - Fonction à appeler
      * @param {Object} options - Options (priority, once, throttle, debounce)
-     * @returns {Function} Fonction pour se dÃ©sabonner
+     * @returns {Function} Fonction pour se désabonner
      */
     on(eventName, callback, options = {}) {
         if (!this.listeners.has(eventName)) {
@@ -151,24 +141,24 @@ class EventBus {
             id: this.generateListenerId()
         };
         
-        // InsÃ©rer en respectant la prioritÃ©
+        // Insérer en respectant la priorité
         const listeners = this.listeners.get(eventName);
         const insertIndex = this.findInsertIndex(listeners, listener.priority);
         listeners.splice(insertIndex, 0, listener);
         
-        // Retourner fonction de dÃ©sabonnement
+        // Retourner fonction de désabonnement
         return () => this.off(eventName, listener.id);
     }
     
     /**
-     * Enregistre un listener qui ne s'exÃ©cute qu'une fois
+     * Enregistre un listener qui ne s'exécute qu'une fois
      */
     once(eventName, callback, options = {}) {
         return this.on(eventName, callback, { ...options, once: true });
     }
     
     /**
-     * DÃ©senregistre un listener
+     * Désenregistre un listener
      */
     off(eventName, listenerId) {
         if (!this.listeners.has(eventName)) return;
@@ -187,21 +177,21 @@ class EventBus {
     }
     
     /**
-     * DÃ©senregistre tous les listeners d'un Ã©vÃ©nement
+     * Désenregistre tous les listeners d'un événement
      */
     offAll(eventName) {
         this.listeners.delete(eventName);
     }
     
     // ========================================================================
-    // Ã‰MISSION D'Ã‰VÃ‰NEMENTS
+    // ÉMISSION D'ÉVÉNEMENTS
     // ========================================================================
     
     /**
-     * Ã‰met un Ã©vÃ©nement
-     * @param {string} eventName - Nom de l'Ã©vÃ©nement
-     * @param {*} data - DonnÃ©es de l'Ã©vÃ©nement
-     * @param {string} priority - PrioritÃ© (HIGH/NORMAL/LOW)
+     * Émet un événement
+     * @param {string} eventName - Nom de l'événement
+     * @param {*} data - Données de l'événement
+     * @param {string} priority - Priorité (HIGH/NORMAL/LOW)
      */
     emit(eventName, data = {}, priority = EventPriority.NORMAL) {
         this.metrics.eventsEmitted++;
@@ -215,37 +205,37 @@ class EventBus {
         };
         
         if (!this.config.enablePriorities || priority === EventPriority.HIGH) {
-            // Traiter immÃ©diatement les Ã©vÃ©nements HIGH
+            // Traiter immédiatement les événements HIGH
             this.processEventNow(event);
         } else {
-            // Ajouter Ã  la queue appropriÃ©e
+            // Ajouter à la queue appropriée
             this.enqueueEvent(event);
         }
     }
     
     /**
-     * Ã‰met un Ã©vÃ©nement HIGH priority (immÃ©diat)
+     * Émet un événement HIGH priority (immédiat)
      */
     emitHigh(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.HIGH);
     }
     
     /**
-     * Ã‰met un Ã©vÃ©nement NORMAL priority
+     * Émet un événement NORMAL priority
      */
     emitNormal(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.NORMAL);
     }
     
     /**
-     * Ã‰met un Ã©vÃ©nement LOW priority
+     * Émet un événement LOW priority
      */
     emitLow(eventName, data = {}) {
         this.emit(eventName, data, EventPriority.LOW);
     }
     
     /**
-     * Ã‰met avec throttling
+     * Émet avec throttling
      */
     emitThrottled(eventName, data = {}, throttleMs = 100, priority = EventPriority.NORMAL) {
         const key = `${eventName}_${priority}`;
@@ -259,17 +249,17 @@ class EventBus {
     }
     
     /**
-     * Ã‰met avec debouncing
+     * Émet avec debouncing
      */
     emitDebounced(eventName, data = {}, debounceMs = 300, priority = EventPriority.NORMAL) {
         const key = `${eventName}_${priority}`;
         
-        // Annuler le timer prÃ©cÃ©dent
+        // Annuler le timer précédent
         if (this.debounceTimers.has(key)) {
             clearTimeout(this.debounceTimers.get(key));
         }
         
-        // CrÃ©er nouveau timer
+        // Créer nouveau timer
         const timer = setTimeout(() => {
             this.emit(eventName, data, priority);
             this.debounceTimers.delete(key);
@@ -279,11 +269,11 @@ class EventBus {
     }
     
     // ========================================================================
-    // TRAITEMENT DES Ã‰VÃ‰NEMENTS
+    // TRAITEMENT DES ÉVÉNEMENTS
     // ========================================================================
     
     /**
-     * Ajoute un Ã©vÃ©nement Ã  la queue
+     * Ajoute un événement à la queue
      */
     enqueueEvent(event) {
         const queue = this.queues[event.priority];
@@ -298,10 +288,10 @@ class EventBus {
     }
     
     /**
-     * Traite les queues dans l'ordre de prioritÃ©
+     * Traite les queues dans l'ordre de priorité
      */
     processQueues() {
-        // HIGH (dÃ©jÃ  traitÃ©s en direct)
+        // HIGH (déjà traités en direct)
         
         // NORMAL
 		this.processQueue(EventPriority.NORMAL, 10);
@@ -309,7 +299,7 @@ class EventBus {
 		// LOW
 		this.processQueue(EventPriority.LOW, 5);
 		
-		// âœ… NOUVEAU: Nettoyage pÃ©riodique du cache (toutes les 60s)
+		// ✅ NOUVEAU: Nettoyage périodique du cache (toutes les 60s)
 		const now = Date.now();
 		if (!this._lastCacheClean || now - this._lastCacheClean > 60000) {
 			this.cleanThrottleCache();
@@ -333,7 +323,7 @@ class EventBus {
     }
     
     /**
-     * Traite un Ã©vÃ©nement immÃ©diatement
+     * Traite un événement immédiatement
      */
     processEventNow(event) {
         const startTime = performance.now();
@@ -347,7 +337,7 @@ class EventBus {
         
         for (const listener of listeners) {
             try {
-                // VÃ©rifier throttle
+                // Vérifier throttle
                 if (listener.throttle > 0) {
                     const key = `${event.name}_${listener.id}`;
                     const lastCall = this.throttleCache.get(key) || 0;
@@ -384,11 +374,11 @@ class EventBus {
     }
     
     // ========================================================================
-    // MÃ‰TRIQUES
+    // MÉTRIQUES
     // ========================================================================
     
     /**
-     * Met Ã  jour les mÃ©triques de latence
+     * Met à jour les métriques de latence
      */
     updateLatencyMetrics(priority, latency) {
         if (!this.config.enableMetrics) return;
@@ -396,7 +386,7 @@ class EventBus {
         const history = this.metrics.latencyHistory[priority];
         history.push(latency);
         
-        // Garder seulement les 100 derniÃ¨res
+        // Garder seulement les 100 dernières
         if (history.length > 100) {
             history.shift();
         }
@@ -407,7 +397,7 @@ class EventBus {
     }
     
     /**
-     * RÃ©cupÃ¨re les mÃ©triques
+     * Récupère les métriques
      */
     getMetrics() {
         return {
@@ -423,7 +413,7 @@ class EventBus {
     }
     
     /**
-     * RÃ©initialise les mÃ©triques
+     * Réinitialise les métriques
      */
     resetMetrics() {
         this.metrics = {
@@ -450,7 +440,7 @@ cleanThrottleCache() {
     }
 }
     /**
-     * Trouve l'index d'insertion pour respecter la prioritÃ©
+     * Trouve l'index d'insertion pour respecter la priorité
      */
     findInsertIndex(listeners, priority) {
         const priorityOrder = {
@@ -469,28 +459,28 @@ cleanThrottleCache() {
     }
     
     /**
-     * GÃ©nÃ¨re un ID unique pour listener
+     * Génère un ID unique pour listener
      */
     generateListenerId() {
         return 'listener_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
     /**
-     * GÃ©nÃ¨re un ID unique pour Ã©vÃ©nement
+     * Génère un ID unique pour événement
      */
     generateEventId() {
         return 'event_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
     /**
-     * Liste tous les Ã©vÃ©nements enregistrÃ©s
+     * Liste tous les événements enregistrés
      */
     listEvents() {
         return Array.from(this.listeners.keys());
     }
     
     /**
-     * Compte les listeners pour un Ã©vÃ©nement
+     * Compte les listeners pour un événement
      */
     listenerCount(eventName) {
         if (!this.listeners.has(eventName)) return 0;
@@ -506,16 +496,6 @@ cleanThrottleCache() {
         this.throttleCache.clear();
         this.debounceTimers.forEach(timer => clearTimeout(timer));
         this.debounceTimers.clear();
-    }
-	
-	/**
-     * Efface tous les événements
-     */
-    clearEvents() {
-        this.listeners = {};
-        this.wildcardListeners = [];
-        this.maxListeners = 100;
-        console.log('✅ All events cleared');
     }
 }
 

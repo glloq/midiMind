@@ -142,7 +142,7 @@ const MidiUtils = {
     quantize(ticks, gridSize) {
         return Math.round(ticks / gridSize) * gridSize;
     },
-	
+    
     NOTE_NAMES: ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
     
     getNoteName(midiNote) {

@@ -2,13 +2,13 @@
 // Fichier: frontend/js/views/components/RoutingMatrix.js
 // Version: v3.1.0 - SIMPLIFIED
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// âœ“ Interface simplifiÃ©e : liste au lieu de matrice NxM
-// âœ“ Dropdowns simples pour sÃ©lection instrument
-// âœ“ Pas de calcul de compatibilitÃ©
-// âœ“ Pas d'indicateurs visuels complexes
+// ✓ Interface simplifiée : liste au lieu de matrice NxM
+// ✓ Dropdowns simples pour sélection instrument
+// ✓ Pas de calcul de compatibilité
+// ✓ Pas d'indicateurs visuels complexes
 // ============================================================================
 
 class RoutingMatrix {
@@ -24,10 +24,10 @@ class RoutingMatrix {
             eventBus: options.eventBus || null
         };
         
-        // Ã‰tat
+        // État
         this.channels = this.options.channels;
         this.instruments = this.options.instruments;
-        this.routes = new Map();  // channel â†’ instrumentId
+        this.routes = new Map();  // channel → instrumentId
         
         // Callbacks
         this.onRouteChange = options.onRouteChange || null;
@@ -47,13 +47,13 @@ class RoutingMatrix {
             <div class="routing-matrix-simple">
                 <!-- Header -->
                 <div class="routing-header">
-                    <h3>Assignation Canaux â†’ Instruments</h3>
+                    <h3>Assignation Canaux → Instruments</h3>
                     <div class="routing-actions">
                         <button class="btn btn-secondary btn-auto-assign" id="btn-auto-assign">
-                            ðŸŽ² Auto-Assign
+                            🎲 Auto-Assign
                         </button>
                         <button class="btn btn-secondary btn-clear-all" id="btn-clear-all">
-                            ðŸ—‘ï¸ Effacer tout
+                            🗑️ Effacer tout
                         </button>
                     </div>
                 </div>
@@ -65,7 +65,7 @@ class RoutingMatrix {
                         <span class="info-value">${this.getActiveChannels().length}</span>
                     </div>
                     <div class="info-card">
-                        <span class="info-label">Instruments connectÃ©s</span>
+                        <span class="info-label">Instruments connectés</span>
                         <span class="info-value">${this.getConnectedInstruments().length}</span>
                     </div>
                     <div class="info-card">
@@ -93,7 +93,7 @@ class RoutingMatrix {
         if (!this.channels || this.channels.length === 0) {
             return `
                 <div class="routing-empty">
-                    <p>Aucun canal MIDI dÃ©tectÃ©</p>
+                    <p>Aucun canal MIDI détecté</p>
                     <p class="text-muted">Chargez un fichier MIDI pour voir les canaux</p>
                 </div>
             `;
@@ -123,7 +123,7 @@ class RoutingMatrix {
                         <button class="btn btn-test" 
                                 data-channel="${channelNumber}"
                                 ${!assignedInstrument ? 'disabled' : ''}>
-                            ðŸŽµ Test
+                            🎵 Test
                         </button>
                     </div>
                     
@@ -174,7 +174,7 @@ class RoutingMatrix {
         if (!instrument) {
             return `
                 <div class="route-status error">
-                    âš ï¸ Instrument non trouvÃ©
+                    ⚠️ Instrument non trouvé
                 </div>
             `;
         }
@@ -182,14 +182,14 @@ class RoutingMatrix {
         if (!instrument.connected) {
             return `
                 <div class="route-status warning">
-                    âš ï¸ Instrument dÃ©connectÃ©
+                    ⚠️ Instrument déconnecté
                 </div>
             `;
         }
         
         return `
             <div class="route-status success">
-                âœ“ RoutÃ© vers ${instrument.name}
+                ✓ Routé vers ${instrument.name}
             </div>
         `;
     }
@@ -199,7 +199,7 @@ class RoutingMatrix {
     // ========================================================================
     
     attachListeners() {
-        // SÃ©lection instrument
+        // Sélection instrument
         this.container.querySelectorAll('.instrument-select').forEach(select => {
             select.addEventListener('change', (e) => {
                 const channel = parseInt(e.target.dataset.channel);
@@ -240,7 +240,7 @@ class RoutingMatrix {
     
     handleRouteChange(channel, instrumentId) {
         if (instrumentId) {
-            // CrÃ©er/modifier route
+            // Créer/modifier route
             this.routes.set(channel, instrumentId);
         } else {
             // Supprimer route
@@ -252,7 +252,7 @@ class RoutingMatrix {
             this.onRouteChange(channel, instrumentId);
         }
         
-        // Re-render pour mettre Ã  jour status
+        // Re-render pour mettre à jour status
         this.render();
     }
     
@@ -274,7 +274,7 @@ class RoutingMatrix {
         const connectedInstruments = this.getConnectedInstruments();
         
         if (connectedInstruments.length === 0) {
-            alert('Aucun instrument connectÃ©');
+            alert('Aucun instrument connecté');
             return;
         }
         
@@ -299,7 +299,7 @@ class RoutingMatrix {
             return;
         }
         
-        // Notifier pour chaque route supprimÃ©e
+        // Notifier pour chaque route supprimée
         if (this.onRouteChange) {
             this.routes.forEach((instrumentId, channel) => {
                 this.onRouteChange(channel, null);

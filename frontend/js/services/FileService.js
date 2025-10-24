@@ -2,20 +2,11 @@
 // Fichier: frontend/js/services/FileService.js
 // Version: v3.0.2 - COMPLET (CRUD complet)
 // Date: 2025-10-08
-// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - Systeme d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
 //   Service de gestion des fichiers MIDI.
 //   Centralise toutes les opÃƒÂ©rations sur les fichiers.
-//
-// CORRECTIONS v3.0.2:
-//   Ã¢Å“â€¦ uploadFile() complet avec validation
-//   Ã¢Å“â€¦ deleteFile() complet avec confirmation
-//   Ã¢Å“â€¦ moveFile() implÃƒÂ©mentÃƒÂ©
-//   Ã¢Å“â€¦ renameFile() implÃƒÂ©mentÃƒÂ©
-//   Ã¢Å“â€¦ Gestion erreurs robuste
-//   Ã¢Å“â€¦ Progress callbacks pour upload
-//
 // Auteur: midiMind Team
 // ============================================================================
 
@@ -66,7 +57,6 @@ class FileService {
         
         this.logger.info('FileService', 'Ã¢Å“â€œ Service initialized');
         
-        // Ãƒâ€°couter les ÃƒÂ©vÃƒÂ©nements backend
         this._bindBackendEvents();
     }
     
@@ -75,12 +65,10 @@ class FileService {
     // ========================================================================
     
     _bindBackendEvents() {
-        // Ãƒâ€°couter la rÃƒÂ©ception de la liste de fichiers
         this.eventBus.on('backend:event:files_list', (data) => {
             this._handleFilesList(data);
         });
         
-        // Ãƒâ€°couter les ÃƒÂ©vÃƒÂ©nements de fichier ajoutÃƒÂ©/supprimÃƒÂ©
         this.eventBus.on('backend:event:file_added', (data) => {
             this._handleFileAdded(data);
         });
@@ -89,7 +77,6 @@ class FileService {
             this._handleFileRemoved(data);
         });
         
-        // Ãƒâ€°couter la connexion backend
         this.eventBus.on('backend:connected', () => {
             if (this.config.autoRefresh) {
                 this.scanFiles();

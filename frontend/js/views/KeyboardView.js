@@ -2,16 +2,15 @@
 // Fichier: frontend/js/views/KeyboardView.js
 // Version: v3.1.0 - MONITOR MODE
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// Ã¢Å“â€œ Mode monitor activÃƒÂ© (affichage + playback uniquement)
-// Ã¢Å“â€œ Warning si enregistrement dÃƒÂ©sactivÃƒÂ©
-// Ã¢Å“â€œ Support note mapping personnalisÃƒÂ©
-// Ã¢Å“â€œ Affichage clavier selon disponibilitÃƒÂ© notes
-// Ã¢Å“â€œ SUPPRESSION : UI enregistrement + loops
+// ✓ Mode monitor activé (affichage + playback uniquement)
+// ✓ Warning si enregistrement désactivé
+// ✓ Support note mapping personnalisé
+// ✓ Affichage clavier selon disponibilité notes
+// ✓ SUPPRESSION : UI enregistrement + loops
 // ============================================================================
-
 
 class KeyboardView extends BaseView {
     constructor(container, eventBus, debugConsole) {
@@ -24,7 +23,7 @@ class KeyboardView extends BaseView {
         this.canvas = null;
         this.ctx = null;
         
-        // Ãƒâ€°tat
+        // État
         this.selectedInstrument = null;
         this.noteRange = { min: 21, max: 108 };
         this.customNoteMapping = null;
@@ -37,13 +36,7 @@ class KeyboardView extends BaseView {
         this.whiteKeyHeight = 120;
         this.blackKeyHeight = 80;
         
-        // Logger
-        this.logger = window.logger || console;
-        
-        if (this.logger && this.logger.debug) {
-            this.logger.debug('KeyboardView', 'Initialized (monitor mode)');
-        }
-        
+        this.logDebug('keyboard', '✓ KeyboardView initialized (monitor mode)');
     }
     
     // ========================================================================
@@ -57,7 +50,7 @@ class KeyboardView extends BaseView {
             <div class="keyboard-page">
                 <!-- Header -->
                 <div class="page-header">
-                    <h2>Ã°Å¸Å½Â¹ Clavier MIDI</h2>
+                    <h2>🎹 Clavier MIDI</h2>
                     <p class="page-description">
                         Jouez des notes MIDI avec votre clavier ou souris
                     </p>
@@ -104,27 +97,24 @@ class KeyboardView extends BaseView {
     
     renderWarningBanner() {
         if (PerformanceConfig.keyboard.enableRecording) {
-            return '';  // Pas de warning si enregistrement activÃƒÂ©
+            return '';  // Pas de warning si enregistrement activé
         }
         
         return `
             <div class="info-banner warning">
-                Ã¢â€žÂ¹Ã¯Â¸Â Mode Monitor : Affichage et lecture uniquement
-                (Enregistrement dÃƒÂ©sactivÃƒÂ© en mode performance)
+                ℹ️ Mode Monitor : Affichage et lecture uniquement
+                (Enregistrement désactivé en mode performance)
             </div>
         `;
     }
     
     renderInstrumentSelector() {
-        // SÃ©curitÃ©: vÃ©rifier que devices existe et est un tableau
-        const devices = Array.isArray(this.devices) ? this.devices : [];
-        
         return `
             <div class="control-group">
                 <label>Instrument</label>
                 <select id="instrument-select" class="instrument-select">
-                    <option value="">-- SÃ©lectionner instrument --</option>
-                    ${devices.map(device => `
+                    <option value="">-- Sélectionner instrument --</option>
+                    ${this.devices.map(device => `
                         <option value="${device.id}" 
                                 ${device.id === this.selectedInstrument ? 'selected' : ''}>
                             ${device.name || device.id}
@@ -136,12 +126,10 @@ class KeyboardView extends BaseView {
     }
     
     renderNoteRangeDisplay() {
-        // SÃ©curitÃ©: vÃ©rifier que noteRange existe
-        const noteRange = this.noteRange || { min: 21, max: 108 };
-        let rangeText = `${noteRange.min}-${noteRange.max}`;
+        let rangeText = `${this.noteRange.min}-${this.noteRange.max}`;
         
         if (this.customNoteMapping) {
-            rangeText += ` (${this.customNoteMapping.size} notes mappÃ©es)`;
+            rangeText += ` (${this.customNoteMapping.size} notes mappées)`;
         }
         
         return `
@@ -161,7 +149,7 @@ class KeyboardView extends BaseView {
         
         return `
             <div class="control-group">
-                <label>VÃƒÂ©locitÃƒÂ© : <span id="velocity-value">${this.currentVelocity}</span></label>
+                <label>Vélocité : <span id="velocity-value">${this.currentVelocity}</span></label>
                 <input type="range" 
                        id="velocity-slider" 
                        class="velocity-slider"
@@ -182,10 +170,10 @@ class KeyboardView extends BaseView {
         return `
             <div class="control-group actions">
                 <button class="btn btn-secondary" id="btn-panic">
-                    Ã°Å¸â€ºâ€˜ Panic (Stop All)
+                    🛑 Panic (Stop All)
                 </button>
                 <button class="btn btn-secondary" id="btn-refresh-devices">
-                    Ã°Å¸â€â€ž RafraÃƒÂ®chir instruments
+                    🔄 Rafraîchir instruments
                 </button>
             </div>
         `;
@@ -209,7 +197,7 @@ class KeyboardView extends BaseView {
                 ${this.customNoteMapping ? `
                     <div class="legend-item">
                         <div class="legend-color" style="background: #FFD93D;"></div>
-                        <span>Note mappÃƒÂ©e personnalisÃƒÂ©e</span>
+                        <span>Note mappée personnalisée</span>
                     </div>
                 ` : ''}
             </div>
@@ -219,8 +207,8 @@ class KeyboardView extends BaseView {
     renderKeyboardMapping() {
         return `
             <div class="keyboard-mapping-info">
-                <h4>Ã°Å¸â€™Â¡ Raccourcis clavier</h4>
-                <p>Utilisez les touches <kbd>A</kbd> ÃƒÂ  <kbd>]</kbd> pour jouer (2 octaves)</p>
+                <h4>💡 Raccourcis clavier</h4>
+                <p>Utilisez les touches <kbd>A</kbd> à <kbd>]</kbd> pour jouer (2 octaves)</p>
                 <div class="key-hints">
                     <span><kbd>A</kbd>=C4</span>
                     <span><kbd>S</kbd>=D4</span>
@@ -238,7 +226,7 @@ class KeyboardView extends BaseView {
         return `
             <div class="keyboard-stats">
                 <div class="stat-item">
-                    <span class="stat-label">Notes jouÃƒÂ©es</span>
+                    <span class="stat-label">Notes jouées</span>
                     <span class="stat-value" id="stat-notes-played">0</span>
                 </div>
                 <div class="stat-item">
@@ -261,7 +249,7 @@ class KeyboardView extends BaseView {
         this.canvas = this.container.querySelector('#keyboard-canvas');
         
         if (!this.canvas) {
-            // this.logDebug('keyboard', 'Canvas not found', 'error');
+            this.logDebug('keyboard', 'Canvas not found', 'error');
             return;
         }
         
@@ -289,7 +277,7 @@ class KeyboardView extends BaseView {
         this.canvas.width = rect.width;
         this.canvas.height = this.whiteKeyHeight + 40;  // +40 pour labels
         
-        // this.logDebug('keyboard', `Canvas resized: ${this.canvas.width}x${this.canvas.height}`);
+        this.logDebug('keyboard', `Canvas resized: ${this.canvas.width}x${this.canvas.height}`);
     }
     
     attachCanvasListeners() {
@@ -312,7 +300,7 @@ class KeyboardView extends BaseView {
             const note = this.getNoteAtPosition(e.offsetX, e.offsetY);
             
             if (note !== null && note !== lastNote) {
-                // ArrÃƒÂªter note prÃƒÂ©cÃƒÂ©dente
+                // Arrêter note précédente
                 if (lastNote !== null) {
                     this.eventBus.emit('keyboard:stop-note', { note: lastNote });
                 }
@@ -439,13 +427,13 @@ class KeyboardView extends BaseView {
         const width = this.keyWidth;
         const height = isBlack ? this.blackKeyHeight : this.whiteKeyHeight;
         
-        // Couleur selon ÃƒÂ©tat
+        // Couleur selon état
         let color;
         
         if (this.activeNotes.has(note)) {
             color = '#FF6B6B';  // Rouge = actif
         } else if (this.customNoteMapping && this.customNoteMapping.has(note)) {
-            color = '#FFD93D';  // Jaune = mappÃƒÂ©
+            color = '#FFD93D';  // Jaune = mappé
         } else if (this.isNotePlayable(note)) {
             color = isBlack ? '#2c3e50' : '#ecf0f1';  // Disponible
         } else {
@@ -546,12 +534,12 @@ class KeyboardView extends BaseView {
     }
     
     isNotePlayable(note) {
-        // Si mapping custom, vÃƒÂ©rifier si mappÃƒÂ©
+        // Si mapping custom, vérifier si mappé
         if (this.customNoteMapping) {
             return this.customNoteMapping.has(note);
         }
         
-        // Sinon, vÃƒÂ©rifier range
+        // Sinon, vérifier range
         return note >= this.noteRange.min && note <= this.noteRange.max;
     }
     
@@ -586,10 +574,10 @@ class KeyboardView extends BaseView {
     setDevices(devices) {
         this.devices = devices || [];
         
-        // Mettre ÃƒÂ  jour dropdown
+        // Mettre à jour dropdown
         const select = this.container.querySelector('#instrument-select');
         if (select) {
-            select.innerHTML = '<option value="">-- SÃƒÂ©lectionner instrument --</option>';
+            select.innerHTML = '<option value="">-- Sélectionner instrument --</option>';
             this.devices.forEach(device => {
                 const option = document.createElement('option');
                 option.value = device.id;
@@ -648,6 +636,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.KeyboardView = KeyboardView;
 }
-
 // Export par défaut
 window.KeyboardView = KeyboardView;

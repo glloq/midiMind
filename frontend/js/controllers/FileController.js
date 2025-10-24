@@ -4,11 +4,10 @@
 // Date: 2025-10-20
 // ============================================================================
 // CORRECTIONS v3.0.3:
-// Ã¢Å“â€¦ Fixed initialization order (logger before initialize call)
-// Ã¢Å“â€¦ Added _fullyInitialized flag pattern
-// Ã¢Å“â€¦ Protected initialize() method
+// ✅ Fixed initialization order (logger before initialize call)
+// ✅ Added _fullyInitialized flag pattern
+// ✅ Protected initialize() method
 // ============================================================================
-
 
 class FileController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
@@ -16,9 +15,9 @@ class FileController extends BaseController {
         
         // Services - Initialize BEFORE everything else
         this.backend = window.app?.services?.backend || null;
-        this.logger = window.logger || console;
+        this.logger = window.Logger || console;
         
-        // Ãƒâ€°tat
+        // État
         this.state = {
             currentDirectory: '/midi',
             selectedFile: null,
@@ -52,10 +51,10 @@ class FileController extends BaseController {
         }
         
         if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'Ã°Å¸â€œÂ Initializing...');
+            this.logger.info('FileController', '📁 Initializing...');
         }
         
-        // VÃƒÂ©rifier dÃƒÂ©pendances
+        // Vérifier dépendances
         if (!this.backend) {
             if (this.logger && this.logger.error) {
                 this.logger.error('FileController', 'BackendService not available');
@@ -63,7 +62,7 @@ class FileController extends BaseController {
             return;
         }
         
-        // Setup ÃƒÂ©vÃƒÂ©nements
+        // Setup événements
         this.setupEventListeners();
         
         // Charger liste initiale
@@ -72,12 +71,12 @@ class FileController extends BaseController {
         }, 1000);
         
         if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'Ã¢Å“â€œ Initialized');
+            this.logger.info('FileController', '✓ Initialized');
         }
     }
     
     setupEventListeners() {
-        // Ãƒâ€°vÃƒÂ©nements UI
+        // Événements UI
         this.eventBus.on('file:select', (data) => this.handleFileSelect(data));
         this.eventBus.on('file:load', (data) => this.handleFileLoad(data));
         this.eventBus.on('file:upload', (data) => this.handleFileUpload(data));
@@ -85,7 +84,7 @@ class FileController extends BaseController {
         this.eventBus.on('file:rename', (data) => this.handleFileRename(data));
         this.eventBus.on('file:refresh', () => this.refreshFileList());
         
-        // Ãƒâ€°vÃƒÂ©nements backend
+        // Événements backend
         this.eventBus.on('backend:event', (event) => this.handleBackendEvent(event));
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
@@ -96,7 +95,7 @@ class FileController extends BaseController {
     // ========================================================================
     
     /**
-     * RafraÃƒÂ®chit la liste des fichiers
+     * Rafraîchit la liste des fichiers
      * @returns {Promise<Array>} Liste des fichiers
      */
     async refreshFileList() {
@@ -117,7 +116,7 @@ class FileController extends BaseController {
             
             const files = result.data?.files || [];
             
-            // Mettre ÃƒÂ  jour model
+            // Mettre à jour model
             const model = this.getModel('file');
             if (model) {
                 model.set('files', files);
@@ -125,7 +124,7 @@ class FileController extends BaseController {
                 model.set('lastRefresh', Date.now());
             }
             
-            // Mettre ÃƒÂ  jour view
+            // Mettre à jour view
             this.updateView('file', {
                 files: files,
                 directory: this.state.currentDirectory,
@@ -135,10 +134,10 @@ class FileController extends BaseController {
             this.state.lastRefresh = Date.now();
             
             if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `Ã¢Å“â€œ ${files.length} files loaded`);
+                this.logger.info('FileController', `✓ ${files.length} files loaded`);
             }
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             this.eventBus.emit('files:refreshed', {
                 files: files,
                 count: files.length
@@ -165,11 +164,11 @@ class FileController extends BaseController {
     }
     
     // ========================================================================
-    // SÃƒâ€°LECTION FICHIER
+    // SÉLECTION FICHIER
     // ========================================================================
     
     /**
-     * SÃƒÂ©lectionne un fichier
+     * Sélectionne un fichier
      * @param {string} fileId - ID du fichier
      */
     selectFile(fileId) {
@@ -180,17 +179,17 @@ class FileController extends BaseController {
         const previousFile = this.state.selectedFile;
         this.state.selectedFile = fileId;
         
-        // RÃƒÂ©cupÃƒÂ©rer infos fichier
+        // Récupérer infos fichier
         const file = this.getFileById(fileId);
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         this.eventBus.emit('file:selected', {
             fileId: fileId,
             file: file,
             previousFile: previousFile
         });
         
-        // Mettre ÃƒÂ  jour view
+        // Mettre à jour view
         this.updateView('file', {
             selectedFile: fileId,
             selectedFileData: file
@@ -198,7 +197,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Handler pour ÃƒÂ©vÃƒÂ©nement file:select
+     * Handler pour événement file:select
      * @private
      */
     handleFileSelect(data) {
@@ -225,7 +224,7 @@ class FileController extends BaseController {
         }
         
         try {
-            // VÃƒÂ©rifier GlobalPlaybackController disponible
+            // Vérifier GlobalPlaybackController disponible
             if (!window.globalPlaybackController) {
                 throw new Error('GlobalPlaybackController not available');
             }
@@ -233,11 +232,11 @@ class FileController extends BaseController {
             // Charger via playback controller
             await window.globalPlaybackController.loadFile(fileId);
             
-            // RÃƒÂ©cupÃƒÂ©rer nom fichier
+            // Récupérer nom fichier
             const file = this.getFileById(fileId);
             const fileName = file?.filename || file?.name || 'File';
             
-            // Notification succÃƒÂ¨s
+            // Notification succès
             this.showNotification(
                 `${fileName} loaded`,
                 'success',
@@ -245,7 +244,7 @@ class FileController extends BaseController {
             );
             
             if (this.logger && this.logger.info) {
-                this.logger.info('FileController', 'Ã¢Å“â€œ File loaded successfully');
+                this.logger.info('FileController', '✓ File loaded successfully');
             }
             
         } catch (error) {
@@ -264,7 +263,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Handler pour ÃƒÂ©vÃƒÂ©nement file:load
+     * Handler pour événement file:load
      * @private
      */
     async handleFileLoad(data) {
@@ -280,7 +279,7 @@ class FileController extends BaseController {
         try {
             await this.loadFile(fileId);
         } catch (error) {
-            // Erreur dÃƒÂ©jÃƒÂ  gÃƒÂ©rÃƒÂ©e dans loadFile()
+            // Erreur déjà gérée dans loadFile()
         }
     }
     
@@ -290,9 +289,9 @@ class FileController extends BaseController {
     
     /**
      * Upload un fichier MIDI
-     * @param {File} file - Fichier ÃƒÂ  uploader
+     * @param {File} file - Fichier à uploader
      * @param {Function} onProgress - Callback progression
-     * @returns {Promise<Object>} Fichier uploadÃƒÂ©
+     * @returns {Promise<Object>} Fichier uploadé
      */
     async uploadFile(file, onProgress = null) {
         if (this.logger && this.logger.info) {
@@ -334,20 +333,20 @@ class FileController extends BaseController {
             const uploadedFile = result.data;
             
             if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `Ã¢Å“â€œ File uploaded: ${file.name}`);
+                this.logger.info('FileController', `✓ File uploaded: ${file.name}`);
             }
             
-            // RafraÃƒÂ®chir liste
+            // Rafraîchir liste
             await this.refreshFileList();
             
-            // Notification succÃƒÂ¨s
+            // Notification succès
             this.showNotification(
                 `File uploaded: ${file.name}`,
                 'success',
                 { duration: 3000 }
             );
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             this.eventBus.emit('file:uploaded', {
                 file: uploadedFile,
                 originalFile: file
@@ -374,7 +373,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Handler pour ÃƒÂ©vÃƒÂ©nement file:upload
+     * Handler pour événement file:upload
      * @private
      */
     async handleFileUpload(data) {
@@ -390,7 +389,7 @@ class FileController extends BaseController {
         try {
             await this.uploadFile(file, onProgress);
         } catch (error) {
-            // Erreur dÃƒÂ©jÃƒÂ  gÃƒÂ©rÃƒÂ©e dans uploadFile()
+            // Erreur déjà gérée dans uploadFile()
         }
     }
     
@@ -401,7 +400,7 @@ class FileController extends BaseController {
     /**
      * Supprime un fichier avec confirmation
      * @param {string} fileId - ID ou path du fichier
-     * @returns {Promise<boolean>} SuccÃƒÂ¨s
+     * @returns {Promise<boolean>} Succès
      */
     async deleteFile(fileId) {
         if (this.logger && this.logger.info) {
@@ -409,11 +408,11 @@ class FileController extends BaseController {
         }
         
         try {
-            // RÃƒÂ©cupÃƒÂ©rer info fichier
+            // Récupérer info fichier
             const file = this.getFileById(fileId);
             const fileName = file?.filename || file?.name || fileId;
             
-            // Confirmation utilisateur (si activÃƒÂ©e)
+            // Confirmation utilisateur (si activée)
             if (this.config.confirmDelete) {
                 const confirmed = confirm(
                     `Delete file "${fileName}"?\n\n` +
@@ -442,26 +441,26 @@ class FileController extends BaseController {
             }
             
             if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `Ã¢Å“â€œ File deleted: ${fileName}`);
+                this.logger.info('FileController', `✓ File deleted: ${fileName}`);
             }
             
-            // Si fichier sÃƒÂ©lectionnÃƒÂ©, dÃƒÂ©sÃƒÂ©lectionner
+            // Si fichier sélectionné, désélectionner
             if (this.state.selectedFile === fileId) {
                 this.state.selectedFile = null;
                 this.eventBus.emit('file:deselected');
             }
             
-            // RafraÃƒÂ®chir liste
+            // Rafraîchir liste
             await this.refreshFileList();
             
-            // Notification succÃƒÂ¨s
+            // Notification succès
             this.showNotification(
                 `File deleted: ${fileName}`,
                 'info',
                 { duration: 3000 }
             );
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             this.eventBus.emit('file:deleted', { 
                 fileId,
                 file
@@ -488,7 +487,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Handler pour ÃƒÂ©vÃƒÂ©nement file:delete
+     * Handler pour événement file:delete
      * @private
      */
     async handleFileDelete(data) {
@@ -509,7 +508,7 @@ class FileController extends BaseController {
     // ========================================================================
     
     /**
-     * RÃƒÂ©cupÃƒÂ¨re un fichier par ID
+     * Récupère un fichier par ID
      * @param {string} fileId - ID du fichier
      * @returns {Object|null} Fichier
      */
@@ -551,9 +550,9 @@ class FileController extends BaseController {
     }
     
     /**
-     * Met ÃƒÂ  jour une vue
+     * Met à jour une vue
      * @param {string} viewName - Nom de la vue
-     * @param {Object} data - DonnÃƒÂ©es
+     * @param {Object} data - Données
      */
     updateView(viewName, data) {
         const view = this.getView(viewName);
@@ -563,8 +562,8 @@ class FileController extends BaseController {
     }
     
     /**
-     * GÃƒÂ¨re les ÃƒÂ©vÃƒÂ©nements reÃƒÂ§us du backend
-     * @param {Object} event - Ãƒâ€°vÃƒÂ©nement backend
+     * Gère les événements reçus du backend
+     * @param {Object} event - Événement backend
      */
     handleBackendEvent(event) {
         if (!event || !event.name) {
@@ -581,7 +580,7 @@ class FileController extends BaseController {
         switch (event.name) {
             case 'files:list':
             case 'files:refreshed':
-                // Liste rafraÃƒÂ®chie
+                // Liste rafraîchie
                 break;
             case 'file:added':
                 this.refreshFileList();
@@ -612,8 +611,8 @@ class FileController extends BaseController {
     }
     
     /**
-     * RÃƒÂ©cupÃƒÂ¨re l'ÃƒÂ©tat du contrÃƒÂ´leur
-     * @returns {Object} Ãƒâ€°tat
+     * Récupère l'état du contrôleur
+     * @returns {Object} État
      */
     getState() {
         return {

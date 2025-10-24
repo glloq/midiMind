@@ -1,32 +1,32 @@
 // ============================================================================
-// Fichier: frontend/js/views/VisualizerView.js
+// 📄 Fichier: frontend/js/views/VisualizerView.js
 // Version: v3.1.0 - CORRECTED TO EXTEND BASEVIEW
 // Date: 2025-10-14
 // ============================================================================
 // CORRECTIONS v3.1.0:
-// âœ… HÃ‰RITAGE: HÃ©rite maintenant de BaseView (CRITIQUE)
-// âœ… Ã‰VÃ‰NEMENTS: IntÃ©gration EventBus conforme Ã  l'architecture MVC
-// âœ… ARCHITECTURE: Pattern BaseView respectÃ©
-// âœ… CANVAS: Gestion optimisÃ©e du render loop
-// âœ… PERFORMANCE: Object pooling, culling, buffering maintenus
-// âœ… CLEANUP: MÃ©thode destroy() complÃ¨te avec arrÃªt render loop
+// ✅ HÉRITAGE: Hérite maintenant de BaseView (CRITIQUE)
+// ✅ ÉVÉNEMENTS: Intégration EventBus conforme à l'architecture MVC
+// ✅ ARCHITECTURE: Pattern BaseView respecté
+// ✅ CANVAS: Gestion optimisée du render loop
+// ✅ PERFORMANCE: Object pooling, culling, buffering maintenus
+// ✅ CLEANUP: Méthode destroy() complète avec arrêt render loop
 //
-// Description:
-//   Vue visualiseur temps rÃ©el des donnÃ©es MIDI en cours de lecture.
-//   Affiche les notes actives, vÃ©locitÃ©, canaux, et instruments utilisÃ©s.
-//   Rendu optimisÃ© avec Canvas HTML5.
+// 📝 Description:
+//   Vue visualiseur temps réel des données MIDI en cours de lecture.
+//   Affiche les notes actives, vélocité, canaux, et instruments utilisés.
+//   Rendu optimisé avec Canvas HTML5.
 //
-// FonctionnalitÃ©s:
-//   - Visualisation notes actives en temps rÃ©el
-//   - Affichage vÃ©locitÃ© (couleur/taille)
-//   - SÃ©paration par canaux MIDI
+// Fonctionnalités:
+//   - Visualisation notes actives en temps réel
+//   - Affichage vélocité (couleur/taille)
+//   - Séparation par canaux MIDI
 //   - Animation fluide (requestAnimationFrame)
-//   - FenÃªtre temporelle configurable
-//   - Statistiques temps rÃ©el
+//   - Fenêtre temporelle configurable
+//   - Statistiques temps réel
 //
 // Architecture:
 //   VisualizerView extends BaseView
-//   - Utilise render loop optimisÃ©
+//   - Utilise render loop optimisé
 //   - Buffering double pour performance
 //   - Pool d'objets pour notes actives
 //
@@ -36,20 +36,18 @@
 /**
  * @class VisualizerView
  * @extends BaseView
- * @description Vue visualiseur temps rÃ©el MIDI avec Canvas
-import BaseView from './BaseView.js';
-
+ * @description Vue visualiseur temps réel MIDI avec Canvas
  */
 class VisualizerView extends BaseView {
     /**
      * Constructeur
-     * @param {string|HTMLElement} containerId - ID du conteneur ou Ã©lÃ©ment DOM
-     * @param {EventBus} eventBus - Bus d'Ã©vÃ©nements global
+     * @param {string|HTMLElement} containerId - ID du conteneur ou élément DOM
+     * @param {EventBus} eventBus - Bus d'événements global
      */
     constructor(containerId, eventBus) {
         super(containerId, eventBus);
         
-        // Configuration spÃ©cifique
+        // Configuration spécifique
         this.config.autoRender = false;
         this.config.preserveState = true;
         
@@ -59,7 +57,7 @@ class VisualizerView extends BaseView {
         
         // Configuration visualiseur
         this.viewConfig = {
-            previewTime: 2000,       // ms Ã  afficher
+            previewTime: 2000,       // ms à afficher
             laneHeight: 40,
             scrollSpeed: 60,
             showVelocity: true,
@@ -67,7 +65,7 @@ class VisualizerView extends BaseView {
             showNoteNames: true
         };
         
-        // Ã‰tat du visualiseur
+        // État du visualiseur
         this.viewState = {
             currentTime: 0,
             midiJson: null,
@@ -111,7 +109,7 @@ class VisualizerView extends BaseView {
         
         this.bindCustomEvents();
         
-        // Exposer globalement pour compatibilitÃ©
+        // Exposer globalement pour compatibilité
         if (typeof window !== 'undefined') {
             window.visualizerView = this;
         }
@@ -120,10 +118,10 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Lie les Ã©vÃ©nements personnalisÃ©s via EventBus
+     * Lie les événements personnalisés via EventBus
      */
     bindCustomEvents() {
-        // Ã‰couter les Ã©vÃ©nements de lecture
+        // Écouter les événements de lecture
         this.eventBus.on('playback:started', () => {
             this.viewState.isPlaying = true;
             if (!this.renderLoopId) {
@@ -148,7 +146,7 @@ class VisualizerView extends BaseView {
             this.removeActiveNote(data);
         });
         
-        // Ã‰couter le redimensionnement
+        // Écouter le redimensionnement
         window.addEventListener('resize', () => {
             this.resize();
             this.invalidate();
@@ -160,9 +158,9 @@ class VisualizerView extends BaseView {
     // ========================================================================
     
     /**
-     * Rend la vue complÃ¨te
+     * Rend la vue complète
      * Override de BaseView.render()
-     * @param {Object} data - DonnÃ©es
+     * @param {Object} data - Données
      * @param {Object} options - Options
      */
     render(data = null, options = {}) {
@@ -171,7 +169,7 @@ class VisualizerView extends BaseView {
             return;
         }
         
-        // Mettre Ã  jour les donnÃ©es
+        // Mettre à jour les données
         if (data) {
             this.data = { ...this.data, ...data };
         }
@@ -205,21 +203,21 @@ class VisualizerView extends BaseView {
             <div class="visualizer-container">
                 <!-- Header -->
                 <div class="visualizer-header">
-                    <h3>ðŸŽµ Live MIDI Visualizer</h3>
+                    <h3>🎵 Live MIDI Visualizer</h3>
                     <div class="visualizer-controls">
                         <button class="control-btn" data-action="toggle-velocity" 
                                 title="Toggle Velocity Display">
-                            <i class="icon">ðŸ“Š</i>
+                            <i class="icon">📊</i>
                             Velocity: ${this.viewConfig.showVelocity ? 'ON' : 'OFF'}
                         </button>
                         <button class="control-btn" data-action="toggle-cc" 
                                 title="Toggle CC Display">
-                            <i class="icon">ðŸŽšï¸</i>
+                            <i class="icon">🎚️</i>
                             CC: ${this.viewConfig.showCC ? 'ON' : 'OFF'}
                         </button>
                         <button class="control-btn" data-action="toggle-notes" 
                                 title="Toggle Note Names">
-                            <i class="icon">ðŸ”¤</i>
+                            <i class="icon">🔤</i>
                             Names: ${this.viewConfig.showNoteNames ? 'ON' : 'OFF'}
                         </button>
                     </div>
@@ -300,7 +298,7 @@ class VisualizerView extends BaseView {
     
     /**
      * Charge un fichier MidiJSON
-     * @param {Object} midiJson - DonnÃ©es MIDI JSON
+     * @param {Object} midiJson - Données MIDI JSON
      */
     loadMidiJson(midiJson) {
         this.viewState.midiJson = midiJson;
@@ -311,7 +309,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Met Ã  jour le temps de lecture
+     * Met à jour le temps de lecture
      * @param {number} currentTime - Temps actuel en ms
      */
     update(currentTime) {
@@ -319,23 +317,23 @@ class VisualizerView extends BaseView {
         
         if (!this.viewState.midiJson) return;
         
-        // Mettre Ã  jour les notes Ã  venir
+        // Mettre à jour les notes à venir
         this.updateUpcomingNotes();
         
-        // Mettre Ã  jour les notes actives
+        // Mettre à jour les notes actives
         this.updateActiveNotes();
         
-        // Mettre Ã  jour les valeurs CC
+        // Mettre à jour les valeurs CC
         this.updateCCValues();
         
-        // Mettre Ã  jour l'affichage du temps
+        // Mettre à jour l'affichage du temps
         this.updateTimeDisplay();
         
         this.invalidate();
     }
     
     /**
-     * Met Ã  jour les notes Ã  venir
+     * Met à jour les notes à venir
      */
     updateUpcomingNotes() {
         const startTime = this.viewState.currentTime;
@@ -351,7 +349,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Met Ã  jour les notes actives
+     * Met à jour les notes actives
      */
     updateActiveNotes() {
         const tolerance = 50; // ms
@@ -371,7 +369,7 @@ class VisualizerView extends BaseView {
                 });
             });
         
-        // Retirer les notes terminÃ©es
+        // Retirer les notes terminées
         Array.from(this.viewState.activeNotes.entries()).forEach(([key, note]) => {
             const endTime = note.time + note.duration;
             if (this.viewState.currentTime > endTime + tolerance) {
@@ -379,17 +377,17 @@ class VisualizerView extends BaseView {
             }
         });
         
-        // Mettre Ã  jour le compteur
+        // Mettre à jour le compteur
         this.updateActiveNotesDisplay();
     }
     
     /**
-     * Met Ã  jour les valeurs CC
+     * Met à jour les valeurs CC
      */
     updateCCValues() {
         if (!this.viewConfig.showCC) return;
         
-        // RÃ©cupÃ©rer les derniÃ¨res valeurs CC avant le temps courant
+        // Récupérer les dernières valeurs CC avant le temps courant
         this.viewState.ccValues.clear();
         
         const ccEvents = this.viewState.midiJson.timeline
@@ -399,7 +397,7 @@ class VisualizerView extends BaseView {
             )
             .sort((a, b) => b.time - a.time);
         
-        // Garder la derniÃ¨re valeur de chaque CC
+        // Garder la dernière valeur de chaque CC
         const seen = new Set();
         ccEvents.forEach(event => {
             const key = `${event.channel}_${event.controller}`;
@@ -412,7 +410,7 @@ class VisualizerView extends BaseView {
     
     /**
      * Ajoute une note active
-     * @param {Object} noteData - DonnÃ©es de la note
+     * @param {Object} noteData - Données de la note
      */
     addActiveNote(noteData) {
         const key = `${noteData.channel}_${noteData.note}`;
@@ -425,7 +423,7 @@ class VisualizerView extends BaseView {
     
     /**
      * Retire une note active
-     * @param {Object} noteData - DonnÃ©es de la note
+     * @param {Object} noteData - Données de la note
      */
     removeActiveNote(noteData) {
         const key = `${noteData.channel}_${noteData.note}`;
@@ -457,12 +455,12 @@ class VisualizerView extends BaseView {
      */
     startRenderLoop() {
         if (this.renderLoopId) {
-            return; // DÃ©jÃ  en cours
+            return; // Déjà en cours
         }
         
         const render = (timestamp) => {
             if (this.state.isDestroyed) {
-                return; // ArrÃªter si dÃ©truit
+                return; // Arrêter si détruit
             }
             
             if (this.needsRedraw) {
@@ -473,7 +471,7 @@ class VisualizerView extends BaseView {
                 }
                 this.needsRedraw = false;
                 
-                // Mettre Ã  jour FPS
+                // Mettre à jour FPS
                 this.updateFpsDisplay();
             }
             
@@ -486,7 +484,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * ArrÃªte la boucle de rendu
+     * Arrête la boucle de rendu
      */
     stopRenderLoop() {
         if (this.renderLoopId) {
@@ -518,20 +516,20 @@ class VisualizerView extends BaseView {
         // Dessiner les lanes par canal
         this.drawChannelLanes();
         
-        // Dessiner les notes Ã  venir
+        // Dessiner les notes à venir
         this.drawUpcomingNotes();
         
         // Dessiner les notes actives
         this.drawActiveNotes();
         
-        // Overlay CC si activÃ©
+        // Overlay CC si activé
         if (this.viewConfig.showCC) {
             this.drawCCOverlay();
         }
     }
     
     /**
-     * Dessine l'Ã©tat vide
+     * Dessine l'état vide
      */
     drawEmptyState() {
         this.ctx.fillStyle = '#666';
@@ -575,7 +573,7 @@ class VisualizerView extends BaseView {
         channels.forEach((channel, index) => {
             const y = index * laneHeight;
             
-            // Background alternÃ©
+            // Background alterné
             if (index % 2 === 0) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
                 this.ctx.fillRect(0, y, this.width, laneHeight);
@@ -588,7 +586,7 @@ class VisualizerView extends BaseView {
             this.ctx.textBaseline = 'top';
             this.ctx.fillText(`Ch ${channel + 1}`, 5, y + 5);
             
-            // Ligne de sÃ©paration
+            // Ligne de séparation
             this.ctx.strokeStyle = '#333';
             this.ctx.lineWidth = 1;
             this.ctx.beginPath();
@@ -599,7 +597,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Dessine les notes Ã  venir
+     * Dessine les notes à venir
      */
     drawUpcomingNotes() {
         const playheadX = this.width * 0.2;
@@ -617,7 +615,7 @@ class VisualizerView extends BaseView {
             // Position verticale
             const y = channelIndex * laneHeight;
             
-            // Largeur selon durÃ©e
+            // Largeur selon durée
             const noteWidth = (note.duration / this.viewConfig.previewTime) * (this.width - playheadX);
             const noteHeight = laneHeight * 0.8;
             const noteY = y + (laneHeight - noteHeight) / 2;
@@ -630,7 +628,7 @@ class VisualizerView extends BaseView {
             this.ctx.fillStyle = this.hexToRgba(channelColor, opacity);
             this.ctx.fillRect(x, noteY, Math.max(noteWidth, 2), noteHeight);
             
-            // Barre de vÃ©locitÃ©
+            // Barre de vélocité
             if (this.viewConfig.showVelocity) {
                 const velocityHeight = (note.velocity / 127) * noteHeight;
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -752,8 +750,8 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Active/dÃ©sactive un canal
-     * @param {number} channel - NumÃ©ro du canal
+     * Active/désactive un canal
+     * @param {number} channel - Numéro du canal
      * @param {boolean} enabled - Actif ou non
      */
     toggleChannel(channel, enabled) {
@@ -766,7 +764,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * DÃ©finit le temps d'aperÃ§u
+     * Définit le temps d'aperçu
      * @param {number} time - Temps en ms
      */
     setPreviewTime(time) {
@@ -775,7 +773,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Active/dÃ©sactive l'affichage de la vÃ©locitÃ©
+     * Active/désactive l'affichage de la vélocité
      * @param {boolean} show
      */
     setShowVelocity(show) {
@@ -784,7 +782,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Active/dÃ©sactive l'affichage des CC
+     * Active/désactive l'affichage des CC
      * @param {boolean} show
      */
     setShowCC(show) {
@@ -793,7 +791,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Active/dÃ©sactive l'affichage des noms de notes
+     * Active/désactive l'affichage des noms de notes
      * @param {boolean} show
      */
     setShowNoteNames(show) {
@@ -880,7 +878,7 @@ class VisualizerView extends BaseView {
     // ========================================================================
     
     /**
-     * Met Ã  jour l'affichage du FPS
+     * Met à jour l'affichage du FPS
      */
     updateFpsDisplay() {
         const now = performance.now();
@@ -897,7 +895,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Met Ã  jour l'affichage des notes actives
+     * Met à jour l'affichage des notes actives
      */
     updateActiveNotesDisplay() {
         const countEl = document.getElementById('activeNotesValue');
@@ -907,7 +905,7 @@ class VisualizerView extends BaseView {
     }
     
     /**
-     * Met Ã  jour l'affichage du temps
+     * Met à jour l'affichage du temps
      */
     updateTimeDisplay() {
         const timeEl = document.getElementById('timeValue');
@@ -921,14 +919,14 @@ class VisualizerView extends BaseView {
     // ========================================================================
     
     /**
-     * DÃ©truit la vue
+     * Détruit la vue
      * Override de BaseView.destroy()
      */
     destroy() {
-        // ArrÃªter le render loop
+        // Arrêter le render loop
         this.stopRenderLoop();
         
-        // Nettoyer les rÃ©fÃ©rences
+        // Nettoyer les références
         this.canvas = null;
         this.ctx = null;
         this.viewState.midiJson = null;
@@ -936,7 +934,7 @@ class VisualizerView extends BaseView {
         this.viewState.upcomingNotes = [];
         this.noteCache.clear();
         
-        // Nettoyer la rÃ©fÃ©rence globale
+        // Nettoyer la référence globale
         if (typeof window !== 'undefined' && window.visualizerView === this) {
             window.visualizerView = null;
         }
@@ -959,9 +957,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.VisualizerView = VisualizerView;
 }
-
 window.VisualizerView = VisualizerView;
-
 // ============================================================================
 // FIN DU FICHIER VisualizerView.js v3.1.0
 // ============================================================================

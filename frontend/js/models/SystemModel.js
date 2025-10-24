@@ -4,27 +4,26 @@
 // Date: 2025-10-22
 // ============================================================================
 // CORRECTIONS v3.0.7:
-// âœ… Ajout de _isBackendAvailable() pour vÃ©rifier le backend
-// âœ… Gestion gracieuse du mode hors ligne (pas d'erreurs rÃ©pÃ©titives)
-// âœ… Toutes les mÃ©thodes vÃ©rifient le backend avant utilisation
+// ✅ Ajout de _isBackendAvailable() pour vérifier le backend
+// ✅ Gestion gracieuse du mode hors ligne (pas d'erreurs répétitives)
+// ✅ Toutes les méthodes vérifient le backend avant utilisation
 // ============================================================================
-
 
 class SystemModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // âœ… FIX: Correct super() call
+        // ✅ FIX: Correct super() call
         super({}, {
             persistKey: 'systemmodel',
             eventPrefix: 'system',
             autoPersist: true
         });
         
-        // âœ… FIX: Assign immediately
+        // ✅ FIX: Assign immediately
         this.eventBus = eventBus;
         this.logger = logger;
         this.backend = backend;
         
-        // âœ… FIX: Initialize data directly
+        // ✅ FIX: Initialize data directly
         this.data = {
             status: 'unknown',
             cpu: 0,
@@ -39,9 +38,9 @@ class SystemModel extends BaseModel {
             midiLatency: 5
         };
         
-        this.logger.info('SystemModel', 'âœ“ Model initialized (minimal version)');
+        this.logger.info('SystemModel', '✓ Model initialized (minimal version)');
         
-        // DÃ©marrer monitoring simple
+        // Démarrer monitoring simple
         this.startMonitoring();
     }
     
@@ -50,7 +49,7 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     /**
-     * VÃ©rifie si le backend est disponible
+     * Vérifie si le backend est disponible
      * @private
      */
     _isBackendAvailable() {
@@ -62,12 +61,12 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     startMonitoring() {
-        // RafraÃ®chir toutes les 5 secondes
+        // Rafraîchir toutes les 5 secondes
         this.monitoringTimer = setInterval(() => {
             this.refreshSystemInfo();
         }, 5000);
         
-        // Premier refresh immÃ©diat
+        // Premier refresh immédiat
         this.refreshSystemInfo();
         
         this.logger.debug('SystemModel', 'Monitoring started');
@@ -83,12 +82,12 @@ class SystemModel extends BaseModel {
     }
     
     /**
-     * RafraÃ®chit les informations systÃ¨me
+     * Rafraîchit les informations système
      */
     async refreshSystemInfo() {
-        // VÃ©rifier si backend est disponible
+        // Vérifier si backend est disponible
         if (!this._isBackendAvailable()) {
-            // Mode hors ligne - retourner des donnÃ©es par dÃ©faut sans erreur
+            // Mode hors ligne - retourner des données par défaut sans erreur
             return {
                 status: 'offline',
                 cpu: 0,
@@ -104,7 +103,7 @@ class SystemModel extends BaseModel {
             if (response.success && response.data) {
                 const info = response.data;
                 
-                // Mettre Ã  jour silencieusement
+                // Mettre à jour silencieusement
                 this.update({
                     status: info.status || 'ready',
                     cpu: info.cpu || 0,
@@ -113,7 +112,7 @@ class SystemModel extends BaseModel {
                     uptime: info.uptime || 0
                 }, { silent: true });
                 
-                // Ã‰mettre Ã©vÃ©nement
+                // Émettre événement
                 this.eventBus.emit('system:info-updated', { info });
                 
                 return info;
@@ -129,7 +128,7 @@ class SystemModel extends BaseModel {
     // ========================================================================
     
     /**
-     * Met Ã  jour la configuration audio
+     * Met à jour la configuration audio
      */
     async updateAudioConfig(config) {
         if (!this._isBackendAvailable()) {
@@ -163,7 +162,7 @@ class SystemModel extends BaseModel {
     }
     
     /**
-     * Met Ã  jour la configuration MIDI
+     * Met à jour la configuration MIDI
      */
     async updateMidiConfig(config) {
         if (!this._isBackendAvailable()) {
@@ -195,11 +194,11 @@ class SystemModel extends BaseModel {
     }
     
     // ========================================================================
-    // ACTIONS SYSTÃˆME
+    // ACTIONS SYSTÈME
     // ========================================================================
     
     /**
-     * RedÃ©marre le systÃ¨me
+     * Redémarre le système
      */
     async restart() {
         if (!this._isBackendAvailable()) {
@@ -225,7 +224,7 @@ class SystemModel extends BaseModel {
     }
     
     /**
-     * Ã‰teint le systÃ¨me
+     * Éteint le système
      */
     async shutdown() {
         if (!this._isBackendAvailable()) {
@@ -291,5 +290,4 @@ if (typeof window !== 'undefined') {
     window.SystemModel = SystemModel;
 }
 
-// Export par défaut
 window.SystemModel = SystemModel;

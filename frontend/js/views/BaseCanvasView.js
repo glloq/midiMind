@@ -1,15 +1,15 @@
 // ============================================================================
-// Fichier: frontend/js/views/BaseCanvasView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// 📄 Fichier: frontend/js/views/BaseCanvasView.js
+// 🎹 Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
-// Description:
+// 📝 Description:
 //   Classe de base pour toutes les vues utilisant un canvas HTML5.
 //   Gère le redimensionnement automatique, le contexte 2D, le render loop,
 //   et les interactions basiques (souris).
 //
-// Fonctionnalités:
+// ✨ Fonctionnalités:
 //   - Gestion pixel ratio (support écrans Retina)
 //   - Render loop avec requestAnimationFrame
 //   - Redimensionnement automatique responsive
@@ -17,12 +17,12 @@
 //   - Invalidation optimisée (render on demand)
 //   - Nettoyage automatique (destroy)
 //
-// Architecture:
+// 🏗️ Architecture:
 //   Template Method Pattern - Méthodes à surcharger :
 //   - render() : Rendu personnalisé
 //   - handleMouseDown/Move/Up/Leave() : Interactions
 //
-// Auteur: MidiMind Team
+// 👤 Auteur: MidiMind Team
 // ============================================================================
 
 class BaseCanvasView {
@@ -46,7 +46,7 @@ class BaseCanvasView {
     }
 
     // ========================================================================
-    // INITIALISATION
+    // 🚀 INITIALISATION
     // ========================================================================
 
     init() {
@@ -67,7 +67,7 @@ class BaseCanvasView {
     }
 
     // ========================================================================
-    // REDIMENSIONNEMENT
+    // 📐 REDIMENSIONNEMENT
     // ========================================================================
 
     resize() {
@@ -87,7 +87,7 @@ class BaseCanvasView {
     }
 
     // ========================================================================
-    // RENDER LOOP
+    // 🎨 RENDER LOOP
     // ========================================================================
 
     startRenderLoop() {
@@ -114,7 +114,7 @@ class BaseCanvasView {
     }
 
     // ========================================================================
-    // MÉTHODES À SURCHARGER
+    // 🔧 MÉTHODES À SURCHARGER
     // ========================================================================
 
     render() {
@@ -140,7 +140,7 @@ class BaseCanvasView {
     }
 
     // ========================================================================
-    // UTILITAIRES
+    // 🛠️ UTILITAIRES
     // ========================================================================
 
     getCanvasPoint(e) {

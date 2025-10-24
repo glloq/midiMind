@@ -1,21 +1,20 @@
-// ===== NAVIGATION CONTROLLER - ContrÃ´leur de navigation et gestion des pages =====
+// ===== NAVIGATION CONTROLLER - Contrôleur de navigation et gestion des pages =====
 // ================================================================================
-// GÃ¨re toute la navigation de l'application :
+// Gère toute la navigation de l'application :
 // - Affichage et transition entre les pages (home, files, instruments, keyboard, system)
 // - Gestion de l'historique et navigation (back/forward)
-// - Mise Ã  jour dynamique du contenu des pages
-// - Coordination entre les vues et contrÃ´leurs
-// - Gestion des Ã©tats de navigation et URL
+// - Mise à jour dynamique du contenu des pages
+// - Coordination entre les vues et contrôleurs
+// - Gestion des états de navigation et URL
 // - Animation des transitions entre pages
 // - Raccourcis clavier pour la navigation
 // ================================================================================
-
 
 class NavigationController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Ã‰tat de navigation
+        // État de navigation
         this.currentPage = 'home';
         this.previousPage = null;
         this.navigationHistory = ['home'];
@@ -25,47 +24,47 @@ class NavigationController extends BaseController {
         this.pages = {
             home: {
                 id: 'home-page',
-                title: 'ðŸ  Accueil',
-                icon: 'ðŸ ',
+                title: '🏠 Accueil',
+                icon: '🏠',
                 shortcut: 'h',
                 requiresData: true,
                 cacheable: false
             },
             files: {
                 id: 'files-page', 
-                title: 'ðŸ“ Fichiers',
-                icon: 'ðŸ“',
+                title: '📁 Fichiers',
+                icon: '📁',
                 shortcut: 'f',
                 requiresData: true,
                 cacheable: true
             },
             instruments: {
                 id: 'instruments-page',
-                title: 'ðŸŽ¼ Instruments', 
-                icon: 'ðŸŽ¼',
+                title: '🎼 Instruments', 
+                icon: '🎼',
                 shortcut: 'i',
                 requiresData: true,
                 cacheable: true
             },
             keyboard: {
                 id: 'keyboard-page',
-                title: 'ðŸŽ¹ Clavier',
-                icon: 'ðŸŽ¹', 
+                title: '🎹 Clavier',
+                icon: '🎹', 
                 shortcut: 'k',
                 requiresData: true,
                 cacheable: false
             },
             system: {
                 id: 'system-page',
-                title: 'âš™ï¸ SystÃ¨me',
-                icon: 'âš™ï¸',
+                title: '⚙️ Système',
+                icon: '⚙️',
                 shortcut: 's',
                 requiresData: true,
                 cacheable: true
             }
         };
         
-        // Ã‰tat des transitions
+        // État des transitions
         this.transitionState = {
             inProgress: false,
             duration: 300, // ms
@@ -89,15 +88,15 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Configuration des Ã©vÃ©nements
+     * Configuration des événements
      */
     bindEvents() {
-        // Ã‰couter les changements de modÃ¨les pour mise Ã  jour automatique
+        // Écouter les changements de modèles pour mise à jour automatique
         this.eventBus.on('model:changed', (data) => {
             this.handleModelChange(data);
         });
         
-        // Ã‰couter les Ã©vÃ©nements de navigation
+        // Écouter les événements de navigation
         this.eventBus.on('navigation:page_request', (data) => {
             this.showPage(data.page, data.options);
         });
@@ -110,7 +109,7 @@ class NavigationController extends BaseController {
             this.goForward();
         });
         
-        // Ã‰couter les Ã©vÃ©nements de donnÃ©es
+        // Écouter les événements de données
         this.eventBus.on('file:added', () => {
             this.invalidatePageCache(['home', 'files']);
         });
@@ -125,19 +124,19 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Initialise le systÃ¨me de navigation
+     * Initialise le système de navigation
      */
     initializeNavigation() {
         // Configurer les raccourcis clavier
         this.setupKeyboardShortcuts();
         
-        // GÃ©rer l'historique du navigateur
+        // Gérer l'historique du navigateur
         this.setupBrowserHistory();
         
         // Afficher la page d'accueil
         this.showPage('home', { skipHistory: true });
         
-        this.logDebug('navigation', 'SystÃ¨me de navigation initialisÃ©');
+        this.logDebug('navigation', 'Système de navigation initialisé');
     }
 
     /**
@@ -175,22 +174,22 @@ class NavigationController extends BaseController {
      * Configure la gestion de l'historique du navigateur
      */
     setupBrowserHistory() {
-        // GÃ©rer les changements d'URL
+        // Gérer les changements d'URL
         window.addEventListener('popstate', (event) => {
             if (event.state && event.state.page) {
                 this.showPage(event.state.page, { skipHistory: true, skipPushState: true });
             }
         });
         
-        // DÃ©finir l'Ã©tat initial
+        // Définir l'état initial
         history.replaceState({ page: this.currentPage }, '', `#${this.currentPage}`);
     }
 
     // ===== NAVIGATION PRINCIPALE =====
 
     /**
-     * Affiche une page spÃ©cifique
-     * @param {string} pageKey - ClÃ© de la page Ã  afficher
+     * Affiche une page spécifique
+     * @param {string} pageKey - Clé de la page à afficher
      * @param {Object} options - Options de navigation
      */
     async showPage(pageKey, options = {}) {
@@ -208,26 +207,26 @@ class NavigationController extends BaseController {
             return false;
         }
         
-        // Ã‰viter les transitions inutiles
+        // Éviter les transitions inutiles
         if (pageKey === this.currentPage && !forceRefresh) {
-            this.logDebug('navigation', `Page dÃ©jÃ  active: ${pageKey}`);
+            this.logDebug('navigation', `Page déjà active: ${pageKey}`);
             return true;
         }
         
-        // VÃ©rifier si une transition est en cours
+        // Vérifier si une transition est en cours
         if (this.transitionState.inProgress) {
-            this.logDebug('navigation', 'Transition dÃ©jÃ  en cours, ignorÃ©e');
+            this.logDebug('navigation', 'Transition déjà en cours, ignorée');
             return false;
         }
         
         this.logDebug('navigation', `Navigation vers: ${pageKey}`);
         
         try {
-            // PrÃ©parer la transition
+            // Préparer la transition
             this.transitionState.inProgress = true;
             this.previousPage = this.currentPage;
             
-            // Ã‰mettre l'Ã©vÃ©nement de dÃ©but de navigation
+            // Émettre l'événement de début de navigation
             this.eventBus.emit('navigation:page_changing', {
                 from: this.currentPage,
                 to: pageKey
@@ -237,30 +236,30 @@ class NavigationController extends BaseController {
             const success = await this.performPageTransition(pageKey, animationDirection);
             
             if (success) {
-                // Mettre Ã  jour l'Ã©tat de navigation
+                // Mettre à jour l'état de navigation
                 this.currentPage = pageKey;
                 
-                // GÃ©rer l'historique
+                // Gérer l'historique
                 if (!skipHistory) {
                     this.addToHistory(pageKey);
                 }
                 
-                // Mettre Ã  jour l'URL du navigateur
+                // Mettre à jour l'URL du navigateur
                 if (!skipPushState) {
                     history.pushState({ page: pageKey }, '', `#${pageKey}`);
                 }
                 
-                // Mettre Ã  jour l'interface de navigation
+                // Mettre à jour l'interface de navigation
                 this.updateNavigationUI();
                 
-                // Ã‰mettre l'Ã©vÃ©nement de fin de navigation
+                // Émettre l'événement de fin de navigation
                 this.eventBus.emit('navigation:page_changed', {
                     from: this.previousPage,
                     to: pageKey,
                     page: pageKey
                 });
                 
-                this.logDebug('navigation', `Navigation rÃ©ussie: ${this.previousPage} â†’ ${pageKey}`);
+                this.logDebug('navigation', `Navigation réussie: ${this.previousPage} → ${pageKey}`);
                 return true;
             }
             
@@ -280,7 +279,7 @@ class NavigationController extends BaseController {
      * Effectue la transition entre les pages
      * @param {string} pageKey - Page de destination
      * @param {string} animationDirection - Direction de l'animation
-     * @returns {Promise<boolean>} - SuccÃ¨s de la transition
+     * @returns {Promise<boolean>} - Succès de la transition
      */
     async performPageTransition(pageKey, animationDirection) {
         const pageConfig = this.pages[pageKey];
@@ -288,7 +287,7 @@ class NavigationController extends BaseController {
         const targetPageElement = document.getElementById(pageConfig.id);
         
         if (!currentPageElement || !targetPageElement) {
-            this.logDebug('navigation', 'Ã‰lÃ©ments de page manquants');
+            this.logDebug('navigation', 'Éléments de page manquants');
             return false;
         }
         
@@ -303,10 +302,10 @@ class NavigationController extends BaseController {
                 currentPageElement.classList.remove('active');
             }
             
-            // Mettre Ã  jour le contenu de la page cible
+            // Mettre à jour le contenu de la page cible
             targetPageElement.innerHTML = pageContent;
             
-            // Animation d'entrÃ©e de la nouvelle page
+            // Animation d'entrée de la nouvelle page
             if (this.animationConfig.enableTransitions) {
                 await this.animatePageIn(targetPageElement, animationDirection);
             } else {
@@ -323,7 +322,7 @@ class NavigationController extends BaseController {
 
     /**
      * Anime la sortie d'une page
-     * @param {HTMLElement} pageElement - Ã‰lÃ©ment de la page
+     * @param {HTMLElement} pageElement - Élément de la page
      * @param {string} direction - Direction de l'animation
      * @returns {Promise} - Promise de fin d'animation
      */
@@ -346,19 +345,19 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Anime l'entrÃ©e d'une page
-     * @param {HTMLElement} pageElement - Ã‰lÃ©ment de la page
+     * Anime l'entrée d'une page
+     * @param {HTMLElement} pageElement - Élément de la page
      * @param {string} direction - Direction de l'animation
      * @returns {Promise} - Promise de fin d'animation
      */
     animatePageIn(pageElement, direction) {
         return new Promise((resolve) => {
-            // PrÃ©parer l'Ã©lÃ©ment
+            // Préparer l'élément
             pageElement.style.opacity = '0';
             pageElement.style.transform = 'translateX(20%)';
             pageElement.classList.add('active');
             
-            // Animation d'entrÃ©e
+            // Animation d'entrée
             const animation = pageElement.animate([
                 { opacity: 0, transform: 'translateX(20%)' },
                 { opacity: 1, transform: 'translateX(0%)' }
@@ -380,23 +379,23 @@ class NavigationController extends BaseController {
 
     /**
      * Obtient le contenu d'une page
-     * @param {string} pageKey - ClÃ© de la page
+     * @param {string} pageKey - Clé de la page
      * @returns {Promise<string>} - Contenu HTML de la page
      */
     async getPageContent(pageKey) {
         const pageConfig = this.pages[pageKey];
         
-        // VÃ©rifier le cache
+        // Vérifier le cache
         if (pageConfig.cacheable && this.pageCache.has(pageKey)) {
             const cachedContent = this.pageCache.get(pageKey);
-            this.logDebug('navigation', `Contenu rÃ©cupÃ©rÃ© du cache: ${pageKey}`);
+            this.logDebug('navigation', `Contenu récupéré du cache: ${pageKey}`);
             return cachedContent;
         }
         
-        // GÃ©nÃ©rer le contenu
+        // Générer le contenu
         const content = await this.generatePageContent(pageKey);
         
-        // Mettre en cache si nÃ©cessaire
+        // Mettre en cache si nécessaire
         if (pageConfig.cacheable) {
             this.cachePageContent(pageKey, content);
         }
@@ -405,9 +404,9 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * GÃ©nÃ¨re le contenu d'une page
-     * @param {string} pageKey - ClÃ© de la page
-     * @returns {Promise<string>} - Contenu HTML gÃ©nÃ©rÃ©
+     * Génère le contenu d'une page
+     * @param {string} pageKey - Clé de la page
+     * @returns {Promise<string>} - Contenu HTML généré
      */
     async generatePageContent(pageKey) {
         const view = this.getView(pageKey);
@@ -418,25 +417,25 @@ class NavigationController extends BaseController {
         }
         
         try {
-            // Obtenir les donnÃ©es nÃ©cessaires
+            // Obtenir les données nécessaires
             const data = this.getPageData(pageKey);
             
-            // GÃ©nÃ©rer le contenu via la vue
+            // Générer le contenu via la vue
             const content = view.buildTemplate(data);
             
-            this.logDebug('navigation', `Contenu gÃ©nÃ©rÃ© pour: ${pageKey}`);
+            this.logDebug('navigation', `Contenu généré pour: ${pageKey}`);
             return content;
             
         } catch (error) {
-            this.logDebug('navigation', `Erreur gÃ©nÃ©ration contenu ${pageKey}: ${error.message}`);
+            this.logDebug('navigation', `Erreur génération contenu ${pageKey}: ${error.message}`);
             return this.getErrorPageContent(pageKey, error);
         }
     }
 
     /**
-     * Obtient les donnÃ©es nÃ©cessaires pour une page
-     * @param {string} pageKey - ClÃ© de la page
-     * @returns {Object} - DonnÃ©es pour la page
+     * Obtient les données nécessaires pour une page
+     * @param {string} pageKey - Clé de la page
+     * @returns {Object} - Données pour la page
      */
     getPageData(pageKey) {
         const stateModel = this.getModel('state');
@@ -444,7 +443,7 @@ class NavigationController extends BaseController {
         const instrumentModel = this.getModel('instrument');
         const playlistModel = this.getModel('playlist');
         
-        // DonnÃ©es communes Ã  toutes les pages
+        // Données communes à toutes les pages
         const commonData = {
             currentPage: pageKey,
             currentFile: stateModel.get('currentFile'),
@@ -454,7 +453,7 @@ class NavigationController extends BaseController {
             settings: stateModel.get('settings') || {}
         };
         
-        // DonnÃ©es spÃ©cifiques par page
+        // Données spécifiques par page
         switch (pageKey) {
             case 'home':
                 return {
@@ -508,8 +507,8 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * GÃ©nÃ¨re le contenu d'erreur pour une page
-     * @param {string} pageKey - ClÃ© de la page
+     * Génère le contenu d'erreur pour une page
+     * @param {string} pageKey - Clé de la page
      * @param {Error} error - Erreur optionnelle
      * @returns {string} - Contenu HTML d'erreur
      */
@@ -517,14 +516,14 @@ class NavigationController extends BaseController {
         const pageConfig = this.pages[pageKey];
         return `
             <div class="error-page" style="text-align: center; padding: 60px 20px; color: #6c757d;">
-                <div style="font-size: 4rem; margin-bottom: 20px;">âš ï¸</div>
+                <div style="font-size: 4rem; margin-bottom: 20px;">⚠️</div>
                 <h2 style="margin-bottom: 16px; color: #dc3545;">Erreur de chargement</h2>
                 <p style="margin-bottom: 20px;">
-                    La page "${pageConfig?.title || pageKey}" n'a pas pu Ãªtre chargÃ©e.
+                    La page "${pageConfig?.title || pageKey}" n'a pas pu être chargée.
                 </p>
                 ${error ? `
                     <details style="margin: 20px 0; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
-                        <summary style="cursor: pointer; color: #007bff;">DÃ©tails de l'erreur</summary>
+                        <summary style="cursor: pointer; color: #007bff;">Détails de l'erreur</summary>
                         <pre style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-top: 10px; text-align: left; overflow-x: auto;">
 ${error.message}
 ${error.stack ? '\n' + error.stack : ''}
@@ -532,10 +531,10 @@ ${error.stack ? '\n' + error.stack : ''}
                     </details>
                 ` : ''}
                 <button class="btn btn-primary" onclick="app.navigationController.refreshCurrentPage()">
-                    ðŸ”„ RÃ©essayer
+                    🔄 Réessayer
                 </button>
                 <button class="btn btn-secondary" onclick="app.navigationController.showPage('home')" style="margin-left: 10px;">
-                    ðŸ  Retour Ã  l'accueil
+                    🏠 Retour à l'accueil
                 </button>
             </div>
         `;
@@ -545,8 +544,8 @@ ${error.stack ? '\n' + error.stack : ''}
 
     /**
      * Met en cache le contenu d'une page
-     * @param {string} pageKey - ClÃ© de la page
-     * @param {string} content - Contenu Ã  mettre en cache
+     * @param {string} pageKey - Clé de la page
+     * @param {string} content - Contenu à mettre en cache
      */
     cachePageContent(pageKey, content) {
         this.pageCache.set(pageKey, content);
@@ -559,7 +558,7 @@ ${error.stack ? '\n' + error.stack : ''}
         const timeout = setTimeout(() => {
             this.pageCache.delete(pageKey);
             this.cacheTimeouts.delete(pageKey);
-            this.logDebug('navigation', `Cache expirÃ©: ${pageKey}`);
+            this.logDebug('navigation', `Cache expiré: ${pageKey}`);
         }, this.defaultCacheDuration);
         
         this.cacheTimeouts.set(pageKey, timeout);
@@ -569,7 +568,7 @@ ${error.stack ? '\n' + error.stack : ''}
 
     /**
      * Invalide le cache de certaines pages
-     * @param {Array<string>} pageKeys - Pages Ã  invalider
+     * @param {Array<string>} pageKeys - Pages à invalider
      */
     invalidatePageCache(pageKeys = []) {
         pageKeys.forEach(pageKey => {
@@ -581,7 +580,7 @@ ${error.stack ? '\n' + error.stack : ''}
                     this.cacheTimeouts.delete(pageKey);
                 }
                 
-                this.logDebug('navigation', `Cache invalidÃ©: ${pageKey}`);
+                this.logDebug('navigation', `Cache invalidé: ${pageKey}`);
             }
         });
     }
@@ -593,17 +592,17 @@ ${error.stack ? '\n' + error.stack : ''}
         this.pageCache.clear();
         this.cacheTimeouts.forEach(timeout => clearTimeout(timeout));
         this.cacheTimeouts.clear();
-        this.logDebug('navigation', 'Tout le cache a Ã©tÃ© vidÃ©');
+        this.logDebug('navigation', 'Tout le cache a été vidé');
     }
 
     // ===== HISTORIQUE DE NAVIGATION =====
 
     /**
-     * Ajoute une page Ã  l'historique
-     * @param {string} pageKey - Page Ã  ajouter
+     * Ajoute une page à l'historique
+     * @param {string} pageKey - Page à ajouter
      */
     addToHistory(pageKey) {
-        // Supprimer les entrÃ©es futures si on navigue depuis le milieu de l'historique
+        // Supprimer les entrées futures si on navigue depuis le milieu de l'historique
         this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
         
         // Ajouter la nouvelle page
@@ -619,16 +618,16 @@ ${error.stack ? '\n' + error.stack : ''}
     }
 
     /**
-     * Navigue vers la page prÃ©cÃ©dente
+     * Navigue vers la page précédente
      */
     goBack() {
         if (this.historyIndex > 0) {
             this.historyIndex--;
             const pageKey = this.navigationHistory[this.historyIndex];
             this.showPage(pageKey, { skipHistory: true, animationDirection: 'back' });
-            this.logDebug('navigation', `Navigation arriÃ¨re vers: ${pageKey}`);
+            this.logDebug('navigation', `Navigation arrière vers: ${pageKey}`);
         } else {
-            this.showNotification('Aucune page prÃ©cÃ©dente', 'info');
+            this.showNotification('Aucune page précédente', 'info');
         }
     }
 
@@ -646,25 +645,25 @@ ${error.stack ? '\n' + error.stack : ''}
         }
     }
 
-    // ===== MÃ‰THODES PUBLIQUES =====
+    // ===== MÉTHODES PUBLIQUES =====
 
     /**
-     * RafraÃ®chit la page actuelle
+     * Rafraîchit la page actuelle
      */
     refreshCurrentPage() {
         this.invalidatePageCache([this.currentPage]);
         this.showPage(this.currentPage, { forceRefresh: true });
-        this.logDebug('navigation', `Page rafraÃ®chie: ${this.currentPage}`);
+        this.logDebug('navigation', `Page rafraîchie: ${this.currentPage}`);
     }
 
     /**
-     * RafraÃ®chit une page spÃ©cifique
-     * @param {string} pageKey - Page Ã  rafraÃ®chir
+     * Rafraîchit une page spécifique
+     * @param {string} pageKey - Page à rafraîchir
      */
     refreshPageView(pageKey) {
         this.invalidatePageCache([pageKey]);
         
-        // Si c'est la page actuelle, la rafraÃ®chir
+        // Si c'est la page actuelle, la rafraîchir
         if (pageKey === this.currentPage) {
             this.refreshCurrentPage();
         }
@@ -672,15 +671,15 @@ ${error.stack ? '\n' + error.stack : ''}
 
     /**
      * Obtient la page actuelle
-     * @returns {string} - ClÃ© de la page actuelle
+     * @returns {string} - Clé de la page actuelle
      */
     getCurrentPage() {
         return this.currentPage;
     }
 
     /**
-     * VÃ©rifie si une page peut Ãªtre mise en cache
-     * @param {string} pageKey - ClÃ© de la page
+     * Vérifie si une page peut être mise en cache
+     * @param {string} pageKey - Clé de la page
      * @returns {boolean} - Page cacheable ou non
      */
     isPageCacheable(pageKey) {
@@ -688,10 +687,10 @@ ${error.stack ? '\n' + error.stack : ''}
     }
 
     /**
-     * Met Ã  jour l'interface de navigation
+     * Met à jour l'interface de navigation
      */
     updateNavigationUI() {
-        // Mettre Ã  jour les liens de navigation actifs
+        // Mettre à jour les liens de navigation actifs
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
@@ -702,7 +701,7 @@ ${error.stack ? '\n' + error.stack : ''}
             activeLink.classList.add('active');
         }
         
-        // Mettre Ã  jour le titre de la page
+        // Mettre à jour le titre de la page
         const pageConfig = this.pages[this.currentPage];
         if (pageConfig) {
             document.title = `${pageConfig.title} - MIDI Orchestrion`;
@@ -710,25 +709,25 @@ ${error.stack ? '\n' + error.stack : ''}
     }
 
     /**
-     * GÃ¨re les changements de modÃ¨le pour mise Ã  jour automatique
-     * @param {Object} data - DonnÃ©es du changement
+     * Gère les changements de modèle pour mise à jour automatique
+     * @param {Object} data - Données du changement
      */
     handleModelChange(data) {
-        // Invalider le cache des pages concernÃ©es selon le modÃ¨le modifiÃ©
+        // Invalider le cache des pages concernées selon le modèle modifié
         const cacheInvalidationMap = {
             'FileModel': ['home', 'files'],
             'InstrumentModel': ['home', 'instruments', 'keyboard'],
             'PlaylistModel': ['home', 'files'],
-            'StateModel': [this.currentPage] // Toujours rafraÃ®chir la page actuelle
+            'StateModel': [this.currentPage] // Toujours rafraîchir la page actuelle
         };
         
         const pagesToInvalidate = cacheInvalidationMap[data.model] || [];
         if (pagesToInvalidate.length > 0) {
             this.invalidatePageCache(pagesToInvalidate);
             
-            // RafraÃ®chir la page actuelle si elle est concernÃ©e
+            // Rafraîchir la page actuelle si elle est concernée
             if (pagesToInvalidate.includes(this.currentPage)) {
-                // DÃ©lai court pour Ã©viter les rafraÃ®chissements trop frÃ©quents
+                // Délai court pour éviter les rafraîchissements trop fréquents
                 clearTimeout(this.refreshTimeout);
                 this.refreshTimeout = setTimeout(() => {
                     this.refreshCurrentPage();
@@ -740,8 +739,8 @@ ${error.stack ? '\n' + error.stack : ''}
     // ===== UTILITAIRES =====
 
     /**
-     * Obtient les statistiques systÃ¨me
-     * @returns {Object} - Statistiques systÃ¨me
+     * Obtient les statistiques système
+     * @returns {Object} - Statistiques système
      */
     getSystemStats() {
         return {
@@ -753,8 +752,8 @@ ${error.stack ? '\n' + error.stack : ''}
     }
 
     /**
-     * Obtient l'Ã©tat de santÃ© du systÃ¨me
-     * @returns {string} - Ã‰tat de santÃ© (good/warning/error)
+     * Obtient l'état de santé du système
+     * @returns {string} - État de santé (good/warning/error)
      */
     getSystemHealth() {
         const fileModel = this.getModel('file');
@@ -769,7 +768,7 @@ ${error.stack ? '\n' + error.stack : ''}
     }
 
     /**
-     * Nettoie les ressources du contrÃ´leur
+     * Nettoie les ressources du contrôleur
      */
     destroy() {
         this.clearAllCache();
@@ -778,7 +777,7 @@ ${error.stack ? '\n' + error.stack : ''}
             clearTimeout(this.refreshTimeout);
         }
         
-        // Nettoyer les Ã©vÃ©nements
+        // Nettoyer les événements
         document.removeEventListener('keydown', this.keyboardHandler);
         window.removeEventListener('popstate', this.popstateHandler);
     }

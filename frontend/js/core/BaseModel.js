@@ -2,46 +2,46 @@
 // Fichier: frontend/js/core/BaseModel.js
 // Version: v3.0.2 - CORRECTED (removed ES6 imports)
 // Date: 2025-10-10
-// Projet: MidiMind v3.0 - SystÃƒÆ’Ã‚Â¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // CORRECTIONS v3.0.2:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Removed ES6 import statements (not compatible with script tags)
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Using global variables instead (EventBus, Logger, etc.)
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Compatible with non-module script loading
+// ✓ Removed ES6 import statements (not compatible with script tags)
+// ✓ Using global variables instead (EventBus, Logger, etc.)
+// ✓ Compatible with non-module script loading
 // ============================================================================
 // Description:
-//   Classe de base pour tous les modÃƒÆ’Ã‚Â¨les de donnÃƒÆ’Ã‚Â©es de l'application.
-//   Fournit la structure commune pour la gestion d'ÃƒÆ’Ã‚Â©tat, validation,
-//   persistence et ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements.
+//   Classe de base pour tous les modèles de données de l'application.
+//   Fournit la structure commune pour la gestion d'état, validation,
+//   persistence et événements.
 //
-// FonctionnalitÃƒÆ’Ã‚Â©s:
-//   - Gestion d'ÃƒÆ’Ã‚Â©tat avec get/set
-//   - Validation de donnÃƒÆ’Ã‚Â©es
+// Fonctionnalités:
+//   - Gestion d'état avec get/set
+//   - Validation de données
 //   - Persistence (localStorage/IndexedDB)
-//   - SystÃƒÆ’Ã‚Â¨me d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+//   - Système d'événements
 //   - Historique des changements
 //
 // Architecture:
 //   - Pattern Observer pour notifications
-//   - Validation dÃƒÆ’Ã‚Â©clarative avec rÃƒÆ’Ã‚Â¨gles
-//   - Storage abstrait (localStorage par dÃƒÆ’Ã‚Â©faut)
+//   - Validation déclarative avec règles
+//   - Storage abstrait (localStorage par défaut)
 // ============================================================================
 
 /**
  * @class BaseModel
- * @description Classe de base abstraite pour tous les modÃƒÆ’Ã‚Â¨les de donnÃƒÆ’Ã‚Â©es
+ * @description Classe de base abstraite pour tous les modèles de données
  */
 class BaseModel {
     /**
-     * Constructeur du modÃƒÆ’Ã‚Â¨le de base
-     * @param {Object} initialData - DonnÃƒÆ’Ã‚Â©es initiales
+     * Constructeur du modèle de base
+     * @param {Object} initialData - Données initiales
      * @param {Object} options - Options de configuration
      */
     constructor(initialData = {}, options = {}) {
-        // DonnÃƒÆ’Ã‚Â©es du modÃƒÆ’Ã‚Â¨le
+        // Données du modèle
         this.data = { ...initialData };
         
-        // MÃƒÆ’Ã‚Â©tadonnÃƒÆ’Ã‚Â©es
+        // Métadonnées
         this.meta = {
             initialized: false,
             dirty: false,
@@ -61,7 +61,7 @@ class BaseModel {
             ...options
         };
         
-        // RÃƒÆ’Ã‚Â¨gles de validation (ÃƒÆ’Ã‚Â  dÃƒÆ’Ã‚Â©finir dans les classes filles)
+        // Règles de validation (à définir dans les classes filles)
         this.validationRules = {};
         
         // Historique des changements (pour undo/redo)
@@ -72,26 +72,26 @@ class BaseModel {
         };
         
         // EventBus pour communication (global)
-        this.eventBus = window.eventBus || null;
+        this.eventBus = window.EventBus || null;
         
         // Logger (global)
-        this.logger = window.logger || console;
+        this.logger = window.Logger || console;
         
         // Timers pour debounce
         this._persistTimer = null;
         this._validationTimer = null;
         
-        if (this.logger && typeof this.logger.debug === "function") this.logger.debug(`${this.constructor.name}`, 'Model created');
+        this.logger.debug(`${this.constructor.name}`, 'Model created');
     }
 
     // ========================================================================
-    // MÃƒÆ’Ã¢â‚¬Â°THODES D'ACCÃƒÆ’Ã‹â€ S AUX DONNÃƒÆ’Ã¢â‚¬Â°ES
+    // MÉTHODES D'ACCÈS AUX DONNÉES
     // ========================================================================
 
     /**
-     * RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â¨re une valeur du modÃƒÆ’Ã‚Â¨le
-     * @param {string} key - ClÃƒÆ’Ã‚Â© ÃƒÆ’Ã‚Â  rÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â©rer (supporte notation pointÃƒÆ’Ã‚Â©e: 'user.name')
-     * @param {*} defaultValue - Valeur par dÃƒÆ’Ã‚Â©faut si non trouvÃƒÆ’Ã‚Â©e
+     * Récupère une valeur du modèle
+     * @param {string} key - Clé à récupérer (supporte notation pointée: 'user.name')
+     * @param {*} defaultValue - Valeur par défaut si non trouvée
      * @returns {*} Valeur
      */
     get(key, defaultValue = undefined) {
@@ -104,16 +104,16 @@ class BaseModel {
     }
 
     /**
-     * DÃƒÆ’Ã‚Â©finit une valeur dans le modÃƒÆ’Ã‚Â¨le
-     * @param {string} key - ClÃƒÆ’Ã‚Â© ÃƒÆ’Ã‚Â  dÃƒÆ’Ã‚Â©finir
+     * Définit une valeur dans le modèle
+     * @param {string} key - Clé à définir
      * @param {*} value - Valeur
-     * @param {boolean} silent - Si true, ne dÃƒÆ’Ã‚Â©clenche pas d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
-     * @returns {boolean} SuccÃƒÆ’Ã‚Â¨s
+     * @param {boolean} silent - Si true, ne déclenche pas d'événements
+     * @returns {boolean} Succès
      */
     set(key, value, silent = false) {
         const oldValue = this.get(key);
         
-        // Validation si activÃƒÆ’Ã‚Â©e
+        // Validation si activée
         if (this.config.validateOnSet && this.validationRules[key]) {
             if (!this.validateField(key, value)) {
                 this.logger.warn(`${this.constructor.name}`, `Validation failed for ${key}`);
@@ -126,18 +126,18 @@ class BaseModel {
             this._addToHistory(key, oldValue);
         }
         
-        // DÃƒÆ’Ã‚Â©finir la valeur
+        // Définir la valeur
         if (key.includes('.')) {
             this._setDeep(this.data, key.split('.'), value);
         } else {
             this.data[key] = value;
         }
         
-        // Mettre ÃƒÆ’Ã‚Â  jour mÃƒÆ’Ã‚Â©tadonnÃƒÆ’Ã‚Â©es
+        // Mettre à jour métadonnées
         this.meta.dirty = true;
         this.meta.lastModified = Date.now();
         
-        // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+        // Émettre événement
         if (!silent && this.eventBus) {
             this.eventBus.emit(`${this.config.eventPrefix}:changed`, {
                 key,
@@ -156,10 +156,10 @@ class BaseModel {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour plusieurs valeurs
-     * @param {Object} updates - Objet avec les mises ÃƒÆ’Ã‚Â  jour
-     * @param {boolean} silent - Si true, ne dÃƒÆ’Ã‚Â©clenche pas d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
-     * @returns {boolean} SuccÃƒÆ’Ã‚Â¨s
+     * Met à jour plusieurs valeurs
+     * @param {Object} updates - Objet avec les mises à jour
+     * @param {boolean} silent - Si true, ne déclenche pas d'événements
+     * @returns {boolean} Succès
      */
     update(updates, silent = false) {
         if (!updates || typeof updates !== 'object') {
@@ -174,7 +174,7 @@ class BaseModel {
             }
         }
         
-        // ÃƒÆ’Ã¢â‚¬Â°mettre un seul ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement pour toutes les modifications
+        // Émettre un seul événement pour toutes les modifications
         if (!silent && this.eventBus && success) {
             this.eventBus.emit(`${this.config.eventPrefix}:updated`, {
                 updates,
@@ -186,9 +186,9 @@ class BaseModel {
     }
 
     /**
-     * Supprime une clÃƒÆ’Ã‚Â©
-     * @param {string} key - ClÃƒÆ’Ã‚Â© ÃƒÆ’Ã‚Â  supprimer
-     * @returns {boolean} SuccÃƒÆ’Ã‚Â¨s
+     * Supprime une clé
+     * @param {string} key - Clé à supprimer
+     * @returns {boolean} Succès
      */
     delete(key) {
         if (!this.data.hasOwnProperty(key)) {
@@ -213,8 +213,8 @@ class BaseModel {
     }
 
     /**
-     * RÃƒÆ’Ã‚Â©initialise le modÃƒÆ’Ã‚Â¨le
-     * @param {Object} newData - Nouvelles donnÃƒÆ’Ã‚Â©es (optionnel)
+     * Réinitialise le modèle
+     * @param {Object} newData - Nouvelles données (optionnel)
      */
     reset(newData = {}) {
         const oldData = { ...this.data };
@@ -237,7 +237,7 @@ class BaseModel {
     // ========================================================================
 
     /**
-     * RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â¨re une valeur en profondeur
+     * Récupère une valeur en profondeur
      * @private
      */
     _getDeep(obj, keys, defaultValue) {
@@ -255,7 +255,7 @@ class BaseModel {
     }
 
     /**
-     * DÃƒÆ’Ã‚Â©finit une valeur en profondeur
+     * Définit une valeur en profondeur
      * @private
      */
     _setDeep(obj, keys, value) {
@@ -280,9 +280,9 @@ class BaseModel {
 
     /**
      * Valide un champ
-     * @param {string} field - Champ ÃƒÆ’Ã‚Â  valider
+     * @param {string} field - Champ à valider
      * @param {*} value - Valeur
-     * @returns {boolean} RÃƒÆ’Ã‚Â©sultat de validation
+     * @returns {boolean} Résultat de validation
      */
     validateField(field, value) {
         const rules = this.validationRules[field];
@@ -294,7 +294,7 @@ class BaseModel {
             try {
                 const result = rule(value, this.data);
                 if (result !== true) {
-                    this.meta.errors[field] = result || `Validation ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©e pour ${field}`;
+                    this.meta.errors[field] = result || `Validation échouée pour ${field}`;
                     return false;
                 }
             } catch (error) {
@@ -308,8 +308,8 @@ class BaseModel {
     }
 
     /**
-     * Valide toutes les donnÃƒÆ’Ã‚Â©es
-     * @returns {boolean} RÃƒÆ’Ã‚Â©sultat global de la validation
+     * Valide toutes les données
+     * @returns {boolean} Résultat global de la validation
      */
     validateAll() {
         this.meta.errors = {};
@@ -327,7 +327,7 @@ class BaseModel {
     }
 
     /**
-     * RÃƒÆ’Ã‚Â©cupÃƒÆ’Ã‚Â¨re les erreurs de validation
+     * Récupère les erreurs de validation
      * @returns {Object} Erreurs par champ
      */
     getErrors() {
@@ -335,8 +335,8 @@ class BaseModel {
     }
 
     /**
-     * VÃƒÆ’Ã‚Â©rifie si le modÃƒÆ’Ã‚Â¨le est valide
-     * @returns {boolean} ValiditÃƒÆ’Ã‚Â©
+     * Vérifie si le modèle est valide
+     * @returns {boolean} Validité
      */
     isValid() {
         return Object.keys(this.meta.errors).length === 0;
@@ -347,8 +347,8 @@ class BaseModel {
     // ========================================================================
 
     /**
-     * Sauvegarde les donnÃƒÆ’Ã‚Â©es
-     * @returns {Promise<boolean>} SuccÃƒÆ’Ã‚Â¨s de la sauvegarde
+     * Sauvegarde les données
+     * @returns {Promise<boolean>} Succès de la sauvegarde
      */
     async persist() {
         try {
@@ -370,7 +370,7 @@ class BaseModel {
                     JSON.stringify(dataToSave)
                 );
             } else if (this.config.storageType === 'indexedDB') {
-                // TODO: ImplÃƒÆ’Ã‚Â©menter IndexedDB
+                // TODO: Implémenter IndexedDB
                 console.warn('IndexedDB not implemented yet');
             }
             
@@ -392,8 +392,8 @@ class BaseModel {
     }
 
     /**
-     * Charge les donnÃƒÆ’Ã‚Â©es depuis le storage
-     * @returns {Promise<boolean>} SuccÃƒÆ’Ã‚Â¨s du chargement
+     * Charge les données depuis le storage
+     * @returns {Promise<boolean>} Succès du chargement
      */
     async load() {
         try {
@@ -452,7 +452,7 @@ class BaseModel {
     // ========================================================================
 
     /**
-     * Ajoute ÃƒÆ’Ã‚Â  l'historique
+     * Ajoute à l'historique
      * @private
      */
     _addToHistory(key, oldValue) {
@@ -472,8 +472,8 @@ class BaseModel {
     }
 
     /**
-     * Annuler la derniÃƒÆ’Ã‚Â¨re modification
-     * @returns {boolean} SuccÃƒÆ’Ã‚Â¨s
+     * Annuler la dernière modification
+     * @returns {boolean} Succès
      */
     undo() {
         if (this.history.past.length === 0) {
@@ -501,8 +501,8 @@ class BaseModel {
     }
 
     /**
-     * Refaire la derniÃƒÆ’Ã‚Â¨re modification annulÃƒÆ’Ã‚Â©e
-     * @returns {boolean} SuccÃƒÆ’Ã‚Â¨s
+     * Refaire la dernière modification annulée
+     * @returns {boolean} Succès
      */
     redo() {
         if (this.history.future.length === 0) {
@@ -530,11 +530,11 @@ class BaseModel {
     }
 
     // ========================================================================
-    // MÃƒÆ’Ã¢â‚¬Â°THODES UTILITAIRES
+    // MÉTHODES UTILITAIRES
     // ========================================================================
 
     /**
-     * VÃƒÆ’Ã‚Â©rifie si le modÃƒÆ’Ã‚Â¨le a ÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â© modifiÃƒÆ’Ã‚Â©
+     * Vérifie si le modèle a été modifié
      * @returns {boolean}
      */
     isDirty() {
@@ -542,14 +542,14 @@ class BaseModel {
     }
 
     /**
-     * RÃƒÆ’Ã‚Â©initialise le flag dirty
+     * Réinitialise le flag dirty
      */
     markClean() {
         this.meta.dirty = false;
     }
 
     /**
-     * Obtient toutes les donnÃƒÆ’Ã‚Â©es
+     * Obtient toutes les données
      * @returns {Object}
      */
     getData() {
@@ -557,7 +557,7 @@ class BaseModel {
     }
 
     /**
-     * Convertit le modÃƒÆ’Ã‚Â¨le en JSON
+     * Convertit le modèle en JSON
      * @returns {Object}
      */
     toJSON() {
@@ -580,11 +580,21 @@ class BaseModel {
         
         this.logger.debug(`${this.constructor.name}`, 'Model destroyed');
     }
+}
 
-    // ========================================================================
-    // MÉTHODES ADDITIONNELLES POUR STATEMODEL
-    // ========================================================================
+// ============================================================================
+// EXPORT
+// ============================================================================
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BaseModel;
+}
+
+if (typeof window !== 'undefined') {
+    window.BaseModel = BaseModel;
+}
+// Export par défaut
+window.BaseModel = BaseModel;
     /**
      * Initialise le modèle avec des données
      * @param {Object} data - Données d'initialisation
@@ -664,35 +674,6 @@ class BaseModel {
             return result;
         };
     }
-
-    /**
-     * Valide les données du modèle
-     * @returns {Object} {valid: boolean, errors: Array}
-     */
-    validate() {
-        const errors = [];
-        
-        // Vérifier si des validateurs sont définis
-        if (this.validationRules && typeof this.validationRules === 'object') {
-            for (const [key, validator] of Object.entries(this.validationRules)) {
-                const value = this.get(key);
-                
-                if (typeof validator === 'function') {
-                    const result = validator(value);
-                    if (result !== true) {
-                        errors.push(result || `Validation failed for ${key}`);
-                    }
-                }
-            }
-        }
-        
-        this.meta.errors = errors.length > 0 ? { validation: errors } : {};
-        
-        return {
-            valid: errors.length === 0,
-            errors
-        };
-    }
 }
 
 // ============================================================================
@@ -706,6 +687,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.BaseModel = BaseModel;
 }
-
-// Export par défaut
-window.BaseModel = BaseModel;

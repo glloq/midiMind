@@ -1,34 +1,35 @@
 // ============================================================================
 // Fichier: frontend/js/editor/core/Viewport.js
-// Projet: MidiMind v3.2.1 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.2.1 (ComplÃ©tÃ©e selon audit 2025-10-14)
+// Projet: MidiMind v3.2.1 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.2.1 (Complétée selon audit 2025-10-14)
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Gestion du viewport de l'Ã©diteur MIDI (zone visible, zoom, pan).
-//   ContrÃ´le ce qui est affichÃ© et comment (limites, transformations).
+//   Gestion du viewport de l'éditeur MIDI (zone visible, zoom, pan).
+//   Contrôle ce qui est affiché et comment (limites, transformations).
 //
-// FonctionnalitÃ©s:
+// Fonctionnalités:
 //   - Gestion zone visible (bounds)
 //   - Zoom in/out (molette, pinch)
-//   - Zoom sur sÃ©lection (fit selection)
-//   - Pan (dÃ©filement) horizontal/vertical
+//   - Zoom sur sélection (fit selection)
+//   - Pan (défilement) horizontal/vertical
 //   - Limites configurables (min/max zoom)
 //   - Centrage automatique (center on time/pitch)
 //   - Smooth scrolling (animation)
 //   - Sauvegarde/restore vue
 //
 // Corrections v3.2.1:
-//   âœ… getVisibleRect() - Retourne noteRange complet et correct
-//   âœ… fitToNotes() - Zoom optimal pour afficher toutes notes
-//   âœ… emitChange() - Notification changements viewport
-//   âœ… animateScroll() - Smooth scrolling avec easing
-//   âœ… Ajout focusRegion(), followPlayhead()
+//   ✅ getVisibleRect() - Retourne noteRange complet et correct
+//   ✅ fitToNotes() - Zoom optimal pour afficher toutes notes
+//   ✅ emitChange() - Notification changements viewport
+//   ✅ animateScroll() - Smooth scrolling avec easing
+//   ✅ Ajout focusRegion(), followPlayhead()
+//   ✅ Ajout pan(), setZoom()
 //
 // Architecture:
 //   Viewport (classe)
 //   - Utilise CoordinateSystem pour conversions
-//   - Ã‰met Ã©vÃ©nements sur changements (zoom, pan)
+//   - Émet événements sur changements (zoom, pan)
 //   - Animation avec requestAnimationFrame
 //
 // Auteur: MidiMind Team
@@ -66,7 +67,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Met Ã  jour les dimensions du viewport
+     * Met à jour les dimensions du viewport
      * @param {number} width - Largeur
      * @param {number} height - Hauteur
      */
@@ -91,11 +92,11 @@ class Viewport {
     }
 
     // ========================================================================
-    // VISIBILITÃ‰
+    // VISIBILITÉ
     // ========================================================================
 
     /**
-     * âœ… AMÃ‰LIORÃ‰: Obtient le rectangle visible (en coordonnÃ©es monde)
+     * ✅ AMÉLIORÉ: Obtient le rectangle visible (en coordonnées monde)
      * @returns {Object} Rectangle visible avec timeRange et noteRange complets
      */
     getVisibleRect() {
@@ -122,7 +123,7 @@ class Viewport {
     }
 
     /**
-     * VÃ©rifie si un point est visible
+     * Vérifie si un point est visible
      * @param {number} x - Position X
      * @param {number} y - Position Y
      * @returns {boolean}
@@ -132,7 +133,7 @@ class Viewport {
     }
 
     /**
-     * VÃ©rifie si un rectangle est visible
+     * Vérifie si un rectangle est visible
      * @param {Object} rect - Rectangle {x, y, width, height}
      * @returns {boolean}
      */
@@ -178,7 +179,7 @@ class Viewport {
     }
 
     /**
-     * Scroll vers un temps spÃ©cifique
+     * Scroll vers un temps spécifique
      * @param {number} timeMs - Temps en millisecondes
      * @param {boolean} animated - Animer le scroll
      */
@@ -196,8 +197,8 @@ class Viewport {
     }
 
     /**
-     * Scroll vers une note spÃ©cifique
-     * @param {number} note - NumÃ©ro MIDI
+     * Scroll vers une note spécifique
+     * @param {number} note - Numéro MIDI
      * @param {boolean} animated - Animer le scroll
      */
     scrollToNote(note, animated = false) {
@@ -214,13 +215,13 @@ class Viewport {
     }
 
     /**
-     * âœ… COMPLET: Animation de scroll smooth
+     * ✅ COMPLET: Animation de scroll smooth
      * @param {number} deltaX - Delta X en pixels
      * @param {number} deltaY - Delta Y en pixels
-     * @param {number} duration - DurÃ©e en ms
+     * @param {number} duration - Durée en ms
      */
     animateScroll(deltaX, deltaY, duration = 300) {
-        // Annuler animation prÃ©cÃ©dente
+        // Annuler animation précédente
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
         }
@@ -242,17 +243,13 @@ class Viewport {
             const newOffsetX = startOffsetX + deltaX * eased;
             const newOffsetY = startOffsetY + deltaY * eased;
             
-            // Appliquer avec limites
-            if (newOffsetX >= this.minScrollX && newOffsetX <= this.maxScrollX) {
-                this.coordSystem.offsetX = newOffsetX;
-            }
-            if (newOffsetY >= this.minScrollY && newOffsetY <= this.maxScrollY) {
-                this.coordSystem.offsetY = newOffsetY;
-            }
+            // Appliquer
+            this.coordSystem.offsetX = newOffsetX;
+            this.coordSystem.offsetY = newOffsetY;
             
             this.emitChange();
             
-            // Continuer animation si pas terminÃ©e
+            // Continuer ou terminer
             if (progress < 1) {
                 this.animationFrameId = requestAnimationFrame(animate);
             } else {
@@ -264,37 +261,28 @@ class Viewport {
         this.animationFrameId = requestAnimationFrame(animate);
     }
 
-    // ========================================================================
-    // AUTO-SCROLL (suivre la lecture)
-    // ========================================================================
-
     /**
-     * Active/dÃ©sactive l'auto-scroll
-     * @param {boolean} enabled - Activer
+     * ✅ NOUVEAU: Pan (déplacement) combiné
+     * @param {number} deltaX - Delta X
+     * @param {number} deltaY - Delta Y
      */
-    setAutoScroll(enabled) {
-        this.autoScroll = enabled;
+    pan(deltaX, deltaY) {
+        this.scrollX(-deltaX);
+        this.scrollY(-deltaY);
     }
 
     /**
-     * âœ… COMPLET: Met Ã  jour le scroll pour suivre la lecture
-     * @param {number} timeMs - Temps actuel en ms
+     * Suit automatiquement la lecture
+     * @param {number} playheadX - Position X du playhead
      */
-    followPlayhead(timeMs) {
+    followPlayhead(playheadX) {
         if (!this.autoScroll) return;
         
-        const x = this.coordSystem.timeToX(timeMs);
+        const rightEdge = this.width - this.autoScrollMargin;
         
-        // Scroll si le playhead approche du bord droit
-        if (x > this.width - this.autoScrollMargin) {
-            const deltaX = (this.width - this.autoScrollMargin) - x;
-            this.scrollX(deltaX);
-        }
-        
-        // Scroll si le playhead est hors vue Ã  gauche
-        if (x < this.autoScrollMargin) {
-            const deltaX = this.autoScrollMargin - x;
-            this.scrollX(deltaX);
+        if (playheadX > rightEdge) {
+            const delta = playheadX - rightEdge;
+            this.scrollX(-delta);
         }
     }
 
@@ -303,50 +291,34 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Zoom centrÃ© sur un point
-     * @param {number} x - Position X du centre
-     * @param {number} y - Position Y du centre
-     * @param {number} factorX - Facteur zoom horizontal
-     * @param {number} factorY - Facteur zoom vertical
+     * Zoom à une position spécifique
+     * @param {number} x - Position X
+     * @param {number} y - Position Y
+     * @param {number} factorX - Facteur zoom X
+     * @param {number} factorY - Facteur zoom Y
      */
     zoomAt(x, y, factorX, factorY) {
-        if (factorX !== 1.0) {
-            this.coordSystem.setZoomX(this.coordSystem.zoomX * factorX, x);
-        }
+        // Coordonnées monde avant zoom
+        const worldBefore = this.screenToWorld(x, y);
         
-        if (factorY !== 1.0) {
-            this.coordSystem.setZoomY(this.coordSystem.zoomY * factorY, y);
-        }
+        // Appliquer zoom
+        this.coordSystem.zoom(factorX, factorY);
+        
+        // Coordonnées monde après zoom
+        const worldAfter = this.screenToWorld(x, y);
+        
+        // Ajuster offset pour garder le point sous la souris
+        const deltaTime = worldAfter.time - worldBefore.time;
+        const deltaNote = worldAfter.note - worldBefore.note;
+        
+        this.coordSystem.offsetX += this.coordSystem.timeToX(deltaTime) - this.coordSystem.timeToX(0);
+        this.coordSystem.offsetY += this.coordSystem.noteToY(deltaNote) - this.coordSystem.noteToY(0);
         
         this.emitChange();
     }
 
     /**
-     * Zoom in
-     * @param {number} centerX - Centre X (null = centre canvas)
-     * @param {number} centerY - Centre Y (null = centre canvas)
-     */
-    zoomIn(centerX = null, centerY = null) {
-        centerX = centerX !== null ? centerX : this.width / 2;
-        centerY = centerY !== null ? centerY : this.height / 2;
-        
-        this.zoomAt(centerX, centerY, 1.2, 1.2);
-    }
-
-    /**
-     * Zoom out
-     * @param {number} centerX - Centre X
-     * @param {number} centerY - Centre Y
-     */
-    zoomOut(centerX = null, centerY = null) {
-        centerX = centerX !== null ? centerX : this.width / 2;
-        centerY = centerY !== null ? centerY : this.height / 2;
-        
-        this.zoomAt(centerX, centerY, 1 / 1.2, 1 / 1.2);
-    }
-
-    /**
-     * Zoom horizontal uniquement
+     * Zoom horizontal
      * @param {number} factor - Facteur
      * @param {number} centerX - Centre
      */
@@ -356,13 +328,49 @@ class Viewport {
     }
 
     /**
-     * Zoom vertical uniquement
+     * Zoom vertical
      * @param {number} factor - Facteur
      * @param {number} centerY - Centre
      */
     zoomVertical(factor, centerY = null) {
         centerY = centerY !== null ? centerY : this.height / 2;
         this.zoomAt(0, centerY, 1.0, factor);
+    }
+
+    /**
+     * ✅ NOUVEAU: Définit le zoom directement
+     * @param {number} zoomX - Zoom X
+     * @param {number} zoomY - Zoom Y (optionnel)
+     */
+    setZoom(zoomX, zoomY = null) {
+        this.setZoomX(zoomX);
+        if (zoomY !== null) {
+            this.setZoomY(zoomY);
+        }
+    }
+
+    /**
+     * Définit le zoom X
+     * @param {number} zoom - Niveau de zoom
+     */
+    setZoomX(zoom) {
+        this.coordSystem.zoomX = Math.max(
+            this.coordSystem.minZoomX,
+            Math.min(this.coordSystem.maxZoomX, zoom)
+        );
+        this.emitChange();
+    }
+
+    /**
+     * Définit le zoom Y
+     * @param {number} zoom - Niveau de zoom
+     */
+    setZoomY(zoom) {
+        this.coordSystem.zoomY = Math.max(
+            this.coordSystem.minZoomY,
+            Math.min(this.coordSystem.maxZoomY, zoom)
+        );
+        this.emitChange();
     }
 
     /**
@@ -378,7 +386,7 @@ class Viewport {
     // ========================================================================
 
     /**
-     * âœ… COMPLET: Ajuste la vue pour montrer toutes les notes
+     * ✅ COMPLET: Ajuste la vue pour montrer toutes les notes
      * @param {Array} notes - Liste des notes
      * @param {number} padding - Padding en pixels
      */
@@ -407,7 +415,7 @@ class Viewport {
         minNote = Math.max(0, minNote - noteMargin);
         maxNote = Math.min(127, maxNote + noteMargin);
         
-        // Calculer le zoom nÃ©cessaire
+        // Calculer le zoom nécessaire
         const timeSpan = maxTime - minTime;
         const noteSpan = maxNote - minNote + 1;
         
@@ -432,7 +440,7 @@ class Viewport {
             Math.min(this.coordSystem.maxZoomY, zoomY)
         );
         
-        // Centrer sur la rÃ©gion
+        // Centrer sur la région
         const centerTime = (minTime + maxTime) / 2;
         const centerNote = (minNote + maxNote) / 2;
         
@@ -443,15 +451,15 @@ class Viewport {
     }
 
     /**
-     * âœ… NOUVEAU: Centre sur une rÃ©gion spÃ©cifique
-     * @param {number} startTime - Temps dÃ©but
+     * ✅ NOUVEAU: Centre sur une région spécifique
+     * @param {number} startTime - Temps début
      * @param {number} endTime - Temps fin
      * @param {number} minNote - Note minimum
      * @param {number} maxNote - Note maximum
      * @param {number} padding - Padding
      */
     focusRegion(startTime, endTime, minNote, maxNote, padding = 50) {
-        // Calculer le zoom nÃ©cessaire
+        // Calculer le zoom nécessaire
         const timeSpan = endTime - startTime;
         const noteSpan = maxNote - minNote + 1;
         
@@ -490,9 +498,9 @@ class Viewport {
     // ========================================================================
 
     /**
-     * Convertit des coordonnÃ©es canvas en coordonnÃ©es monde
-     * @param {number} screenX - X Ã©cran
-     * @param {number} screenY - Y Ã©cran
+     * Convertit des coordonnées canvas en coordonnées monde
+     * @param {number} screenX - X écran
+     * @param {number} screenY - Y écran
      * @returns {Object} {time, note}
      */
     screenToWorld(screenX, screenY) {
@@ -503,7 +511,7 @@ class Viewport {
     }
 
     /**
-     * Convertit des coordonnÃ©es monde en coordonnÃ©es canvas
+     * Convertit des coordonnées monde en coordonnées canvas
      * @param {number} time - Temps
      * @param {number} note - Note
      * @returns {Object} {x, y}
@@ -522,14 +530,14 @@ class Viewport {
     /**
      * Fonction d'easing cubic
      * @param {number} t - Progress (0-1)
-     * @returns {number} Valeur easÃ©e
+     * @returns {number} Valeur easée
      */
     easeInOutCubic(t) {
         return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
 
     /**
-     * âœ… COMPLET: Ã‰met un Ã©vÃ©nement de changement
+     * ✅ COMPLET: Émet un événement de changement
      */
     emitChange() {
         if (this.onViewChanged) {
@@ -556,8 +564,8 @@ class Viewport {
     }
 
     /**
-     * SÃ©rialise l'Ã©tat
-     * @returns {Object} Ã‰tat sÃ©rialisÃ©
+     * Sérialise l'état
+     * @returns {Object} État sérialisé
      */
     serialize() {
         return {
@@ -569,8 +577,8 @@ class Viewport {
     }
 
     /**
-     * Restaure l'Ã©tat
-     * @param {Object} data - DonnÃ©es sÃ©rialisÃ©es
+     * Restaure l'état
+     * @param {Object} data - Données sérialisées
      */
     deserialize(data) {
         this.width = data.width;
@@ -592,23 +600,6 @@ class Viewport {
         
         this.onViewChanged = null;
     }
-
-    // ========================================================================
-    // MÉTHODES MANQUANTES AJOUTÉES v3.1.0
-    // ========================================================================
-    
-    pan(deltaX, deltaY) {
-        this.scrollX(-deltaX);
-        this.scrollY(-deltaY);
-    }
-    
-    setZoom(zoomX, zoomY = null) {
-        this.setZoomX(zoomX);
-        if (zoomY !== null) {
-            this.setZoomY(zoomY);
-        }
-    }
-
 }
 
 // ============================================================================

@@ -1,28 +1,28 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PerformanceController.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   ContrÃ´leur de monitoring et optimisation des performances de l'application.
-//   Mesure FPS, latence, utilisation mÃ©moire, et dÃ©clenche alertes si dÃ©gradation.
+//   Contrôleur de monitoring et optimisation des performances de l'application.
+//   Mesure FPS, latence, utilisation mémoire, et déclenche alertes si dégradation.
 //
-// FonctionnalitÃ©s:
-//   - Monitoring FPS temps rÃ©el
-//   - Mesure latence MIDI (input â†’ output)
-//   - Utilisation mÃ©moire (heap size)
+// Fonctionnalités:
+//   - Monitoring FPS temps réel
+//   - Mesure latence MIDI (input → output)
+//   - Utilisation mémoire (heap size)
 //   - Temps de rendu Canvas
-//   - DÃ©tection ralentissements (frame drops)
-//   - Alertes automatiques si seuils dÃ©passÃ©s
+//   - Détection ralentissements (frame drops)
+//   - Alertes automatiques si seuils dépassés
 //   - Logs de performance
 //   - Suggestions d'optimisation
 //
 // Architecture:
 //   PerformanceController extends BaseController
 //   - Utilise PerformanceMonitor (utils/)
-//   - Sampling pÃ©riodique (requestAnimationFrame)
-//   - Historique mÃ©triques (buffer circulaire)
+//   - Sampling périodique (requestAnimationFrame)
+//   - Historique métriques (buffer circulaire)
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -45,7 +45,7 @@
                     this.recordRenderTime(data.view, Date.now());
                 });
                 
-                // Intercepter tous les Ã©vÃ©nements pour compter
+                // Intercepter tous les événements pour compter
                 const originalEmit = this.eventBus.emit;
                 this.eventBus.emit = (event, data) => {
                     this.recordEvent(event);
@@ -76,7 +76,7 @@
                     this.collectMetrics();
                 }, 10000);
                 
-                // Nettoyage pÃ©riodique
+                // Nettoyage périodique
                 setInterval(() => {
                     this.cleanupMetrics();
                 }, 60000);
@@ -92,13 +92,13 @@
                         limit: memory.jsHeapSizeLimit
                     });
                     
-                    // Garder seulement les 60 derniÃ¨res mesures (10 minutes)
+                    // Garder seulement les 60 dernières mesures (10 minutes)
                     if (this.metrics.memoryUsage.length > 60) {
                         this.metrics.memoryUsage = this.metrics.memoryUsage.slice(-60);
                     }
                 }
                 
-                // DÃ©tecter les problÃ¨mes de performance
+                // Détecter les problèmes de performance
                 this.detectPerformanceIssues();
             }
 
@@ -107,13 +107,13 @@
                 const avgRenderTime = recentRenders.reduce((sum, r) => sum + r.duration, 0) / recentRenders.length;
                 
                 if (avgRenderTime > 100) { // Plus de 100ms
-                    this.logDebug('system', `Performance dÃ©gradÃ©e: rendu moyen ${avgRenderTime.toFixed(1)}ms`);
+                    this.logDebug('system', `Performance dégradée: rendu moyen ${avgRenderTime.toFixed(1)}ms`);
                 }
                 
-                // VÃ©rifier l'usage mÃ©moire
+                // Vérifier l'usage mémoire
                 const lastMemory = this.metrics.memoryUsage[this.metrics.memoryUsage.length - 1];
                 if (lastMemory && lastMemory.used > lastMemory.total * 0.8) {
-                    this.logDebug('system', 'Usage mÃ©moire Ã©levÃ© dÃ©tectÃ©');
+                    this.logDebug('system', 'Usage mémoire élevé détecté');
                 }
             }
 
@@ -146,44 +146,44 @@
                 const last = recent[recent.length - 1].used;
                 
                 if (last > first * 1.1) return 'Croissant';
-                if (last < first * 0.9) return 'DÃ©croissant';
+                if (last < first * 0.9) return 'Décroissant';
                 return 'Stable';
             }
 
             optimizePerformance() {
-                // Nettoyer les mÃ©triques anciennes
+                // Nettoyer les métriques anciennes
                 this.cleanupMetrics();
                 
                 // Forcer le garbage collection si disponible
                 if (window.gc) {
                     window.gc();
-                    this.logDebug('system', 'Garbage collection forcÃ©');
+                    this.logDebug('system', 'Garbage collection forcé');
                 }
                 
-                // Optimiser les Ã©vÃ©nements
+                // Optimiser les événements
                 this.debounceEvents();
                 
-                this.logDebug('system', 'Optimisation des performances effectuÃ©e');
-                this.showNotification('Performances optimisÃ©es', 'success');
+                this.logDebug('system', 'Optimisation des performances effectuée');
+                this.showNotification('Performances optimisées', 'success');
             }
 
             cleanupMetrics() {
-                // Nettoyer les mÃ©triques anciennes
+                // Nettoyer les métriques anciennes
                 const now = Date.now();
                 const oneHourAgo = now - 3600000;
                 
                 this.metrics.renderTimes = this.metrics.renderTimes.filter(r => r.time > oneHourAgo);
                 this.metrics.memoryUsage = this.metrics.memoryUsage.filter(m => m.time > oneHourAgo);
                 
-                // RÃ©initialiser les compteurs d'Ã©vÃ©nements pÃ©riodiquement
+                // Réinitialiser les compteurs d'événements périodiquement
                 if (Object.keys(this.metrics.eventCounts).length > 100) {
                     this.metrics.eventCounts = {};
                 }
             }
 
             debounceEvents() {
-                // ImplÃ©menter un debouncing pour les Ã©vÃ©nements frÃ©quents
-                // Cette mÃ©thode pourrait Ãªtre Ã©tendue selon les besoins
+                // Implémenter un debouncing pour les événements fréquents
+                // Cette méthode pourrait être étendue selon les besoins
             }
 
             formatDuration(seconds) {
