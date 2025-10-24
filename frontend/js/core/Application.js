@@ -286,10 +286,10 @@ class Application {
             this.views.home = new HomeView('home', eventBus);
         }
         
-        // FileView
-        if (window.FileView) {
-            this.views.file = new FileView('file-manager', eventBus);
-        }
+        // FileView - Skip: no container in HTML
+        // if (window.FileView) {
+        //     this.views.file = new FileView('file-manager', eventBus);
+        // }
         
         // InstrumentView
         if (window.InstrumentView) {
@@ -439,11 +439,6 @@ class Application {
      */
     async initNavigation() {
         console.log('🧭 Initializing navigation...');
-        
-        // Router global si disponible
-        if (window.Router && typeof window.Router === 'function') {
-            this.router = new Router(this.eventBus, this.logger);
-        }
         
         // Gérer le hash pour la navigation
         window.addEventListener('hashchange', () => {
