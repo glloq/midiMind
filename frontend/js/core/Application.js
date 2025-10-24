@@ -283,53 +283,32 @@ class Application {
         
         // HomeView
         if (window.HomeView) {
-            this.views.home = new HomeView(
-                this.models.file,
-                this.models.playlist,
-                eventBus,
-                logger
-            );
+            this.views.home = new HomeView('home', eventBus);
         }
         
         // FileView
         if (window.FileView) {
-            this.views.file = new FileView(
-                this.models.file,
-                eventBus,
-                logger
-            );
+            this.views.file = new FileView('file-manager', eventBus);
         }
         
         // InstrumentView
         if (window.InstrumentView) {
-            this.views.instrument = new InstrumentView(
-                this.models.instrument,
-                eventBus,
-                logger
-            );
+            this.views.instrument = new InstrumentView('instruments', eventBus);
         }
         
         // KeyboardView
         if (window.KeyboardView) {
-            this.views.keyboard = new KeyboardView(eventBus, logger);
+            this.views.keyboard = new KeyboardView('keyboard', eventBus);
         }
         
         // SystemView
         if (window.SystemView) {
-            this.views.system = new SystemView(
-                this.models.system,
-                eventBus,
-                logger
-            );
+            this.views.system = new SystemView('system', eventBus);
         }
         
         // EditorView
         if (window.EditorView) {
-            this.views.editor = new EditorView(
-                this.models.editor,
-                eventBus,
-                logger
-            );
+            this.views.editor = new EditorView('editor', eventBus);
         }
         
         this.logger.info('Application', '✓ Views initialized');
