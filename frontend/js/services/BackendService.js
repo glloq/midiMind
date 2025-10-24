@@ -13,7 +13,8 @@
 // ============================================================================
 
 class BackendService {
-    constructor(eventBus, logger) {
+class BackendService {
+    constructor(url, eventBus, logger) {
         this.eventBus = eventBus;
         this.logger = logger || console;
         
@@ -24,7 +25,7 @@ class BackendService {
         
         // Configuration
         this.config = {
-            url: 'ws://localhost:8080',
+            url: url || 'ws://localhost:8080',
             reconnectInterval: 3000,
             maxReconnectInterval: 30000,
             reconnectDecay: 1.5,
