@@ -1,8 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/KeyboardView.js
-// Version: v3.1.0 - MONITOR MODE
-// Date: 2025-10-16
+// Version: v3.1.1 - CORRECTED DEVICES INITIALIZATION
+// Date: 2025-10-24
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// CORRECTIONS v3.1.1:
+// ✅ Fixed renderInstrumentSelector: added fallback for this.devices
+// ✅ Prevents "can't access property 'map', this.devices is undefined" error
+// ✅ Robust initialization with devices fallback to empty array
 // ============================================================================
 // MODIFICATIONS v3.1.0:
 // ✓ Mode monitor activé (affichage + playback uniquement)
@@ -109,12 +114,14 @@ class KeyboardView extends BaseView {
     }
     
     renderInstrumentSelector() {
+        const devices = this.devices || [];
+        
         return `
             <div class="control-group">
                 <label>Instrument</label>
                 <select id="instrument-select" class="instrument-select">
                     <option value="">-- Sélectionner instrument --</option>
-                    ${this.devices.map(device => `
+                    ${devices.map(device => `
                         <option value="${device.id}" 
                                 ${device.id === this.selectedInstrument ? 'selected' : ''}>
                             ${device.name || device.id}
