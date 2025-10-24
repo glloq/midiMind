@@ -328,7 +328,7 @@ class Application {
         
         // NavigationController
         if (window.NavigationController) {
-            this.controllers.navigation = new NavigationController(eventBus, logger);
+            this.controllers.navigation = new NavigationController(eventBus, this.models, this.views, this.notifications, this.debugConsole);
         }
         
         // FileController
