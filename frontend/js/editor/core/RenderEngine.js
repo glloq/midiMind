@@ -485,9 +485,13 @@ class RenderEngine {
     }
     
     logDebug(category, message, level = 'info') {
-        if (this.debugConsole) {
-            this.debugConsole.log(category, message, level);
+        // Protection : debugConsole.log() n'existe pas
+        if (this.debugConsole && typeof this.debugConsole.debug === 'function') {
+            this.debugConsole.debug(category, message);
+        } else if (window.logger && typeof window.logger.debug === 'function') {
+            window.logger.debug('RenderEngine', message);
         }
+        // Silencieux si aucune méthode disponible
     }
     
     // ========================================================================
