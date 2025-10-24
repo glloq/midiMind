@@ -166,11 +166,6 @@ const MidiUtils = {
         if (noteIndex === -1) return null;
         
         return (parseInt(octave) + 1) * 12 + noteIndex;
-    },
-    
-    isBlackKey2(midiNote) {
-        const noteName = this.getNoteName(midiNote);
-        return noteName.includes('#');
     }
 };
 

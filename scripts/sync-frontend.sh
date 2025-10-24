@@ -1,22 +1,19 @@
 #!/bin/bash
 # ============================================================================
-# Script: sync-frontend.sh
-# Version: v1.3 - FIX EDITOR FOLDER SYNC
-# Description: Synchronise le frontend depuis le repo vers www après git pull
-# Usage: ./sync-frontend.sh
-# ============================================================================
-# CORRECTIONS v1.3:
-# ✅ AJOUT de la synchronisation du dossier js/editor/ (CRITIQUE)
-# ✅ Correction de la structure complète
+# Script: sync-frontend-complete.sh
+# Version: v2.0 - STRUCTURE COMPLÈTE NON-PLATE
+# Description: Synchronise TOUT le frontend depuis GitHub avec structure complète
+# Usage: ./sync-frontend-complete.sh
 # ============================================================================
 
-# Couleurs pour les messages
+# Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
 # Chemins
 REPO_DIR="$HOME/midiMind"
@@ -25,15 +22,15 @@ WWW_DEST="/var/www/midimind"
 BACKUP_DIR="$HOME/backups/midimind"
 
 # ============================================================================
-# FONCTIONS
+# FONCTIONS UTILITAIRES
 # ============================================================================
 
 print_header() {
     echo -e "${BLUE}"
-    echo "╔════════════════════════════════════════════════════════╗"
-    echo "║         MidiMind Frontend Sync Script v1.3            ║"
-    echo "║              (Editor Folder Fix)                      ║"
-    echo "╚════════════════════════════════════════════════════════╝"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║     MidiMind Frontend Complete Sync v2.0                   ║"
+    echo "║     Structure Non-Plate - Tous les fichiers               ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
@@ -57,431 +54,456 @@ print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
+# ============================================================================
+# VÉRIFICATIONS
+# ============================================================================
+
 check_directories() {
-    print_step "Checking directories..."
+    print_step "Vérification des répertoires..."
     
     if [ ! -d "$REPO_DIR" ]; then
-        print_error "Repository directory not found: $REPO_DIR"
+        print_error "Répertoire repo introuvable: $REPO_DIR"
         exit 1
     fi
     
     if [ ! -d "$FRONTEND_SRC" ]; then
-        print_error "Frontend source not found: $FRONTEND_SRC"
+        print_error "Source frontend introuvable: $FRONTEND_SRC"
         exit 1
     fi
     
     if [ ! -d "$WWW_DEST" ]; then
-        print_error "WWW destination not found: $WWW_DEST"
-        print_step "Creating destination directory..."
+        print_warning "Destination introuvable, création..."
         sudo mkdir -p "$WWW_DEST"
         sudo chown -R $USER:www-data "$WWW_DEST"
     fi
     
-    print_success "All directories OK"
+    print_success "Répertoires OK"
 }
 
-fix_git_permissions_complete() {
-    print_step "Performing COMPLETE Git permissions repair..."
+# ============================================================================
+# GIT PERMISSIONS
+# ============================================================================
+
+fix_git_permissions() {
+    print_step "Réparation des permissions Git..."
     
     cd "$REPO_DIR" || exit 1
     
-    # Vérifier si le dossier .git existe
     if [ ! -d ".git" ]; then
-        print_error "Not a git repository: $REPO_DIR"
+        print_error "Pas un dépôt Git: $REPO_DIR"
         exit 1
     fi
     
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${MAGENTA}    RÉPARATION COMPLÈTE DES PERMISSIONS GIT${NC}"
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
     CURRENT_USER=$(whoami)
     
-    # 1. Réparer TOUT le dossier .git récursivement
-    print_info "Fixing ownership of entire .git directory..."
+    # Réparer ownership
     sudo chown -R $CURRENT_USER:$CURRENT_USER .git/
     
-    # 2. Réparer les permissions des dossiers
-    print_info "Fixing directory permissions..."
+    # Permissions directories
     sudo find .git -type d -exec chmod 755 {} \;
     
-    # 3. Réparer les permissions des fichiers
-    print_info "Fixing file permissions..."
+    # Permissions fichiers
     sudo find .git -type f -exec chmod 644 {} \;
     
-    # 4. Fichiers spécifiques qui doivent être exécutables
-    print_info "Setting executable permissions for hooks..."
+    # Hooks exécutables
     if [ -d ".git/hooks" ]; then
         sudo chmod -R 755 .git/hooks/
     fi
     
-    # 5. Réparer spécifiquement les fichiers de contrôle Git critiques
-    print_info "Fixing critical Git control files..."
-    CRITICAL_FILES=(
-        ".git/HEAD"
-        ".git/FETCH_HEAD"
-        ".git/ORIG_HEAD"
-        ".git/config"
-        ".git/description"
-        ".git/index"
-        ".git/packed-refs"
-    )
-    
-    for file in "${CRITICAL_FILES[@]}"; do
-        if [ -f "$file" ]; then
-            sudo chown $CURRENT_USER:$CURRENT_USER "$file"
-            sudo chmod 644 "$file"
-            echo "    ✓ Fixed: $file"
-        fi
-    done
-    
-    # 6. Réparer les dossiers critiques
-    print_info "Fixing critical Git directories..."
-    CRITICAL_DIRS=(
-        ".git/objects"
-        ".git/refs"
-        ".git/refs/heads"
-        ".git/refs/remotes"
-        ".git/refs/tags"
-        ".git/logs"
-        ".git/logs/refs"
-        ".git/info"
-        ".git/hooks"
-    )
-    
-    for dir in "${CRITICAL_DIRS[@]}"; do
-        if [ -d "$dir" ]; then
-            sudo chown -R $CURRENT_USER:$CURRENT_USER "$dir"
-            sudo chmod -R u+rwX "$dir"
-            echo "    ✓ Fixed: $dir"
-        fi
-    done
-    
-    # 7. Nettoyer les locks s'ils existent
-    print_info "Removing stale lock files..."
+    # Supprimer locks
     sudo rm -f .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock 2>/dev/null
     
-    # 8. Vérifier l'état final
-    print_step "Verifying Git repository state..."
-    
+    # Vérifier état
     if git status &>/dev/null; then
-        print_success "Git repository is healthy"
+        print_success "Permissions Git réparées"
     else
-        print_warning "Git repository may have issues, attempting repair..."
-        git fsck --full 2>&1 | grep -E "(error|warning)" || true
-        
-        if ! git status &>/dev/null; then
-            print_error "Unable to repair git repository"
-            print_info "You may need to:"
-            echo "  1. Run: cd $REPO_DIR && git reset --hard HEAD"
-            echo "  2. Or re-clone the repository"
-            exit 1
-        fi
+        print_error "Problème avec le dépôt Git"
+        exit 1
     fi
-    
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    print_success "Git permissions completely repaired"
-    echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
+# ============================================================================
+# BACKUP
+# ============================================================================
+
 create_backup() {
-    print_step "Creating backup..."
+    print_step "Création du backup..."
     
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     BACKUP_PATH="$BACKUP_DIR/backup_$TIMESTAMP"
     
     mkdir -p "$BACKUP_DIR"
     
-    if [ -d "$WWW_DEST/js" ]; then
-        cp -r "$WWW_DEST/js" "$BACKUP_PATH"
-        print_success "Backup created: $BACKUP_PATH"
+    if [ -d "$WWW_DEST/js" ] || [ -d "$WWW_DEST/styles" ]; then
+        mkdir -p "$BACKUP_PATH"
+        [ -d "$WWW_DEST/js" ] && cp -r "$WWW_DEST/js" "$BACKUP_PATH/"
+        [ -d "$WWW_DEST/styles" ] && cp -r "$WWW_DEST/styles" "$BACKUP_PATH/"
+        [ -f "$WWW_DEST/index.html" ] && cp "$WWW_DEST/index.html" "$BACKUP_PATH/"
+        print_success "Backup créé: $BACKUP_PATH"
     else
-        print_info "No existing files to backup"
+        print_info "Aucun fichier à sauvegarder"
     fi
 }
 
+# ============================================================================
+# GIT PULL
+# ============================================================================
+
 git_pull() {
-    print_step "Pulling latest changes from GitHub..."
+    print_step "Pull des dernières modifications GitHub..."
     
     cd "$REPO_DIR" || exit 1
     
-    # Sauvegarder la branche actuelle
     CURRENT_BRANCH=$(git branch --show-current)
+    echo -e "${BLUE}Branche: $CURRENT_BRANCH${NC}"
     
-    # Afficher l'état avant le pull
-    echo -e "${BLUE}Current branch: $CURRENT_BRANCH${NC}"
-    
-    # Vérifier s'il y a des changements locaux
+    # Stash changements locaux si nécessaire
     if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-        print_warning "Local changes detected"
-        
-        # Lister les fichiers modifiés
-        echo -e "${BLUE}Modified files:${NC}"
+        print_warning "Changements locaux détectés"
         git status --short
         
-        print_step "Stashing local changes..."
-        if git stash push -m "Auto-stash before sync $(date +%Y%m%d_%H%M%S)"; then
-            print_success "Local changes stashed"
-        else
-            print_error "Failed to stash changes"
-            print_info "Attempting to continue anyway..."
+        if git stash push -m "Auto-stash $(date +%Y%m%d_%H%M%S)"; then
+            print_success "Changements stashés"
         fi
     fi
     
     # Pull avec retry
     PULL_SUCCESS=0
     for i in {1..3}; do
-        echo -e "${BLUE}Pull attempt $i/3...${NC}"
+        echo -e "${CYAN}Tentative $i/3...${NC}"
         
         if git pull origin "$CURRENT_BRANCH" 2>&1; then
             PULL_SUCCESS=1
             break
         else
-            print_warning "Pull attempt $i failed"
+            print_warning "Échec tentative $i"
             
             if [ $i -lt 3 ]; then
-                print_step "Checking permissions again..."
-                
-                # Vérifier si c'est un problème de permissions
-                if [ ! -w ".git/FETCH_HEAD" ] 2>/dev/null; then
-                    print_warning "FETCH_HEAD permission issue detected"
-                    print_step "Attempting emergency repair..."
-                    sudo chown $USER:$USER .git/FETCH_HEAD 2>/dev/null
-                    sudo chmod 644 .git/FETCH_HEAD 2>/dev/null
-                fi
-                
-                print_step "Retrying in 2 seconds..."
                 sleep 2
+                fix_git_permissions
             fi
         fi
     done
     
     if [ $PULL_SUCCESS -eq 0 ]; then
-        print_error "Git pull failed after 3 attempts"
-        print_step "Diagnostics:"
-        
-        # Diagnostic détaillé
-        echo -e "${BLUE}Git status:${NC}"
-        git status || true
-        
-        echo -e "${BLUE}Git remote:${NC}"
-        git remote -v || true
-        
-        echo -e "${BLUE}Network test:${NC}"
-        if ping -c 1 github.com &>/dev/null; then
-            print_success "Network connection OK"
-        else
-            print_error "Cannot reach github.com - check your internet connection"
-        fi
-        
-        # Proposer une solution
-        echo ""
-        print_info "Possible solutions:"
-        echo "  1. Run: cd $REPO_DIR && git reset --hard HEAD"
-        echo "  2. Run: cd $REPO_DIR && git fetch origin && git reset --hard origin/$CURRENT_BRANCH"
-        echo "  3. Re-run this script"
-        
+        print_error "Échec du git pull après 3 tentatives"
         exit 1
     fi
     
-    print_success "Git pull successful"
+    print_success "Git pull réussi"
     
-    # Afficher les derniers commits
-    echo -e "${BLUE}Last 3 commits:${NC}"
+    # Derniers commits
+    echo -e "${BLUE}Derniers commits:${NC}"
     git log --oneline -3 --color=always
-    
-    # Afficher les fichiers modifiés
-    if git diff --name-status HEAD@{1} HEAD &>/dev/null; then
-        echo -e "${BLUE}Modified files in this pull:${NC}"
-        git diff --name-status HEAD@{1} HEAD | head -n 10
-    fi
 }
 
-sync_files() {
-    print_step "Synchronizing files..."
+# ============================================================================
+# SYNCHRONISATION COMPLÈTE
+# ============================================================================
+
+sync_complete_structure() {
+    print_step "Synchronisation de la structure complète..."
     
-    # Créer la structure de destination si nécessaire
-    sudo mkdir -p "$WWW_DEST/js/"{core,models,views,controllers,utils,services,editor}
-    sudo mkdir -p "$WWW_DEST/css"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}   CRÉATION DE LA STRUCTURE COMPLÈTE${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    # Créer TOUTE la structure de dossiers
+    print_info "Création des dossiers..."
+    
+    # Structure JS complète
+    sudo mkdir -p "$WWW_DEST/js"/{audio,config,controllers,core,editor,models,monitoring,services,ui,utils,views}
+    
+    # Sous-dossiers editor
+    sudo mkdir -p "$WWW_DEST/js/editor"/{components,core,interaction,renderers,utils}
+    
+    # Sous-dossier views/components
+    sudo mkdir -p "$WWW_DEST/js/views/components"
+    
+    # Dossier styles
     sudo mkdir -p "$WWW_DEST/styles"
     
-    # Compteur de fichiers synchronisés
-    SYNC_COUNT=0
+    print_success "Structure créée"
     
-    # Synchroniser les fichiers JS
-    echo "  → Syncing core files..."
-    if [ -d "$FRONTEND_SRC/js/core" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/core/" "$WWW_DEST/js/core/" | grep -v "/$" | wc -l
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/core" -type f | wc -l)))
-    fi
+    # ========================================================================
+    # SYNCHRONISATION PAR CATÉGORIE
+    # ========================================================================
     
-    # ✅ AJOUT CRITIQUE : Synchroniser le dossier editor
-    echo "  → Syncing editor files... (CRITICAL)"
-    if [ -d "$FRONTEND_SRC/js/editor" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/editor/" "$WWW_DEST/js/editor/" | grep -v "/$" | wc -l
-        EDITOR_COUNT=$(find "$WWW_DEST/js/editor" -type f | wc -l)
-        SYNC_COUNT=$((SYNC_COUNT + EDITOR_COUNT))
-        print_success "Editor files synced: $EDITOR_COUNT files"
-    else
-        print_warning "Editor folder not found in source!"
-    fi
+    TOTAL_FILES=0
     
-    echo "  → Syncing models..."
-    if [ -d "$FRONTEND_SRC/js/models" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/models/" "$WWW_DEST/js/models/" > /dev/null
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/models" -type f | wc -l)))
-    fi
-    
-    echo "  → Syncing views..."
-    if [ -d "$FRONTEND_SRC/js/views" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/views/" "$WWW_DEST/js/views/" > /dev/null
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/views" -type f | wc -l)))
-    fi
-    
-    echo "  → Syncing controllers..."
-    if [ -d "$FRONTEND_SRC/js/controllers" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/controllers/" "$WWW_DEST/js/controllers/" > /dev/null
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/controllers" -type f | wc -l)))
-    fi
-    
-    echo "  → Syncing utils..."
-    if [ -d "$FRONTEND_SRC/js/utils" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/utils/" "$WWW_DEST/js/utils/" > /dev/null
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/utils" -type f | wc -l)))
-    fi
-    
-    echo "  → Syncing services..."
-    if [ -d "$FRONTEND_SRC/js/services" ]; then
-        sudo rsync -av --delete "$FRONTEND_SRC/js/services/" "$WWW_DEST/js/services/" > /dev/null
-        SYNC_COUNT=$((SYNC_COUNT + $(find "$WWW_DEST/js/services" -type f | wc -l)))
-    fi
-    
-    # Synchroniser index.html et main.js
+    # index.html
     if [ -f "$FRONTEND_SRC/index.html" ]; then
-        echo "  → Syncing index.html..."
+        echo -e "${CYAN}→${NC} index.html"
         sudo cp "$FRONTEND_SRC/index.html" "$WWW_DEST/"
+        ((TOTAL_FILES++))
     fi
     
+    # main.js
     if [ -f "$FRONTEND_SRC/js/main.js" ]; then
-        echo "  → Syncing main.js..."
+        echo -e "${CYAN}→${NC} main.js"
         sudo cp "$FRONTEND_SRC/js/main.js" "$WWW_DEST/js/"
+        ((TOTAL_FILES++))
     fi
     
-    # Synchroniser CSS depuis les deux emplacements possibles
-    if [ -d "$FRONTEND_SRC/css" ]; then
-        echo "  → Syncing CSS files (from css/)..."
-        sudo rsync -av --delete "$FRONTEND_SRC/css/" "$WWW_DEST/css/" > /dev/null
+    # Audio
+    if [ -d "$FRONTEND_SRC/js/audio" ]; then
+        echo -e "${CYAN}→${NC} audio/"
+        COUNT=$(find "$FRONTEND_SRC/js/audio" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/audio/" "$WWW_DEST/js/audio/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
     fi
     
+    # Config
+    if [ -d "$FRONTEND_SRC/js/config" ]; then
+        echo -e "${CYAN}→${NC} config/"
+        COUNT=$(find "$FRONTEND_SRC/js/config" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/config/" "$WWW_DEST/js/config/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Controllers
+    if [ -d "$FRONTEND_SRC/js/controllers" ]; then
+        echo -e "${CYAN}→${NC} controllers/"
+        COUNT=$(find "$FRONTEND_SRC/js/controllers" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/controllers/" "$WWW_DEST/js/controllers/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Core
+    if [ -d "$FRONTEND_SRC/js/core" ]; then
+        echo -e "${CYAN}→${NC} core/"
+        COUNT=$(find "$FRONTEND_SRC/js/core" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/core/" "$WWW_DEST/js/core/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Editor (STRUCTURE COMPLÈTE)
+    if [ -d "$FRONTEND_SRC/js/editor" ]; then
+        echo -e "${CYAN}→${NC} editor/ (STRUCTURE COMPLÈTE)"
+        
+        # Sous-dossiers editor
+        for subdir in components core interaction renderers utils; do
+            if [ -d "$FRONTEND_SRC/js/editor/$subdir" ]; then
+                COUNT=$(find "$FRONTEND_SRC/js/editor/$subdir" -type f | wc -l)
+                sudo rsync -a --delete "$FRONTEND_SRC/js/editor/$subdir/" "$WWW_DEST/js/editor/$subdir/"
+                TOTAL_FILES=$((TOTAL_FILES + COUNT))
+                echo "  ✓ editor/$subdir: $COUNT fichiers"
+            fi
+        done
+    fi
+    
+    # Models
+    if [ -d "$FRONTEND_SRC/js/models" ]; then
+        echo -e "${CYAN}→${NC} models/"
+        COUNT=$(find "$FRONTEND_SRC/js/models" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/models/" "$WWW_DEST/js/models/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Monitoring
+    if [ -d "$FRONTEND_SRC/js/monitoring" ]; then
+        echo -e "${CYAN}→${NC} monitoring/"
+        COUNT=$(find "$FRONTEND_SRC/js/monitoring" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/monitoring/" "$WWW_DEST/js/monitoring/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Services
+    if [ -d "$FRONTEND_SRC/js/services" ]; then
+        echo -e "${CYAN}→${NC} services/"
+        COUNT=$(find "$FRONTEND_SRC/js/services" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/services/" "$WWW_DEST/js/services/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # UI
+    if [ -d "$FRONTEND_SRC/js/ui" ]; then
+        echo -e "${CYAN}→${NC} ui/"
+        COUNT=$(find "$FRONTEND_SRC/js/ui" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/ui/" "$WWW_DEST/js/ui/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Utils
+    if [ -d "$FRONTEND_SRC/js/utils" ]; then
+        echo -e "${CYAN}→${NC} utils/"
+        COUNT=$(find "$FRONTEND_SRC/js/utils" -type f | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/js/utils/" "$WWW_DEST/js/utils/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers"
+    fi
+    
+    # Views (avec components)
+    if [ -d "$FRONTEND_SRC/js/views" ]; then
+        echo -e "${CYAN}→${NC} views/"
+        
+        # Fichiers racine views
+        COUNT_ROOT=$(find "$FRONTEND_SRC/js/views" -maxdepth 1 -type f | wc -l)
+        sudo rsync -a --delete --exclude='components/' "$FRONTEND_SRC/js/views/" "$WWW_DEST/js/views/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT_ROOT))
+        echo "  ✓ views racine: $COUNT_ROOT fichiers"
+        
+        # Sous-dossier components
+        if [ -d "$FRONTEND_SRC/js/views/components" ]; then
+            COUNT_COMP=$(find "$FRONTEND_SRC/js/views/components" -type f | wc -l)
+            sudo rsync -a --delete "$FRONTEND_SRC/js/views/components/" "$WWW_DEST/js/views/components/"
+            TOTAL_FILES=$((TOTAL_FILES + COUNT_COMP))
+            echo "  ✓ views/components: $COUNT_COMP fichiers"
+        fi
+    fi
+    
+    # Styles (tous les CSS)
     if [ -d "$FRONTEND_SRC/styles" ]; then
-        echo "  → Syncing CSS files (from styles/)..."
-        sudo rsync -av --delete "$FRONTEND_SRC/styles/" "$WWW_DEST/styles/" > /dev/null
+        echo -e "${CYAN}→${NC} styles/"
+        COUNT=$(find "$FRONTEND_SRC/styles" -type f -name "*.css" | wc -l)
+        sudo rsync -a --delete "$FRONTEND_SRC/styles/" "$WWW_DEST/styles/"
+        TOTAL_FILES=$((TOTAL_FILES + COUNT))
+        echo "  ✓ $COUNT fichiers CSS"
     fi
     
-    # Synchroniser assets si présent
-    if [ -d "$FRONTEND_SRC/assets" ]; then
-        echo "  → Syncing assets..."
-        sudo rsync -av --delete "$FRONTEND_SRC/assets/" "$WWW_DEST/assets/" > /dev/null
-    fi
-    
-    print_success "Files synchronized ($SYNC_COUNT files)"
-    
-    # Vérification spécifique de RenderEngine.js
-    if [ -f "$WWW_DEST/js/editor/core/RenderEngine.js" ]; then
-        print_success "RenderEngine.js found in destination ✓"
-    else
-        print_error "RenderEngine.js NOT FOUND in destination!"
-    fi
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    print_success "Synchronisation complète: $TOTAL_FILES fichiers"
 }
+
+# ============================================================================
+# PERMISSIONS
+# ============================================================================
 
 set_permissions() {
-    print_step "Setting permissions..."
+    print_step "Configuration des permissions..."
     
     sudo chown -R $USER:www-data "$WWW_DEST"
-    sudo chmod -R 755 "$WWW_DEST"
-    
-    # Permissions spécifiques pour les fichiers
-    sudo find "$WWW_DEST" -type f -exec chmod 644 {} \;
     sudo find "$WWW_DEST" -type d -exec chmod 755 {} \;
+    sudo find "$WWW_DEST" -type f -exec chmod 644 {} \;
     
-    print_success "Permissions set"
+    print_success "Permissions configurées"
 }
 
-show_summary() {
-    echo ""
-    echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}✓ Synchronization completed successfully!${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo "Summary:"
-    echo "  • Source: $FRONTEND_SRC"
-    echo "  • Destination: $WWW_DEST"
-    echo "  • Backup: $BACKUP_PATH"
-    echo ""
-    echo "Files synchronized:"
-    if [ -d "$WWW_DEST/js" ]; then
-        JS_FILES=$(find "$WWW_DEST/js" -type f -name "*.js" | wc -l)
-        echo "  • JavaScript: $JS_FILES files"
-    fi
-    if [ -d "$WWW_DEST/js/editor" ]; then
-        EDITOR_FILES=$(find "$WWW_DEST/js/editor" -type f -name "*.js" | wc -l)
-        echo "  • Editor JS: $EDITOR_FILES files"
-    fi
-    if [ -d "$WWW_DEST/css" ] || [ -d "$WWW_DEST/styles" ]; then
-        CSS_FILES=$(find "$WWW_DEST" -type f -name "*.css" | wc -l)
-        echo "  • CSS: $CSS_FILES files"
-    fi
-    echo ""
-    echo "Next steps:"
-    echo "  1. Open http://localhost:8000 in your browser"
-    echo "  2. Press Ctrl+Shift+R to clear cache and reload"
-    echo "  3. Check browser console (F12) for any errors"
-    echo "  4. Check backend connection status"
-    echo ""
-}
+# ============================================================================
+# VÉRIFICATION
+# ============================================================================
 
-clean_old_backups() {
-    print_step "Cleaning old backups (keeping last 5)..."
+verify_structure() {
+    print_step "Vérification de la structure..."
     
-    if [ -d "$BACKUP_DIR" ]; then
-        cd "$BACKUP_DIR" || return
-        ls -t | tail -n +6 | xargs -r rm -rf
-        print_success "Old backups cleaned"
-    fi
-}
-
-verify_sync() {
-    print_step "Verifying synchronization..."
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # Vérifier que les fichiers essentiels sont présents
-    ESSENTIAL_FILES=(
+    # Fichiers essentiels
+    CRITICAL_FILES=(
         "$WWW_DEST/index.html"
         "$WWW_DEST/js/main.js"
+        "$WWW_DEST/js/core/Application.js"
         "$WWW_DEST/js/editor/core/RenderEngine.js"
+        "$WWW_DEST/js/editor/renderers/PianoRollRenderer.js"
     )
     
-    MISSING_FILES=0
-    for file in "${ESSENTIAL_FILES[@]}"; do
-        if [ ! -f "$file" ]; then
-            print_warning "Missing essential file: $file"
-            MISSING_FILES=$((MISSING_FILES + 1))
+    MISSING=0
+    for file in "${CRITICAL_FILES[@]}"; do
+        if [ -f "$file" ]; then
+            echo "  ✓ $(basename $file)"
         else
-            echo "  ✓ Found: $(basename $file)"
+            echo "  ✗ MANQUANT: $(basename $file)"
+            ((MISSING++))
         fi
     done
     
-    if [ $MISSING_FILES -gt 0 ]; then
-        print_warning "$MISSING_FILES essential file(s) missing"
-        print_info "Please check the synchronization manually"
+    if [ $MISSING -gt 0 ]; then
+        print_warning "$MISSING fichier(s) critique(s) manquant(s)"
     else
-        print_success "All essential files present"
+        print_success "Tous les fichiers critiques présents"
     fi
     
-    # Vérifier la taille du dossier js
+    # Statistiques par dossier
+    echo ""
+    echo "Statistiques:"
+    
     if [ -d "$WWW_DEST/js" ]; then
-        JS_SIZE=$(du -sh "$WWW_DEST/js" | cut -f1)
-        echo "  • JavaScript folder size: $JS_SIZE"
+        for dir in audio config controllers core editor models monitoring services ui utils views; do
+            if [ -d "$WWW_DEST/js/$dir" ]; then
+                COUNT=$(find "$WWW_DEST/js/$dir" -type f -name "*.js" | wc -l)
+                printf "  • %-15s %3d fichiers\n" "$dir:" "$COUNT"
+            fi
+        done
     fi
+    
+    if [ -d "$WWW_DEST/js/editor" ]; then
+        echo ""
+        echo "Editor sous-structure:"
+        for subdir in components core interaction renderers utils; do
+            if [ -d "$WWW_DEST/js/editor/$subdir" ]; then
+                COUNT=$(find "$WWW_DEST/js/editor/$subdir" -type f -name "*.js" | wc -l)
+                printf "  • editor/%-12s %3d fichiers\n" "$subdir:" "$COUNT"
+            fi
+        done
+    fi
+    
+    if [ -d "$WWW_DEST/styles" ]; then
+        CSS_COUNT=$(find "$WWW_DEST/styles" -type f -name "*.css" | wc -l)
+        echo ""
+        printf "  • %-15s %3d fichiers\n" "styles:" "$CSS_COUNT"
+    fi
+    
+    # Taille totale
+    if [ -d "$WWW_DEST/js" ]; then
+        SIZE=$(du -sh "$WWW_DEST/js" | cut -f1)
+        echo ""
+        echo "  • Taille JS totale: $SIZE"
+    fi
+    
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+# ============================================================================
+# NETTOYAGE
+# ============================================================================
+
+clean_old_backups() {
+    print_step "Nettoyage des anciens backups (garde les 5 derniers)..."
+    
+    if [ -d "$BACKUP_DIR" ]; then
+        cd "$BACKUP_DIR" || return
+        BACKUP_COUNT=$(ls -1 | wc -l)
+        
+        if [ $BACKUP_COUNT -gt 5 ]; then
+            ls -t | tail -n +6 | xargs -r rm -rf
+            print_success "Backups nettoyés"
+        else
+            print_info "Pas besoin de nettoyage ($BACKUP_COUNT backups)"
+        fi
+    fi
+}
+
+# ============================================================================
+# RÉSUMÉ
+# ============================================================================
+
+show_summary() {
+    echo ""
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}✓ SYNCHRONISATION COMPLÈTE RÉUSSIE !${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "Détails:"
+    echo "  • Source      : $FRONTEND_SRC"
+    echo "  • Destination : $WWW_DEST"
+    if [ -n "$BACKUP_PATH" ]; then
+        echo "  • Backup      : $BACKUP_PATH"
+    fi
+    echo ""
+    echo "Prochaines étapes:"
+    echo "  1. Ouvrir http://localhost:8000"
+    echo "  2. Ctrl+Shift+R pour vider le cache"
+    echo "  3. F12 pour vérifier la console"
+    echo "  4. Vérifier la connexion backend"
+    echo ""
 }
 
 # ============================================================================
@@ -491,23 +513,25 @@ verify_sync() {
 main() {
     print_header
     
-    # Vérifier si on est root
+    # Vérifier qu'on n'est pas root
     if [ "$EUID" -eq 0 ]; then 
-        print_error "Do not run this script as root"
+        print_error "Ne pas exécuter en root"
         exit 1
     fi
     
-    # Étapes
+    # Exécution séquentielle
     check_directories
-    fix_git_permissions_complete    # 🔧 RÉPARATION COMPLÈTE
+    fix_git_permissions
     create_backup
     git_pull
-    sync_files
+    sync_complete_structure
     set_permissions
-    verify_sync
+    verify_structure
     clean_old_backups
     show_summary
+    
+    echo -e "${GREEN}✓ Script terminé avec succès${NC}"
 }
 
-# Exécuter
+# Exécution
 main
