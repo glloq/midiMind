@@ -1,6 +1,6 @@
 // ============================================================================
 // Fichier: frontend/js/services/FileService.js
-// Version: v3.0.2 - COMPLET (CRUD complet)
+// Version: v3.1.0 - FIXED BACKEND PROTOCOL - COMPLET (CRUD complet)
 // Date: 2025-10-08
 // Projet: midiMind v3.0 - Systeme d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
@@ -77,9 +77,13 @@ class FileService {
             this._handleFileRemoved(data);
         });
         
-        this.eventBus.on('backend:connected', () => {
+        this.eventBus.on('backend:connected', async () => {
             if (this.config.autoRefresh) {
-                this.scanFiles();
+                try {
+                    await this.scanFiles();
+                } catch (error) {
+                    this.logger.warn('FileService', 'Auto-scan failed:', error.message);
+                }
             }
         });
     }
@@ -115,13 +119,13 @@ class FileService {
         try {
             this.logger.info('FileService', 'Ã°Å¸â€Â Scanning files...');
             
-            const response = await this.backend.sendCommand('files.scan', {
-                recursive: true
+            const response = await this.backend.sendCommand('file.list', {
+                type: 'midi',
+                limit: 1000,
+                offset: 0
             });
             
-            if (!response.success) {
-                throw new Error(response.error || 'Scan failed');
-            }
+            // Response format: { files: [...] }
             
             const files = response.data?.files || response.files || [];
             
