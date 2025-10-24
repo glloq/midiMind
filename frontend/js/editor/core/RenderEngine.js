@@ -326,6 +326,13 @@ class RenderEngine {
         this.ctx.fillRect(0, 0, this.width, this.height);
     }
     
+    /**
+     * Alias pour compatibilité avec MidiVisualizer
+     */
+    clearCanvas() {
+        this.clear();
+    }
+    
     renderGrid() {
         if (this.renderers.grid) {
             this.renderers.grid.render(this.ctx, this.viewport);
