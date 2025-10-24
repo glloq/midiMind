@@ -314,6 +314,11 @@ class Application {
             this.views.editor = new EditorView('editor', eventBus);
         }
         
+        // RoutingView
+        if (window.RoutingView) {
+            this.views.routing = new RoutingView('routing', eventBus);
+        }
+        
         this.logger.info('Application', '✓ Views initialized');
     }
     
@@ -328,7 +333,7 @@ class Application {
         
         // NavigationController
         if (window.NavigationController) {
-            this.controllers.navigation = new NavigationController(eventBus, this.models, this.views, this.notifications, this.debugConsole);
+            this.controllers.navigation = new NavigationController(eventBus, logger);
         }
         
         // FileController
