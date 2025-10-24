@@ -286,6 +286,14 @@ class Viewport {
         }
     }
 
+    /**
+     * Active/désactive l'auto-scroll
+     * @param {boolean} enabled - Activer auto-scroll
+     */
+    setAutoScroll(enabled) {
+        this.autoScroll = !!enabled;
+    }
+
     // ========================================================================
     // ZOOM
     // ========================================================================
