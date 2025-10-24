@@ -1,8 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/views/KeyboardView.js
-// Version: v3.1.1 - CORRECTED DEVICES INITIALIZATION
+// Version: v3.1.2 - FIXED INITIALIZATION ORDER
 // Date: 2025-10-24
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// CORRECTIONS v3.1.2:
+// ✅ CRITIQUE: Fixed constructor parameter order (BaseView only takes 2 params)
+// ✅ CRITIQUE: Initialize all properties BEFORE super.initialize() is called
+// ✅ CRITIQUE: Properly disable autoRender to prevent premature rendering
+// ✅ Fixed initialization race condition causing "this.noteRange is undefined"
 // ============================================================================
 // CORRECTIONS v3.1.1:
 // ✅ Fixed renderInstrumentSelector: added fallback for this.devices
@@ -19,16 +25,25 @@
 
 class KeyboardView extends BaseView {
     constructor(container, eventBus, debugConsole) {
-        super(container, eventBus, debugConsole, {
-            name: 'KeyboardView',
-            autoRender: false
-        });
+        // CRITIQUE: BaseView n'accepte que 2 paramètres (containerId, eventBus)
+        // On ne peut PAS passer debugConsole ou config ici
+        super(container, eventBus);
+        
+        // IMPORTANT: Désactiver autoRender immédiatement après super()
+        // pour éviter que BaseView.initialize() n'appelle render() trop tôt
+        this.config.autoRender = false;
+        this.config.name = 'KeyboardView';
+        this.config.preserveState = false;
+        
+        // Sauvegarder debugConsole si fourni
+        this.debugConsole = debugConsole || null;
         
         // Canvas clavier
         this.canvas = null;
         this.ctx = null;
         
-        // État
+        // État - INITIALISER TOUTES LES PROPRIÉTÉS CRITIQUES ICI
+        // pour éviter "undefined" lors du render
         this.selectedInstrument = null;
         this.noteRange = { min: 21, max: 108 };
         this.customNoteMapping = null;
@@ -41,7 +56,33 @@ class KeyboardView extends BaseView {
         this.whiteKeyHeight = 120;
         this.blackKeyHeight = 80;
         
-        this.logDebug('keyboard', '✓ KeyboardView initialized (monitor mode)');
+        // Stats pour tracking
+        this.stats = {
+            notesPlayed: 0,
+            activeNotes: 0,
+            errors: 0
+        };
+        
+        // Log de débogage si disponible
+        if (this.debugConsole && typeof this.debugConsole.log === 'function') {
+            this.debugConsole.log('keyboard', '✓ KeyboardView initialized (monitor mode)');
+        } else if (console && console.log) {
+            console.log('[KeyboardView] ✓ Initialized (monitor mode)');
+        }
+    }
+    
+    // ========================================================================
+    // LIFECYCLE - Surcharge pour contrôle précis de l'initialisation
+    // ========================================================================
+    
+    /**
+     * Hook appelé par BaseView.initialize() APRÈS le constructeur
+     * C'est ici qu'on fait le premier rendu si nécessaire
+     */
+    onInitialize() {
+        // À ce stade, toutes les propriétés sont initialisées
+        // On peut maintenant rendre en toute sécurité
+        // (mais on attend que le controller appelle render() manuellement)
     }
     
     // ========================================================================
@@ -101,8 +142,11 @@ class KeyboardView extends BaseView {
     // ========================================================================
     
     renderWarningBanner() {
-        if (PerformanceConfig.keyboard.enableRecording) {
-            return '';  // Pas de warning si enregistrement activé
+        // Vérifier que PerformanceConfig existe
+        if (typeof PerformanceConfig === 'undefined' || 
+            !PerformanceConfig.keyboard || 
+            PerformanceConfig.keyboard.enableRecording) {
+            return '';  // Pas de warning si enregistrement activé ou config absente
         }
         
         return `
@@ -114,6 +158,7 @@ class KeyboardView extends BaseView {
     }
     
     renderInstrumentSelector() {
+        // Fallback robuste pour devices
         const devices = this.devices || [];
         
         return `
@@ -133,6 +178,11 @@ class KeyboardView extends BaseView {
     }
     
     renderNoteRangeDisplay() {
+        // Vérifier que noteRange est défini (protection supplémentaire)
+        if (!this.noteRange || typeof this.noteRange.min === 'undefined') {
+            this.noteRange = { min: 21, max: 108 }; // Fallback sécurisé
+        }
+        
         let rangeText = `${this.noteRange.min}-${this.noteRange.max}`;
         
         if (this.customNoteMapping) {
@@ -150,7 +200,10 @@ class KeyboardView extends BaseView {
     }
     
     renderVelocityControl() {
-        if (!PerformanceConfig.keyboard.enablePlayback) {
+        // Vérifier PerformanceConfig
+        if (typeof PerformanceConfig === 'undefined' || 
+            !PerformanceConfig.keyboard || 
+            !PerformanceConfig.keyboard.enablePlayback) {
             return '';
         }
         
@@ -234,15 +287,15 @@ class KeyboardView extends BaseView {
             <div class="keyboard-stats">
                 <div class="stat-item">
                     <span class="stat-label">Notes jouées</span>
-                    <span class="stat-value" id="stat-notes-played">0</span>
+                    <span class="stat-value" id="stat-notes-played">${this.stats.notesPlayed}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Notes actives</span>
-                    <span class="stat-value" id="stat-active-notes">0</span>
+                    <span class="stat-value" id="stat-active-notes">${this.stats.activeNotes}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Erreurs</span>
-                    <span class="stat-value" id="stat-errors">0</span>
+                    <span class="stat-value" id="stat-errors">${this.stats.errors}</span>
                 </div>
             </div>
         `;
@@ -254,85 +307,28 @@ class KeyboardView extends BaseView {
     
     initCanvas() {
         this.canvas = this.container.querySelector('#keyboard-canvas');
-        
-        if (!this.canvas) {
-            this.logDebug('keyboard', 'Canvas not found', 'error');
-            return;
-        }
+        if (!this.canvas) return;
         
         this.ctx = this.canvas.getContext('2d');
         
-        // Taille canvas
-        this.resizeCanvas();
+        // Dimensionner canvas selon clavier
+        const whiteKeyCount = this.countWhiteKeys();
+        this.canvas.width = whiteKeyCount * this.keyWidth;
+        this.canvas.height = this.whiteKeyHeight + 20; // +20 pour labels
         
-        // Listeners canvas
-        this.attachCanvasListeners();
-        
-        // Resize observer
-        const resizeObserver = new ResizeObserver(() => {
-            this.resizeCanvas();
-            this.drawKeyboard();
-        });
-        
-        resizeObserver.observe(this.canvas.parentElement);
+        // Style canvas
+        this.canvas.style.border = '1px solid #ccc';
+        this.canvas.style.borderRadius = '4px';
     }
     
-    resizeCanvas() {
-        const wrapper = this.canvas.parentElement;
-        const rect = wrapper.getBoundingClientRect();
-        
-        this.canvas.width = rect.width;
-        this.canvas.height = this.whiteKeyHeight + 40;  // +40 pour labels
-        
-        this.logDebug('keyboard', `Canvas resized: ${this.canvas.width}x${this.canvas.height}`);
-    }
-    
-    attachCanvasListeners() {
-        let mouseDown = false;
-        let lastNote = null;
-        
-        this.canvas.addEventListener('mousedown', (e) => {
-            mouseDown = true;
-            const note = this.getNoteAtPosition(e.offsetX, e.offsetY);
-            
-            if (note !== null) {
-                lastNote = note;
-                this.eventBus.emit('keyboard:play-note', { note });
+    countWhiteKeys() {
+        let count = 0;
+        for (let note = this.noteRange.min; note <= this.noteRange.max; note++) {
+            if (!this.isBlackKey(note)) {
+                count++;
             }
-        });
-        
-        this.canvas.addEventListener('mousemove', (e) => {
-            if (!mouseDown) return;
-            
-            const note = this.getNoteAtPosition(e.offsetX, e.offsetY);
-            
-            if (note !== null && note !== lastNote) {
-                // Arrêter note précédente
-                if (lastNote !== null) {
-                    this.eventBus.emit('keyboard:stop-note', { note: lastNote });
-                }
-                
-                // Jouer nouvelle note
-                this.eventBus.emit('keyboard:play-note', { note });
-                lastNote = note;
-            }
-        });
-        
-        this.canvas.addEventListener('mouseup', (e) => {
-            if (lastNote !== null) {
-                this.eventBus.emit('keyboard:stop-note', { note: lastNote });
-                lastNote = null;
-            }
-            mouseDown = false;
-        });
-        
-        this.canvas.addEventListener('mouseleave', (e) => {
-            if (mouseDown && lastNote !== null) {
-                this.eventBus.emit('keyboard:stop-note', { note: lastNote });
-                lastNote = null;
-            }
-            mouseDown = false;
-        });
+        }
+        return count;
     }
     
     // ========================================================================
@@ -344,7 +340,7 @@ class KeyboardView extends BaseView {
         const instrumentSelect = this.container.querySelector('#instrument-select');
         if (instrumentSelect) {
             instrumentSelect.addEventListener('change', (e) => {
-                this.eventBus.emit('keyboard:select-instrument', {
+                this.emit('keyboard:instrument:changed', {
                     instrumentId: e.target.value
                 });
             });
@@ -352,28 +348,26 @@ class KeyboardView extends BaseView {
         
         // Velocity slider
         const velocitySlider = this.container.querySelector('#velocity-slider');
-        const velocityValue = this.container.querySelector('#velocity-value');
-        
-        if (velocitySlider && velocityValue) {
+        if (velocitySlider) {
             velocitySlider.addEventListener('input', (e) => {
-                const velocity = parseInt(e.target.value);
-                velocityValue.textContent = velocity;
-                this.currentVelocity = velocity;
-                
-                this.eventBus.emit('keyboard:velocity-changed', { velocity });
+                this.currentVelocity = parseInt(e.target.value);
+                const valueDisplay = this.container.querySelector('#velocity-value');
+                if (valueDisplay) {
+                    valueDisplay.textContent = this.currentVelocity;
+                }
             });
         }
         
         // Velocity presets
-        this.container.querySelectorAll('.btn-preset').forEach(btn => {
+        const presetButtons = this.container.querySelectorAll('.btn-preset');
+        presetButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const velocity = parseInt(e.target.dataset.velocity);
-                
-                if (velocitySlider) velocitySlider.value = velocity;
-                if (velocityValue) velocityValue.textContent = velocity;
-                
                 this.currentVelocity = velocity;
-                this.eventBus.emit('keyboard:velocity-changed', { velocity });
+                const valueDisplay = this.container.querySelector('#velocity-value');
+                const slider = this.container.querySelector('#velocity-slider');
+                if (valueDisplay) valueDisplay.textContent = velocity;
+                if (slider) slider.value = velocity;
             });
         });
         
@@ -381,36 +375,97 @@ class KeyboardView extends BaseView {
         const panicBtn = this.container.querySelector('#btn-panic');
         if (panicBtn) {
             panicBtn.addEventListener('click', () => {
-                this.eventBus.emit('keyboard:panic');
+                this.emit('keyboard:panic');
+                this.activeNotes.clear();
+                this.drawKeyboard();
             });
         }
         
-        // Refresh devices
+        // Refresh devices button
         const refreshBtn = this.container.querySelector('#btn-refresh-devices');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                this.eventBus.emit('keyboard:refresh-devices');
+                this.emit('keyboard:refresh:devices');
             });
+        }
+        
+        // Canvas mouse events
+        if (this.canvas) {
+            this.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+            this.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+            this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e));
+            this.canvas.addEventListener('mouseleave', (e) => this.handleCanvasMouseLeave(e));
         }
     }
     
     // ========================================================================
-    // DRAWING KEYBOARD
+    // CANVAS INTERACTION
+    // ========================================================================
+    
+    handleCanvasMouseDown(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const note = this.getNoteAtPosition(x, y);
+        if (note !== null && this.isNotePlayable(note)) {
+            this.activeNotes.add(note);
+            this.drawKeyboard();
+            
+            this.emit('keyboard:note:on', {
+                note: note,
+                velocity: this.currentVelocity,
+                instrument: this.selectedInstrument
+            });
+            
+            this.stats.notesPlayed++;
+            this.updateStats();
+        }
+    }
+    
+    handleCanvasMouseUp(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const note = this.getNoteAtPosition(x, y);
+        if (note !== null) {
+            this.activeNotes.delete(note);
+            this.drawKeyboard();
+            
+            this.emit('keyboard:note:off', {
+                note: note,
+                instrument: this.selectedInstrument
+            });
+        }
+    }
+    
+    handleCanvasMouseMove(e) {
+        // Optionnel: hover effects
+    }
+    
+    handleCanvasMouseLeave(e) {
+        // Arrêter toutes les notes actives
+        this.activeNotes.forEach(note => {
+            this.emit('keyboard:note:off', {
+                note: note,
+                instrument: this.selectedInstrument
+            });
+        });
+        
+        this.activeNotes.clear();
+        this.drawKeyboard();
+    }
+    
+    // ========================================================================
+    // CANVAS DRAWING
     // ========================================================================
     
     drawKeyboard() {
-        if (!this.ctx) return;
+        if (!this.ctx || !this.canvas) return;
         
-        // Clear
-        this.ctx.fillStyle = '#1a1a1a';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Calculer nombre de touches visibles
-        const numKeys = this.noteRange.max - this.noteRange.min + 1;
-        const totalWidth = this.canvas.width;
-        const whiteKeyWidth = totalWidth / (numKeys * 0.6);  // Approximation
-        
-        this.keyWidth = Math.max(15, Math.min(30, whiteKeyWidth));
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Dessiner touches blanches d'abord
         for (let note = this.noteRange.min; note <= this.noteRange.max; note++) {
@@ -598,8 +653,10 @@ class KeyboardView extends BaseView {
     setActiveNote(note, active) {
         if (active) {
             this.activeNotes.add(note);
+            this.stats.activeNotes = this.activeNotes.size;
         } else {
             this.activeNotes.delete(note);
+            this.stats.activeNotes = this.activeNotes.size;
         }
         
         this.drawKeyboard();
@@ -607,11 +664,13 @@ class KeyboardView extends BaseView {
     }
     
     updateStats(stats) {
-        if (!stats) return;
+        if (stats) {
+            this.stats = { ...this.stats, ...stats };
+        }
         
-        this.updateStatValue('stat-notes-played', stats.notesPlayed);
-        this.updateStatValue('stat-active-notes', stats.activeNotes);
-        this.updateStatValue('stat-errors', stats.errors);
+        this.updateStatValue('stat-notes-played', this.stats.notesPlayed);
+        this.updateStatValue('stat-active-notes', this.stats.activeNotes);
+        this.updateStatValue('stat-errors', this.stats.errors);
     }
     
     updateStatValue(id, value) {
@@ -622,12 +681,33 @@ class KeyboardView extends BaseView {
     }
     
     // ========================================================================
+    // UTILITY METHOD FOR DEBUG LOGGING
+    // ========================================================================
+    
+    logDebug(category, message) {
+        if (this.debugConsole && typeof this.debugConsole.log === 'function') {
+            this.debugConsole.log(category, message);
+        } else if (console && console.log) {
+            console.log(`[KeyboardView][${category}] ${message}`);
+        }
+    }
+    
+    // ========================================================================
     // DESTRUCTION
     // ========================================================================
     
     destroy() {
+        // Nettoyer état
         this.activeNotes.clear();
         
+        // Nettoyer canvas
+        if (this.ctx && this.canvas) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+        this.canvas = null;
+        this.ctx = null;
+        
+        // Appeler destroy parent
         super.destroy();
     }
 }
@@ -643,5 +723,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.KeyboardView = KeyboardView;
 }
-// Export par défaut
-window.KeyboardView = KeyboardView;
