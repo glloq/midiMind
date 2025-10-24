@@ -75,9 +75,6 @@ class EditorController extends BaseController {
         } else {
             this.logDebug('warning', 'RoutingManager not available');
         }
-		setTimeout(() => {
-			this.initVisualizer();
-		}, 100);
     }
     /**
  * Méthode init() publique appelée par Application.js
@@ -94,7 +91,13 @@ init() {
     if (this.view && typeof this.view.render === 'function') {
         this.view.render();
         this.logDebug('editor', 'EditorView rendered');
-    }
+    
+    
+    // Initialiser le visualizer maintenant que la vue est rendue
+    setTimeout(() => {
+        this.initVisualizer();
+    }, 100);
+}
 }
 	
     bindEvents() {

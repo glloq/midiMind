@@ -328,7 +328,11 @@ class Application {
         const editorElement = document.getElementById('editor');
         if (editorElement && window.EditorView) {
             this.views.editor = new EditorView(editorElement, this.eventBus, this.logger);
-            // La vue s'initialise elle-même via BaseView
+            // CRITIQUE: Rendre explicitement pour créer le canvas dans le DOM
+            if (typeof this.views.editor.render === 'function') {
+                this.views.editor.render();
+                console.log('✓ EditorView rendered - canvas created');
+            }
             console.log('✓ EditorView initialized');
         }
         
