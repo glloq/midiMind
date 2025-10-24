@@ -30,7 +30,8 @@ class BaseController {
             handleErrors: true,
             logActions: true,
             validateInputs: true,
-            debounceActions: {}
+            debounceActions: {},
+            cacheTTL: 5 * 60 * 1000 // 5 minutes
         };
         
         // Gestion des événements
@@ -47,6 +48,7 @@ class BaseController {
         
         // Cache pour optimisation
         this.cache = new Map();
+        this.cacheTimestamps = new Map();
         this._lastCacheClean = null;
 		
         // Validateurs d'entrée
@@ -200,7 +202,7 @@ class BaseController {
     if (opts.cache) {
         const cached = this.getCached(actionName);
         if (cached !== null) {
-            this.log('debug', `Cache hit for ${actionName}`);
+            this.logDebug('debug', `Cache hit for ${actionName}`);
             return cached;
         }
     }
@@ -230,6 +232,7 @@ class BaseController {
                 if (opts.cache && result !== undefined) {
                     const cacheKey = `${actionName}:${JSON.stringify(data)}`;
                     this.cache.set(cacheKey, result);
+                    this.cacheTimestamps.set(cacheKey, Date.now());
                 }
                 
                 // Métriques
@@ -250,8 +253,7 @@ class BaseController {
                 this.emitEvent('controller:action:success', {
                     controller: this.constructor.name,
                     action: actionName,
-                    duration: this.state.lastAction.duration,
-                    result
+                    duration: performance.now() - startTime
                 });
                 
                 return result;
@@ -259,167 +261,248 @@ class BaseController {
             } catch (error) {
                 lastError = error;
                 
-                if (attempts <= opts.retry) {
-                    this.logDebug('warning', `Tentative ${attempts}/${opts.retry + 1} échouée pour ${actionName}: ${error.message}`);
-                    await this.sleep(Math.pow(2, attempts - 1) * 1000); // Backoff exponentiel
-                    continue;
+                // Logging de l'erreur
+                this.logDebug('error', `Erreur dans ${actionName} (tentative ${attempts}/${opts.retry + 1}):`, error.message);
+                
+                // Notification d'erreur
+                if (opts.notify && opts.notify.error) {
+                    this.showNotification(opts.notify.error, 'error');
                 }
                 
-                // Toutes les tentatives échouées
-                this.handleActionError(actionName, error, data, opts);
-                throw error;
+                // Si c'est la dernière tentative, propager l'erreur
+                if (attempts > opts.retry) {
+                    // Enregistrer l'erreur
+                    this.state.errors.push({
+                        action: actionName,
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    this.metrics.errorsHandled++;
+                    this.state.lastAction = {
+                        name: actionName,
+                        timestamp: new Date().toISOString(),
+                        duration: performance.now() - startTime,
+                        success: false,
+                        error: error.message
+                    };
+                    
+                    // Événement d'erreur
+                    this.emitEvent('controller:action:error', {
+                        controller: this.constructor.name,
+                        action: actionName,
+                        error: error.message,
+                        duration: performance.now() - startTime
+                    });
+                    
+                    throw error;
+                }
+                
+                // Attendre avant retry
+                await this.sleep(500 * attempts);
             }
         } while (attempts <= opts.retry);
-    }
-
-    /**
-     * Gérer une erreur d'action
-     * @param {string} actionName - Nom de l'action
-     * @param {Error} error - Erreur
-     * @param {*} data - Données de l'action
-     * @param {Object} options - Options
-     */
-    handleActionError(actionName, error, data, options) {
-        // Métriques
-        this.metrics.errorsHandled++;
-        this.state.errors.push({
-            action: actionName,
-            error: error.message,
-            timestamp: new Date().toISOString(),
-            data
-        });
         
-        // Logging
-        this.logDebug('error', `Erreur dans ${actionName}: ${error.message}`, { data, stack: error.stack });
-        
-        // Notification d'erreur
-        if (options.notify && options.notify.error) {
-            this.showNotification(options.notify.error, 'error');
-        }
-        
-        // Événement d'erreur
-        this.emitEvent('controller:action:error', {
-            controller: this.constructor.name,
-            action: actionName,
-            error: error.message,
-            data
-        });
-        
-        // Gestion d'erreur globale
-        if (this.config.handleErrors) {
-            this.handleError(`Erreur dans l'action ${actionName}`, error);
-        }
+        throw lastError;
     }
 
     /**
      * Configurer les actions debouncées
+     * @private
      */
     setupDebouncedActions() {
-        Object.keys(this.config.debounceActions).forEach(actionName => {
-            const delay = this.config.debounceActions[actionName];
+        if (!this.config.debounceActions || Object.keys(this.config.debounceActions).length === 0) {
+            return;
+        }
+        
+        for (const [actionName, delay] of Object.entries(this.config.debounceActions)) {
             if (typeof this[actionName] === 'function') {
-                this.debouncedActions.set(actionName, this.debounce(this[actionName], delay));
+                const original = this[actionName].bind(this);
+                this.debouncedActions.set(actionName, this.debounce(original, delay));
             }
-        });
-    }
-
-    /**
-     * Exécuter une action debouncée
-     * @param {string} actionName - Nom de l'action
-     * @param {...*} args - Arguments
-     */
-    executeDebouncedAction(actionName, ...args) {
-        const debouncedAction = this.debouncedActions.get(actionName);
-        if (debouncedAction) {
-            return debouncedAction.apply(this, args);
-        } else {
-            this.logDebug('warning', `Action debouncée ${actionName} non trouvée`);
         }
     }
 
     /**
-     * Obtenir un modèle par nom
-     * @param {string} modelName - Nom du modèle
-     * @returns {BaseModel} Instance du modèle
-     */
-    getModel(modelName) {
-        const model = this.models[modelName];
-        if (!model) {
-            this.logDebug('warning', `Modèle '${modelName}' non trouvé`);
-        }
-        return model;
-    }
-
-    /**
-     * Obtenir une vue par nom
-     * @param {string} viewName - Nom de la vue
-     * @returns {BaseView} Instance de la vue
-     */
-    getView(viewName) {
-        const view = this.views[viewName];
-        if (!view) {
-            this.logDebug('warning', `Vue '${viewName}' non trouvée`);
-        }
-        return view;
-    }
-
-    /**
-     * Afficher une notification
-     * @param {string} message - Message à afficher
-     * @param {string} type - Type de notification (info, success, warning, error)
-     * @param {Object} options - Options de notification
-     */
-    showNotification(message, type = 'info', options = {}) {
-        if (this.notifications && typeof this.notifications.show === 'function') {
-            this.notifications.show(message, type, options);
-            this.metrics.notificationsSent++;
-            
-            this.logDebug('notification', `Notification ${type}: ${message}`);
-        }
-    }
-
-    /**
-     * Logger un message de debug
-     * @param {string} category - Catégorie du message
-     * @param {string} message - Message à logger
-     * @param {*} data - Données additionnelles
-     */
-    logDebug(category, message, data = null) {
-        if (this.debugConsole && typeof this.debugConsole.log === 'function') {
-            const logMessage = `[${this.constructor.name}] ${message}`;
-            this.debugConsole.log(category, logMessage, data);
-        }
-    }
-
-    /**
-     * Gérer une erreur générale
+     * Gérer une erreur
      * @param {string} context - Contexte de l'erreur
      * @param {Error} error - Erreur
      */
     handleError(context, error) {
-        const errorMessage = `${context}: ${error.message}`;
-        
         // Logging
-        this.logDebug('error', errorMessage, { stack: error.stack });
+        this.logDebug('error', `[${this.constructor.name}] ${context}:`, error);
         
-        // Ajouter à l'historique des erreurs
+        // Enregistrer l'erreur
         this.state.errors.push({
             context,
-            error: error.message,
-            timestamp: new Date().toISOString(),
-            stack: error.stack
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
         });
         
-        // Émettre un événement d'erreur
+        // Limiter le nombre d'erreurs en mémoire
+        if (this.state.errors.length > 50) {
+            this.state.errors = this.state.errors.slice(-50);
+        }
+        
+        // Métriques
+        this.metrics.errorsHandled++;
+        
+        // Notification utilisateur si système de notification disponible
+        if (this.notifications && typeof this.notifications.showError === 'function') {
+            this.notifications.showError(`${context}: ${error.message}`);
+        }
+        
+        // Émettre événement d'erreur
         this.emitEvent('controller:error', {
             controller: this.constructor.name,
             context,
             error: error.message
         });
         
-        // Notification optionnelle
-        if (this.config.notifyErrors) {
-            this.showNotification(`Erreur: ${context}`, 'error');
+        // Re-throw si configuré pour ne pas gérer les erreurs
+        if (!this.config.handleErrors) {
+            throw error;
+        }
+    }
+
+    /**
+     * Afficher une notification
+     * @param {string} message - Message
+     * @param {string} type - Type (success, error, info, warning)
+     * @param {Object} options - Options
+     */
+    showNotification(message, type = 'info', options = {}) {
+        // Vérifier si le système de notification est disponible
+        if (!this.notifications) {
+            this.logDebug('warning', 'Notification system not available');
+            return;
+        }
+        
+        // Métriques
+        this.metrics.notificationsSent++;
+        
+        // Afficher la notification selon le type
+        const method = `show${type.charAt(0).toUpperCase() + type.slice(1)}`;
+        
+        if (typeof this.notifications[method] === 'function') {
+            this.notifications[method](message, options);
+        } else if (typeof this.notifications.show === 'function') {
+            this.notifications.show(message, type, options);
+        } else {
+            // Fallback: log dans la console
+            this.logDebug(type, message);
+        }
+        
+        // Émettre événement
+        this.emitEvent('controller:notification', {
+            controller: this.constructor.name,
+            message,
+            type
+        });
+    }
+
+    /**
+     * Afficher un message d'erreur
+     * @param {string} message - Message d'erreur
+     * @param {Object} options - Options
+     */
+    showError(message, options = {}) {
+        this.showNotification(message, 'error', options);
+    }
+
+    /**
+     * Afficher un message de succès
+     * @param {string} message - Message de succès
+     * @param {Object} options - Options
+     */
+    showSuccess(message, options = {}) {
+        this.showNotification(message, 'success', options);
+    }
+
+    /**
+     * Afficher un message d'information
+     * @param {string} message - Message d'information
+     * @param {Object} options - Options
+     */
+    showInfo(message, options = {}) {
+        this.showNotification(message, 'info', options);
+    }
+
+    /**
+     * Afficher un avertissement
+     * @param {string} message - Message d'avertissement
+     * @param {Object} options - Options
+     */
+    showWarning(message, options = {}) {
+        this.showNotification(message, 'warning', options);
+    }
+
+    /**
+     * Logger un message de debug
+     * @param {string} category - Catégorie
+     * @param {string} message - Message
+     * @param {*} data - Données additionnelles
+     */
+    logDebug(category, message, data = null) {
+        if (this.debugConsole && typeof this.debugConsole.log === 'function') {
+            this.debugConsole.log(category, `[${this.constructor.name}] ${message}`, data);
+        } else if (window.Logger && typeof window.Logger.log === 'function') {
+            window.Logger.log(category, `[${this.constructor.name}] ${message}`, data);
+        } else {
+            // Fallback: console standard
+            const prefix = `[${this.constructor.name}]`;
+            switch (category) {
+                case 'error':
+                    console.error(prefix, message, data);
+                    break;
+                case 'warning':
+                case 'warn':
+                    console.warn(prefix, message, data);
+                    break;
+                case 'info':
+                    console.info(prefix, message, data);
+                    break;
+                default:
+                    console.log(prefix, message, data);
+            }
+        }
+    }
+
+    /**
+     * Obtenir une valeur du cache
+     * @param {string} key - Clé
+     * @returns {*} Valeur ou null
+     */
+    getCached(key) {
+        if (!this.cache.has(key)) {
+            return null;
+        }
+        
+        // Vérifier si le cache n'a pas expiré
+        const timestamp = this.cacheTimestamps.get(key);
+        if (timestamp && Date.now() - timestamp > this.config.cacheTTL) {
+            this.cache.delete(key);
+            this.cacheTimestamps.delete(key);
+            return null;
+        }
+        
+        return this.cache.get(key);
+    }
+
+    /**
+     * Définir une valeur dans le cache
+     * @param {string} key - Clé
+     * @param {*} value - Valeur
+     */
+    setCached(key, value) {
+        this.cache.set(key, value);
+        this.cacheTimestamps.set(key, Date.now());
+        
+        // Nettoyer le cache si nécessaire
+        if (this.shouldCleanCache()) {
+            this.cleanCache();
+            this._lastCacheClean = Date.now();
         }
     }
 
@@ -431,6 +514,7 @@ class BaseController {
      */
     validateActionData(actionName, data) {
         const validator = this.validators[actionName];
+        
         if (!validator) {
             return true; // Pas de validation définie
         }
@@ -509,10 +593,12 @@ class BaseController {
             for (const [key] of this.cache.entries()) {
                 if (regex.test(key)) {
                     this.cache.delete(key);
+                    this.cacheTimestamps.delete(key);
                 }
             }
         } else {
             this.cache.clear();
+            this.cacheTimestamps.clear();
         }
         
         this.logDebug('info', `Cache nettoyé${pattern ? ` (pattern: ${pattern})` : ''}`);
@@ -544,6 +630,15 @@ class BaseController {
             return;
         }
         
+        // Hook de destruction personnalisé
+        if (typeof this.onDestroy === 'function') {
+            try {
+                this.onDestroy();
+            } catch (error) {
+                this.logDebug('error', 'Erreur lors du hook onDestroy:', error);
+            }
+        }
+        
         // Nettoyer les abonnements aux événements
         this.eventSubscriptions.forEach(({ unsubscribe }) => {
             if (typeof unsubscribe === 'function') {
@@ -554,6 +649,7 @@ class BaseController {
         
         // Nettoyer le cache
         this.cache.clear();
+        this.cacheTimestamps.clear();
         
         // Nettoyer les actions debouncées
         this.debouncedActions.clear();
@@ -579,7 +675,7 @@ cleanCache() {
         if (now - timestamp > this.config.cacheTTL) {
             this.cache.delete(key);
             this.cacheTimestamps.delete(key);
-            this.log('debug', `Cache entry expired: ${key}`);
+            this.logDebug('debug', `Cache entry expired: ${key}`);
         }
     }
 }
