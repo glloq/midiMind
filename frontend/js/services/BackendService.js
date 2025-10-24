@@ -13,7 +13,6 @@
 // ============================================================================
 
 class BackendService {
-class BackendService {
     constructor(url, eventBus, logger) {
         this.eventBus = eventBus;
         this.logger = logger || console;

@@ -1,13 +1,18 @@
 // ============================================================================
-// Fichier: SearchController.js (ROOT)
-// Version: v1.0
-// Date: 2025-10-23
+// Fichier: SearchController.js (frontend/js/controllers/SearchController.js)
+// Version: v1.1 - CORRIGÉ
+// Date: 2025-01-24
 // Projet: midiMind v3.0 - Contrôleur de Recherche
+// ============================================================================
+// CORRECTIONS v1.1:
+// ✅ Paramètres du constructeur alignés avec BaseController
+// ✅ Utilisation de debugConsole au lieu de logger
+// ✅ Fallback vers console si debugConsole non disponible
 // ============================================================================
 
 class SearchController extends BaseController {
-    constructor(eventBus, logger) {
-        super(eventBus, logger, null, null);
+    constructor(eventBus, models, views, notifications, debugConsole) {
+        super(eventBus, models, views, notifications, debugConsole);
         
         // Index de recherche
         this.searchIndex = new Map();
@@ -20,6 +25,7 @@ class SearchController extends BaseController {
         
         // Configuration
         this.config = {
+            ...this.config,  // Hériter de BaseController
             minQueryLength: 2,
             maxResults: 50,
             fuzzySearch: true,
@@ -31,9 +37,8 @@ class SearchController extends BaseController {
      * Initialisation du contrôleur
      */
     onInitialize() {
-        this.logger.info('SearchController', 'Initializing search controller...');
-        this.bindEvents();
-        this.logger.info('SearchController', 'Search controller initialized');
+        this.logDebug('info', 'Initializing search controller...');
+        this.logDebug('info', 'Search controller initialized');
     }
     
     /**
@@ -41,14 +46,14 @@ class SearchController extends BaseController {
      */
     bindEvents() {
         // Écouter les changements de fichiers pour réindexer
-        this.eventBus.on('file:loaded', (file) => this.indexFile(file));
-        this.eventBus.on('file:updated', (file) => this.updateFileIndex(file));
-        this.eventBus.on('file:deleted', (fileId) => this.removeFromIndex(fileId));
+        this.subscribe('file:loaded', (file) => this.indexFile(file));
+        this.subscribe('file:updated', (file) => this.updateFileIndex(file));
+        this.subscribe('file:deleted', (data) => this.removeFromIndex(data.fileId || data));
         
         // Écouter les changements de playlists
-        this.eventBus.on('playlist:created', (playlist) => this.indexPlaylist(playlist));
-        this.eventBus.on('playlist:updated', (playlist) => this.indexPlaylist(playlist));
-        this.eventBus.on('playlist:deleted', (playlistId) => this.removePlaylistFromIndex(playlistId));
+        this.subscribe('playlist:created', (playlist) => this.indexPlaylist(playlist));
+        this.subscribe('playlist:updated', (playlist) => this.indexPlaylist(playlist));
+        this.subscribe('playlist:deleted', (data) => this.removePlaylistFromIndex(data.playlistId || data));
     }
     
     /**
@@ -78,7 +83,7 @@ class SearchController extends BaseController {
         ].slice(0, opts.maxResults);
         
         // Émettre événement
-        this.eventBus.emit('search:results', {
+        this.emitEvent('search:results', {
             query,
             results: this.lastResults,
             count: this.lastResults.length
@@ -198,7 +203,7 @@ class SearchController extends BaseController {
         };
         
         this.fileIndex.set(file.id, indexed);
-        this.logger.debug('SearchController', `Indexed file: ${file.name}`);
+        this.logDebug('debug', `Indexed file: ${file.name}`);
     }
     
     /**
@@ -217,7 +222,7 @@ class SearchController extends BaseController {
         };
         
         this.playlistIndex.set(playlist.id, indexed);
-        this.logger.debug('SearchController', `Indexed playlist: ${playlist.name}`);
+        this.logDebug('debug', `Indexed playlist: ${playlist.name}`);
     }
     
     /**
@@ -247,7 +252,7 @@ class SearchController extends BaseController {
      */
     removeFromIndex(fileId) {
         this.fileIndex.delete(fileId);
-        this.logger.debug('SearchController', `Removed file from index: ${fileId}`);
+        this.logDebug('debug', `Removed file from index: ${fileId}`);
     }
     
     /**
@@ -255,14 +260,14 @@ class SearchController extends BaseController {
      */
     removePlaylistFromIndex(playlistId) {
         this.playlistIndex.delete(playlistId);
-        this.logger.debug('SearchController', `Removed playlist from index: ${playlistId}`);
+        this.logDebug('debug', `Removed playlist from index: ${playlistId}`);
     }
     
     /**
      * Réindexation complète
      */
     reindexAll(files = [], playlists = []) {
-        this.logger.info('SearchController', 'Reindexing all content...');
+        this.logDebug('info', 'Reindexing all content...');
         
         // Vider les index
         this.fileIndex.clear();
@@ -272,7 +277,7 @@ class SearchController extends BaseController {
         files.forEach(file => this.indexFile(file));
         playlists.forEach(playlist => this.indexPlaylist(playlist));
         
-        this.logger.info('SearchController', `Reindexed ${files.length} files and ${playlists.length} playlists`);
+        this.logDebug('info', `Reindexed ${files.length} files and ${playlists.length} playlists`);
     }
     
     /**
@@ -283,7 +288,7 @@ class SearchController extends BaseController {
         this.playlistIndex.clear();
         this.lastQuery = '';
         this.lastResults = [];
-        this.logger.info('SearchController', 'Search index cleared');
+        this.logDebug('info', 'Search index cleared');
     }
     
     /**
@@ -315,7 +320,7 @@ class SearchController extends BaseController {
      */
     setConfig(config) {
         Object.assign(this.config, config);
-        this.logger.debug('SearchController', 'Configuration updated');
+        this.logDebug('debug', 'Configuration updated');
     }
     
     getConfig() {
@@ -323,8 +328,14 @@ class SearchController extends BaseController {
     }
 }
 
-// Exposition globale pour compatibilité
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SearchController;
+}
+
 if (typeof window !== 'undefined') {
     window.SearchController = SearchController;
 }
-window.SearchController = SearchController;
