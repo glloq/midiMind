@@ -768,6 +768,74 @@ shouldCleanCache() {
     generateId() {
         return `${this.constructor.name.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
+
+    /**
+     * Obtenir un modèle de manière sécurisée
+     * @param {string} name - Nom du modèle
+     * @returns {Object|null} Modèle ou null
+     */
+    getModel(name) {
+        if (!this.models || typeof this.models !== 'object') {
+            return null;
+        }
+        return this.models[name] || null;
+    }
+
+    /**
+     * Obtenir une vue de manière sécurisée
+     * @param {string} name - Nom de la vue
+     * @returns {Object|null} Vue ou null
+     */
+    getView(name) {
+        if (!this.views || typeof this.views !== 'object') {
+            return null;
+        }
+        return this.views[name] || null;
+    }
+
+    /**
+     * Définir un modèle
+     * @param {string} name - Nom du modèle
+     * @param {Object} model - Instance du modèle
+     */
+    setModel(name, model) {
+        if (!this.models || typeof this.models !== 'object') {
+            this.models = {};
+        }
+        this.models[name] = model;
+        this.logDebug('info', `Model '${name}' set`);
+    }
+
+    /**
+     * Définir une vue
+     * @param {string} name - Nom de la vue
+     * @param {Object} view - Instance de la vue
+     */
+    setView(name, view) {
+        if (!this.views || typeof this.views !== 'object') {
+            this.views = {};
+        }
+        this.views[name] = view;
+        this.logDebug('info', `View '${name}' set`);
+    }
+
+    /**
+     * Vérifier si un modèle existe
+     * @param {string} name - Nom du modèle
+     * @returns {boolean} True si le modèle existe
+     */
+    hasModel(name) {
+        return this.getModel(name) !== null;
+    }
+
+    /**
+     * Vérifier si une vue existe
+     * @param {string} name - Nom de la vue
+     * @returns {boolean} True si la vue existe
+     */
+    hasView(name) {
+        return this.getView(name) !== null;
+    }
 }
 // ============================================================================
 // EXPORT
