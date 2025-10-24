@@ -1,7 +1,28 @@
-/**
- * HomeView.js
- * Vue de la page d'accueil avec player et visualizer live
- */
+// ============================================================================
+// Fichier: frontend/js/views/HomeView.js
+// Version: v3.0.1 - CORRECTED LOGGER AND LIVEVISUALIZER
+// Date: 2025-10-24
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// ============================================================================
+// CORRECTIONS v3.0.1:
+// ✅ Fixed logger: use window.logger (instance) instead of window.Logger (class)
+// ✅ Fixed LiveVisualizer: added check for class existence to prevent ReferenceError
+// ✅ Graceful degradation: visualizer features disabled if LiveVisualizer not available
+// ============================================================================
+// Description:
+//   Vue de la page d'accueil avec player et visualizer live
+//
+// Fonctionnalités:
+//   - Player MIDI avec contrôles de lecture
+//   - Visualizer live des notes (si LiveVisualizer disponible)
+//   - Sélection et chargement de fichiers MIDI
+//   - Affichage des statistiques de lecture
+//
+// Note:
+//   LiveVisualizer est optionnel. Si la classe n'est pas disponible,
+//   l'application fonctionnera sans le visualizer (dégradation gracieuse).
+// ============================================================================
+
 
 class HomeView {
     constructor(container) {
@@ -21,7 +42,7 @@ class HomeView {
         
         this.visualizer = null;
         this.currentFile = null;
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
     }
 
     /**
@@ -245,12 +266,22 @@ class HomeView {
         const canvas = document.getElementById('visualizerCanvas');
         
         if (canvas) {
-            this.visualizer = new LiveVisualizer(canvas, {
-                previewTime: 2000,
-                showVelocity: true,
-                showCC: false,
-                showNoteNames: true
-            });
+            // Check if LiveVisualizer class exists
+            if (typeof LiveVisualizer !== 'undefined') {
+                this.visualizer = new LiveVisualizer(canvas, {
+                    previewTime: 2000,
+                    showVelocity: true,
+                    showCC: false,
+                    showNoteNames: true
+                });
+            } else {
+                // LiveVisualizer not implemented yet - visualizer will remain null
+                // This is not an error, just a feature not yet implemented
+                if (this.logger && this.logger.info) {
+                    this.logger.info('HomeView', 'LiveVisualizer class not found - visualizer disabled');
+                }
+                console.info('[HomeView] LiveVisualizer not implemented - visualizer features disabled');
+            }
         }
     }
 
