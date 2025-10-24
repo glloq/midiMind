@@ -378,7 +378,7 @@ window.addEventListener('error', (event) => {
             `Unhandled error: ${errorMessage}`, 
             'error'
         );
-    
+    }
 });
 
 // Capturer les promesses rejetÃ©es
