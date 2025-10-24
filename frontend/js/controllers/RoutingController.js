@@ -1112,6 +1112,7 @@ class RoutingController extends BaseController {
             this.showError('Route test failed');
             return false;
         }
+    }
     
     
     // ========================================================================

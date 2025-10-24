@@ -1070,14 +1070,9 @@ buildFileInfo(file) {
         ];
         return colors[channel % colors.length];
     }
-}
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = HomeView;
 
     // ========================================================================
-    // 🔧 MÉTHODES UTILITAIRES (ajoutées pour compatibilité)
+    // 🔧 MÉTHODES UTILITAIRES
     // ========================================================================
     
     /**
@@ -1141,5 +1136,16 @@ if (typeof module !== 'undefined' && module.exports) {
             </div>
         `;
     }
+}
 
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = HomeView;
+}
+
+if (typeof window !== 'undefined') {
+    window.HomeView = HomeView;
 }
