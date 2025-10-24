@@ -363,9 +363,9 @@ class Application {
         // PlaylistController
         if (window.PlaylistController) {
             this.controllers.playlist = new PlaylistController(
+                eventBus,
                 this.models.playlist,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -373,10 +373,10 @@ class Application {
         // InstrumentController
         if (window.InstrumentController) {
             this.controllers.instrument = new InstrumentController(
+                eventBus,
                 this.models.instrument,
                 this.views.instrument,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -384,9 +384,9 @@ class Application {
         // PlaybackController
         if (window.PlaybackController) {
             this.controllers.playback = new PlaybackController(
+                eventBus,
                 this.models.playback,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -394,9 +394,9 @@ class Application {
         // GlobalPlaybackController
         if (window.GlobalPlaybackController) {
             this.controllers.globalPlayback = new GlobalPlaybackController(
+                eventBus,
                 this.models.playback,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -404,10 +404,10 @@ class Application {
         // SystemController
         if (window.SystemController) {
             this.controllers.system = new SystemController(
+                eventBus,
                 this.models.system,
                 this.views.system,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -415,8 +415,8 @@ class Application {
         // SearchController
         if (window.SearchController) {
             this.controllers.search = new SearchController(
-                this.models.file,
                 eventBus,
+                this.models.file,
                 logger
             );
         }
@@ -424,9 +424,9 @@ class Application {
         // RoutingController
         if (window.RoutingController) {
             this.controllers.routing = new RoutingController(
+                eventBus,
                 this.models.routing,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -434,10 +434,10 @@ class Application {
         // EditorController
         if (window.EditorController) {
             this.controllers.editor = new EditorController(
+                eventBus,
                 this.models.editor,
                 this.views.editor,
                 this.services.backend,
-                eventBus,
                 logger
             );
         }
@@ -445,9 +445,9 @@ class Application {
         // HomeController
         if (window.HomeController) {
             this.controllers.home = new HomeController(
+                eventBus,
                 this.models.file,
                 this.views.home,
-                eventBus,
                 logger
             );
         }
