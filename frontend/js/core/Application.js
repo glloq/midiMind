@@ -284,6 +284,9 @@ class Application {
         // HomeView
         if (window.HomeView) {
             this.views.home = new HomeView('home', eventBus);
+            if (this.views.home && typeof this.views.home.init === 'function') {
+                this.views.home.init();
+            }
         }
         
         // FileView - Skip: no container in HTML

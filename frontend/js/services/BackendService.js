@@ -357,13 +357,16 @@ class BackendService {
                 return;
             }
             
-            // Gérer les réponses aux requêtes
-            if (data.requestId && this.pendingRequests.has(data.requestId)) {
-                const { resolve, reject } = this.pendingRequests.get(data.requestId);
-                this.pendingRequests.delete(data.requestId);
+            // Gérer les réponses aux requêtes (format backend)
+            if ((data.type === 'response' || data.requestId || data.id) && 
+                (this.pendingRequests.has(data.requestId) || this.pendingRequests.has(data.id))) {
                 
-                if (data.error) {
-                    reject(new Error(data.error));
+                const reqId = data.id || data.requestId;
+                const { resolve, reject } = this.pendingRequests.get(reqId);
+                this.pendingRequests.delete(reqId);
+                
+                if (data.success === false || data.error) {
+                    reject(new Error(data.error || 'Command failed'));
                 } else {
                     resolve(data);
                 }
@@ -420,7 +423,7 @@ class BackendService {
                 return;
             }
             
-            const requestId = ++this.requestId;
+            const requestId = 'req_' + Date.now() + '_' + (++this.requestId);
             
             // Enregistrer la requête en attente
             this.pendingRequests.set(requestId, { resolve, reject });
@@ -433,12 +436,13 @@ class BackendService {
                 }
             }, 30000);
             
-            // Envoyer la commande
+            // Envoyer au format backend
             this.send({
-                type: 'command',
-                command,
-                params,
-                requestId
+                id: requestId,
+                type: 'request',
+                timestamp: new Date().toISOString(),
+                command: command,
+                params: params
             });
         });
     }
