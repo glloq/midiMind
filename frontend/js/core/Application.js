@@ -74,7 +74,7 @@ class Application {
         
         // Configuration
         this.config = {
-            backendUrl: 'ws://localhost:8080',
+            backendUrl: window.MIDIMIND_BACKEND_URL || `ws://${window.location.hostname}:8080`,
             autoReconnect: true,
             reconnectInterval: 5000,
             logLevel: 'debug',
