@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.5.0 - FIXED CONNECTION STABILITY
+// Version: v3.6.0 - FIXED HEARTBEAT PROTOCOL COMPATIBILITY
 // Date: 2025-10-24
 // ============================================================================
-// CORRECTIONS v3.5.0:
-// ✅ Heartbeat avec détection de timeout (connexion morte)
-// ✅ Événements cohérents avec Application.js
-// ✅ Ping/Pong bidirectionnel avec timestamps
-// ✅ Détection automatique de connexion morte
-// ✅ Logs améliorés pour debugging
+// CORRECTIONS v3.6.0:
+// ✅ FIX CRITIQUE: Utilise sendCommand('system.status') pour heartbeat
+// ✅ Compatible avec le protocole backend réel (request/response)
+// ✅ Détection robuste de connexion morte
+// ✅ Watchdog sur les réponses (pas seulement les pongs)
+// ✅ Logs détaillés pour debugging
 // ============================================================================
 
 class BackendService {
@@ -30,8 +30,8 @@ class BackendService {
             maxReconnectInterval: 30000,
             reconnectDecay: 1.5,
             timeoutInterval: 5000,
-            heartbeatInterval: 15000,      // ✅ RÉDUIT: 15s au lieu de 30s
-            heartbeatTimeout: 10000,       // ✅ NOUVEAU: timeout pour pong
+            heartbeatInterval: 20000,      // Vérifier toutes les 20s
+            heartbeatTimeout: 45000,       // Considérer mort si pas de réponse depuis 45s
             maxReconnectAttempts: 5
         };
         
@@ -39,9 +39,12 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
-        this.heartbeatTimeoutTimer = null;  // ✅ NOUVEAU
         this.connectionTimeout = null;
-        this.lastPongTime = Date.now();     // ✅ NOUVEAU
+        
+        // ✅ NOUVEAU: Suivi de l'activité backend
+        this.lastActivityTime = Date.now();  // Toute réponse = activité
+        this.heartbeatPending = false;       // Éviter ping en double
+        this.heartbeatFailures = 0;          // Compteur d'échecs consécutifs
         
         // File d'attente des messages
         this.messageQueue = [];
@@ -51,7 +54,7 @@ class BackendService {
         this.requestId = 0;
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized');
+        this.logger.info('BackendService', 'Service initialized (v3.6.0)');
     }
     
     /**
@@ -124,11 +127,11 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.offlineMode = false;
         this.reconnectionStopped = false;
-        this.lastPongTime = Date.now();  // ✅ Réinitialiser
+        this.lastActivityTime = Date.now();
+        this.heartbeatFailures = 0;
         
         this.logger.info('BackendService', '✓ Connected to backend');
         
-        // ✅ Événement avec détails
         this.eventBus.emit('backend:connected', {
             url: this.config.url,
             timestamp: Date.now()
@@ -156,7 +159,6 @@ class BackendService {
         
         this.logger.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
         
-        // ✅ CORRIGÉ: Émettre 'backend:disconnected' (pas websocket:)
         this.eventBus.emit('backend:disconnected', { 
             code, 
             reason,
@@ -164,7 +166,7 @@ class BackendService {
             offlineMode: this.offlineMode
         });
         
-        // Tenter une reconnexion automatique seulement si pas proprement fermé
+        // Tenter une reconnexion automatique
         if (!event.wasClean && !this.reconnectionStopped) {
             this.scheduleReconnect();
         } else if (this.reconnectionStopped) {
@@ -237,84 +239,97 @@ class BackendService {
         });
         
         this.reconnectTimer = setTimeout(() => {
-            this.logger.info('BackendService', `Attempting reconnection (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})...`);
+            this.logger.info('BackendService', 'Attempting reconnection...');
             this.connect();
         }, delay);
     }
     
     /**
-     * Entre en mode offline graceful
+     * Entre en mode offline
      */
     enterOfflineMode() {
-        this.offlineMode = true;
-        this.connected = false;
-        this.connecting = false;
-        this.reconnectionStopped = true;
+        if (this.offlineMode) return;
         
-        this.logger.warn('BackendService', '📴 Entering offline mode - manual reconnection required');
+        this.offlineMode = true;
+        this.logger.warn('BackendService', '⚠️ Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
-            reason: 'max_reconnect_attempts_reached',
+            reason: 'Max reconnection attempts reached',
             timestamp: Date.now()
         });
     }
     
     /**
-     * Reconnexion manuelle (appelée depuis l'UI)
-     */
-    async reconnectManually() {
-        this.logger.info('BackendService', '🔄 Manual reconnection requested');
-        
-        // Réinitialiser les compteurs
-        this.reconnectAttempts = 0;
-        this.reconnectionStopped = false;
-        this.offlineMode = false;
-        
-        // Annuler timer existant
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        this.eventBus.emit('backend:manual-reconnect-attempt');
-        
-        return await this.connect();
-    }
-    
-    /**
-     * ✅ AMÉLIORÉ: Démarre le heartbeat avec détection de timeout
+     * ✅ NOUVEAU: Démarre le heartbeat avec vraies commandes backend
      */
     startHeartbeat() {
         this.stopHeartbeat();
         
-        this.logger.debug('BackendService', '💓 Starting heartbeat');
+        this.logger.debug('BackendService', 
+            `Starting heartbeat (interval: ${this.config.heartbeatInterval}ms, timeout: ${this.config.heartbeatTimeout}ms)`);
         
-        // Envoyer ping régulièrement
         this.heartbeatTimer = setInterval(() => {
-            if (this.connected) {
-                const timeSinceLastPong = Date.now() - this.lastPongTime;
-                
-                // ✅ NOUVEAU: Vérifier si connexion morte
-                if (timeSinceLastPong > this.config.heartbeatTimeout + this.config.heartbeatInterval) {
-                    this.logger.error('BackendService', 
-                        `❌ Heartbeat timeout (${timeSinceLastPong}ms since last pong)`);
-                    
-                    // Fermer connexion morte
-                    if (this.ws) {
-                        this.ws.close(1000, 'Heartbeat timeout');
-                    }
-                    return;
-                }
-                
-                // Envoyer ping avec timestamp
-                this.send({ 
-                    type: 'ping',
-                    timestamp: Date.now()
-                });
-                
-                this.logger.debug('BackendService', '📤 Ping sent');
-            }
+            this.performHeartbeat();
         }, this.config.heartbeatInterval);
+    }
+    
+    /**
+     * ✅ NOUVEAU: Effectue un heartbeat via system.status
+     */
+    async performHeartbeat() {
+        if (!this.connected) {
+            this.logger.debug('BackendService', 'Heartbeat skipped (not connected)');
+            return;
+        }
+        
+        const timeSinceActivity = Date.now() - this.lastActivityTime;
+        
+        // Vérifier si le backend répond encore
+        if (timeSinceActivity > this.config.heartbeatTimeout) {
+            this.heartbeatFailures++;
+            this.logger.error('BackendService', 
+                `❌ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+            
+            if (this.heartbeatFailures >= 2) {
+                // Après 2 échecs consécutifs, forcer reconnexion
+                this.logger.error('BackendService', '💀 Connection dead, forcing reconnect');
+                this.forceReconnect('Heartbeat timeout - connection dead');
+                return;
+            }
+        }
+        
+        // Si déjà un heartbeat en cours, attendre
+        if (this.heartbeatPending) {
+            this.logger.debug('BackendService', 'Heartbeat pending, skipping');
+            return;
+        }
+        
+        // Envoyer un system.status comme heartbeat
+        try {
+            this.heartbeatPending = true;
+            this.logger.debug('BackendService', '💓 Sending heartbeat (system.status)');
+            
+            const startTime = Date.now();
+            await this.sendCommand('system.status');
+            const latency = Date.now() - startTime;
+            
+            this.heartbeatPending = false;
+            this.heartbeatFailures = 0;  // Reset sur succès
+            
+            this.logger.debug('BackendService', `✓ Heartbeat OK (latency: ${latency}ms)`);
+            
+        } catch (error) {
+            this.heartbeatPending = false;
+            this.heartbeatFailures++;
+            
+            this.logger.warn('BackendService', 
+                `⚠️ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+            
+            if (this.heartbeatFailures >= 3) {
+                this.logger.error('BackendService', '💀 Multiple heartbeat failures, forcing reconnect');
+                this.forceReconnect('Multiple heartbeat failures');
+            }
+        }
     }
     
     /**
@@ -324,61 +339,67 @@ class BackendService {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
             this.heartbeatTimer = null;
-            this.logger.debug('BackendService', '💔 Heartbeat stopped');
-        }
-        
-        if (this.heartbeatTimeoutTimer) {
-            clearTimeout(this.heartbeatTimeoutTimer);
-            this.heartbeatTimeoutTimer = null;
+            this.heartbeatPending = false;
         }
     }
     
     /**
-     * ✅ AMÉLIORÉ: Gère les messages reçus
+     * ✅ NOUVEAU: Force une reconnexion immédiate
+     */
+    forceReconnect(reason) {
+        this.logger.warn('BackendService', `Forcing reconnect: ${reason}`);
+        
+        this.stopHeartbeat();
+        
+        if (this.ws) {
+            this.ws.close(1000, reason);
+            this.ws = null;
+        }
+        
+        this.connected = false;
+        this.connecting = false;
+        
+        // Reconnexion immédiate (sans backoff)
+        setTimeout(() => {
+            this.connect();
+        }, 1000);
+    }
+    
+    /**
+     * Gère les messages reçus
      */
     handleMessage(event) {
         try {
             const data = JSON.parse(event.data);
             
-            // ✅ AMÉLIORÉ: Gérer les pings et pongs
-            if (data.type === 'ping') {
-                this.send({ 
-                    type: 'pong',
-                    timestamp: data.timestamp || Date.now()
-                });
-                this.logger.debug('BackendService', '📥 Ping received, pong sent');
-                return;
-            }
+            // ✅ Toute réponse/event = activité backend
+            this.lastActivityTime = Date.now();
             
-            if (data.type === 'pong') {
-                this.lastPongTime = Date.now();
-                const latency = data.timestamp ? Date.now() - data.timestamp : 0;
-                this.logger.debug('BackendService', `📥 Pong received (latency: ${latency}ms)`);
-                return;
-            }
-            
-            // Gérer les réponses aux requêtes (format backend)
-            if ((data.type === 'response' || data.requestId || data.id) && 
-                (this.pendingRequests.has(data.requestId) || this.pendingRequests.has(data.id))) {
-                
-                const reqId = data.id || data.requestId;
-                const { resolve, reject } = this.pendingRequests.get(reqId);
-                this.pendingRequests.delete(reqId);
-                
-                if (data.success === false || data.error) {
-                    reject(new Error(data.error || 'Command failed'));
-                } else {
-                    resolve(data);
+            // Gérer les réponses aux requêtes
+            if (data.type === 'response' && data.id) {
+                const pending = this.pendingRequests.get(data.id);
+                if (pending) {
+                    this.pendingRequests.delete(data.id);
+                    
+                    if (data.success) {
+                        pending.resolve(data.data);
+                    } else {
+                        pending.reject(new Error(data.error?.message || 'Unknown error'));
+                    }
                 }
-                return;
             }
             
             // Émettre événement générique
             this.eventBus.emit('backend:message', data);
             
-            // Émettre également un événement spécifique au type
+            // Émettre événement spécifique au type
             if (data.type) {
                 this.eventBus.emit(`backend:${data.type}`, data);
+            }
+            
+            // Émettre événement pour les events nommés
+            if (data.type === 'event' && data.name) {
+                this.eventBus.emit(`backend:event:${data.name}`, data.data);
             }
             
         } catch (error) {
@@ -391,14 +412,12 @@ class BackendService {
      */
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            // Ajouter à la file d'attente (sauf pour ping/pong)
-            if (data.type !== 'ping' && data.type !== 'pong') {
-                if (this.messageQueue.length < this.maxQueueSize) {
-                    this.messageQueue.push(data);
-                    this.logger.debug('BackendService', 'Message queued (not connected)');
-                } else {
-                    this.logger.warn('BackendService', 'Message queue full, dropping message');
-                }
+            // Ajouter à la file d'attente
+            if (this.messageQueue.length < this.maxQueueSize) {
+                this.messageQueue.push(data);
+                this.logger.debug('BackendService', 'Message queued (not connected)');
+            } else {
+                this.logger.warn('BackendService', 'Message queue full, dropping message');
             }
             return false;
         }
@@ -414,7 +433,7 @@ class BackendService {
     }
     
     /**
-     * Envoie une commande au backend et attend la réponse
+     * Envoie une commande au backend et attend la réponse (format protocole backend)
      */
     async sendCommand(command, params = {}) {
         return new Promise((resolve, reject) => {
@@ -425,16 +444,25 @@ class BackendService {
             
             const requestId = 'req_' + Date.now() + '_' + (++this.requestId);
             
-            // Enregistrer la requête en attente
-            this.pendingRequests.set(requestId, { resolve, reject });
-            
             // Timeout après 30 secondes
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
                     reject(new Error('Command timeout'));
                 }
             }, 30000);
+            
+            // Enregistrer avec cleanup du timeout
+            this.pendingRequests.set(requestId, {
+                resolve: (data) => {
+                    clearTimeout(timeout);
+                    resolve(data);
+                },
+                reject: (error) => {
+                    clearTimeout(timeout);
+                    reject(error);
+                }
+            });
             
             // Envoyer au format backend
             this.send({
@@ -466,7 +494,7 @@ class BackendService {
                         new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
                     
-                    const response = await this.sendCommand('upload_file', {
+                    const response = await this.sendCommand('file.upload', {
                         filename: file.name,
                         data: base64Data,
                         size: file.size,
@@ -492,35 +520,55 @@ class BackendService {
     // ========================================================================
     
     async listDevices() {
-        return this.sendCommand('list_devices');
+        return this.sendCommand('device.list');
     }
     
     async getRouting() {
-        return this.sendCommand('get_routing');
+        return this.sendCommand('route.list');
     }
     
     async setChannelRouting(channelId, deviceId) {
-        return this.sendCommand('set_channel_routing', { channelId, deviceId });
+        return this.sendCommand('route.update', { 
+            channel_id: channelId, 
+            device_id: deviceId 
+        });
     }
     
     async setChannelVolume(channelId, volume) {
-        return this.sendCommand('set_channel_volume', { channelId, volume });
+        return this.sendCommand('midi.send_cc', { 
+            channel: channelId, 
+            controller: 7, 
+            value: volume 
+        });
     }
     
     async setChannelPan(channelId, pan) {
-        return this.sendCommand('set_channel_pan', { channelId, pan });
+        return this.sendCommand('midi.send_cc', { 
+            channel: channelId, 
+            controller: 10, 
+            value: pan 
+        });
     }
     
     async muteChannel(channelId, muted) {
-        return this.sendCommand('mute_channel', { channelId, muted });
+        return this.sendCommand('route.update', { 
+            channel_id: channelId, 
+            muted: muted 
+        });
     }
     
     async soloChannel(channelId, soloed) {
-        return this.sendCommand('solo_channel', { channelId, soloed });
+        return this.sendCommand('route.update', { 
+            channel_id: channelId, 
+            soloed: soloed 
+        });
     }
     
     async setChannelTranspose(channelId, semitones) {
-        return this.sendCommand('set_channel_transpose', { channelId, semitones });
+        return this.sendCommand('route.update', { 
+            channel_id: channelId, 
+            transpose: semitones 
+        });
     }
     
     /**
@@ -542,6 +590,7 @@ class BackendService {
      */
     disconnect() {
         this.stopHeartbeat();
+        this.reconnectionStopped = true;
         
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -564,6 +613,20 @@ class BackendService {
         this.reconnectAttempts = 0;
         
         this.logger.info('BackendService', 'Disconnected');
+    }
+    
+    /**
+     * Réactive la reconnexion automatique
+     */
+    enableReconnection() {
+        this.reconnectionStopped = false;
+        this.offlineMode = false;
+        this.reconnectAttempts = 0;
+        
+        if (!this.connected && !this.connecting) {
+            this.logger.info('BackendService', 'Reconnection enabled, attempting to connect');
+            this.connect();
+        }
     }
     
     /**
@@ -610,8 +673,10 @@ class BackendService {
             state: this.getConnectionState(),
             queuedMessages: this.messageQueue.length,
             url: this.config.url,
-            lastPongTime: this.lastPongTime,
-            timeSinceLastPong: Date.now() - this.lastPongTime
+            lastActivityTime: this.lastActivityTime,
+            timeSinceActivity: Date.now() - this.lastActivityTime,
+            heartbeatFailures: this.heartbeatFailures,
+            heartbeatPending: this.heartbeatPending
         };
     }
 }
