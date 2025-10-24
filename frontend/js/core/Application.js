@@ -779,6 +779,13 @@ initPageController(page) {
         // Erreurs JavaScript non capturées
         window.addEventListener('error', (event) => {
             const error = event.error || event.message || 'Unknown error';
+            
+            // Ignorer erreur ResizeObserver (bénigne)
+            const errorMsg = typeof error === 'string' ? error : error.message;
+            if (errorMsg && errorMsg.includes('ResizeObserver')) {
+                return;
+            }
+            
             if (this.logger && this.logger.error) {
                 this.logger.error('Application', 'Uncaught error:', error);
             }

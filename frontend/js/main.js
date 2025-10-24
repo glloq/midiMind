@@ -371,6 +371,11 @@ window.addEventListener('error', (event) => {
         ? event.error.message 
         : (event.message || 'Unknown error');
     
+    // Ignorer erreur ResizeObserver (bénigne)
+    if (errorMessage.includes('ResizeObserver')) {
+        return;
+    }
+    
     console.error('🔴 Unhandled error:', event.error || errorMessage);
     
     if (window.app && window.app.debugConsole) {
