@@ -1,8 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseModel.js
-// Version: v3.0.2 - CORRECTED (removed ES6 imports)
-// Date: 2025-10-10
+// Version: v3.0.3 - CORRECTED LOGGER INSTANCE
+// Date: 2025-10-24
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// ============================================================================
+// CORRECTIONS v3.0.3:
+// ✅ Fixed logger initialization: use window.logger (instance) instead of window.Logger (class)
+// ✅ This fixes "TypeError: this.logger.debug is not a function" error
 // ============================================================================
 // CORRECTIONS v3.0.2:
 // ✓ Removed ES6 import statements (not compatible with script tags)
@@ -75,7 +79,7 @@ class BaseModel {
         this.eventBus = window.EventBus || null;
         
         // Logger (global)
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         
         // Timers pour debounce
         this._persistTimer = null;
