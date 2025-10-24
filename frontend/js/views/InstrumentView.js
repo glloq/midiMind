@@ -1,7 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v3.0.8 - FIXED (Initialization order corrected)
-// Date: 2025-10-20
+// Version: v3.0.9 - FIXED LOGGER INITIALIZATION
+// Date: 2025-10-24
+// ============================================================================
+// CORRECTIONS v3.0.9:
+// ✅ CRITIQUE: Fixed logger initialization - create instance not class reference
+// ✅ CRITIQUE: Override initialize() to prevent premature render
+// ✅ CRITIQUE: Initialize logger in initialize() before any log calls
+// ✅ Proper fallback to console if Logger not available
 // ============================================================================
 // VERSION ÉQUILIBRÉE - Features utiles sans complexité excessive
 // FIX: Proper initialization order to prevent undefined displayConfig error
@@ -13,6 +19,7 @@ class InstrumentView extends BaseView {
         
         // Configure to prevent auto-render during construction
         this.config.autoRender = false;
+        this.config.name = 'InstrumentView';
         
         // État local
         this.localState = {
@@ -36,20 +43,93 @@ class InstrumentView extends BaseView {
             'virtual': '#95a5a6'
         };
         
-        // Logger safe - MUST be initialized before initialize() is called
-        this.logger = window.Logger || console;
-        
-        this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
+        // Logger - sera initialisé dans initialize()
+        this.logger = null;
     }
     
-    // Override initialize to prevent BaseView from calling render before properties are set
+    /**
+     * OVERRIDE de BaseView.initialize()
+     * Appelée par BaseView constructor AVANT que notre constructor soit fini
+     */
     initialize() {
-        // Don't call super.initialize() - it would call render() with autoRender
-        // Properties are already initialized in constructor
-        // Just do the initial render now that everything is ready
-        if (this.container) {
-            this.render();
+        // CRITIQUE: Initialiser le logger ICI, avant toute utilisation
+        if (!this.logger) {
+            if (typeof window !== 'undefined' && window.Logger) {
+                // Créer une INSTANCE de Logger, pas juste une référence à la classe
+                try {
+                    this.logger = new window.Logger({
+                        level: 'info',
+                        enableConsole: true
+                    });
+                } catch (e) {
+                    console.warn('[InstrumentView] Failed to create Logger instance, using console fallback');
+                    this.logger = console;
+                }
+            } else {
+                // Fallback vers console
+                this.logger = console;
+            }
         }
+        
+        // Initialiser les propriétés critiques si elles n'existent pas encore
+        if (!this.displayConfig) {
+            this.displayConfig = {
+                compactMode: false,
+                showMetrics: true,
+                showCapabilities: true
+            };
+        }
+        
+        if (!this.localState) {
+            this.localState = {
+                selectedInstruments: new Set(),
+                expandedInstruments: new Set(),
+                displayMode: 'normal'
+            };
+        }
+        
+        if (!this.connectionColors) {
+            this.connectionColors = {
+                'usb': '#3498db',
+                'bluetooth': '#9b59b6',
+                'network': '#1abc9c',
+                'virtual': '#95a5a6'
+            };
+        }
+        
+        // Désactiver autoRender
+        this.config.autoRender = false;
+        
+        // Vérifier container
+        if (!this.container) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('InstrumentView', 'Container not found');
+            } else {
+                console.error('[InstrumentView] Container not found');
+            }
+            return;
+        }
+        
+        // Maintenant on peut logger en toute sécurité
+        if (this.logger && this.logger.info) {
+            this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
+        } else {
+            console.log('[InstrumentView] ✓ View initialized (balanced version)');
+        }
+        
+        // Hook personnalisé
+        if (typeof this.onInitialize === 'function') {
+            this.onInitialize();
+        }
+        
+        // Ne PAS rendre automatiquement - le controller le fera
+    }
+    
+    /**
+     * Hook appelé par initialize() après que tout soit prêt
+     */
+    onInitialize() {
+        // Prêt pour le rendu si nécessaire
     }
     
     // ========================================================================
@@ -58,16 +138,20 @@ class InstrumentView extends BaseView {
     
     render(data = {}) {
         if (!this.container) {
-            if (this.logger) {
-                this.logger.warning('InstrumentView', 'Container not found');
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('InstrumentView', 'Container not found');
+            } else {
+                console.warn('[InstrumentView] Container not found');
             }
             return;
         }
         
         // Safety check: ensure displayConfig exists
         if (!this.displayConfig) {
-            if (this.logger) {
-                this.logger.warning('InstrumentView', 'displayConfig not initialized yet, skipping render');
+            if (this.logger && this.logger.warn) {
+                this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
+            } else {
+                console.warn('[InstrumentView] displayConfig not initialized yet, skipping render');
             }
             return;
         }
@@ -79,359 +163,266 @@ class InstrumentView extends BaseView {
                 
                 <!-- Header avec actions -->
                 <div class="instrument-header">
-                    <h2>🎹 MIDI Instruments</h2>
+                    <div class="header-title">
+                        <h2>🎹 Instruments MIDI</h2>
+                        <span class="instrument-count">${instruments.length} instrument${instruments.length > 1 ? 's' : ''}</span>
+                    </div>
+                    
                     <div class="header-actions">
-                        <button id="scan-instruments-btn" class="btn btn-primary">
-                            🔄 Scan Devices
-                        </button>
-                        <button id="toggle-view-btn" class="btn btn-secondary">
-                            ${this.displayConfig.compactMode ? '📋 Normal View' : '📊 Compact View'}
+                        ${this.renderDisplayModeButtons()}
+                        <button class="btn btn-primary" id="btn-refresh-instruments">
+                            🔄 Rafraîchir
                         </button>
                     </div>
                 </div>
                 
-                <!-- Statistiques -->
-                ${this.renderStats(instruments)}
-                
                 <!-- Liste des instruments -->
-                <div class="instrument-list ${this.displayConfig.compactMode ? 'compact' : ''}">
-                    ${instruments.length === 0 ? 
-                        this.renderEmptyState() :
-                        instruments.map(inst => this.renderInstrumentCard(inst)).join('')
+                <div class="instruments-list" id="instruments-list">
+                    ${instruments.length > 0 ? 
+                        instruments.map(inst => this.renderInstrument(inst)).join('') :
+                        this.renderEmptyState()
                     }
                 </div>
-                
             </div>
         `;
         
         this.container.innerHTML = html;
         this.attachEventListeners();
-        
-        if (this.logger) {
-            this.logger.debug('InstrumentView', `Rendered ${instruments.length} instruments`);
-        }
     }
     
     // ========================================================================
-    // RENDU STATISTIQUES
+    // COMPOSANTS UI
     // ========================================================================
     
-    renderStats(instruments) {
-        const total = instruments.length;
-        const connected = instruments.filter(i => i.connected).length;
-        const disconnected = total - connected;
-        
+    renderDisplayModeButtons() {
         return `
-            <div class="instrument-stats">
-                <div class="stat-card">
-                    <span class="stat-icon">📊</span>
-                    <div class="stat-info">
-                        <span class="stat-value">${total}</span>
-                        <span class="stat-label">Total</span>
-                    </div>
-                </div>
-                <div class="stat-card connected">
-                    <span class="stat-icon">🟢</span>
-                    <div class="stat-info">
-                        <span class="stat-value">${connected}</span>
-                        <span class="stat-label">Connected</span>
-                    </div>
-                </div>
-                <div class="stat-card disconnected">
-                    <span class="stat-icon">🔴</span>
-                    <div class="stat-info">
-                        <span class="stat-value">${disconnected}</span>
-                        <span class="stat-label">Disconnected</span>
-                    </div>
-                </div>
+            <div class="display-mode-buttons">
+                <button class="btn btn-sm ${this.localState.displayMode === 'normal' ? 'active' : ''}" 
+                        data-mode="normal" title="Vue normale">
+                    📋
+                </button>
+                <button class="btn btn-sm ${this.localState.displayMode === 'compact' ? 'active' : ''}" 
+                        data-mode="compact" title="Vue compacte">
+                    ⬜
+                </button>
+                <button class="btn btn-sm ${this.localState.displayMode === 'detailed' ? 'active' : ''}" 
+                        data-mode="detailed" title="Vue détaillée">
+                    📊
+                </button>
             </div>
         `;
     }
     
-    // ========================================================================
-    // RENDU CARTE INSTRUMENT
-    // ========================================================================
-    
-    renderInstrumentCard(instrument) {
-        const isSelected = this.localState.selectedInstruments.has(instrument.id);
+    renderInstrument(instrument) {
         const isExpanded = this.localState.expandedInstruments.has(instrument.id);
-        const connectionColor = this.connectionColors[instrument.type] || '#95a5a6';
-        
-        const cardClasses = [
-            'instrument-card',
-            instrument.connected ? 'connected' : 'disconnected',
-            isSelected ? 'selected' : '',
-            isExpanded ? 'expanded' : ''
-        ].filter(Boolean).join(' ');
+        const isSelected = this.localState.selectedInstruments.has(instrument.id);
         
         return `
-            <div class="${cardClasses}" 
-                 data-instrument-id="${instrument.id}"
-                 style="border-left: 4px solid ${connectionColor}">
-                
-                ${this.renderCardHeader(instrument)}
-                
-                ${isExpanded ? this.renderCardBody(instrument) : ''}
-                
-                ${this.renderCardFooter(instrument)}
-                
-            </div>
-        `;
-    }
-    
-    // ========================================================================
-    // RENDU HEADER CARTE
-    // ========================================================================
-    
-    renderCardHeader(instrument) {
-        const statusIcon = instrument.connected ? '🟢' : '🔴';
-        const statusText = instrument.connected ? 'Connected' : 'Disconnected';
-        
-        return `
-            <div class="card-header">
-                <div class="instrument-info">
-                    <div class="info-row">
-                        <span class="status-indicator">${statusIcon}</span>
-                        <h3 class="instrument-name">${this.escapeHtml(instrument.name)}</h3>
+            <div class="instrument-card ${isSelected ? 'selected' : ''}" data-instrument-id="${instrument.id}">
+                <div class="instrument-header-card">
+                    <div class="instrument-info">
+                        ${this.renderConnectionBadge(instrument.connection_type)}
+                        <h3 class="instrument-name">${this.escapeHTML(instrument.name || instrument.id)}</h3>
+                        ${instrument.port ? `<span class="instrument-port">${this.escapeHTML(instrument.port)}</span>` : ''}
                     </div>
-                    <div class="info-row details">
-                        <span class="instrument-type">${instrument.type || 'MIDI'}</span>
-                        ${instrument.manufacturer ? 
-                            `<span class="instrument-manufacturer">${this.escapeHtml(instrument.manufacturer)}</span>` :
-                            ''
-                        }
-                        <span class="instrument-status">${statusText}</span>
+                    
+                    <div class="instrument-actions">
+                        ${this.renderInstrumentStatus(instrument)}
+                        <button class="btn-icon btn-expand" data-action="toggle-expand" title="${isExpanded ? 'Réduire' : 'Développer'}">
+                            ${isExpanded ? '▼' : '▶'}
+                        </button>
                     </div>
                 </div>
                 
-                <div class="card-actions">
-                    <button class="btn-icon expand-btn" 
-                            data-id="${instrument.id}"
-                            title="Show details">
-                        ${this.localState.expandedInstruments.has(instrument.id) ? '▼' : '▶'}
-                    </button>
-                </div>
+                ${isExpanded ? this.renderInstrumentDetails(instrument) : ''}
             </div>
         `;
     }
     
-    // ========================================================================
-    // RENDU BODY CARTE (DÉTAILS)
-    // ========================================================================
-    
-    renderCardBody(instrument) {
-        return `
-            <div class="card-body">
-                
-                <!-- Informations détaillées -->
-                <div class="detailed-info">
-                    ${instrument.model ? 
-                        `<div class="info-item">
-                            <strong>Model:</strong> ${this.escapeHtml(instrument.model)}
-                        </div>` : ''
-                    }
-                    ${instrument.id ? 
-                        `<div class="info-item">
-                            <strong>ID:</strong> <code>${this.escapeHtml(instrument.id)}</code>
-                        </div>` : ''
-                    }
-                    ${instrument.port ? 
-                        `<div class="info-item">
-                            <strong>Port:</strong> ${this.escapeHtml(instrument.port)}
-                        </div>` : ''
-                    }
-                </div>
-                
-                <!-- Capabilities -->
-                ${this.renderCapabilities(instrument)}
-                
-                <!-- Metrics -->
-                ${this.renderMetrics(instrument)}
-                
-            </div>
-        `;
-    }
-    
-    // ========================================================================
-    // RENDU CAPABILITIES
-    // ========================================================================
-    
-    renderCapabilities(instrument) {
-        if (!this.displayConfig.showCapabilities || !instrument.capabilities) {
-            return '';
-        }
-        
-        const caps = instrument.capabilities;
+    renderConnectionBadge(type) {
+        const color = this.connectionColors[type] || '#95a5a6';
+        const icons = {
+            'usb': '🔌',
+            'bluetooth': '📶',
+            'network': '🌐',
+            'virtual': '💻'
+        };
+        const icon = icons[type] || '❓';
         
         return `
-            <div class="capabilities">
-                <h4>Capabilities</h4>
-                <div class="capability-tags">
-                    ${caps.input ? '<span class="cap-tag">📥 Input</span>' : ''}
-                    ${caps.output ? '<span class="cap-tag">📤 Output</span>' : ''}
-                    ${caps.clock ? '<span class="cap-tag">🕐 Clock</span>' : ''}
-                    ${caps.program ? '<span class="cap-tag">🎛️ Program</span>' : ''}
-                </div>
-            </div>
+            <span class="connection-badge" style="background-color: ${color};" title="${type}">
+                ${icon}
+            </span>
         `;
     }
     
-    // ========================================================================
-    // RENDU METRICS
-    // ========================================================================
+    renderInstrumentStatus(instrument) {
+        const isActive = instrument.status === 'active' || instrument.is_connected;
+        
+        return `
+            <span class="status-indicator ${isActive ? 'active' : 'inactive'}" 
+                  title="${isActive ? 'Connecté' : 'Déconnecté'}">
+                ${isActive ? '🟢' : '🔴'}
+            </span>
+        `;
+    }
+    
+    renderInstrumentDetails(instrument) {
+        return `
+            <div class="instrument-details">
+                ${this.displayConfig.showMetrics ? this.renderMetrics(instrument) : ''}
+                ${this.displayConfig.showCapabilities ? this.renderCapabilities(instrument) : ''}
+                ${this.renderActions(instrument)}
+            </div>
+        `;
+    }
     
     renderMetrics(instrument) {
-        if (!this.displayConfig.showMetrics || !instrument.metrics) {
-            return '';
-        }
-        
-        const metrics = instrument.metrics;
+        const metrics = instrument.metrics || {};
         
         return `
-            <div class="metrics">
-                <h4>Metrics</h4>
-                <div class="metric-grid">
-                    ${metrics.notesReceived !== undefined ? 
-                        `<div class="metric">
-                            <span class="metric-label">Notes Received:</span>
-                            <span class="metric-value">${metrics.notesReceived}</span>
-                        </div>` : ''
-                    }
-                    ${metrics.notesSent !== undefined ? 
-                        `<div class="metric">
-                            <span class="metric-label">Notes Sent:</span>
-                            <span class="metric-value">${metrics.notesSent}</span>
-                        </div>` : ''
-                    }
-                    ${metrics.latency !== undefined ? 
-                        `<div class="metric">
-                            <span class="metric-label">Latency:</span>
-                            <span class="metric-value">${metrics.latency}ms</span>
-                        </div>` : ''
-                    }
+            <div class="instrument-metrics">
+                <h4>Métriques</h4>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-label">Notes jouées</span>
+                        <span class="metric-value">${metrics.notes_played || 0}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Latence</span>
+                        <span class="metric-value">${metrics.latency || 0}ms</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Messages/s</span>
+                        <span class="metric-value">${metrics.messages_per_second || 0}</span>
+                    </div>
                 </div>
             </div>
         `;
     }
     
-    // ========================================================================
-    // RENDU FOOTER CARTE
-    // ========================================================================
-    
-    renderCardFooter(instrument) {
+    renderCapabilities(instrument) {
+        const caps = instrument.capabilities || {};
+        
         return `
-            <div class="card-footer">
-                ${instrument.connected ? 
-                    `<button class="btn btn-sm btn-danger disconnect-btn" 
-                            data-id="${instrument.id}">
-                        🔌 Disconnect
-                    </button>` : 
-                    `<button class="btn btn-sm btn-success connect-btn" 
-                            data-id="${instrument.id}">
-                        🔌 Connect
-                    </button>`
-                }
-                ${instrument.connected ? 
-                    `<button class="btn btn-sm btn-secondary config-btn" 
-                            data-id="${instrument.id}">
-                        ⚙️ Configure
-                    </button>` : ''
-                }
+            <div class="instrument-capabilities">
+                <h4>Capacités</h4>
+                <div class="capabilities-list">
+                    ${caps.channels ? `<span class="capability">📻 ${caps.channels} canaux</span>` : ''}
+                    ${caps.polyphony ? `<span class="capability">🎵 Polyphonie: ${caps.polyphony}</span>` : ''}
+                    ${caps.program_change ? `<span class="capability">✓ Program Change</span>` : ''}
+                    ${caps.pitch_bend ? `<span class="capability">✓ Pitch Bend</span>` : ''}
+                </div>
             </div>
         `;
     }
     
-    // ========================================================================
-    // RENDU EMPTY STATE
-    // ========================================================================
+    renderActions(instrument) {
+        return `
+            <div class="instrument-actions-bar">
+                <button class="btn btn-sm btn-primary" data-action="select" data-instrument-id="${instrument.id}">
+                    ${this.localState.selectedInstruments.has(instrument.id) ? '✓ Sélectionné' : 'Sélectionner'}
+                </button>
+                <button class="btn btn-sm btn-secondary" data-action="configure" data-instrument-id="${instrument.id}">
+                    ⚙️ Configurer
+                </button>
+                <button class="btn btn-sm btn-secondary" data-action="test" data-instrument-id="${instrument.id}">
+                    🎵 Tester
+                </button>
+            </div>
+        `;
+    }
     
     renderEmptyState() {
         return `
             <div class="empty-state">
                 <div class="empty-icon">🎹</div>
-                <h3>No MIDI Instruments Found</h3>
-                <p>Connect a MIDI device and click "Scan Devices" to detect it.</p>
-                <button id="scan-empty-btn" class="btn btn-primary">
-                    🔄 Scan Now
+                <h3>Aucun instrument détecté</h3>
+                <p>Connectez un instrument MIDI et cliquez sur "Rafraîchir"</p>
+                <button class="btn btn-primary" id="btn-scan-instruments">
+                    🔍 Scanner les instruments
                 </button>
             </div>
         `;
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS
+    // EVENT LISTENERS
     // ========================================================================
     
     attachEventListeners() {
-        // Bouton scan
-        const scanBtn = this.container.querySelector('#scan-instruments-btn');
+        // Bouton rafraîchir
+        const refreshBtn = this.container.querySelector('#btn-refresh-instruments');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.emit('instruments:refresh');
+            });
+        }
+        
+        // Bouton scanner
+        const scanBtn = this.container.querySelector('#btn-scan-instruments');
         if (scanBtn) {
             scanBtn.addEventListener('click', () => {
-                this.emit('instrument:scan-requested');
+                this.emit('instruments:scan');
             });
         }
         
-        // Bouton scan empty state
-        const scanEmptyBtn = this.container.querySelector('#scan-empty-btn');
-        if (scanEmptyBtn) {
-            scanEmptyBtn.addEventListener('click', () => {
-                this.emit('instrument:scan-requested');
-            });
-        }
-        
-        // Toggle view mode
-        const toggleViewBtn = this.container.querySelector('#toggle-view-btn');
-        if (toggleViewBtn) {
-            toggleViewBtn.addEventListener('click', () => {
-                this.displayConfig.compactMode = !this.displayConfig.compactMode;
-                this.emit('instrument:view-mode-changed', { 
-                    compact: this.displayConfig.compactMode 
-                });
-                // Re-render needed
-            });
-        }
-        
-        // Boutons expand
-        const expandBtns = this.container.querySelectorAll('.expand-btn');
-        expandBtns.forEach(btn => {
+        // Boutons de mode d'affichage
+        const modeButtons = this.container.querySelectorAll('.display-mode-buttons button');
+        modeButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const instrumentId = btn.getAttribute('data-id');
+                const mode = e.currentTarget.dataset.mode;
+                this.setDisplayMode(mode);
+            });
+        });
+        
+        // Boutons d'expansion
+        const expandButtons = this.container.querySelectorAll('[data-action="toggle-expand"]');
+        expandButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const card = e.target.closest('.instrument-card');
+                const instrumentId = card.dataset.instrumentId;
                 this.toggleExpand(instrumentId);
             });
         });
         
-        // Boutons connect
-        const connectBtns = this.container.querySelectorAll('.connect-btn');
-        connectBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const instrumentId = btn.getAttribute('data-id');
-                this.emit('instrument:connect-requested', { instrumentId });
+        // Boutons de sélection
+        const selectButtons = this.container.querySelectorAll('[data-action="select"]');
+        selectButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const instrumentId = e.currentTarget.dataset.instrumentId;
+                this.toggleSelect(instrumentId);
             });
         });
         
-        // Boutons disconnect
-        const disconnectBtns = this.container.querySelectorAll('.disconnect-btn');
-        disconnectBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const instrumentId = btn.getAttribute('data-id');
-                this.emit('instrument:disconnect-requested', { instrumentId });
+        // Boutons de configuration
+        const configButtons = this.container.querySelectorAll('[data-action="configure"]');
+        configButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const instrumentId = e.currentTarget.dataset.instrumentId;
+                this.emit('instruments:configure', { instrumentId });
             });
         });
         
-        // Boutons config
-        const configBtns = this.container.querySelectorAll('.config-btn');
-        configBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const instrumentId = btn.getAttribute('data-id');
-                this.emit('instrument:configure-requested', { instrumentId });
+        // Boutons de test
+        const testButtons = this.container.querySelectorAll('[data-action="test"]');
+        testButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const instrumentId = e.currentTarget.dataset.instrumentId;
+                this.emit('instruments:test', { instrumentId });
             });
         });
     }
     
     // ========================================================================
-    // INTERACTIONS
+    // ACTIONS
     // ========================================================================
+    
+    setDisplayMode(mode) {
+        this.localState.displayMode = mode;
+        this.displayConfig.compactMode = (mode === 'compact');
+        this.render();
+    }
     
     toggleExpand(instrumentId) {
         if (this.localState.expandedInstruments.has(instrumentId)) {
@@ -439,98 +430,74 @@ class InstrumentView extends BaseView {
         } else {
             this.localState.expandedInstruments.add(instrumentId);
         }
-        
-        // Re-render la carte
-        const card = this.container.querySelector(`[data-instrument-id="${instrumentId}"]`);
-        if (card) {
-            // Trouver l'instrument dans les données
-            this.emit('instrument:expand-toggled', { instrumentId });
+        this.render();
+    }
+    
+    toggleSelect(instrumentId) {
+        if (this.localState.selectedInstruments.has(instrumentId)) {
+            this.localState.selectedInstruments.delete(instrumentId);
+        } else {
+            this.localState.selectedInstruments.add(instrumentId);
         }
+        
+        this.emit('instruments:selection:changed', {
+            instrumentId,
+            selected: this.localState.selectedInstruments.has(instrumentId),
+            selectedInstruments: Array.from(this.localState.selectedInstruments)
+        });
+        
+        this.render();
+    }
+    
+    // ========================================================================
+    // API PUBLIQUE
+    // ========================================================================
+    
+    updateInstruments(instruments) {
+        this.render({ instruments });
     }
     
     selectInstrument(instrumentId) {
         this.localState.selectedInstruments.add(instrumentId);
-        this.emit('instrument:selected', { instrumentId });
+        this.render();
     }
     
     deselectInstrument(instrumentId) {
         this.localState.selectedInstruments.delete(instrumentId);
-        this.emit('instrument:deselected', { instrumentId });
+        this.render();
     }
     
-    // ========================================================================
-    // MISES À JOUR
-    // ========================================================================
-    
-    updateInstrumentList(instruments) {
-        this.render({ instruments });
+    clearSelection() {
+        this.localState.selectedInstruments.clear();
+        this.render();
     }
     
-    updateInstrumentStatus(instrumentId, connected) {
-        const card = this.container.querySelector(`[data-instrument-id="${instrumentId}"]`);
-        
-        if (card) {
-            if (connected) {
-                card.classList.remove('disconnected');
-                card.classList.add('connected');
-            } else {
-                card.classList.remove('connected');
-                card.classList.add('disconnected');
-            }
-        }
-    }
-    
-    showScanProgress() {
-        const scanBtn = this.container.querySelector('#scan-instruments-btn');
-        if (scanBtn) {
-            scanBtn.disabled = true;
-            scanBtn.innerHTML = '⏳ Scanning...';
-        }
-    }
-    
-    hideScanProgress() {
-        const scanBtn = this.container.querySelector('#scan-instruments-btn');
-        if (scanBtn) {
-            scanBtn.disabled = false;
-            scanBtn.innerHTML = '🔄 Scan Devices';
-        }
+    getSelectedInstruments() {
+        return Array.from(this.localState.selectedInstruments);
     }
     
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
     
-    escapeHtml(text) {
-        if (!text) return '';
+    escapeHTML(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
     
-    clear() {
-        if (this.container) {
-            this.container.innerHTML = '<p class="loading">Loading instruments...</p>';
-        }
-    }
+    // ========================================================================
+    // DESTRUCTION
+    // ========================================================================
     
-    showError(message) {
-        if (this.container) {
-            this.container.innerHTML = `
-                <div class="error-message">
-                    <p>❌ ${this.escapeHtml(message)}</p>
-                    <button id="retry-scan-btn" class="btn btn-primary">Retry Scan</button>
-                </div>
-            `;
-            
-            const retryBtn = this.container.querySelector('#retry-scan-btn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    this.emit('instrument:scan-requested');
-                });
-            }
-        }
+    destroy() {
+        this.localState.selectedInstruments.clear();
+        this.localState.expandedInstruments.clear();
+        
+        super.destroy();
     }
 }
+
 // ============================================================================
 // EXPORT
 // ============================================================================
