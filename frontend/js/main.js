@@ -367,14 +367,18 @@ function displayPerformanceInfo() {
 
 // Capturer les erreurs non gÃ©rÃ©es
 window.addEventListener('error', (event) => {
-    console.error('ðŸ”´ Unhandled error:', event.error);
+    const errorMessage = event.error && event.error.message 
+        ? event.error.message 
+        : (event.message || 'Unknown error');
+    
+    console.error('🔴 Unhandled error:', event.error || errorMessage);
     
     if (window.app && window.app.debugConsole) {
         window.app.debugConsole.log('error', 
-            `Unhandled error: ${event.error.message}`, 
+            `Unhandled error: ${errorMessage}`, 
             'error'
         );
-    }
+    
 });
 
 // Capturer les promesses rejetÃ©es

@@ -778,26 +778,35 @@ initPageController(page) {
     attachErrorHandlers() {
         // Erreurs JavaScript non capturées
         window.addEventListener('error', (event) => {
+            const error = event.error || event.message || 'Unknown error';
             if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Uncaught error:', event.error);
+                this.logger.error('Application', 'Uncaught error:', error);
             }
-            this.handleError(event.error);
+            this.handleError(error);
         });
         
         // Promesses rejetées non capturées
         window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason || 'Unknown rejection';
             if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Unhandled rejection:', event.reason);
+                this.logger.error('Application', 'Unhandled rejection:', reason);
             }
-            this.handleError(event.reason);
+            this.handleError(reason);
         });
     }
     
     handleError(error) {
+        // Normaliser l'erreur
+        if (!error) {
+            error = { message: 'Unknown error', stack: '' };
+        } else if (typeof error === 'string') {
+            error = { message: error, stack: '' };
+        }
+        
         // Afficher notification
         if (this.notifications && this.notifications.show) {
             this.notifications.show(
-                `Error: ${error.message || error}`,
+                `Error: ${error.message || error.toString()}`,
                 'error'
             );
         }
@@ -805,8 +814,8 @@ initPageController(page) {
         // Logger détaillé
         if (this.logger && this.logger.error) {
             this.logger.error('Application', 'Error occurred:', {
-                message: error.message,
-                stack: error.stack
+                message: error.message || error.toString(),
+                stack: error.stack || ''
             });
         }
         
