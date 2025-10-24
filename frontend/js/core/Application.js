@@ -352,11 +352,11 @@ class Application {
         // FileController
         if (window.FileController) {
             this.controllers.file = new FileController(
+                eventBus,
                 this.models.file,
                 this.views.file,
-                this.services.file,
-                eventBus,
-                logger
+                this.notifications,
+                this.debugConsole
             );
         }
         
