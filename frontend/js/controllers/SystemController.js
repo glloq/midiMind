@@ -1,60 +1,25 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/SystemController.js
-// Version: 3.0.1-FIXED
-// Date: 2025-10-20
-// ============================================================================
-// CORRECTIONS v3.0.1:
-// ✅ Fixed initialization order (logger before startConnectionMonitor)
-// ✅ Added _fullyInitialized pattern
-// ✅ Protected logger calls throughout
+// Version: 3.1.0 - OFFLINE MODE + MANUAL RECONNECT
+// Date: 2025-10-24
 // ============================================================================
 
 class SystemController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Initialize logger FIRST
         this.logger = window.Logger || console;
-        
-        // Get specific model and view
         this.model = models.system || models.state;
         this.view = views.system;
-        
-        // Backend service
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // Configuration système par défaut
         this.defaultConfig = {
-            audioConfig: {
-                bufferSize: 256,
-                sampleRate: 44100,
-                targetLatency: 10,
-                autoCompensation: true
-            },
-            visualizerConfig: {
-                targetFPS: 60,
-                timeWindow: 10,
-                pianoKeyHeight: 20,
-                antiAliasing: true,
-                visualEffects: true
-            },
-            interfaceConfig: {
-                theme: 'light',
-                animations: true,
-                soundNotifications: false,
-                showTooltips: true,
-                keyboardShortcuts: true
-            },
-            advancedConfig: {
-                verboseLogging: false,
-                realtimeMetrics: true,
-                predictiveCache: true,
-                dataCompression: true,
-                strictMidiValidation: true
-            }
+            audioConfig: { bufferSize: 256, sampleRate: 44100, targetLatency: 10, autoCompensation: true },
+            visualizerConfig: { targetFPS: 60, timeWindow: 10, pianoKeyHeight: 20, antiAliasing: true, visualEffects: true },
+            interfaceConfig: { theme: 'light', animations: true, soundNotifications: false, showTooltips: true, keyboardShortcuts: true },
+            advancedConfig: { verboseLogging: false, realtimeMetrics: true, predictiveCache: true, dataCompression: true, strictMidiValidation: true }
         };
         
-        // État système
         this.systemHealth = 'good';
         this.currentPreset = 'balanced';
         this.showAdvanced = false;
@@ -62,374 +27,287 @@ class SystemController extends BaseController {
         this.statsMonitoringInterval = null;
         this.calibrationInProgress = false;
         this.connectionMonitorTimer = null;
+        this.offlineMode = false;
+        this.reconnectButtonCreated = false;
         
-        // Mark as fully initialized
         this._fullyInitialized = true;
-        
-        // Now start monitoring and initialize
         this.startConnectionMonitor();
         this.initializeSystemConfig();
     }
 
-    /**
-     * Configuration des événements
-     */
     bindEvents() {
-        // Écouter les changements d'instruments pour mettre à jour les latences
-        this.eventBus.on('instrument:connected', (data) => {
-            this.updateInstrumentLatencies();
-            this.refreshSystemView();
-        });
-        
-        this.eventBus.on('instrument:disconnected', (data) => {
-            this.updateInstrumentLatencies();
-            this.refreshSystemView();
-        });
-        
-        // Écouter les demandes de mise à jour des stats
-        this.eventBus.on('system:request_stats_update', () => {
-            this.updateSystemStats();
-        });
-        
-        // Écouter les changements de page
+        this.eventBus.on('instrument:connected', () => { this.updateInstrumentLatencies(); this.refreshSystemView(); });
+        this.eventBus.on('instrument:disconnected', () => { this.updateInstrumentLatencies(); this.refreshSystemView(); });
+        this.eventBus.on('system:request_stats_update', () => this.updateSystemStats());
         this.eventBus.on('navigation:page_changed', (data) => {
-            if (data.page === 'system') {
-                this.onSystemPageActive();
-            } else {
-                this.onSystemPageInactive();
-            }
+            if (data.page === 'system') this.onSystemPageActive();
+            else this.onSystemPageInactive();
         });
+        this.eventBus.on('performance:fps_update', (data) => this.updateFPSStats(data.fps));
+        this.eventBus.on('backend:offline-mode', (data) => this.handleOfflineMode(data));
+        this.eventBus.on('backend:connected', (data) => this.handleBackendConnected(data));
+        this.eventBus.on('backend:disconnected', (data) => this.handleBackendDisconnected(data));
         
-        // Écouter les changements de performance
-        this.eventBus.on('performance:fps_update', (data) => {
-            this.updateFPSStats(data.fps);
-        });
-        
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', '✓ Events bound');
-        }
+        if (this.logger && this.logger.info) this.logger.info('SystemController', '✓ Events bound');
     }
 
-    /**
-     * Initialise la configuration système
-     */
     initializeSystemConfig() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'Initializing system config...');
-        }
-        
-        // Load saved config or use defaults
-        const savedConfig = this.loadConfig();
-        const config = savedConfig || this.defaultConfig;
-        
-        if (this.model && typeof this.model.set === 'function') {
-            this.model.set('systemConfig', config);
-        }
-        
+        if (this.logger && this.logger.info) this.logger.info('SystemController', 'Initializing system config...');
+        const config = this.loadConfig() || this.defaultConfig;
+        if (this.model && typeof this.model.set === 'function') this.model.set('systemConfig', config);
         this.bindEvents();
-        
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', '✓ System config initialized');
-        }
+        if (this.logger && this.logger.info) this.logger.info('SystemController', '✓ System config initialized');
     }
 
-    /**
-     * Charge la configuration sauvegardée
-     */
     loadConfig() {
         try {
             const saved = localStorage.getItem('midimind_system_config');
             return saved ? JSON.parse(saved) : null;
         } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('SystemController', 'Failed to load config:', error);
-            }
+            if (this.logger && this.logger.error) this.logger.error('SystemController', 'Failed to load config:', error);
             return null;
         }
     }
 
-    /**
-     * Sauvegarde la configuration
-     */
     saveConfig(config) {
         try {
             localStorage.setItem('midimind_system_config', JSON.stringify(config));
-            if (this.logger && this.logger.info) {
-                this.logger.info('SystemController', 'Config saved');
-            }
+            if (this.logger && this.logger.info) this.logger.info('SystemController', 'Config saved');
         } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('SystemController', 'Failed to save config:', error);
-            }
+            if (this.logger && this.logger.error) this.logger.error('SystemController', 'Failed to save config:', error);
         }
     }
 
-    /**
-     * Rafraîchit la vue système
-     */
     refreshSystemView() {
-        if (!this.view || typeof this.view.render !== 'function') {
-            return;
-        }
+        if (!this.view || typeof this.view.render !== 'function') return;
         
+        const backendStatus = this.getBackendStatus();
         const data = {
             systemHealth: this.systemHealth,
             audioConfig: this.defaultConfig.audioConfig,
             visualizerConfig: this.defaultConfig.visualizerConfig,
             interfaceConfig: this.defaultConfig.interfaceConfig,
             advancedConfig: this.defaultConfig.advancedConfig,
-            backend: this.getBackendData(),
-            backendConnected: this.backend?.isConnected() || false
+            backend: backendStatus,
+            backendConnected: backendStatus.connected,
+            offlineMode: this.offlineMode || backendStatus.offlineMode
         };
         
         this.view.render(data);
+        if (this.offlineMode || backendStatus.offlineMode) this.createReconnectButton();
     }
 
-    /**
-     * Obtient les données du backend
-     */
-    getBackendData() {
+    getBackendStatus() {
         if (!this.backend) {
-            return {
-                connected: false,
-                url: 'ws://localhost:8080',
-                queuedCommands: 0
-            };
+            return { connected: false, offlineMode: true, url: 'ws://localhost:8080', queuedCommands: 0, state: 'unavailable' };
         }
+        
+        if (typeof this.backend.getStatus === 'function') return this.backend.getStatus();
         
         return {
             connected: this.backend.isConnected ? this.backend.isConnected() : false,
-            url: this.backend.wsUrl || 'ws://localhost:8080',
-            queuedCommands: this.backend.commandQueue?.length || 0
+            offlineMode: this.backend.isOffline ? this.backend.isOffline() : false,
+            url: this.backend.config?.url || 'ws://localhost:8080',
+            queuedCommands: this.backend.messageQueue?.length || 0,
+            state: this.backend.getConnectionState ? this.backend.getConnectionState() : 'unknown'
         };
     }
 
-    /**
-     * Vérifie périodiquement la connexion
-     */
-    startConnectionMonitor() {
-        // Arrêter monitor existant
+    getBackendData() {
+        return this.getBackendStatus();
+    }
+
+    handleOfflineMode(data) {
+        this.offlineMode = true;
+        if (this.logger && this.logger.warn) this.logger.warn('SystemController', '📴 Backend offline mode activated');
         this.stopConnectionMonitor();
-        
-        this.connectionMonitorTimer = setInterval(async () => {
-            if (this.backend && typeof this.backend.isConnected === 'function') {
-                if (!this.backend.isConnected()) {
-                    if (this.logger && this.logger.warn) {
-                        this.logger.warn('SystemController', 'Backend disconnected, attempting reconnect...');
-                    }
-                    await this.reconnectBackend();
-                }
-            }
-        }, 10000); // Check toutes les 10 secondes
-        
-        if (this.logger && this.logger.debug) {
-            this.logger.debug('SystemController', 'Connection monitor started');
-        }
+        this.refreshSystemView();
+        this.createReconnectButton();
     }
 
-    /**
-     * Arrête le monitoring de connexion
-     */
-    stopConnectionMonitor() {
-        if (this.connectionMonitorTimer) {
-            clearInterval(this.connectionMonitorTimer);
-            this.connectionMonitorTimer = null;
-        }
+    handleBackendConnected(data) {
+        this.offlineMode = false;
+        if (this.logger && this.logger.info) this.logger.info('SystemController', '✅ Backend reconnected');
+        this.startConnectionMonitor();
+        this.refreshSystemView();
+        this.removeReconnectButton();
     }
 
-    /**
-     * Tente de reconnecter le backend
-     */
-    async reconnectBackend() {
+    handleBackendDisconnected(data) {
+        if (this.logger && this.logger.warn) this.logger.warn('SystemController', '🔴 Backend disconnected');
+        this.refreshSystemView();
+    }
+
+    createReconnectButton() {
+        if (this.reconnectButtonCreated) return;
+        
+        const systemElement = document.getElementById('system');
+        if (!systemElement) return;
+        
+        let backendSection = systemElement.querySelector('.backend-status');
+        if (!backendSection) {
+            backendSection = document.createElement('div');
+            backendSection.className = 'backend-status';
+            systemElement.insertBefore(backendSection, systemElement.firstChild);
+        }
+        
+        if (backendSection.querySelector('.reconnect-button')) return;
+        
+        const button = document.createElement('button');
+        button.className = 'reconnect-button btn-primary';
+        button.innerHTML = '🔄 Reconnect to Backend';
+        button.onclick = () => this.reconnectManually();
+        
+        const info = document.createElement('div');
+        info.className = 'backend-offline-info';
+        info.innerHTML = `<p class="offline-message"><span class="status-indicator offline"></span>Backend is offline. Some features are unavailable.</p>`;
+        
+        backendSection.innerHTML = '';
+        backendSection.appendChild(info);
+        backendSection.appendChild(button);
+        this.reconnectButtonCreated = true;
+        
+        if (this.logger && this.logger.debug) this.logger.debug('SystemController', 'Reconnect button created');
+    }
+
+    removeReconnectButton() {
+        const systemElement = document.getElementById('system');
+        if (!systemElement) return;
+        
+        const backendSection = systemElement.querySelector('.backend-status');
+        if (backendSection) backendSection.remove();
+        this.reconnectButtonCreated = false;
+    }
+
+    async reconnectManually() {
         if (!this.backend) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('SystemController', 'Backend service not available');
-            }
+            if (this.logger && this.logger.error) this.logger.error('SystemController', 'Backend service not available');
             return;
         }
         
         try {
-            if (this.logger && this.logger.info) {
-                this.logger.info('SystemController', '🔄 Attempting reconnection...');
+            if (this.logger && this.logger.info) this.logger.info('SystemController', '🔄 Manual reconnection requested');
+            
+            this.eventBus.emit('notification:show', { message: 'Attempting to reconnect...', type: 'info', duration: 2000 });
+            
+            const button = document.querySelector('.reconnect-button');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '⏳ Connecting...';
             }
             
-            this.eventBus.emit('notification:show', {
-                message: 'Reconnexion au backend...',
-                type: 'info',
-                duration: 2000
-            });
-            
-            // Déconnecter proprement d'abord
-            if (typeof this.backend.disconnect === 'function') {
-                this.backend.disconnect();
+            let success = false;
+            if (typeof this.backend.reconnectManually === 'function') {
+                success = await this.backend.reconnectManually();
+            } else if (typeof this.backend.connect === 'function') {
+                success = await this.backend.connect();
             }
             
-            // Attendre un peu
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Reconnecter
-            if (typeof this.backend.connect === 'function') {
-                await this.backend.connect();
+            if (success) {
+                if (this.logger && this.logger.info) this.logger.info('SystemController', '✅ Manual reconnection successful');
+                this.eventBus.emit('notification:show', { message: 'Reconnected successfully!', type: 'success', duration: 3000 });
+            } else {
+                throw new Error('Connection failed');
             }
-            
-            if (this.logger && this.logger.info) {
-                this.logger.info('SystemController', '✓ Reconnection successful');
-            }
-            
-            this.eventBus.emit('notification:show', {
-                message: 'Reconnecté avec succès !',
-                type: 'success',
-                duration: 3000
-            });
-            
-            // Rafraîchir état système
-            await this.refreshSystemStatus();
             
         } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('SystemController', 'Reconnection failed:', error);
+            if (this.logger && this.logger.error) this.logger.error('SystemController', 'Manual reconnection failed:', error);
+            this.eventBus.emit('notification:show', { message: 'Reconnection failed: ' + error.message, type: 'error', duration: 5000 });
+            
+            const button = document.querySelector('.reconnect-button');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '🔄 Reconnect to Backend';
             }
-            this.eventBus.emit('notification:show', {
-                message: 'Échec de reconnexion: ' + error.message,
-                type: 'error',
-                duration: 5000
-            });
         }
     }
 
-    /**
-     * Rafraîchit le statut système
-     */
+    startConnectionMonitor() {
+        this.stopConnectionMonitor();
+        if (this.offlineMode) {
+            if (this.logger && this.logger.debug) this.logger.debug('SystemController', 'Not starting monitor - offline mode active');
+            return;
+        }
+        
+        this.connectionMonitorTimer = setInterval(async () => {
+            if (this.backend && typeof this.backend.isConnected === 'function') {
+                const status = this.getBackendStatus();
+                if (status.offlineMode || status.reconnectionStopped) this.stopConnectionMonitor();
+            }
+        }, 10000);
+        
+        if (this.logger && this.logger.debug) this.logger.debug('SystemController', 'Connection monitor started');
+    }
+
+    stopConnectionMonitor() {
+        if (this.connectionMonitorTimer) {
+            clearInterval(this.connectionMonitorTimer);
+            this.connectionMonitorTimer = null;
+            if (this.logger && this.logger.debug) this.logger.debug('SystemController', 'Connection monitor stopped');
+        }
+    }
+
+    async reconnectBackend() {
+        return this.reconnectManually();
+    }
+
     async refreshSystemStatus() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'Refreshing system status...');
-        }
-        
+        if (this.logger && this.logger.info) this.logger.info('SystemController', 'Refreshing system status...');
         this.refreshSystemView();
     }
 
-    /**
-     * Met à jour les statistiques système
-     */
     async updateSystemStats() {
-        // Update stats logic here
         this.refreshSystemView();
     }
 
-    /**
-     * Démarre le monitoring temps réel
-     */
     startStatsMonitoring() {
-        if (this.statsMonitoringInterval) {
-            return; // Déjà démarré
-        }
-        
-        if (this.logger && this.logger.debug) {
-            this.logger.debug('SystemController', '📊 Starting stats monitoring');
-        }
-        
-        // Update toutes les secondes
-        this.statsMonitoringInterval = setInterval(() => {
-            this.updateSystemStats();
-        }, 1000);
+        if (this.statsMonitoringInterval) return;
+        if (this.logger && this.logger.debug) this.logger.debug('SystemController', '📊 Starting stats monitoring');
+        this.statsMonitoringInterval = setInterval(() => this.updateSystemStats(), 1000);
     }
 
-    /**
-     * Arrête le monitoring
-     */
     stopStatsMonitoring() {
         if (this.statsMonitoringInterval) {
             clearInterval(this.statsMonitoringInterval);
             this.statsMonitoringInterval = null;
-            
-            if (this.logger && this.logger.debug) {
-                this.logger.debug('SystemController', '⏸️ Stats monitoring stopped');
-            }
+            if (this.logger && this.logger.debug) this.logger.debug('SystemController', '⏸️ Stats monitoring stopped');
         }
     }
 
-    /**
-     * Met à jour les latences des instruments
-     */
     updateInstrumentLatencies() {
-        if (this.logger && this.logger.debug) {
-            this.logger.debug('SystemController', 'Updating instrument latencies...');
-        }
-        // Logic here
+        if (this.logger && this.logger.debug) this.logger.debug('SystemController', 'Updating instrument latencies...');
     }
 
-    /**
-     * Callback quand la page système devient active
-     */
     onSystemPageActive() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'System page activated');
-        }
+        if (this.logger && this.logger.info) this.logger.info('SystemController', 'System page activated');
         this.startStatsMonitoring();
         this.refreshSystemView();
     }
 
-    /**
-     * Callback quand la page système devient inactive
-     */
     onSystemPageInactive() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'System page deactivated');
-        }
+        if (this.logger && this.logger.info) this.logger.info('SystemController', 'System page deactivated');
         this.stopStatsMonitoring();
     }
 
-    /**
-     * Met à jour les stats FPS
-     */
-    updateFPSStats(fps) {
-        // Update FPS logic
-    }
+    updateFPSStats(fps) {}
 
-    /**
-     * Helper pour logger en debug
-     */
     logDebug(category, message, data = null) {
         if (!this.logger) {
             console.log(`[${category}] ${message}`, data || '');
             return;
         }
-        
-        if (typeof this.logger.debug === 'function') {
-            this.logger.debug(category, message, data);
-        } else if (typeof this.logger.info === 'function') {
-            this.logger.info(category, message, data);
-        } else {
-            console.log(`[${category}] ${message}`, data || '');
-        }
+        if (typeof this.logger.debug === 'function') this.logger.debug(category, message, data);
+        else if (typeof this.logger.info === 'function') this.logger.info(category, message, data);
+        else console.log(`[${category}] ${message}`, data || '');
     }
 
-    /**
-     * Nettoie les ressources du contrôleur
-     */
     destroy() {
         this.stopStatsMonitoring();
         this.stopConnectionMonitor();
-        
-        if (this.logger && this.logger.info) {
-            this.logger.info('SystemController', 'Destroyed');
-        }
+        this.removeReconnectButton();
+        if (this.logger && this.logger.info) this.logger.info('SystemController', 'Destroyed');
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SystemController;
-}
-
-if (typeof window !== 'undefined') {
-    window.SystemController = SystemController;
-}
-
-
-// Export par dÃ©faut
-window.SystemController = SystemController;
-
-// ============================================================================
-// FIN DU FICHIER SystemController.js v3.0.1-FIXED
-// ============================================================================
+if (typeof module !== 'undefined' && module.exports) module.exports = SystemController;
+if (typeof window !== 'undefined') window.SystemController = SystemController;

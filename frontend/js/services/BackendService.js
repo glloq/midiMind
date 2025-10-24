@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.3.0 - COMPLETE WITH ALL MISSING METHODS
-// Date: 2025-10-23
+// Version: v3.4.0 - OFFLINE MODE + GRACEFUL RECONNECTION
+// Date: 2025-10-24
 // ============================================================================
-// CORRECTIONS v3.3.0:
-// ✓ Ajout de sendCommand() pour tous les contrôleurs
-// ✓ Ajout de uploadFile() pour FileService
-// ✓ Ajout des méthodes de routing (listDevices, setChannelRouting, etc.)
-// ✓ Reconnexion automatique améliorée avec backoff exponentiel
-// ✓ Heartbeat pour détecter les connexions mortes
-// ✓ File d'attente de messages en cas de déconnexion
+// CORRECTIONS v3.4.0:
+// ✅ Arrêt des tentatives de reconnexion après maxReconnectAttempts
+// ✅ Mode offline graceful - l'app continue sans backend
+// ✅ Reconnexion manuelle possible via UI
+// ✅ Notifications claires de l'état de connexion
+// ✅ File d'attente persistante pour les commandes
+// ✅ Événements détaillés pour l'UI
 // ============================================================================
 
 class BackendService {
@@ -21,6 +21,8 @@ class BackendService {
         this.ws = null;
         this.connected = false;
         this.connecting = false;
+        this.offlineMode = false; // ← NOUVEAU
+        this.reconnectionStopped = false; // ← NOUVEAU
         
         // Configuration
         this.config = {
@@ -30,7 +32,7 @@ class BackendService {
             reconnectDecay: 1.5,
             timeoutInterval: 5000,
             heartbeatInterval: 30000,
-            maxReconnectAttempts: 10
+            maxReconnectAttempts: 5  // ← RÉDUIT de 10 à 5
         };
         
         // Gestion de la reconnexion
@@ -66,6 +68,7 @@ class BackendService {
         
         const wsUrl = url || this.config.url;
         this.connecting = true;
+        this.reconnectionStopped = false; // ← Réinitialiser flag
         this.logger.info('BackendService', `Connecting to ${wsUrl}...`);
         
         return new Promise((resolve) => {
@@ -117,9 +120,16 @@ class BackendService {
         this.connected = true;
         this.connecting = false;
         this.reconnectAttempts = 0;
+        this.offlineMode = false; // ← Sortir du mode offline
+        this.reconnectionStopped = false;
         
         this.logger.info('BackendService', '✓ Connected to backend');
-        this.eventBus.emit('backend:connected');
+        
+        // ← Événement avec détails
+        this.eventBus.emit('backend:connected', {
+            url: this.config.url,
+            timestamp: Date.now()
+        });
         
         // Démarrer le heartbeat
         this.startHeartbeat();
@@ -132,6 +142,8 @@ class BackendService {
      * Gère la fermeture de la connexion
      */
     handleClose(event) {
+        const wasConnected = this.connected;
+        
         this.connected = false;
         this.connecting = false;
         this.stopHeartbeat();
@@ -140,11 +152,21 @@ class BackendService {
         const code = event.code;
         
         this.logger.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
-        this.eventBus.emit('websocket:disconnected', { code, reason });
         
-        // Tenter une reconnexion automatique
-        if (!event.wasClean) {
+        // ← Événement détaillé
+        this.eventBus.emit('backend:disconnected', { 
+            code, 
+            reason,
+            wasConnected,
+            offlineMode: this.offlineMode
+        });
+        
+        // Tenter une reconnexion automatique seulement si pas proprement fermé
+        if (!event.wasClean && !this.reconnectionStopped) {
             this.scheduleReconnect();
+        } else if (this.reconnectionStopped) {
+            // ← Basculer en mode offline si reconnexion arrêtée
+            this.enterOfflineMode();
         }
     }
     
@@ -165,7 +187,8 @@ class BackendService {
         
         this.eventBus.emit('backend:connection-failed', { 
             message,
-            attempt: this.reconnectAttempts + 1
+            attempt: this.reconnectAttempts + 1,
+            maxAttempts: this.config.maxReconnectAttempts
         });
         
         this.scheduleReconnect();
@@ -179,9 +202,21 @@ class BackendService {
             clearTimeout(this.reconnectTimer);
         }
         
+        // ← NOUVEAU : Arrêter après max attempts
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-            this.logger.error('BackendService', 'Max reconnection attempts reached');
-            this.eventBus.emit('backend:max-reconnect-attempts');
+            this.logger.error('BackendService', 
+                `❌ Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
+            
+            this.reconnectionStopped = true;
+            
+            // ← Émettre événement spécifique
+            this.eventBus.emit('backend:max-reconnect-attempts', {
+                attempts: this.reconnectAttempts,
+                maxAttempts: this.config.maxReconnectAttempts
+            });
+            
+            // ← Basculer en mode offline
+            this.enterOfflineMode();
             return;
         }
         
@@ -192,12 +227,63 @@ class BackendService {
         );
         
         this.reconnectAttempts++;
-        this.logger.info('BackendService', `Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
+        
+        this.logger.info('BackendService', 
+            `Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
+        
+        // ← Émettre événement de reconnexion planifiée
+        this.eventBus.emit('backend:reconnect-scheduled', {
+            attempt: this.reconnectAttempts,
+            maxAttempts: this.config.maxReconnectAttempts,
+            delayMs: delay
+        });
         
         this.reconnectTimer = setTimeout(() => {
-            this.logger.info('BackendService', 'Attempting reconnection...');
+            this.logger.info('BackendService', `Attempting reconnection (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})...`);
             this.connect();
         }, delay);
+    }
+    
+    /**
+     * ← NOUVEAU : Entre en mode offline graceful
+     */
+    enterOfflineMode() {
+        this.offlineMode = true;
+        this.connected = false;
+        this.connecting = false;
+        this.reconnectionStopped = true;
+        
+        this.logger.warn('BackendService', '📴 Entering offline mode - manual reconnection required');
+        
+        // Émettre événement mode offline
+        this.eventBus.emit('backend:offline-mode', {
+            reason: 'max_reconnect_attempts_reached',
+            timestamp: Date.now()
+        });
+    }
+    
+    /**
+     * ← NOUVEAU : Reconnexion manuelle (appelée depuis l'UI)
+     */
+    async reconnectManually() {
+        this.logger.info('BackendService', '🔄 Manual reconnection requested');
+        
+        // Réinitialiser les compteurs
+        this.reconnectAttempts = 0;
+        this.reconnectionStopped = false;
+        this.offlineMode = false;
+        
+        // Annuler timer existant
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        // Émettre événement
+        this.eventBus.emit('backend:manual-reconnect-attempt');
+        
+        // Tenter la connexion
+        return await this.connect();
     }
     
     /**
@@ -249,7 +335,7 @@ class BackendService {
                 return;
             }
             
-            // Émettre le message via l'eventBus
+            // Émettre événement générique
             this.eventBus.emit('backend:message', data);
             
             // Émettre également un événement spécifique au type
@@ -289,9 +375,6 @@ class BackendService {
     
     /**
      * Envoie une commande au backend et attend la réponse
-     * @param {string} command - Nom de la commande
-     * @param {Object} params - Paramètres de la commande
-     * @returns {Promise<Object>} Réponse du backend
      */
     async sendCommand(command, params = {}) {
         return new Promise((resolve, reject) => {
@@ -325,9 +408,6 @@ class BackendService {
     
     /**
      * Upload un fichier au backend
-     * @param {File} file - Fichier à uploader
-     * @param {Function} progressCallback - Callback pour la progression
-     * @returns {Promise<Object>} Réponse du backend
      */
     async uploadFile(file, progressCallback = null) {
         return new Promise((resolve, reject) => {
@@ -370,58 +450,34 @@ class BackendService {
     // MÉTHODES DE ROUTING
     // ========================================================================
     
-    /**
-     * Liste les devices MIDI disponibles
-     */
     async listDevices() {
         return this.sendCommand('list_devices');
     }
     
-    /**
-     * Obtient la configuration de routing actuelle
-     */
     async getRouting() {
         return this.sendCommand('get_routing');
     }
     
-    /**
-     * Configure le routing d'un canal
-     */
     async setChannelRouting(channelId, deviceId) {
         return this.sendCommand('set_channel_routing', { channelId, deviceId });
     }
     
-    /**
-     * Définit le volume d'un canal
-     */
     async setChannelVolume(channelId, volume) {
         return this.sendCommand('set_channel_volume', { channelId, volume });
     }
     
-    /**
-     * Définit le panoramique d'un canal
-     */
     async setChannelPan(channelId, pan) {
         return this.sendCommand('set_channel_pan', { channelId, pan });
     }
     
-    /**
-     * Active/désactive le mute d'un canal
-     */
     async muteChannel(channelId, muted) {
         return this.sendCommand('mute_channel', { channelId, muted });
     }
     
-    /**
-     * Active/désactive le solo d'un canal
-     */
     async soloChannel(channelId, soloed) {
         return this.sendCommand('solo_channel', { channelId, soloed });
     }
     
-    /**
-     * Définit la transposition d'un canal
-     */
     async setChannelTranspose(channelId, semitones) {
         return this.sendCommand('set_channel_transpose', { channelId, semitones });
     }
@@ -477,9 +533,17 @@ class BackendService {
     }
     
     /**
+     * ← NOUVEAU : Vérifie si en mode offline
+     */
+    isOffline() {
+        return this.offlineMode;
+    }
+    
+    /**
      * Obtient l'état de la connexion
      */
     getConnectionState() {
+        if (this.offlineMode) return 'offline';
         if (!this.ws) return 'disconnected';
         
         switch (this.ws.readyState) {
@@ -489,6 +553,23 @@ class BackendService {
             case WebSocket.CLOSED: return 'disconnected';
             default: return 'unknown';
         }
+    }
+    
+    /**
+     * ← NOUVEAU : Obtient le statut complet
+     */
+    getStatus() {
+        return {
+            connected: this.connected,
+            connecting: this.connecting,
+            offlineMode: this.offlineMode,
+            reconnectAttempts: this.reconnectAttempts,
+            maxReconnectAttempts: this.config.maxReconnectAttempts,
+            reconnectionStopped: this.reconnectionStopped,
+            state: this.getConnectionState(),
+            queuedMessages: this.messageQueue.length,
+            url: this.config.url
+        };
     }
 }
 
