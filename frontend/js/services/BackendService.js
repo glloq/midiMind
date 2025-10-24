@@ -1,15 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.4.0 - OFFLINE MODE + GRACEFUL RECONNECTION
+// Version: v3.5.0 - FIXED CONNECTION STABILITY
 // Date: 2025-10-24
 // ============================================================================
-// CORRECTIONS v3.4.0:
-// ✅ Arrêt des tentatives de reconnexion après maxReconnectAttempts
-// ✅ Mode offline graceful - l'app continue sans backend
-// ✅ Reconnexion manuelle possible via UI
-// ✅ Notifications claires de l'état de connexion
-// ✅ File d'attente persistante pour les commandes
-// ✅ Événements détaillés pour l'UI
+// CORRECTIONS v3.5.0:
+// ✅ Heartbeat avec détection de timeout (connexion morte)
+// ✅ Événements cohérents avec Application.js
+// ✅ Ping/Pong bidirectionnel avec timestamps
+// ✅ Détection automatique de connexion morte
+// ✅ Logs améliorés pour debugging
 // ============================================================================
 
 class BackendService {
@@ -21,8 +20,8 @@ class BackendService {
         this.ws = null;
         this.connected = false;
         this.connecting = false;
-        this.offlineMode = false; // ← NOUVEAU
-        this.reconnectionStopped = false; // ← NOUVEAU
+        this.offlineMode = false;
+        this.reconnectionStopped = false;
         
         // Configuration
         this.config = {
@@ -31,15 +30,18 @@ class BackendService {
             maxReconnectInterval: 30000,
             reconnectDecay: 1.5,
             timeoutInterval: 5000,
-            heartbeatInterval: 30000,
-            maxReconnectAttempts: 5  // ← RÉDUIT de 10 à 5
+            heartbeatInterval: 15000,      // ✅ RÉDUIT: 15s au lieu de 30s
+            heartbeatTimeout: 10000,       // ✅ NOUVEAU: timeout pour pong
+            maxReconnectAttempts: 5
         };
         
         // Gestion de la reconnexion
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
+        this.heartbeatTimeoutTimer = null;  // ✅ NOUVEAU
         this.connectionTimeout = null;
+        this.lastPongTime = Date.now();     // ✅ NOUVEAU
         
         // File d'attente des messages
         this.messageQueue = [];
@@ -68,7 +70,7 @@ class BackendService {
         
         const wsUrl = url || this.config.url;
         this.connecting = true;
-        this.reconnectionStopped = false; // ← Réinitialiser flag
+        this.reconnectionStopped = false;
         this.logger.info('BackendService', `Connecting to ${wsUrl}...`);
         
         return new Promise((resolve) => {
@@ -120,12 +122,13 @@ class BackendService {
         this.connected = true;
         this.connecting = false;
         this.reconnectAttempts = 0;
-        this.offlineMode = false; // ← Sortir du mode offline
+        this.offlineMode = false;
         this.reconnectionStopped = false;
+        this.lastPongTime = Date.now();  // ✅ Réinitialiser
         
         this.logger.info('BackendService', '✓ Connected to backend');
         
-        // ← Événement avec détails
+        // ✅ Événement avec détails
         this.eventBus.emit('backend:connected', {
             url: this.config.url,
             timestamp: Date.now()
@@ -153,7 +156,7 @@ class BackendService {
         
         this.logger.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
         
-        // ← Événement détaillé
+        // ✅ CORRIGÉ: Émettre 'backend:disconnected' (pas websocket:)
         this.eventBus.emit('backend:disconnected', { 
             code, 
             reason,
@@ -165,7 +168,6 @@ class BackendService {
         if (!event.wasClean && !this.reconnectionStopped) {
             this.scheduleReconnect();
         } else if (this.reconnectionStopped) {
-            // ← Basculer en mode offline si reconnexion arrêtée
             this.enterOfflineMode();
         }
     }
@@ -202,20 +204,17 @@ class BackendService {
             clearTimeout(this.reconnectTimer);
         }
         
-        // ← NOUVEAU : Arrêter après max attempts
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             this.logger.error('BackendService', 
                 `❌ Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
             
             this.reconnectionStopped = true;
             
-            // ← Émettre événement spécifique
             this.eventBus.emit('backend:max-reconnect-attempts', {
                 attempts: this.reconnectAttempts,
                 maxAttempts: this.config.maxReconnectAttempts
             });
             
-            // ← Basculer en mode offline
             this.enterOfflineMode();
             return;
         }
@@ -231,7 +230,6 @@ class BackendService {
         this.logger.info('BackendService', 
             `Scheduling reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
         
-        // ← Émettre événement de reconnexion planifiée
         this.eventBus.emit('backend:reconnect-scheduled', {
             attempt: this.reconnectAttempts,
             maxAttempts: this.config.maxReconnectAttempts,
@@ -245,7 +243,7 @@ class BackendService {
     }
     
     /**
-     * ← NOUVEAU : Entre en mode offline graceful
+     * Entre en mode offline graceful
      */
     enterOfflineMode() {
         this.offlineMode = true;
@@ -255,7 +253,6 @@ class BackendService {
         
         this.logger.warn('BackendService', '📴 Entering offline mode - manual reconnection required');
         
-        // Émettre événement mode offline
         this.eventBus.emit('backend:offline-mode', {
             reason: 'max_reconnect_attempts_reached',
             timestamp: Date.now()
@@ -263,7 +260,7 @@ class BackendService {
     }
     
     /**
-     * ← NOUVEAU : Reconnexion manuelle (appelée depuis l'UI)
+     * Reconnexion manuelle (appelée depuis l'UI)
      */
     async reconnectManually() {
         this.logger.info('BackendService', '🔄 Manual reconnection requested');
@@ -279,22 +276,43 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        // Émettre événement
         this.eventBus.emit('backend:manual-reconnect-attempt');
         
-        // Tenter la connexion
         return await this.connect();
     }
     
     /**
-     * Démarre le heartbeat
+     * ✅ AMÉLIORÉ: Démarre le heartbeat avec détection de timeout
      */
     startHeartbeat() {
         this.stopHeartbeat();
         
+        this.logger.debug('BackendService', '💓 Starting heartbeat');
+        
+        // Envoyer ping régulièrement
         this.heartbeatTimer = setInterval(() => {
             if (this.connected) {
-                this.send({ type: 'ping' });
+                const timeSinceLastPong = Date.now() - this.lastPongTime;
+                
+                // ✅ NOUVEAU: Vérifier si connexion morte
+                if (timeSinceLastPong > this.config.heartbeatTimeout + this.config.heartbeatInterval) {
+                    this.logger.error('BackendService', 
+                        `❌ Heartbeat timeout (${timeSinceLastPong}ms since last pong)`);
+                    
+                    // Fermer connexion morte
+                    if (this.ws) {
+                        this.ws.close(1000, 'Heartbeat timeout');
+                    }
+                    return;
+                }
+                
+                // Envoyer ping avec timestamp
+                this.send({ 
+                    type: 'ping',
+                    timestamp: Date.now()
+                });
+                
+                this.logger.debug('BackendService', '📤 Ping sent');
             }
         }, this.config.heartbeatInterval);
     }
@@ -306,19 +324,36 @@ class BackendService {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
             this.heartbeatTimer = null;
+            this.logger.debug('BackendService', '💔 Heartbeat stopped');
+        }
+        
+        if (this.heartbeatTimeoutTimer) {
+            clearTimeout(this.heartbeatTimeoutTimer);
+            this.heartbeatTimeoutTimer = null;
         }
     }
     
     /**
-     * Gère les messages reçus
+     * ✅ AMÉLIORÉ: Gère les messages reçus
      */
     handleMessage(event) {
         try {
             const data = JSON.parse(event.data);
             
-            // Répondre aux pings
+            // ✅ AMÉLIORÉ: Gérer les pings et pongs
             if (data.type === 'ping') {
-                this.send({ type: 'pong' });
+                this.send({ 
+                    type: 'pong',
+                    timestamp: data.timestamp || Date.now()
+                });
+                this.logger.debug('BackendService', '📥 Ping received, pong sent');
+                return;
+            }
+            
+            if (data.type === 'pong') {
+                this.lastPongTime = Date.now();
+                const latency = data.timestamp ? Date.now() - data.timestamp : 0;
+                this.logger.debug('BackendService', `📥 Pong received (latency: ${latency}ms)`);
                 return;
             }
             
@@ -353,12 +388,14 @@ class BackendService {
      */
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            // Ajouter à la file d'attente
-            if (this.messageQueue.length < this.maxQueueSize) {
-                this.messageQueue.push(data);
-                this.logger.debug('BackendService', 'Message queued (not connected)');
-            } else {
-                this.logger.warn('BackendService', 'Message queue full, dropping message');
+            // Ajouter à la file d'attente (sauf pour ping/pong)
+            if (data.type !== 'ping' && data.type !== 'pong') {
+                if (this.messageQueue.length < this.maxQueueSize) {
+                    this.messageQueue.push(data);
+                    this.logger.debug('BackendService', 'Message queued (not connected)');
+                } else {
+                    this.logger.warn('BackendService', 'Message queue full, dropping message');
+                }
             }
             return false;
         }
@@ -533,7 +570,7 @@ class BackendService {
     }
     
     /**
-     * ← NOUVEAU : Vérifie si en mode offline
+     * Vérifie si en mode offline
      */
     isOffline() {
         return this.offlineMode;
@@ -556,7 +593,7 @@ class BackendService {
     }
     
     /**
-     * ← NOUVEAU : Obtient le statut complet
+     * Obtient le statut complet
      */
     getStatus() {
         return {
@@ -568,7 +605,9 @@ class BackendService {
             reconnectionStopped: this.reconnectionStopped,
             state: this.getConnectionState(),
             queuedMessages: this.messageQueue.length,
-            url: this.config.url
+            url: this.config.url,
+            lastPongTime: this.lastPongTime,
+            timeSinceLastPong: Date.now() - this.lastPongTime
         };
     }
 }
