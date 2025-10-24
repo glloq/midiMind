@@ -2118,27 +2118,4 @@ if (typeof module !== 'undefined' && module.exports) {
 
 if (typeof window !== 'undefined') {
     window.EditorView = EditorView;
-
-    // ========================================================================
-    // 🔧 MÉTHODES UTILITAIRES (ajoutées pour compatibilité)
-    // ========================================================================
-    
-    /**
-     * Émet un événement via EventBus
-     */
-    emit(eventName, data) {
-        if (this.eventBus && typeof this.eventBus.emit === 'function') {
-            this.eventBus.emit(eventName, data);
-        }
-    }
-    
-    /**
-     * Échappe le HTML
-     */
-    escapeHTML(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
 }

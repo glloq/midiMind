@@ -673,24 +673,6 @@ shouldCleanCache() {
         return `${this.constructor.name.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 }
-
-
-/**
- * Nettoie les entrées de cache expirées
- * @private
- */
-cleanCache() {
-    const now = Date.now();
-    
-    for (const [key, timestamp] of this.cacheTimestamps.entries()) {
-        if (now - timestamp > this.config.cacheTTL) {
-            this.cache.delete(key);
-            this.cacheTimestamps.delete(key);
-            this.log('debug', `Cache entry expired: ${key}`);
-        }
-    }
-}
-
 // ============================================================================
 // EXPORT
 // ============================================================================

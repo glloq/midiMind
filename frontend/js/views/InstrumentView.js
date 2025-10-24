@@ -542,7 +542,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.InstrumentView = InstrumentView;
 }
-
-// Export par défaut
-window.InstrumentView = InstrumentView;
-}
