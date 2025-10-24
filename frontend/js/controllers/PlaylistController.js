@@ -1,7 +1,7 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaylistController.js
-// Version: v3.0.3 - COMPLETE
-// Date: 2025-10-10
+// Version: v3.0.4 - FIXED LOGGER INITIALIZATION
+// Date: 2025-10-24
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
@@ -111,10 +111,28 @@ class PlaylistController extends BaseController {
         // Import/Export handler (sera ajouté par mixin)
         this.importExport = null;
         
-        // Logger
-        this.logger = window.Logger || console;
+        // Logger - Créer une INSTANCE, pas référence à la classe
+        if (typeof window !== 'undefined' && window.Logger) {
+            try {
+                this.logger = new window.Logger({
+                    level: 'info',
+                    enableConsole: true
+                });
+            } catch (e) {
+                console.warn('[PlaylistController] Failed to create Logger instance, using console fallback');
+                this.logger = console;
+            }
+        } else {
+            // Fallback vers console
+            this.logger = console;
+        }
         
-        this.logger.info('PlaylistController', '🎵 PlaylistController v3.0.3 initialized');
+        // Logger safely
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaylistController', '🎵 PlaylistController v3.0.4 initialized');
+        } else {
+            console.log('[PlaylistController] 🎵 PlaylistController v3.0.4 initialized');
+        }
     }
     
 
@@ -1228,14 +1246,6 @@ class PlaylistController extends BaseController {
     }
 
 }
-
-
-	
-	
-
-
-
-
 
 // ============================================================================
 // EXPORT
