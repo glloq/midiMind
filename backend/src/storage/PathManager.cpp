@@ -101,7 +101,7 @@ PathManager::PathManager() {
     
     // Try to create directory first - avoid TOCTOU race
     // If creation succeeds, we know we have write access
-    if (FileManager::Unsafe::createDirectory(varLibPath, true)) {
+    if (FileManagerUnsafe::createDirectory(varLibPath, true)) {
         basePath_ = varLibPath;
         Logger::debug("PathManager", "Using production path: " + std::string(varLibPath));
     } else {
@@ -159,8 +159,8 @@ void PathManager::initialize() {
     int failed = 0;
     
     for (const auto& dir : directories) {
-        if (!FileManager::Unsafe::exists(dir)) {
-            if (FileManager::Unsafe::createDirectory(dir, true)) {
+        if (!FileManagerUnsafe::exists(dir)) {
+            if (FileManagerUnsafe::createDirectory(dir, true)) {
                 Logger::info("PathManager", "  ✓ Created: " + dir);
                 created++;
                 
@@ -331,13 +331,13 @@ std::string PathManager::createDatabaseBackup() {
     std::string dbPath = getDatabasePath();
     
     // Check if database exists
-    if (!FileManager::Unsafe::exists(dbPath)) {
+    if (!FileManagerUnsafe::exists(dbPath)) {
         Logger::error("PathManager", "Database not found: " + dbPath);
         return "";
     }
     
     // Copy database file
-    if (FileManager::Unsafe::copyFile(dbPath, backupPath)) {
+    if (FileManagerUnsafe::copyFile(dbPath, backupPath)) {
         Logger::info("PathManager", "✓ Backup created: " + backupPath);
         return backupPath;
     } else {
@@ -353,12 +353,12 @@ std::string PathManager::createDatabaseBackup() {
 int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
     Logger::info("PathManager", "Cleaning old files in: " + directory);
     
-    if (!FileManager::Unsafe::exists(directory)) {
+    if (!FileManagerUnsafe::exists(directory)) {
         Logger::warning("PathManager", "Directory not found: " + directory);
         return 0;
     }
     
-    auto files = FileManager::Unsafe::listFiles(directory);
+    auto files = FileManagerUnsafe::listFiles(directory);
     
     int deletedCount = 0;
     uint64_t maxAgeSeconds = static_cast<uint64_t>(maxAgeDays) * 24 * 3600;
@@ -371,7 +371,7 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
     uint64_t nowSeconds = static_cast<uint64_t>(nowTime);
     
     for (const auto& filename : files) {
-        std::string filepath = joinPath({directory, filename});
+        std::string filepath = joinPath(std::vector<std::string>{directory, filename});
         
         struct stat fileStat;
         if (stat(filepath.c_str(), &fileStat) != 0) {
@@ -384,7 +384,7 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
         uint64_t fileAge = nowSeconds - static_cast<uint64_t>(fileStat.st_mtime);
         
         if (fileAge > maxAgeSeconds) {
-            if (FileManager::Unsafe::deleteFile(filepath)) {
+            if (FileManagerUnsafe::deleteFile(filepath)) {
                 Logger::debug("PathManager", "  Deleted: " + filename);
                 deletedCount++;
             } else {
