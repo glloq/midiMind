@@ -112,11 +112,11 @@ std::optional<Session> SessionManager::load(int id) {
     }
     
     Session session;
-    session.id = std::stoi(results[0][0]);
-    session.name = results[0][1];
-    session.data = json::parse(results[0][2]);
-    session.createdAt = results[0][3];
-    session.updatedAt = results[0][4];
+    session.id = std::stoi(results.rows[0].at("id"));
+    session.name = results.rows[0].at("name");
+    session.data = json::parse(results.rows[0].at("data"));
+    session.createdAt = results.rows[0].at("created_at");
+    session.updatedAt = results.rows[0].at("updated_at");
     
     return session;
 }
@@ -128,12 +128,12 @@ std::vector<Session> SessionManager::list() {
     auto results = database_.query(query);
     
     std::vector<Session> sessions;
-    for (const auto& row : results) {
+    for (const auto& row : results.rows) {
         Session session;
-        session.id = std::stoi(row[0]);
-        session.name = row[1];
-        session.createdAt = row[2];
-        session.updatedAt = row[3];
+        session.id = std::stoi(row.at("id"));
+        session.name = row.at("name");
+        session.createdAt = row.at("created_at");
+        session.updatedAt = row.at("updated_at");
         // data is intentionally not loaded for performance
         sessions.push_back(session);
     }
@@ -152,12 +152,12 @@ std::vector<Session> SessionManager::search(const std::string& query) {
     auto results = database_.query(sql, {searchPattern});
     
     std::vector<Session> sessions;
-    for (const auto& row : results) {
+    for (const auto& row : results.rows) {
         Session session;
-        session.id = std::stoi(row[0]);
-        session.name = row[1];
-        session.createdAt = row[2];
-        session.updatedAt = row[3];
+        session.id = std::stoi(row.at("id"));
+        session.name = row.at("name");
+        session.createdAt = row.at("created_at");
+        session.updatedAt = row.at("updated_at");
         sessions.push_back(session);
     }
     
@@ -223,7 +223,8 @@ bool SessionManager::remove(int id) {
     }
     
     std::string query = "DELETE FROM sessions WHERE id = ?";
-    int affected = database_.execute(query, {std::to_string(id)});
+    auto execResult = database_.execute(query, {std::to_string(id)});
+    int affected = execResult.affectedRows;
     
     if (affected > 0) {
         Logger::info("SessionManager", "Deleted session ID: " + std::to_string(id));
@@ -241,10 +242,11 @@ int SessionManager::cleanup(int daysOld) {
         "julianday('now') - julianday(updated_at) > ?";
     
     int activeId = activeSessionId_.load();
-    int affected = database_.execute(query, {
+    auto execResult = database_.execute(query, {
         std::to_string(activeId),
         std::to_string(daysOld)
     });
+    int affected = execResult.affectedRows;
     
     if (affected > 0) {
         Logger::info("SessionManager", "Cleaned up " + std::to_string(affected) + " old sessions");
@@ -472,7 +474,7 @@ size_t SessionManager::count() const {
         return 0;
     }
     
-    return static_cast<size_t>(std::stoi(results[0][0]));
+    return static_cast<size_t>(std::stoi(results.rows[0].at("count")));
 }
 
 json SessionManager::getStatistics() const {
@@ -490,8 +492,8 @@ json SessionManager::getStatistics() const {
     auto results = database_.query(query);
     
     if (!results.empty()) {
-        stats["most_recent_session"] = results[0][0];
-        stats["most_recent_update"] = results[0][1];
+        stats["most_recent_session"] = results.rows[0].at("name");
+        stats["most_recent_update"] = results.rows[0].at("updated_at");
     }
     
     return stats;
@@ -506,7 +508,7 @@ bool SessionManager::existsUnsafe(int id) const {
     std::string query = "SELECT COUNT(*) FROM sessions WHERE id = ?";
     auto results = database_.query(query, {std::to_string(id)});
     
-    return !results.empty() && std::stoi(results[0][0]) > 0;
+    return !results.empty() && std::stoi(results.rows[0].at("count")) > 0;
 }
 
 } // namespace midiMind

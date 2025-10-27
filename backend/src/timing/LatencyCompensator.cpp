@@ -205,7 +205,7 @@ void LatencyCompensator::recordDeviceLatency(const std::string& deviceId, uint64
     if (outlierDetection && isOutlier(profile, latencyUs)) {
         Logger::debug("LatencyCompensator", 
                      "Outlier detected for " + deviceId + ": " + 
-                     std::to_string(latencyUs) + "µs");
+                     std::to_string(latencyUs) + "Âµs");
         return;
     }
     
@@ -218,8 +218,8 @@ void LatencyCompensator::recordDeviceLatency(const std::string& deviceId, uint64
     }
     
     Logger::debug("LatencyCompensator", 
-                 deviceId + " latency: " + std::to_string(latencyUs) + "µs, " +
-                 "avg: " + std::to_string(profile.averageLatency) + "µs");
+                 deviceId + " latency: " + std::to_string(latencyUs) + "Âµs, " +
+                 "avg: " + std::to_string(profile.averageLatency) + "Âµs");
 }
 
 int64_t LatencyCompensator::getDeviceCompensation(const std::string& deviceId) const {
@@ -243,7 +243,7 @@ void LatencyCompensator::setDeviceCompensation(const std::string& deviceId, int6
         
         Logger::info("LatencyCompensator", 
                     deviceId + " manual compensation set to " + 
-                    std::to_string(offsetUs) + "µs");
+                    std::to_string(offsetUs) + "Âµs");
     }
 }
 
@@ -306,7 +306,7 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
         }
         variance /= profile.calibrationHistory.size();
         profile.stdDeviation = std::sqrt(variance);
-        profile.jitter = profile.stdDeviation;  // Jitter ≈ stddev for now
+        profile.jitter = profile.stdDeviation;  // Jitter â‰ˆ stddev for now
     }
     
     // Update compensation if auto calibration enabled
@@ -325,8 +325,8 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
     profile.lastCalibration = std::time(nullptr);
     
     Logger::debug("LatencyCompensator", 
-                 instrumentId + " latency: " + std::to_string(latencyUs) + "µs, " +
-                 "avg: " + std::to_string(profile.avgLatency) + "µs");
+                 instrumentId + " latency: " + std::to_string(latencyUs) + "Âµs, " +
+                 "avg: " + std::to_string(profile.avgLatency) + "Âµs");
 }
 
 int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrumentId) const {
@@ -357,7 +357,7 @@ void LatencyCompensator::setInstrumentCompensation(const std::string& instrument
         
         Logger::info("LatencyCompensator", 
                     instrumentId + " manual compensation set to " + 
-                    std::to_string(offsetUs) + "µs");
+                    std::to_string(offsetUs) + "Âµs");
     }
 }
 
@@ -417,7 +417,7 @@ bool LatencyCompensator::saveInstrumentProfiles() {
     
     for (const auto& [id, profile] : instruments_) {
         // Convert to database entry
-        InstrumentDatabaseEntry entry;
+        InstrumentLatencyEntry entry;
         
         entry.id = profile.instrumentId;
         entry.deviceId = profile.deviceId;
@@ -467,7 +467,7 @@ bool LatencyCompensator::saveInstrumentProfiles() {
     }
     
     Logger::info("LatencyCompensator", 
-                "✓ Saved " + std::to_string(savedCount) + " profiles, " +
+                "âœ“ Saved " + std::to_string(savedCount) + " profiles, " +
                 std::to_string(failedCount) + " failed");
     
     return failedCount == 0;
@@ -533,7 +533,7 @@ bool LatencyCompensator::loadInstrumentProfiles() {
     }
     
     Logger::info("LatencyCompensator", 
-                "✓ Loaded " + std::to_string(instruments_.size()) + " instrument profiles");
+                "âœ“ Loaded " + std::to_string(instruments_.size()) + " instrument profiles");
     
     return true;
 }
@@ -636,10 +636,10 @@ double LatencyCompensator::getSyncScore() const {
     double stddev = std::sqrt(variance);
     
     // Convert to score (lower stddev = higher score)
-    // Perfect sync: stddev < 1000µs (1ms) = 100 points
-    // Good sync: stddev < 5000µs (5ms) = 90+ points
-    // Medium sync: stddev < 10000µs (10ms) = 70+ points
-    // Poor sync: stddev > 10000µs = < 70 points
+    // Perfect sync: stddev < 1000Âµs (1ms) = 100 points
+    // Good sync: stddev < 5000Âµs (5ms) = 90+ points
+    // Medium sync: stddev < 10000Âµs (10ms) = 70+ points
+    // Poor sync: stddev > 10000Âµs = < 70 points
     
     double score = 100.0 - (stddev / 100.0);  // 1ms stddev = -1 point
     
