@@ -14,7 +14,6 @@
 #include <typeindex>
 #include <atomic>
 #include <algorithm>
-#include <string>
 
 namespace midiMind {
 
@@ -23,6 +22,7 @@ class EventBus;
 class Subscription {
 public:
     Subscription() = default;
+    
     explicit Subscription(std::function<void()> unsubscribe)
         : unsubscribe_(std::move(unsubscribe)) {}
     
@@ -170,11 +170,9 @@ public:
                 (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
-                std::string msg = "Handler exception: ";
-                msg += e.what();
-                logError("EventBus", msg);
+                logError("EventBus", std::string("Handler exception: ") + e.what());
             } catch (...) {
-                logError("EventBus", "Handler exception: unknown error");
+                logError("EventBus", std::string("Handler exception: unknown error"));
             }
         }
         

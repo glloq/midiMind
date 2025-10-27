@@ -3,14 +3,6 @@
 // Version: 4.4.0 - SECURE
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
-//
-// Changes v4.4.0:
-//   - Fixed: Unsafe namespace (was struct) with proper error logging
-//   - Fixed: Read operations verify file.good() and file size
-//   - Fixed: allowedExtensions_ now const
-//   - Fixed: All exceptions properly logged
-//
-// ============================================================================
 
 #pragma once
 
@@ -30,10 +22,6 @@ using json = nlohmann::json;
 
 namespace midiMind {
 
-// ============================================================================
-// ENUMS & STRUCTURES
-// ============================================================================
-
 enum class DirectoryType {
     LOGS,
     BACKUPS,
@@ -43,7 +31,7 @@ enum class DirectoryType {
 };
 
 struct FileInfo {
-    std::string id;              // Unique file ID (filename)
+    std::string id;
     std::string name;
     std::string path;
     std::string extension;
@@ -66,10 +54,6 @@ struct FileInfo {
         };
     }
 };
-
-// ============================================================================
-// UNSAFE NAMESPACE (INTERNAL USE ONLY - MINIMAL VALIDATION)
-// ============================================================================
 
 namespace FileManagerUnsafe {
     
@@ -195,7 +179,6 @@ namespace FileManagerUnsafe {
             return {};
         }
         
-        // Get file size first
         file.seekg(0, std::ios::end);
         std::streamsize size = file.tellg();
         file.seekg(0, std::ios::beg);
@@ -215,7 +198,6 @@ namespace FileManagerUnsafe {
             return {};
         }
         
-        // Verify size matches
         if (static_cast<std::streamsize>(data.size()) != size) {
             Logger::warning("FileManagerUnsafe", 
                 "Size mismatch for " + path + ": expected " + std::to_string(size) + 
@@ -278,42 +260,18 @@ namespace FileManagerUnsafe {
 
 } // namespace FileManagerUnsafe
 
-// ============================================================================
-// CLASS: FileManager
-// ============================================================================
+// Namespace alias for backward compatibility
+namespace Unsafe = FileManagerUnsafe;
 
-/**
- * @class FileManager
- * @brief Thread-safe file manager with path validation
- * 
- * Provides two API levels:
- * - FileManagerUnsafe:: for internal use (minimal validation)
- * - FileManager:: for public use (full validation)
- * 
- * Thread Safety:
- * - All public methods are thread-safe
- * - Uses internal mutex for synchronization
- */
 class FileManager {
 public:
-    // For backward compatibility - namespace alias
-    namespace Unsafe = FileManagerUnsafe;
-    
     explicit FileManager(const std::string& rootPath);
     ~FileManager();
     
     FileManager(const FileManager&) = delete;
     FileManager& operator=(const FileManager&) = delete;
     
-    // ========================================================================
-    // INITIALIZATION
-    // ========================================================================
-    
     bool initializeDirectories();
-    
-    // ========================================================================
-    // UPLOAD / DOWNLOAD
-    // ========================================================================
     
     std::string uploadFile(const std::vector<uint8_t>& data,
                           const std::string& filename,
@@ -325,10 +283,6 @@ public:
     FileInfo uploadFileBase64(const std::string& filename, const std::string& base64Data);
     std::string downloadFileBase64(const std::string& fileId);
     
-    // ========================================================================
-    // FILE OPERATIONS
-    // ========================================================================
-    
     bool deleteFile(const std::string& filepath);
     bool copyFile(const std::string& source, const std::string& dest);
     bool moveFile(const std::string& source, const std::string& dest);
@@ -336,51 +290,27 @@ public:
     bool renameFile(const std::string& fileId, const std::string& newName);
     FileInfo copyFileByName(const std::string& fileId, const std::string& newName);
     
-    // ========================================================================
-    // DIRECTORY OPERATIONS
-    // ========================================================================
-    
     std::vector<FileInfo> listFiles(DirectoryType dirType);
     std::vector<FileInfo> listFiles();
     
     std::optional<FileInfo> getFileInfo(const std::string& filepath);
     std::string getDirectoryPath(DirectoryType dirType) const;
     
-    // ========================================================================
-    // VALIDATION
-    // ========================================================================
-    
     std::string sanitizeFilename(const std::string& filename) const;
     bool isPathSafe(const std::string& path) const;
-    
-    // ========================================================================
-    // STATISTICS
-    // ========================================================================
     
     json getStatistics() const;
     
 private:
-    // ========================================================================
-    // PRIVATE METHODS
-    // ========================================================================
-    
     bool validatePath(const std::string& path) const;
     std::optional<FileInfo> parseFileInfo(const std::string& filepath, 
                                          DirectoryType dirType);
     std::string directoryTypeToString(DirectoryType type) const;
     
-    /**
-     * @brief Build validated full path from relative path
-     * @throws ErrorCode::VALIDATION_FAILED if path escapes root
-     */
     std::string buildFullPath(const std::string& relativePath) const;
     
     std::string base64Encode(const std::vector<uint8_t>& data) const;
     std::vector<uint8_t> base64Decode(const std::string& encoded) const;
-    
-    // ========================================================================
-    // MEMBER VARIABLES
-    // ========================================================================
     
     std::string rootPath_;
     mutable std::mutex mutex_;
