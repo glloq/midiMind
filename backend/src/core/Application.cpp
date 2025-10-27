@@ -1,14 +1,7 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.2.3 - CORRECTIONS CRITIQUES
+// Version: 4.2.4 - FIX MidiPlayer and ApiServer constructors
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Changes v4.2.3:
-//   🔧 FIXED: EventBus initialisé AVANT CommandHandler (phase 4)
-//   🔧 FIXED: CommandHandler reçoit eventBus_ en paramètre
-//   🔧 FIXED: Ordre d'initialisation corrigé pour dépendances
-//
 // ============================================================================
 
 #include "Application.h"
@@ -160,7 +153,7 @@ bool Application::initialize(const std::string& configPath) {
     
     Logger::info("Application", "");
     Logger::info("Application", "╔═══════════════════════════════════════╗");
-    Logger::info("Application", "║   MidiMind Initialization v4.2.3     ║");
+    Logger::info("Application", "║   MidiMind Initialization v4.2.4     ║");
     Logger::info("Application", "╚═══════════════════════════════════════╝");
     Logger::info("Application", "");
     
@@ -204,14 +197,18 @@ bool Application::initializeConfiguration(const std::string& configPath) {
             Config::instance().set("database.path", "/var/lib/midimind/midimind.db");
             Config::instance().set("database.migrations", "data/migrations");
             Config::instance().set("api.host", "0.0.0.0");
-            Config::instance().set("api.port", "8080");
+            Config::instance().set("api.port", 8080);
+            Config::instance().set("log.level", "info");
+            Config::instance().set("log.file", "/var/log/midimind/midimind.log");
+            Config::instance().set("midi.scan_on_startup", true);
+            Config::instance().set("midi.auto_connect", false);
             
-            Logger::info("Application", "  ✓ Using hardcoded defaults");
-        } else {
-            Logger::info("Application", "  ✓ Configuration loaded from " + path);
+            if (!Config::instance().save(path)) {
+                Logger::warning("Application", "  Failed to save default config");
+            }
         }
+        Logger::info("Application", "  ✓ Configuration loaded");
         
-        configPath_ = path;
         Logger::info("Application", "");
         return true;
         
@@ -226,33 +223,27 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        Logger::info("Application", "  Initializing Database...");
+        Logger::info("Application", "  Connecting to database...");
+        database_ = Database::instance();
         
         std::string dbPath = Config::instance().getString("database.path", 
-                                                         "/var/lib/midimind/midimind.db");
-        std::string migrationsPath = Config::instance().getString("database.migrations",
-                                                                  "data/migrations");
-        
-        database_ = &Database::instance();
-        
-        // CRITICAL: Null check before connect
-        if (!database_) {
-            Logger::error("Application", "Failed to get Database instance");
-            return false;
-        }
+                                                          "/var/lib/midimind/midimind.db");
         
         if (!database_->connect(dbPath)) {
-            Logger::error("Application", "Failed to connect to database");
+            Logger::error("Application", "  Database connection failed");
             return false;
         }
         Logger::info("Application", "  ✓ Database connected");
         
         Logger::info("Application", "  Running migrations...");
-        if (!database_->migrate(migrationsPath)) {
-            Logger::warning("Application", "  Database migration failed (continuing anyway)");
-        } else {
-            Logger::info("Application", "  ✓ Migrations complete");
+        std::string migrationsPath = Config::instance().getString("database.migrations", 
+                                                                  "data/migrations");
+        
+        if (!database_->runMigrations(migrationsPath)) {
+            Logger::error("Application", "  Migration failed");
+            return false;
         }
+        Logger::info("Application", "  ✓ Migrations complete");
         
         Logger::info("Application", "");
         return true;
@@ -347,7 +338,7 @@ bool Application::initializeMidi() {
         Logger::info("Application", "  ✓ MidiRouter initialized");
         
         Logger::info("Application", "  Initializing MidiPlayer...");
-        player_ = std::make_shared<MidiPlayer>();
+        player_ = std::make_shared<MidiPlayer>(router_, eventBus_);
         Logger::info("Application", "  ✓ MidiPlayer initialized");
         
         Logger::info("Application", "");
@@ -373,16 +364,13 @@ bool Application::initializeApi() {
             latencyCompensator_,
             instrumentDatabase_,
             presetManager_,
-            eventBus_  // ✅ EventBus passé en paramètre
+            eventBus_
         );
         Logger::info("Application", "  ✓ CommandHandler initialized");
         
         Logger::info("Application", "  Initializing ApiServer...");
-        std::string host = Config::instance().getString("api.host", "0.0.0.0");
-        int port = Config::instance().getInt("api.port", 8080);
-        
-        apiServer_ = std::make_shared<ApiServer>(host, port, commandHandler_.get());
-        Logger::info("Application", "  ✓ ApiServer initialized (" + host + ":" + std::to_string(port) + ")");
+        apiServer_ = std::make_shared<ApiServer>(eventBus_);
+        Logger::info("Application", "  ✓ ApiServer initialized");
         
         Logger::info("Application", "");
         return true;
@@ -409,11 +397,10 @@ bool Application::start() {
     }
     
     try {
-        Logger::info("Application", "Starting API server...");
-        if (!apiServer_->start()) {
-            Logger::error("Application", "Failed to start API server");
-            return false;
-        }
+        int port = Config::instance().getInt("api.port", 8080);
+        
+        Logger::info("Application", "Starting API server on port " + std::to_string(port) + "...");
+        apiServer_->start(port);
         Logger::info("Application", "✓ API server started");
         
         Logger::info("Application", "Starting monitoring threads...");
@@ -525,7 +512,6 @@ void Application::startMonitoringThreads() {
                         {"timestamp", ms},
                         {"uptime", getUptime()},
                         {"components", {
-                            // CRITICAL: Verify database_ before use
                             {"database", database_ && database_->isConnected()},
                             {"api_server", apiServerCopy && apiServerCopy->isRunning()},
                             {"midi_devices", deviceManagerCopy ? deviceManagerCopy->getDeviceCount() : 0},
@@ -553,7 +539,6 @@ void Application::stopMonitoringThreads() {
     statusBroadcastRunning_ = false;
     
     if (statusBroadcastThread_.joinable()) {
-        // CRITICAL: Thread join avec timeout de 5 secondes
         auto future = std::async(std::launch::async, [this]() {
             statusBroadcastThread_.join();
         });
@@ -577,7 +562,6 @@ void Application::broadcastStatus() {
         {"timestamp", ms},
         {"uptime", getUptime()},
         {"components", {
-            // CRITICAL: Verify database_ before use
             {"database", database_ && database_->isConnected()},
             {"api_server", apiServer_ && apiServer_->isRunning()},
             {"midi_devices", deviceManager_ ? deviceManager_->getDeviceCount() : 0},
@@ -604,7 +588,7 @@ void Application::setupSignalHandlers() {
 // ============================================================================
 
 std::string Application::getVersion() const {
-    return "4.2.3";
+    return "4.2.4";
 }
 
 std::string Application::getProtocolVersion() const {

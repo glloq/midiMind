@@ -1,18 +1,7 @@
 // ============================================================================
 // File: backend/src/core/JsonValidator.h
-// Version: 4.1.0
+// Version: 4.1.1 - FIX FieldSchema copy constructors
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Description:
-//   JSON schema validator for API request/response validation.
-//
-// Changes v4.1.0:
-//   - objectSchema/arrayItemSchema: shared_ptr → unique_ptr
-//   - minValue/maxValue: int → int64_t
-//   - validate() moved to .cpp (no longer inline)
-//   - Optimized field checking with unordered_set
-//
 // ============================================================================
 
 #pragma once
@@ -87,6 +76,42 @@ struct FieldSchema {
         , maxLength(SIZE_MAX)
         , objectSchema(nullptr)
         , arrayItemSchema(nullptr) {}
+    
+    // Copy constructor for unique_ptr deep copy
+    FieldSchema(const FieldSchema& other)
+        : name(other.name)
+        , type(other.type)
+        , required(other.required)
+        , minValue(other.minValue)
+        , maxValue(other.maxValue)
+        , minLength(other.minLength)
+        , maxLength(other.maxLength)
+        , allowedValues(other.allowedValues)
+        , pattern(other.pattern)
+        , objectSchema(other.objectSchema ? std::make_unique<ObjectSchema>(*other.objectSchema) : nullptr)
+        , arrayItemSchema(other.arrayItemSchema ? std::make_unique<FieldSchema>(*other.arrayItemSchema) : nullptr) {}
+    
+    // Copy assignment operator
+    FieldSchema& operator=(const FieldSchema& other) {
+        if (this != &other) {
+            name = other.name;
+            type = other.type;
+            required = other.required;
+            minValue = other.minValue;
+            maxValue = other.maxValue;
+            minLength = other.minLength;
+            maxLength = other.maxLength;
+            allowedValues = other.allowedValues;
+            pattern = other.pattern;
+            objectSchema = other.objectSchema ? std::make_unique<ObjectSchema>(*other.objectSchema) : nullptr;
+            arrayItemSchema = other.arrayItemSchema ? std::make_unique<FieldSchema>(*other.arrayItemSchema) : nullptr;
+        }
+        return *this;
+    }
+    
+    // Move constructor and assignment (default)
+    FieldSchema(FieldSchema&&) = default;
+    FieldSchema& operator=(FieldSchema&&) = default;
 };
 
 /**

@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.2.1 - FIX string concatenation
+// Version: 4.2.2 - FIX string concatenation
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -220,9 +220,9 @@ public:
                 count++;
             } catch (const std::exception& e) {
                 // Log error but continue with other handlers
-                logError("EventBus", std::string("Handler exception: ") + e.what());
+                logError("EventBus", std::string("Handler exception: ") + std::string(e.what()));
             } catch (...) {
-                logError("EventBus", "Handler exception: unknown error");
+                logError("EventBus", std::string("Handler exception: unknown error"));
             }
         }
         

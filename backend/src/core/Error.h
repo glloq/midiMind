@@ -1,14 +1,7 @@
 // ============================================================================
 // File: backend/src/core/Error.h
-// Version: 4.1.1 - CORRECTIONS COMPLÈTES
+// Version: 4.1.2 - FIX NETWORK_ERROR duplicate value
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Corrections v4.1.1:
-//   - Ajout des cas manquants dans errorCodeToString()
-//   - Indentation corrigée ligne 188
-//   - Documentation des codes explicites
-//
 // ============================================================================
 
 #pragma once
@@ -84,7 +77,7 @@ enum class ErrorCode {
     MIDI_FILE_READ_FAILED,
     
     // Network
-    NETWORK_ERROR,
+    NETWORK_ERROR = 1519,           // Explicit value to avoid conflict with DATABASE_NOT_CONNECTED
     NETWORK_CONNECTION_FAILED,
     NETWORK_TIMEOUT,
     NETWORK_SEND_ERROR,
