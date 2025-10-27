@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.2.4 - FIX string concatenation
+// Version: 4.2.5 - FIX string concatenation for GCC 14
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -14,6 +14,7 @@
 #include <typeindex>
 #include <atomic>
 #include <algorithm>
+#include <string>
 
 namespace midiMind {
 
@@ -170,9 +171,11 @@ public:
                 (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
-                logError("EventBus", std::string("Handler exception: ") + e.what());
+                std::string msg = "Handler exception: ";
+                msg += e.what();
+                logError("EventBus", msg);
             } catch (...) {
-                logError("EventBus", std::string("Handler exception: unknown error"));
+                logError("EventBus", "Handler exception: unknown error");
             }
         }
         
