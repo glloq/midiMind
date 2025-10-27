@@ -160,7 +160,10 @@ namespace FileManagerUnsafe {
             return "";
         }
         
-        std::string content{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        std::string content{
+            std::istreambuf_iterator<char>(file),
+            std::istreambuf_iterator<char>()
+        };
         
         if (!file.good() && !file.eof()) {
             Logger::error("FileManagerUnsafe", "Read error: " + path);
@@ -202,10 +205,13 @@ namespace FileManagerUnsafe {
             return {};
         }
         
-        std::vector<uint8_t> data(
+        std::vector<uint8_t> data{
             std::istreambuf_iterator<char>(file),
             std::istreambuf_iterator<char>()
-        std::vector<uint8_t> data{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        };
+        
+        if (!file.good() && !file.eof()) {
+            Logger::error("FileManagerUnsafe", "Read error: " + path);
             return {};
         }
         

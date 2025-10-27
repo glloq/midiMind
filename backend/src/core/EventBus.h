@@ -179,9 +179,9 @@ public:
                 (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
-                logError("EventBus", ("Handler exception: " + std::string(e.what())));
+                logError("EventBus", std::string("Handler exception: ") + e.what());
             } catch (...) {
-                logError("EventBus", "Handler exception: unknown error");
+                logError("EventBus", std::string("Handler exception: unknown error"));
             }
         }
         

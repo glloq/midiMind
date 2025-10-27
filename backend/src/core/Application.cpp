@@ -260,7 +260,7 @@ bool Application::initializeStorage() {
     
     try {
         Logger::info("Application", "  Initializing Settings...");
-        settings_ = std::make_shared<Settings>();
+        settings_ = std::make_shared<Settings>(*database_);
         if (!settings_->load()) {
             Logger::warning("Application", "  Failed to load settings (using defaults)");
         } else {
@@ -272,7 +272,7 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  ✓ FileManager initialized");
         
         Logger::info("Application", "  Initializing InstrumentDatabase...");
-        instrumentDatabase_ = std::make_shared<InstrumentDatabase>();
+        instrumentDatabase_ = std::make_shared<InstrumentDatabase>(*database_);
         Logger::info("Application", "  ✓ InstrumentDatabase initialized");
         
         Logger::info("Application", "  Initializing PresetManager...");
