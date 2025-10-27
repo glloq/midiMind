@@ -56,7 +56,7 @@ SessionManager::SessionManager(Database& database)
     , autoSaveInterval_(300)
     , stopAutoSave_(false)
 {
-    if (!database_.isOpen()) {
+    if (!database_.isConnected()) {
         throw MidiMindException(ErrorCode::DATABASE_ERROR, "Database not opened");
     }
     
@@ -82,14 +82,15 @@ SessionManager::~SessionManager() {
 int SessionManager::create(const std::string& name, const json& data) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string timestamp = TimeUtils::formatISO8601Now();
     std::string dataStr = data.dump();
     
     std::string query = 
         "INSERT INTO sessions (name, data, created_at, updated_at) "
         "VALUES (?, ?, ?, ?)";
     
-    int id = database_.executeInsert(query, {name, dataStr, timestamp, timestamp});
+    auto result = database_.execute(query, {name, dataStr, timestamp, timestamp});
+    int id = result.lastInsertId;
     
     Logger::info("SessionManager", "Created session: " + name + " (ID: " + std::to_string(id) + ")");
     
@@ -104,7 +105,7 @@ std::optional<Session> SessionManager::load(int id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::string query = "SELECT id, name, data, created_at, updated_at FROM sessions WHERE id = ?";
-    auto results = database_.executeQuery(query, {std::to_string(id)});
+    auto results = database_.query(query, {std::to_string(id)});
     
     if (results.empty()) {
         return std::nullopt;
@@ -124,7 +125,7 @@ std::vector<Session> SessionManager::list() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::string query = "SELECT id, name, created_at, updated_at FROM sessions ORDER BY updated_at DESC";
-    auto results = database_.executeQuery(query);
+    auto results = database_.query(query);
     
     std::vector<Session> sessions;
     for (const auto& row : results) {
@@ -148,7 +149,7 @@ std::vector<Session> SessionManager::search(const std::string& query) {
         "WHERE name LIKE ? ORDER BY updated_at DESC";
     
     std::string searchPattern = "%" + query + "%";
-    auto results = database_.executeQuery(sql, {searchPattern});
+    auto results = database_.query(sql, {searchPattern});
     
     std::vector<Session> sessions;
     for (const auto& row : results) {
@@ -177,16 +178,16 @@ void SessionManager::update(int id, const std::string& name, const json& data) {
     
     // Use existsUnsafe to avoid double-locking
     if (!existsUnsafe(id)) {
-        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+        throw MidiMindException(ErrorCode::FILE_NOT_FOUND, "Session not found: " + std::to_string(id));
     }
     
-    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string timestamp = TimeUtils::formatISO8601Now();
     std::string dataStr = data.dump();
     
     std::string query = 
         "UPDATE sessions SET name = ?, data = ?, updated_at = ? WHERE id = ?";
     
-    database_.executeUpdate(query, {name, dataStr, timestamp, std::to_string(id)});
+    database_.execute(query, {name, dataStr, timestamp, std::to_string(id)});
     
     Logger::info("SessionManager", "Updated session: " + name + " (ID: " + std::to_string(id) + ")");
 }
@@ -196,16 +197,16 @@ void SessionManager::save(int id, const json& data) {
     
     // Use existsUnsafe to avoid double-locking
     if (!existsUnsafe(id)) {
-        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+        throw MidiMindException(ErrorCode::FILE_NOT_FOUND, "Session not found: " + std::to_string(id));
     }
     
-    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string timestamp = TimeUtils::formatISO8601Now();
     std::string dataStr = data.dump();
     
     std::string query = 
         "UPDATE sessions SET data = ?, updated_at = ? WHERE id = ?";
     
-    database_.executeUpdate(query, {dataStr, timestamp, std::to_string(id)});
+    database_.execute(query, {dataStr, timestamp, std::to_string(id)});
 }
 
 // ============================================================================
@@ -222,7 +223,7 @@ bool SessionManager::remove(int id) {
     }
     
     std::string query = "DELETE FROM sessions WHERE id = ?";
-    int affected = database_.executeUpdate(query, {std::to_string(id)});
+    int affected = database_.execute(query, {std::to_string(id)});
     
     if (affected > 0) {
         Logger::info("SessionManager", "Deleted session ID: " + std::to_string(id));
@@ -240,7 +241,7 @@ int SessionManager::cleanup(int daysOld) {
         "julianday('now') - julianday(updated_at) > ?";
     
     int activeId = activeSessionId_.load();
-    int affected = database_.executeUpdate(query, {
+    int affected = database_.execute(query, {
         std::to_string(activeId),
         std::to_string(daysOld)
     });
@@ -260,7 +261,7 @@ void SessionManager::setActive(int id) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (id != 0 && !existsUnsafe(id)) {
-        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+        throw MidiMindException(ErrorCode::FILE_NOT_FOUND, "Session not found: " + std::to_string(id));
     }
     
     activeSessionId_ = id;
@@ -465,7 +466,7 @@ size_t SessionManager::count() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::string query = "SELECT COUNT(*) FROM sessions";
-    auto results = database_.executeQuery(query);
+    auto results = database_.query(query);
     
     if (results.empty()) {
         return 0;
@@ -486,7 +487,7 @@ json SessionManager::getStatistics() const {
     
     // Get most recent session
     std::string query = "SELECT name, updated_at FROM sessions ORDER BY updated_at DESC LIMIT 1";
-    auto results = database_.executeQuery(query);
+    auto results = database_.query(query);
     
     if (!results.empty()) {
         stats["most_recent_session"] = results[0][0];
@@ -503,7 +504,7 @@ json SessionManager::getStatistics() const {
 bool SessionManager::existsUnsafe(int id) const {
     // Must be called with mutex_ locked
     std::string query = "SELECT COUNT(*) FROM sessions WHERE id = ?";
-    auto results = database_.executeQuery(query, {std::to_string(id)});
+    auto results = database_.query(query, {std::to_string(id)});
     
     return !results.empty() && std::stoi(results[0][0]) > 0;
 }

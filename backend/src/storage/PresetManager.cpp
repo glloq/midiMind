@@ -173,7 +173,7 @@ PresetManager::PresetManager(Database& database)
     
     initializeSchema();
     
-    Logger::info("PresetManager", "✓ PresetManager initialized");
+    Logger::info("PresetManager", "âœ“ PresetManager initialized");
 }
 
 PresetManager::~PresetManager() {
@@ -207,7 +207,7 @@ bool PresetManager::initializeSchema() {
     
     try {
         database_.execute(sql);
-        Logger::info("PresetManager", "✓ Schema initialized");
+        Logger::info("PresetManager", "âœ“ Schema initialized");
         return true;
     } catch (const std::exception& e) {
         Logger::error("PresetManager", 
@@ -253,7 +253,7 @@ int PresetManager::create(const Preset& preset) {
     }
     
     int id = static_cast<int>(result.lastInsertId);
-    Logger::info("PresetManager", "✓ Preset created with ID: " + std::to_string(id));
+    Logger::info("PresetManager", "âœ“ Preset created with ID: " + std::to_string(id));
     
     return id;
 }
@@ -399,7 +399,7 @@ void PresetManager::update(int id, const Preset& preset) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (!exists(id)) {
-        THROW_ERROR(ErrorCode::NOT_FOUND, "Preset not found: " + std::to_string(id));
+        THROW_ERROR(ErrorCode::FILE_NOT_FOUND, "Preset not found: " + std::to_string(id));
     }
     
     Logger::info("PresetManager", "Updating preset: " + std::to_string(id));
@@ -429,7 +429,7 @@ void PresetManager::update(int id, const Preset& preset) {
                    "Failed to update preset: " + result.error);
     }
     
-    Logger::info("PresetManager", "✓ Preset updated");
+    Logger::info("PresetManager", "âœ“ Preset updated");
 }
 
 // ============================================================================
@@ -495,7 +495,7 @@ bool PresetManager::exportToFile(int id, const std::string& filepath) {
         
         file.close();
         
-        Logger::info("PresetManager", "✓ Preset exported to: " + filepath);
+        Logger::info("PresetManager", "âœ“ Preset exported to: " + filepath);
         return true;
         
     } catch (const std::exception& e) {
@@ -532,7 +532,7 @@ int PresetManager::importFromFile(const std::string& filepath) {
         
         int id = create(preset);
         
-        Logger::info("PresetManager", "✓ Preset imported from: " + filepath);
+        Logger::info("PresetManager", "âœ“ Preset imported from: " + filepath);
         return id;
         
     } catch (const std::exception& e) {
@@ -591,7 +591,7 @@ std::string PresetManager::serializePreset(const Preset& preset) const {
     try {
         return preset.toJson().dump();
     } catch (const std::exception& e) {
-        THROW_ERROR(ErrorCode::JSON_SERIALIZE_ERROR,
+        THROW_ERROR(ErrorCode::VALIDATION_ERROR,
                    "Failed to serialize preset: " + std::string(e.what()));
     }
 }
@@ -601,7 +601,7 @@ Preset PresetManager::deserializePreset(const std::string& data) const {
         json j = json::parse(data);
         return Preset::fromJson(j);
     } catch (const std::exception& e) {
-        THROW_ERROR(ErrorCode::JSON_PARSE_ERROR, 
+        THROW_ERROR(ErrorCode::CONFIG_PARSE_ERROR, 
                    "Failed to deserialize preset: " + std::string(e.what()));
     }
 }
