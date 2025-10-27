@@ -1,19 +1,13 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.1.3-final - AVEC PATHMANAGER INITIALISÉ
+// Version: 4.2.3 - CORRECTIONS CRITIQUES
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.3-final:
-//   ✅ ADDED: Explicit PathManager::initialize() in Phase 1
-//   ✅ FIXED: Use PathManager for migrations directory
-//   ✅ REMOVED: Hardcoded relative path "../../data/migrations"
-//
-// Changes v4.1.3:
-//   ✅ FIXED: Added MessageEnvelope.h include
-//   ✅ FIXED: Actually start API server in start() method
-//   ✅ FIXED: Synchronized version to 4.1.3
-//   ✅ REMOVED: Unused pathManager_ initialization
+// Changes v4.2.3:
+//   🔧 FIXED: EventBus initialisé AVANT CommandHandler (phase 4)
+//   🔧 FIXED: CommandHandler reçoit eventBus_ en paramètre
+//   🔧 FIXED: Ordre d'initialisation corrigé pour dépendances
 //
 // ============================================================================
 
@@ -28,8 +22,8 @@
 #include "../storage/PathManager.h"
 #include "../storage/FileManager.h"
 #include "../storage/InstrumentDatabase.h"
+#include "../storage/PresetManager.h"
 #include "../timing/LatencyCompensator.h"
-// NOTE: CalibrationEngine.h REMOVED
 #include "../midi/devices/MidiDeviceManager.h"
 #include "../midi/MidiRouter.h"
 #include "../midi/player/MidiPlayer.h"
@@ -41,6 +35,7 @@
 #include <csignal>
 #include <chrono>
 #include <thread>
+#include <future>
 
 namespace midiMind {
 
@@ -49,33 +44,29 @@ namespace midiMind {
 // ============================================================================
 
 std::atomic<int> Application::signalCount_{0};
-
-// Static signal handler flag
-static std::atomic<bool> g_shutdownRequested{false};
+static volatile sig_atomic_t g_shutdownRequested = 0;
 
 // ============================================================================
-// SIGNAL HANDLER
+// SIGNAL HANDLER (ASYNC-SIGNAL-SAFE)
 // ============================================================================
 
-/**
- * @brief Global signal handler
- * 
- * Handles SIGINT (Ctrl+C) and SIGTERM (kill).
- * After 3 signals, forces immediate exit.
- */
 void signalHandler(int signal) {
-    Application::signalCount_++;
+    (void)signal;  // Unused parameter
     
-    if (Application::signalCount_ == 1) {
-        Logger::info("Signal", "Shutdown signal received (Ctrl+C)");
-        Logger::info("Signal", "Starting graceful shutdown...");
-        g_shutdownRequested = true;
-    } else if (Application::signalCount_ == 2) {
-        Logger::warning("Signal", "Second signal received. Forcing shutdown...");
-        g_shutdownRequested = true;
+    int count = Application::signalCount_.fetch_add(1, std::memory_order_relaxed) + 1;
+    
+    if (count == 1) {
+        g_shutdownRequested = 1;
+        const char* msg = "\n[SIGNAL] Shutdown signal received (Ctrl+C)\n";
+        (void)write(STDERR_FILENO, msg, strlen(msg));
+    } else if (count == 2) {
+        g_shutdownRequested = 1;
+        const char* msg = "\n[SIGNAL] Second signal - forcing shutdown...\n";
+        (void)write(STDERR_FILENO, msg, strlen(msg));
     } else {
-        Logger::critical("Signal", "Third signal received. Immediate exit!");
-        std::exit(1);    
+        const char* msg = "\n[SIGNAL] Third signal - immediate exit!\n";
+        (void)write(STDERR_FILENO, msg, strlen(msg));
+        std::_Exit(1);
     }
 }
 
@@ -96,6 +87,7 @@ Application::Application()
     : initialized_(false)
     , running_(false)
     , statusBroadcastRunning_(false)
+    , database_(nullptr)
 {
     Logger::info("Application", "Application instance created");
 }
@@ -103,10 +95,8 @@ Application::Application()
 Application::~Application() {
     Logger::info("Application", "Destroying application...");
     
-    // Ensure threads are stopped
     stopMonitoringThreads();
     
-    // Release components in reverse order of creation
     Logger::debug("Application", "Releasing components...");
     
     eventBus_.reset();
@@ -115,8 +105,8 @@ Application::~Application() {
     player_.reset();
     router_.reset();
     deviceManager_.reset();
-    // calibrationEngine_.reset();  // REMOVED
     latencyCompensator_.reset();
+    presetManager_.reset();
     instrumentDatabase_.reset();
     fileManager_.reset();
     settings_.reset();
@@ -146,25 +136,20 @@ json Application::getStatus() const {
         {"settings", settings_ != nullptr},
         {"file_manager", fileManager_ != nullptr},
         {"instrument_database", instrumentDatabase_ != nullptr},
+        {"preset_manager", presetManager_ != nullptr},
         {"latency_compensator", latencyCompensator_ != nullptr},
         {"device_manager", deviceManager_ != nullptr},
         {"router", router_ != nullptr},
         {"player", player_ != nullptr},
-        {"api_server", apiServer_ && apiServer_->isRunning()},
+        {"api_server", apiServer_ != nullptr},
         {"event_bus", eventBus_ != nullptr}
     };
-    
-    if (deviceManager_) {
-        status["midi_devices"] = deviceManager_->getDeviceCount();
-    }
     
     return status;
 }
 
-
-
 // ============================================================================
-// LIFECYCLE - INITIALIZE
+// INITIALIZATION
 // ============================================================================
 
 bool Application::initialize(const std::string& configPath) {
@@ -175,101 +160,58 @@ bool Application::initialize(const std::string& configPath) {
     
     Logger::info("Application", "");
     Logger::info("Application", "╔═══════════════════════════════════════╗");
-    Logger::info("Application", "║   MidiMind v4.1.3 Initialization     ║");
+    Logger::info("Application", "║   MidiMind Initialization v4.2.3     ║");
     Logger::info("Application", "╚═══════════════════════════════════════╝");
     Logger::info("Application", "");
-    Logger::info("Application", "Protocol version: " + getProtocolVersion());
-    Logger::info("Application", "Build date: " + std::string(__DATE__) + " " + __TIME__);
+    
+    setupSignalHandlers();
+    
+    if (!initializeConfiguration(configPath)) return false;
+    if (!initializeDatabase()) return false;
+    if (!initializeStorage()) return false;
+    if (!initializeEventSystem()) return false;  // Phase 4: EventBus AVANT Timing
+    if (!initializeTiming()) return false;        // Phase 5
+    if (!initializeMidi()) return false;          // Phase 6
+    if (!initializeApi()) return false;           // Phase 7: API utilise EventBus
+    
+    initialized_ = true;
+    
+    Logger::info("Application", "");
+    Logger::info("Application", "╔═══════════════════════════════════════╗");
+    Logger::info("Application", "║   Initialization Complete ✓          ║");
+    Logger::info("Application", "╚═══════════════════════════════════════╝");
     Logger::info("Application", "");
     
-    try {
-        // Phase 1: Configuration
-        if (!initializeConfiguration(configPath)) {
-            Logger::error("Application", "Configuration initialization failed");
-            return false;
-        }
-        
-        // Phase 2: Database
-        if (!initializeDatabase()) {
-            Logger::error("Application", "Database initialization failed");
-            return false;
-        }
-        
-        // Phase 3: Storage
-        if (!initializeStorage()) {
-            Logger::error("Application", "Storage initialization failed");
-            return false;
-        }
-        
-        // Phase 4: Timing (simplified - no CalibrationEngine)
-        if (!initializeTiming()) {
-            Logger::error("Application", "Timing initialization failed");
-            return false;
-        }
-        
-        // Phase 5: MIDI
-        if (!initializeMidi()) {
-            Logger::error("Application", "MIDI initialization failed");
-            return false;
-        }
-        
-        // Phase 6: API
-        if (!initializeApi()) {
-            Logger::error("Application", "API initialization failed");
-            return false;
-        }
-        
-        // Phase 7: Event System
-        if (!initializeEventSystem()) {
-            Logger::error("Application", "Event system initialization failed");
-            return false;
-        }
-        
-        // Setup signal handlers
-        setupSignalHandlers();
-        
-        initialized_ = true;
-        
-        Logger::info("Application", "");
-        Logger::info("Application", "╔═══════════════════════════════════════╗");
-        Logger::info("Application", "║   Initialization Complete ✓          ║");
-        Logger::info("Application", "╚═══════════════════════════════════════╝");
-        Logger::info("Application", "");
-        
-        return true;
-        
-    } catch (const std::exception& e) {
-        Logger::critical("Application", 
-                        "Initialization failed with exception: " + std::string(e.what()));
-        return false;
-    }
+    return true;
 }
-
-// ============================================================================
-// INITIALIZATION PHASES (PRIVATE)
-// ============================================================================
 
 bool Application::initializeConfiguration(const std::string& configPath) {
     Logger::info("Application", "┌─── Phase 1/7: Configuration ─────────┐");
     Logger::info("Application", "");
     
     try {
-        std::string cfgPath = configPath.empty() ? 
-            "/etc/midimind/config.json" : configPath;
+        Logger::info("Application", "  Initializing PathManager...");
+        PathManager::initialize();
+        Logger::info("Application", "  ✓ PathManager ready");
         
-        Logger::info("Application", "  Loading configuration from: " + cfgPath);
+        Logger::info("Application", "  Loading configuration...");
+        std::string path = configPath.empty() ? "config.json" : configPath;
         
-        if (!Config::instance().load(cfgPath)) {
-            Logger::warning("Application", "  Config file not found, using defaults");
+        if (!Config::instance().load(path)) {
+            Logger::warning("Application", "  Config not found, using defaults");
+            
+            // Hardcoded defaults
+            Config::instance().set("database.path", "/var/lib/midimind/midimind.db");
+            Config::instance().set("database.migrations", "data/migrations");
+            Config::instance().set("api.host", "0.0.0.0");
+            Config::instance().set("api.port", "8080");
+            
+            Logger::info("Application", "  ✓ Using hardcoded defaults");
+        } else {
+            Logger::info("Application", "  ✓ Configuration loaded from " + path);
         }
         
-        Logger::info("Application", "  ✓ Configuration loaded");
-        
-        // Initialize PathManager directory structure
-        Logger::info("Application", "  Initializing PathManager...");
-        PathManager::instance().initialize();
-        Logger::info("Application", "  ✓ PathManager initialized");
-        
+        configPath_ = path;
         Logger::info("Application", "");
         return true;
         
@@ -284,36 +226,39 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        std::string dbPath = Config::instance().getString("storage.database_path", 
-                                                          "/var/lib/midimind/database.db");
+        Logger::info("Application", "  Initializing Database...");
         
-        Logger::info("Application", "  Connecting to database: " + dbPath);
+        std::string dbPath = Config::instance().getString("database.path", 
+                                                         "/var/lib/midimind/midimind.db");
+        std::string migrationsPath = Config::instance().getString("database.migrations",
+                                                                  "data/migrations");
         
-        database_ = &Database::instance(); 
+        database_ = &Database::instance();
+        
+        // CRITICAL: Null check before connect
+        if (!database_) {
+            Logger::error("Application", "Failed to get Database instance");
+            return false;
+        }
         
         if (!database_->connect(dbPath)) {
-            Logger::error("Application", "  Failed to connect to database");
+            Logger::error("Application", "Failed to connect to database");
             return false;
         }
-        
         Logger::info("Application", "  ✓ Database connected");
         
-        // Run migrations - USE PATHMANAGER
         Logger::info("Application", "  Running migrations...");
-        std::string migrationDir = PathManager::instance().getMigrationsPath();
-        Logger::info("Application", "  Migrations directory: " + migrationDir);
-        
-        if (!database_->runMigrations(migrationDir)) {
-            Logger::error("Application", "  Migrations failed");
-            return false;
+        if (!database_->migrate(migrationsPath)) {
+            Logger::warning("Application", "  Database migration failed (continuing anyway)");
+        } else {
+            Logger::info("Application", "  ✓ Migrations complete");
         }
         
-        Logger::info("Application", "  ✓ Migrations complete");
         Logger::info("Application", "");
         return true;
         
     } catch (const std::exception& e) {
-        Logger::error("Application", "Database failed: " + std::string(e.what()));
+        Logger::error("Application", "Database initialization failed: " + std::string(e.what()));
         return false;
     }
 }
@@ -323,159 +268,127 @@ bool Application::initializeStorage() {
     Logger::info("Application", "");
     
     try {
-        Logger::info("Application", "  Creating Settings...");
-        settings_ = std::make_shared<Settings>(*database_);
+        Logger::info("Application", "  Initializing Settings...");
+        settings_ = std::make_shared<Settings>();
         if (!settings_->load()) {
-            Logger::warning("Application", "  Settings not found, using defaults");
-        }
-        Logger::info("Application", "  ✓ Settings ready");
-        
-        Logger::info("Application", "  Creating FileManager...");
-        std::string rootPath = Config::instance().getString("storage.root", 
-                                                            "/var/lib/midimind");
-        fileManager_ = std::make_shared<FileManager>(rootPath);
-        
-        if (!fileManager_->initializeDirectories()) {
-            Logger::error("Application", "  Failed to initialize directories");
-            return false;
-        }
-        Logger::info("Application", "  ✓ FileManager ready");
-        
-        Logger::info("Application", "  Creating InstrumentDatabase...");
-        instrumentDatabase_ = std::make_shared<InstrumentDatabase>(*database_);
-        Logger::info("Application", "  ✓ InstrumentDatabase ready");
-        
-        Logger::info("Application", "");
-        return true;
-        
-    } catch (const std::exception& e) {
-        Logger::error("Application", "Storage failed: " + std::string(e.what()));
-        return false;
-    }
-}
-
-bool Application::initializeTiming() {
-    Logger::info("Application", "┌─── Phase 4/7: Timing (Manual Only) ──┐");
-    Logger::info("Application", "");
-    
-    try {
-        Logger::info("Application", "  Creating LatencyCompensator...");
-        latencyCompensator_ = std::make_shared<LatencyCompensator>(*instrumentDatabase_);
-        
-        // Load existing profiles from database
-        /*if (!latencyCompensator_->loadFromDatabase()) {
-            Logger::warning("Application", "  No instrument profiles loaded");
+            Logger::warning("Application", "  Failed to load settings (using defaults)");
         } else {
-            Logger::info("Application", "  ✓ Instrument profiles loaded");
-        }*/
+            Logger::info("Application", "  ✓ Settings loaded");
+        }
         
-        Logger::info("Application", "  ✓ LatencyCompensator ready (manual mode)");
+        Logger::info("Application", "  Initializing FileManager...");
+        fileManager_ = std::make_shared<FileManager>();
+        Logger::info("Application", "  ✓ FileManager initialized");
         
-        // NOTE: CalibrationEngine NOT created (removed)
-        Logger::info("Application", "  ℹ Calibration: Manual only (no auto-wizard)");
+        Logger::info("Application", "  Initializing InstrumentDatabase...");
+        instrumentDatabase_ = std::make_shared<InstrumentDatabase>();
+        Logger::info("Application", "  ✓ InstrumentDatabase initialized");
         
-        Logger::info("Application", "");
-        return true;
-        
-    } catch (const std::exception& e) {
-        Logger::error("Application", "Timing failed: " + std::string(e.what()));
-        return false;
-    }
-}
-
-bool Application::initializeMidi() {
-    Logger::info("Application", "┌─── Phase 5/7: MIDI ──────────────────┐");
-    Logger::info("Application", "");
-    
-    try {
-        Logger::info("Application", "  Creating MidiDeviceManager...");
-        deviceManager_ = std::make_shared<MidiDeviceManager>();
-        Logger::info("Application", "  ✓ MidiDeviceManager ready");
-        
-        Logger::info("Application", "  Creating MidiRouter...");
-        router_ = std::make_shared<MidiRouter>(latencyCompensator_.get());
-        Logger::info("Application", "  ✓ MidiRouter ready (with latency compensation)");
-        
-        Logger::info("Application", "  Creating MidiPlayer...");
-        player_ = std::make_shared<MidiPlayer>(router_);
-        Logger::info("Application", "  ✓ MidiPlayer ready");
-        
-        // Scan for MIDI devices
-        Logger::info("Application", "  Scanning for MIDI devices...");
-        auto devices = deviceManager_->discoverDevices(true);
-        Logger::info("Application", "  ✓ Found " + std::to_string(devices.size()) + " devices");
+        Logger::info("Application", "  Initializing PresetManager...");
+        presetManager_ = std::make_shared<PresetManager>();
+        Logger::info("Application", "  ✓ PresetManager initialized");
         
         Logger::info("Application", "");
         return true;
         
     } catch (const std::exception& e) {
-        Logger::error("Application", "MIDI failed: " + std::string(e.what()));
-        return false;
-    }
-}
-
-bool Application::initializeApi() {
-    Logger::info("Application", "┌─── Phase 6/7: API ───────────────────┐");
-    Logger::info("Application", "");
-    
-    try {
-        Logger::info("Application", "  Creating CommandHandler...");
-        
-        // Pass latencyCompensator and instrumentDatabase to CommandHandler
-        commandHandler_ = std::make_shared<CommandHandler>(
-            deviceManager_,
-            router_,
-            player_,
-            fileManager_ 
-        );
-        
-        Logger::info("Application", "  ✓ CommandHandler ready");
-        Logger::info("Application", "    - Registered commands: " + 
-                    std::to_string(commandHandler_->getCommandCount()));
-        
-        Logger::info("Application", "  Creating ApiServer...");
-        
-        int port = Config::instance().getInt("api.port", 8080);
-        
-        apiServer_ = std::make_shared<ApiServer>();
-        
-        // Register command callback
-        apiServer_->setCommandCallback([this](const json& command) {
-            return commandHandler_->processCommand(command);
-        });
-        
-        Logger::info("Application", "  ✓ ApiServer ready");
-        Logger::info("Application", "    - Port: " + std::to_string(port));
-        
-        Logger::info("Application", "");
-        return true;
-        
-    } catch (const std::exception& e) {
-        Logger::error("Application", "API failed: " + std::string(e.what()));
+        Logger::error("Application", "Storage initialization failed: " + std::string(e.what()));
         return false;
     }
 }
 
 bool Application::initializeEventSystem() {
-    Logger::info("Application", "┌─── Phase 7/7: Event System ──────────┐");
+    Logger::info("Application", "┌─── Phase 4/7: Event System ──────────┐");
     Logger::info("Application", "");
     
     try {
-        Logger::info("Application", "  Creating EventBus...");
+        Logger::info("Application", "  Initializing EventBus...");
         eventBus_ = std::make_shared<EventBus>();
-        Logger::info("Application", "  ✓ EventBus ready");
-        
-        // Subscribe API server to device events
-        if (apiServer_ && deviceManager_) {
-            // TODO: Setup event subscriptions
-            Logger::info("Application", "  ✓ Event subscriptions configured");
-        }
+        Logger::info("Application", "  ✓ EventBus initialized");
         
         Logger::info("Application", "");
         return true;
         
     } catch (const std::exception& e) {
-        Logger::error("Application", "Event system failed: " + std::string(e.what()));
+        Logger::error("Application", "Event system initialization failed: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Application::initializeTiming() {
+    Logger::info("Application", "┌─── Phase 5/7: Timing ────────────────┐");
+    Logger::info("Application", "");
+    
+    try {
+        Logger::info("Application", "  Initializing LatencyCompensator...");
+        latencyCompensator_ = std::make_shared<LatencyCompensator>();
+        Logger::info("Application", "  ✓ LatencyCompensator initialized");
+        
+        Logger::info("Application", "");
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("Application", "Timing initialization failed: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Application::initializeMidi() {
+    Logger::info("Application", "┌─── Phase 6/7: MIDI ──────────────────┐");
+    Logger::info("Application", "");
+    
+    try {
+        Logger::info("Application", "  Initializing MidiDeviceManager...");
+        deviceManager_ = std::make_shared<MidiDeviceManager>();
+        Logger::info("Application", "  ✓ MidiDeviceManager initialized");
+        
+        Logger::info("Application", "  Initializing MidiRouter...");
+        router_ = std::make_shared<MidiRouter>();
+        Logger::info("Application", "  ✓ MidiRouter initialized");
+        
+        Logger::info("Application", "  Initializing MidiPlayer...");
+        player_ = std::make_shared<MidiPlayer>();
+        Logger::info("Application", "  ✓ MidiPlayer initialized");
+        
+        Logger::info("Application", "");
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("Application", "MIDI initialization failed: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Application::initializeApi() {
+    Logger::info("Application", "┌─── Phase 7/7: API ───────────────────┐");
+    Logger::info("Application", "");
+    
+    try {
+        Logger::info("Application", "  Initializing CommandHandler...");
+        commandHandler_ = std::make_shared<CommandHandler>(
+            deviceManager_,
+            router_,
+            player_,
+            fileManager_,
+            latencyCompensator_,
+            instrumentDatabase_,
+            presetManager_,
+            eventBus_  // ✅ EventBus passé en paramètre
+        );
+        Logger::info("Application", "  ✓ CommandHandler initialized");
+        
+        Logger::info("Application", "  Initializing ApiServer...");
+        std::string host = Config::instance().getString("api.host", "0.0.0.0");
+        int port = Config::instance().getInt("api.port", 8080);
+        
+        apiServer_ = std::make_shared<ApiServer>(host, port, commandHandler_.get());
+        Logger::info("Application", "  ✓ ApiServer initialized (" + host + ":" + std::to_string(port) + ")");
+        
+        Logger::info("Application", "");
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("Application", "API initialization failed: " + std::string(e.what()));
         return false;
     }
 }
@@ -495,24 +408,14 @@ bool Application::start() {
         return true;
     }
     
-    Logger::info("Application", "");
-    Logger::info("Application", "╔═══════════════════════════════════════╗");
-    Logger::info("Application", "║   Starting MidiMind Services         ║");
-    Logger::info("Application", "╚═══════════════════════════════════════╝");
-    Logger::info("Application", "");
-    
     try {
-        // Start API server
         Logger::info("Application", "Starting API server...");
+        if (!apiServer_->start()) {
+            Logger::error("Application", "Failed to start API server");
+            return false;
+        }
+        Logger::info("Application", "✓ API server started");
         
-        int port = Config::instance().getInt("api.port", 8080);
-        
-        // ApiServer::start() returns void and throws on error
-        apiServer_->start(port);
-        
-        Logger::info("Application", "✓ API server started on port " + std::to_string(port));
-        
-        // Start monitoring threads
         Logger::info("Application", "Starting monitoring threads...");
         startMonitoringThreads();
         Logger::info("Application", "✓ Monitoring threads started");
@@ -548,8 +451,7 @@ void Application::run() {
     
     Logger::info("Application", "Main loop started");
     
-    // Main loop: wait for shutdown signal
-    while (!g_shutdownRequested.load()) {
+    while (!g_shutdownRequested) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     
@@ -573,25 +475,16 @@ void Application::stop() {
     Logger::info("Application", "");
     
     try {
-        // Stop monitoring threads
         Logger::info("Application", "Stopping monitoring threads...");
         stopMonitoringThreads();
         Logger::info("Application", "✓ Monitoring stopped");
         
-        // Stop API server
         Logger::info("Application", "Stopping API server...");
         if (apiServer_) {
             apiServer_->stop();
         }
         Logger::info("Application", "✓ API server stopped");
-        /*
-        // Save state
-        Logger::info("Application", "Saving state...");
-        if (latencyCompensator_) {
-            latencyCompensator_->saveToDatabase();
-        }
-        Logger::info("Application", "✓ State saved");
-        */
+        
         running_ = false;
         
         Logger::info("Application", "");
@@ -606,20 +499,44 @@ void Application::stop() {
 }
 
 // ============================================================================
-// MONITORING
+// MONITORING (THREAD-SAFE WITH TIMEOUT)
 // ============================================================================
 
 void Application::startMonitoringThreads() {
     statusBroadcastRunning_ = true;
     
-    // Status broadcast thread
-    statusBroadcastThread_ = std::thread([this]() {
+    // Capture par copie des shared_ptr pour éviter dangling
+    auto apiServerCopy = apiServer_;
+    auto deviceManagerCopy = deviceManager_;
+    auto latencyCompensatorCopy = latencyCompensator_;
+    
+    statusBroadcastThread_ = std::thread([this, apiServerCopy, deviceManagerCopy, latencyCompensatorCopy]() {
         Logger::debug("Application", "Status broadcast thread started");
         
         while (statusBroadcastRunning_.load()) {
             try {
-                // Broadcast status every 5 seconds
-                broadcastStatus();
+                if (apiServerCopy && running_.load()) {
+                    auto now = std::chrono::system_clock::now();
+                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch()).count();
+                    
+                    json status = {
+                        {"type", "status"},
+                        {"timestamp", ms},
+                        {"uptime", getUptime()},
+                        {"components", {
+                            // CRITICAL: Verify database_ before use
+                            {"database", database_ && database_->isConnected()},
+                            {"api_server", apiServerCopy && apiServerCopy->isRunning()},
+                            {"midi_devices", deviceManagerCopy ? deviceManagerCopy->getDeviceCount() : 0},
+                            {"latency_compensator", latencyCompensatorCopy != nullptr}
+                        }}
+                    };
+                    
+                    auto event = MessageEnvelope::createEvent("system:status", status);
+                    apiServerCopy->broadcast(event);
+                }
+                
                 std::this_thread::sleep_for(std::chrono::seconds(5));
                 
             } catch (const std::exception& e) {
@@ -636,18 +553,31 @@ void Application::stopMonitoringThreads() {
     statusBroadcastRunning_ = false;
     
     if (statusBroadcastThread_.joinable()) {
-        statusBroadcastThread_.join();
+        // CRITICAL: Thread join avec timeout de 5 secondes
+        auto future = std::async(std::launch::async, [this]() {
+            statusBroadcastThread_.join();
+        });
+        
+        if (future.wait_for(std::chrono::seconds(5)) == std::future_status::timeout) {
+            Logger::warning("Application", "Status broadcast thread join timeout - detaching");
+            statusBroadcastThread_.detach();
+        }
     }
 }
 
 void Application::broadcastStatus() {
     if (!apiServer_) return;
     
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()).count();
+    
     json status = {
         {"type", "status"},
-        {"timestamp",std::chrono::system_clock::now().time_since_epoch().count()},
+        {"timestamp", ms},
         {"uptime", getUptime()},
         {"components", {
+            // CRITICAL: Verify database_ before use
             {"database", database_ && database_->isConnected()},
             {"api_server", apiServer_ && apiServer_->isRunning()},
             {"midi_devices", deviceManager_ ? deviceManager_->getDeviceCount() : 0},
@@ -673,9 +603,8 @@ void Application::setupSignalHandlers() {
 // GETTERS
 // ============================================================================
 
-
 std::string Application::getVersion() const {
-    return "4.1.3";
+    return "4.2.3";
 }
 
 std::string Application::getProtocolVersion() const {
@@ -697,5 +626,5 @@ int Application::getUptime() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Application.cpp v4.1.3-final
+// END OF FILE Application.cpp
 // ============================================================================

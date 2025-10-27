@@ -1,27 +1,29 @@
 // ============================================================================
 // File: backend/src/core/EventBus.cpp
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.2.0 - CORRECTIONS CRITIQUES
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Implementation of EventBus utility functions.
-//   Main class methods are inline in header.
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.0:
-//   - Fixed method calls (getEventTypeCount, getTotalEventsPublished)
-//   - All functions now correctly reference EventBus methods
+// Changes v4.2.0:
+//   🔧 ADDED: logError implementation with Logger
+//   ✅ FIXED: Proper error logging in event handlers
 //
 // ============================================================================
 
 #include "EventBus.h"
+#include "Logger.h"
 #include <sstream>
 #include <iomanip>
 
 namespace midiMind {
+
+// ============================================================================
+// EVENTBUS IMPLEMENTATION
+// ============================================================================
+
+void EventBus::logError(const char* component, const std::string& message) {
+    Logger::error(component, message);
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS

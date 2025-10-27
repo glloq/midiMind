@@ -33,6 +33,7 @@
 #include <fstream>
 #include <vector>
 #include <optional>
+#include <stdexcept>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -74,11 +75,13 @@ struct JsonMidiEvent {
     
     /**
      * @brief Convert to JSON
+     * @throws json::exception if conversion fails
      */
     json toJson() const;
     
     /**
      * @brief Create from JSON
+     * @throws json::exception if JSON is invalid
      */
     static JsonMidiEvent fromJson(const json& j);
 };
@@ -190,11 +193,13 @@ struct JsonMidi {
     
     /**
      * @brief Create from JSON
+     * @throws json::exception if JSON is invalid
      */
     static JsonMidi fromJson(const json& j);
     
     /**
      * @brief Create from JSON string
+     * @throws json::parse_error if parsing fails
      */
     static JsonMidi fromString(const std::string& jsonStr);
     
@@ -263,6 +268,7 @@ public:
      * @param ticksPerBeat Ticks per quarter note
      * @param tempo Tempo in BPM
      * @return JsonMidi Converted structure
+     * @note Message timestamps are in microseconds, converted to milliseconds in output
      */
     JsonMidi fromMidiMessages(
         const std::vector<MidiMessage>& messages,
@@ -285,6 +291,7 @@ public:
      * @brief Convert JsonMidi to MIDI messages
      * @param jsonMidi JsonMidi structure
      * @return std::vector<MidiMessage> MIDI messages with timestamps
+     * @note Event times (ms) are converted to microseconds for message timestamps
      */
     std::vector<MidiMessage> toMidiMessages(const JsonMidi& jsonMidi);
     
@@ -360,6 +367,7 @@ private:
     
     /**
      * @brief Extract metadata from messages
+     * @note Message timestamps are converted from microseconds to milliseconds
      */
     JsonMidiMetadata extractMetadata(const std::vector<MidiMessage>& messages);
     
@@ -373,10 +381,10 @@ private:
     // ========================================================================
     
     /// Default tempo (BPM)
-    uint32_t defaultTempo_ = 120;
+    static constexpr uint32_t defaultTempo_ = 120;
     
     /// Default time signature
-    std::string defaultTimeSignature_ = "4/4";
+    static constexpr const char* defaultTimeSignature_ = "4/4";
 };
 
 // ============================================================================
@@ -385,6 +393,8 @@ private:
 
 /**
  * @brief Load JsonMidi from file
+ * @throws std::runtime_error if file cannot be opened
+ * @throws json::exception if parsing fails
  */
 inline JsonMidi loadJsonMidi(const std::string& filepath) {
     std::ifstream file(filepath);
@@ -393,12 +403,18 @@ inline JsonMidi loadJsonMidi(const std::string& filepath) {
     }
     
     json j;
-    file >> j;
+    try {
+        file >> j;
+    } catch (const json::exception& e) {
+        throw std::runtime_error("Invalid JSON in file " + filepath + ": " + e.what());
+    }
+    
     return JsonMidi::fromJson(j);
 }
 
 /**
  * @brief Save JsonMidi to file
+ * @throws std::runtime_error if file cannot be created
  */
 inline void saveJsonMidi(const JsonMidi& jsonMidi, const std::string& filepath) {
     std::ofstream file(filepath);

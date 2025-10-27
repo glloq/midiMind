@@ -1,20 +1,7 @@
 // ============================================================================
 // File: backend/src/midi/devices/VirtualMidiDevice.cpp
-// Version: 4.1.0
+// Version: 4.2.0
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Description:
-//   Implementation of VirtualMidiDevice.
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Complete implementation
-//   - ALSA virtual port support
-//   - Fallback for non-ALSA platforms
-//
 // ============================================================================
 
 #include "VirtualMidiDevice.h"
@@ -35,6 +22,7 @@ VirtualMidiDevice::VirtualMidiDevice(const std::string& id, const std::string& n
     , isInput_(true)
     , isOutput_(true)
     , shouldStop_(false)
+    , maxQueueSize_(1000)
 {
     Logger::info("VirtualMidiDevice", "Created: " + name);
 }
@@ -58,20 +46,17 @@ bool VirtualMidiDevice::connect() {
     status_ = DeviceStatus::CONNECTING;
     
 #ifdef __linux__
-    // 1. Open ALSA sequencer
     if (!openSequencer()) {
         status_ = DeviceStatus::ERROR;
         return false;
     }
     
-    // 2. Create virtual port
     if (!createVirtualPort()) {
         closeSequencer();
         status_ = DeviceStatus::ERROR;
         return false;
     }
     
-    // 3. Start receive thread
     shouldStop_ = false;
     receiveThread_ = std::thread(&VirtualMidiDevice::receiveThreadFunc, this);
     
@@ -81,7 +66,7 @@ bool VirtualMidiDevice::connect() {
     
     return true;
 #else
-    // Non-ALSA fallback: use queues only
+    // FIX: Non-Linux mode should still work with queue-only mode
     status_ = DeviceStatus::CONNECTED;
     
     Logger::warning("VirtualMidiDevice", 
@@ -99,16 +84,12 @@ bool VirtualMidiDevice::disconnect() {
     Logger::info("VirtualMidiDevice", "Disconnecting virtual port: " + name_);
     
 #ifdef __linux__
-    // 1. Stop receive thread
     shouldStop_ = true;
     if (receiveThread_.joinable()) {
         receiveThread_.join();
     }
     
-    // 2. Delete virtual port
     deleteVirtualPort();
-    
-    // 3. Close sequencer
     closeSequencer();
 #endif
     
@@ -133,24 +114,23 @@ bool VirtualMidiDevice::sendMessage(const MidiMessage& message) {
         return false;
     }
     
-    if (!isOutput_) {
+    // FIX: Use atomic load for thread-safe read
+    if (!isOutput_.load()) {
         Logger::warning("VirtualMidiDevice", "Cannot send: port is input-only");
         return false;
     }
     
 #ifdef __linux__
-    if (alsaSeq_ && virtualPort_ >= 0) {
-        // Send via ALSA
+    int port = virtualPort_.load();
+    if (alsaSeq_ && port >= 0) {
         snd_seq_event_t ev;
         snd_seq_ev_clear(&ev);
         midiMessageToAlsaEvent(message, &ev);
         
-        // Set source
-        snd_seq_ev_set_source(&ev, virtualPort_);
+        snd_seq_ev_set_source(&ev, port);
         snd_seq_ev_set_subs(&ev);
         snd_seq_ev_set_direct(&ev);
         
-        // Send event
         int result = snd_seq_event_output(alsaSeq_, &ev);
         if (result < 0) {
             Logger::error("VirtualMidiDevice", "Failed to send event: " + 
@@ -165,10 +145,9 @@ bool VirtualMidiDevice::sendMessage(const MidiMessage& message) {
     }
 #endif
     
-    // Fallback: queue mode
     std::lock_guard<std::mutex> lock(sendMutex_);
     
-    if (sendQueue_.size() >= MAX_QUEUE_SIZE) {
+    if (sendQueue_.size() >= maxQueueSize_.load()) {
         Logger::warning("VirtualMidiDevice", "Send queue full, dropping message");
         return false;
     }
@@ -186,7 +165,7 @@ MidiMessage VirtualMidiDevice::receiveMessage() {
         return MidiMessage();
     }
     
-    MidiMessage msg = receiveQueue_.front();
+    MidiMessage msg = std::move(receiveQueue_.front());
     receiveQueue_.pop();
     
     return msg;
@@ -198,21 +177,54 @@ bool VirtualMidiDevice::hasMessages() const {
 }
 
 // ============================================================================
+// NEW METHODS
+// ============================================================================
+
+bool VirtualMidiDevice::requestIdentity() {
+    Logger::debug("VirtualMidiDevice", "Virtual devices do not support identity requests");
+    return false;
+}
+
+json VirtualMidiDevice::getCapabilities() const {
+    return json{
+        {"channels", 16},
+        {"polyphony", "unlimited"},
+        {"type", "virtual"},
+        {"is_input", isInput_.load()},
+        {"is_output", isOutput_.load()},
+        {"supports_sysex", false},
+        {"supports_mpe", false},
+        {"latency_ms", 0},
+        {"queue_size", maxQueueSize_.load()},
+        {"platform", "ALSA Virtual Port"}
+    };
+}
+
+// ============================================================================
 // INFORMATION
 // ============================================================================
 
 std::string VirtualMidiDevice::getPort() const {
-    return "virtual:" + std::to_string(virtualPort_);
+    return "virtual:" + std::to_string(virtualPort_.load());
 }
 
 json VirtualMidiDevice::getInfo() const {
     json info = MidiDevice::getInfo();
     
-    info["virtual_port"] = virtualPort_;
-    info["is_input"] = isInput_;
-    info["is_output"] = isOutput_;
-    info["receive_queue_size"] = receiveQueue_.size();
-    info["send_queue_size"] = sendQueue_.size();
+    info["virtual_port"] = virtualPort_.load();
+    info["is_input"] = isInput_.load();
+    info["is_output"] = isOutput_.load();
+    info["max_queue_size"] = maxQueueSize_.load();
+    
+    // FIX: Access queues with mutex
+    {
+        std::lock_guard<std::mutex> lock(receiveMutex_);
+        info["receive_queue_size"] = receiveQueue_.size();
+    }
+    {
+        std::lock_guard<std::mutex> lock(sendMutex_);
+        info["send_queue_size"] = sendQueue_.size();
+    }
     
     return info;
 }
@@ -222,6 +234,7 @@ json VirtualMidiDevice::getInfo() const {
 // ============================================================================
 
 void VirtualMidiDevice::setPortDirection(bool input, bool output) {
+    // FIX: Use atomic store for thread-safe write
     isInput_ = input;
     isOutput_ = output;
     
@@ -232,6 +245,10 @@ void VirtualMidiDevice::setPortDirection(bool input, bool output) {
     else dirStr = "NONE";
     
     Logger::info("VirtualMidiDevice", "Port direction set: " + dirStr);
+}
+
+void VirtualMidiDevice::setMaxQueueSize(size_t size) {
+    maxQueueSize_ = size;
 }
 
 size_t VirtualMidiDevice::getMessageCount() const {
@@ -276,7 +293,13 @@ bool VirtualMidiDevice::openSequencer() {
         return false;
     }
     
-    // Set client name
+    // FIX: Set non-blocking mode to avoid blocking in receiveThreadFunc
+    result = snd_seq_nonblock(alsaSeq_, 1);
+    if (result < 0) {
+        Logger::warning("VirtualMidiDevice", 
+            "Failed to set non-blocking mode: " + std::string(snd_strerror(result)));
+    }
+    
     snd_seq_set_client_name(alsaSeq_, ("MidiMind_" + name_).c_str());
     
     Logger::debug("VirtualMidiDevice", "ALSA sequencer opened");
@@ -302,30 +325,30 @@ bool VirtualMidiDevice::createVirtualPort() {
         return false;
     }
     
-    // Determine capabilities
     unsigned int caps = 0;
-    if (isInput_) {
+    if (isInput_.load()) {
         caps |= SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE;
     }
-    if (isOutput_) {
+    if (isOutput_.load()) {
         caps |= SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ;
     }
     
-    // Create virtual port
-    virtualPort_ = snd_seq_create_simple_port(
+    int port = snd_seq_create_simple_port(
         alsaSeq_,
         name_.c_str(),
         caps,
         SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION
     );
     
-    if (virtualPort_ < 0) {
+    if (port < 0) {
         Logger::error("VirtualMidiDevice", 
-            "Failed to create virtual port: " + std::string(snd_strerror(virtualPort_)));
+            "Failed to create virtual port: " + std::string(snd_strerror(port)));
         return false;
     }
     
-    Logger::debug("VirtualMidiDevice", "Created virtual port: " + std::to_string(virtualPort_));
+    virtualPort_ = port;
+    
+    Logger::debug("VirtualMidiDevice", "Created virtual port: " + std::to_string(port));
     return true;
 #else
     return false;
@@ -334,8 +357,9 @@ bool VirtualMidiDevice::createVirtualPort() {
 
 void VirtualMidiDevice::deleteVirtualPort() {
 #ifdef __linux__
-    if (alsaSeq_ && virtualPort_ >= 0) {
-        snd_seq_delete_simple_port(alsaSeq_, virtualPort_);
+    int port = virtualPort_.load();
+    if (alsaSeq_ && port >= 0) {
+        snd_seq_delete_simple_port(alsaSeq_, port);
         virtualPort_ = -1;
         Logger::debug("VirtualMidiDevice", "Deleted virtual port");
     }
@@ -356,12 +380,12 @@ void VirtualMidiDevice::receiveThreadFunc() {
             continue;
         }
         
-        // Poll for events
         snd_seq_event_t* ev = nullptr;
         int result = snd_seq_event_input(alsaSeq_, &ev);
         
         if (result < 0) {
             if (result == -EAGAIN) {
+                // Non-blocking mode: no event available
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
@@ -372,6 +396,7 @@ void VirtualMidiDevice::receiveThreadFunc() {
             continue;
         }
         
+        // FIX: No memory leak - ev points to ALSA internal buffer
         if (ev) {
             processAlsaEvent(ev);
         }
@@ -385,31 +410,33 @@ void VirtualMidiDevice::processAlsaEvent(const snd_seq_event_t* ev) {
 #ifdef __linux__
     if (!ev) return;
     
-    // Convert to MidiMessage
     MidiMessage msg = alsaEventToMidiMessage(ev);
     
     if (msg.isValid()) {
-        // Add to queue
+        // FIX: Copy callback and call without holding lock to avoid deadlock
+        std::function<void(const MidiMessage&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(callbackMutex_);
+            callback = messageCallback_;
+        }
+        
+        // Call callback with message before moving it to queue
+        if (callback) {
+            callback(msg);
+        }
+        
         {
             std::lock_guard<std::mutex> lock(receiveMutex_);
             
-            if (receiveQueue_.size() >= MAX_QUEUE_SIZE) {
+            if (receiveQueue_.size() >= maxQueueSize_.load()) {
                 Logger::warning("VirtualMidiDevice", "Receive queue full, dropping message");
                 return;
             }
             
-            receiveQueue_.push(msg);
+            receiveQueue_.push(std::move(msg));
         }
         
         messagesReceived_++;
-        
-        // Call callback
-        {
-            std::lock_guard<std::mutex> lock(callbackMutex_);
-            if (messageCallback_) {
-                messageCallback_(msg);
-            }
-        }
     }
 #endif
 }
@@ -509,7 +536,3 @@ MidiMessage VirtualMidiDevice::alsaEventToMidiMessage(const snd_seq_event_t* ev)
 }
 
 } // namespace midiMind
-
-// ============================================================================
-// END OF FILE VirtualMidiDevice.cpp
-// ============================================================================

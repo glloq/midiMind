@@ -1,27 +1,12 @@
 // ============================================================================
-// File: backend/src/storage/InstrumentDatabase.h
-// Version: 4.1.0
-// Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// File: backend/src/storage/InstrumentDatabase.h  
+// Version: 4.3.0 - THREAD-SAFE
 // ============================================================================
 //
-// Description:
-//   Database interface for instrument latency profiles.
-//   Manages CRUD operations on instruments_latency table.
-//
-// Features:
-//   - CRUD operations for instrument profiles
-//   - In-memory cache for fast access
-//   - Thread-safe operations
-//   - Filtering by device, channel, etc.
-//   - Statistics and monitoring
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Initial implementation for instrument-level latency compensation
-//   - Integration with Database class
-//   - Cache management
+// Changes v4.3.0:
+//   - Fixed: updateLatencyMs() race condition with atomic operation
+//   - Fixed: Moved inline methods to .cpp for proper thread-safety
+//   - Fixed: Documented mutex protection for cache
 //
 // ============================================================================
 
@@ -40,54 +25,28 @@ using json = nlohmann::json;
 
 namespace midiMind {
 
-// ============================================================================
-// STRUCTURE: InstrumentLatencyEntry
-// ============================================================================
-
-/**
- * @struct InstrumentLatencyEntry
- * @brief Complete instrument latency profile data
- */
 struct InstrumentLatencyEntry {
-    // Identifiers
     std::string id;
     std::string deviceId;
     int channel;
-    
-    // Metadata
     std::string name;
     std::string instrumentType;
-    
-    // Latency measurements (microseconds)
-    int64_t avgLatency;
-    int64_t minLatency;
-    int64_t maxLatency;
-    
-    // Statistics
+    int64_t avgLatency;      // µs
+    int64_t minLatency;      // µs
+    int64_t maxLatency;      // µs
     double jitter;
     double stdDeviation;
     int measurementCount;
-    
-    // Calibration
     double calibrationConfidence;
     std::string lastCalibration;
     std::string calibrationMethod;
-    
-    // Compensation
-    int64_t compensationOffset;
+    int64_t compensationOffset;  // µs
     bool autoCalibration;
     bool enabled;
-    
-    // History (JSON string)
     std::string measurementHistory;
-    
-    // Timestamps
     std::string createdAt;
     std::string updatedAt;
     
-    /**
-     * @brief Convert to JSON
-     */
     json toJson() const {
         return {
             {"id", id},
@@ -113,204 +72,78 @@ struct InstrumentLatencyEntry {
     }
 };
 
-// ============================================================================
-// CLASS: InstrumentDatabase
-// ============================================================================
-
 /**
  * @class InstrumentDatabase
- * @brief Database interface for instrument latency profiles
- * 
- * Provides CRUD operations on the instruments_latency table with:
- * - In-memory cache for fast access
- * - Thread-safe operations
- * - Filtering and search capabilities
+ * @brief Thread-safe instrument latency profile manager with caching
  * 
  * Thread Safety:
  * - All public methods are thread-safe
- * - Uses internal mutex for synchronization
- * 
- * Example:
- * ```cpp
- * InstrumentDatabase instrDb(database);
- * 
- * // Create instrument
- * InstrumentLatencyEntry entry;
- * entry.id = "piano_001";
- * entry.deviceId = "device_usb_128_0";
- * entry.channel = 0;
- * entry.name = "Grand Piano";
- * instrDb.createInstrument(entry);
- * 
- * // Get instrument
- * auto piano = instrDb.getInstrument("piano_001");
- * if (piano.has_value()) {
- *     int64_t offset = piano->compensationOffset;
- * }
- * 
- * // Update
- * entry.avgLatency = 8000;
- * instrDb.updateInstrument(entry);
- * ```
+ * - Internal cache protected by mutex_
+ * - Can be safely called from multiple threads
  */
 class InstrumentDatabase {
 public:
-    // ========================================================================
-    // CONSTRUCTOR / DESTRUCTOR
-    // ========================================================================
-    
-    /**
-     * @brief Constructor
-     * @param database Reference to Database instance
-     */
     explicit InstrumentDatabase(Database& database);
-    
-    /**
-     * @brief Destructor
-     */
     ~InstrumentDatabase();
     
-    // Disable copy
     InstrumentDatabase(const InstrumentDatabase&) = delete;
     InstrumentDatabase& operator=(const InstrumentDatabase&) = delete;
     
-    // ========================================================================
-    // CRUD OPERATIONS
-    // ========================================================================
-    
-    /**
-     * @brief Create new instrument profile
-     * @param entry Instrument data
-     * @return true if successful
-     * @note Thread-safe
-     * @note Updates cache
-     */
+    // CRUD operations
     bool createInstrument(const InstrumentLatencyEntry& entry);
-    
-    /**
-     * @brief Get instrument by ID
-     * @param id Instrument ID
-     * @return Optional entry
-     * @note Thread-safe
-     * @note Uses cache if available
-     */
     std::optional<InstrumentLatencyEntry> getInstrument(const std::string& id);
-    
-    /**
-     * @brief Update instrument profile
-     * @param entry Updated instrument data
-     * @return true if successful
-     * @note Thread-safe
-     * @note Updates cache
-     */
     bool updateInstrument(const InstrumentLatencyEntry& entry);
-    
-    /**
-     * @brief Delete instrument
-     * @param id Instrument ID
-     * @return true if successful
-     * @note Thread-safe
-     * @note Clears from cache
-     */
     bool deleteInstrument(const std::string& id);
     
-    // ========================================================================
-    // QUERY OPERATIONS
-    // ========================================================================
-    
-    /**
-     * @brief List all instruments
-     * @return Vector of all instruments
-     * @note Thread-safe
-     */
+    // Query operations
     std::vector<InstrumentLatencyEntry> listAll();
-    
-    /**
-     * @brief List instruments by device
-     * @param deviceId Device ID
-     * @return Vector of instruments
-     * @note Thread-safe
-     */
     std::vector<InstrumentLatencyEntry> listByDevice(const std::string& deviceId);
-    
-    /**
-     * @brief List instruments by channel
-     * @param channel MIDI channel (0-15)
-     * @return Vector of instruments
-     * @note Thread-safe
-     */
     std::vector<InstrumentLatencyEntry> listByChannel(int channel);
-    
-    /**
-     * @brief List enabled instruments
-     * @return Vector of enabled instruments
-     * @note Thread-safe
-     */
     std::vector<InstrumentLatencyEntry> listEnabled();
-    
-    /**
-     * @brief Get instrument by device and channel
-     * @param deviceId Device ID
-     * @param channel MIDI channel
-     * @return Optional entry
-     * @note Thread-safe
-     */
     std::optional<InstrumentLatencyEntry> getByDeviceAndChannel(
         const std::string& deviceId, int channel);
     
-    // ========================================================================
-    // CACHE MANAGEMENT
-    // ========================================================================
-    
     /**
-     * @brief Clear cache and reload from database
+     * @brief Get all instrument profiles (alias for listAll)
+     * @return Vector of all instrument entries
      * @note Thread-safe
      */
+    std::vector<InstrumentLatencyEntry> getAllProfiles();
+    
+    /**
+     * @brief Update latency for instrument (atomic operation)
+     * @param id Instrument ID
+     * @param latencyMs Latency in milliseconds
+     * @note Thread-safe - performs atomic update with single lock
+     * @note Converts ms to µs internally
+     */
+    void updateLatencyMs(const std::string& id, double latencyMs);
+    
+    // Cache management
     void refreshCache();
-    
-    /**
-     * @brief Clear cache only
-     * @note Thread-safe
-     */
     void clearCache();
     
-    // ========================================================================
-    // STATISTICS
-    // ========================================================================
-    
-    /**
-     * @brief Get statistics
-     * @return JSON with statistics
-     * @note Thread-safe
-     */
+    // Statistics
     json getStatistics() const;
-    
+
 private:
-    // ========================================================================
-    // PRIVATE METHODS
-    // ========================================================================
-    
     /**
-     * @brief Load all instruments into cache
+     * @brief Load cache from database (assumes mutex already locked)
      */
-    void loadCache();
+    void loadCacheInternal();
     
     /**
      * @brief Parse database row to entry
+     * @throws std::exception on parse error
      */
     InstrumentLatencyEntry parseRow(const DatabaseRow& row);
     
-    // ========================================================================
-    // MEMBER VARIABLES
-    // ========================================================================
-    
-    /// Reference to database
     Database& database_;
     
-    /// In-memory cache (id -> entry)
+    /// Cache of instrument entries (protected by mutex_)
     std::map<std::string, InstrumentLatencyEntry> cache_;
     
-    /// Mutex for thread-safety
+    /// Mutex protecting cache_ and database operations
     mutable std::mutex mutex_;
 };
 

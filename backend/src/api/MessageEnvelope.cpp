@@ -7,6 +7,7 @@
 // Changes v4.1.3:
 //   - Format unique plat: {id, type, timestamp, version, payload}
 //   - Suppression du format nested legacy
+//   - Added noexcept to payload checking methods
 //
 // ============================================================================
 
@@ -156,19 +157,19 @@ const protocol::Error& MessageEnvelope::getError() const {
     return *error_;
 }
 
-bool MessageEnvelope::hasRequest() const {
+bool MessageEnvelope::hasRequest() const noexcept {
     return request_.has_value();
 }
 
-bool MessageEnvelope::hasResponse() const {
+bool MessageEnvelope::hasResponse() const noexcept {
     return response_.has_value();
 }
 
-bool MessageEnvelope::hasEvent() const {
+bool MessageEnvelope::hasEvent() const noexcept {
     return event_.has_value();
 }
 
-bool MessageEnvelope::hasError() const {
+bool MessageEnvelope::hasError() const noexcept {
     return error_.has_value();
 }
 
@@ -278,7 +279,13 @@ json MessageEnvelope::toJson() const {
 }
 
 std::string MessageEnvelope::toString() const {
-    return toJson().dump();
+    try {
+        return toJson().dump();
+    } catch (const std::exception& e) {
+        Logger::error("MessageEnvelope", 
+                     "Failed to serialize to string: " + std::string(e.what()));
+        return "{}";
+    }
 }
 
 // ============================================================================

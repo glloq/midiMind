@@ -2,29 +2,29 @@
 // Fichier: frontend/js/main.js
 // Version: v3.2.0 - FIXED INTERFACE DISPLAY
 // Date: 2025-10-22
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.2.0:
-// âœ… Ajout d'un timeout pour forcer l'affichage si l'init bloque
-// âœ… Affichage de l'interface mÃªme si l'initialisation est incomplÃ¨te
-// âœ… Meilleure gestion des erreurs d'initialisation
+// ✅ Ajout d'un timeout pour forcer l'affichage si l'init bloque
+// ✅ Affichage de l'interface même si l'initialisation est incomplète
+// ✅ Meilleure gestion des erreurs d'initialisation
 // ============================================================================
 
 
-// Attendre que le DOM soit chargÃ©
+// Attendre que le DOM soit chargé
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('ðŸš€ Starting MidiMind v3.1.0 (Performance Mode)...');
+    console.log('🚀 Starting MidiMind v3.1.0 (Performance Mode)...');
     
     try {
         // =====================================================================
-        // Ã‰TAPE 0: VÃ‰RIFIER PERFORMANCE CONFIG
+        // ÉTAPE 0: VÉRIFIER PERFORMANCE CONFIG
         // =====================================================================
         
         if (typeof PerformanceConfig === 'undefined') {
             throw new Error('PerformanceConfig not loaded! Check index.html script order.');
         }
         
-        console.log('âœ“ PerformanceConfig loaded:', {
+        console.log('✔ PerformanceConfig loaded:', {
             targetFPS: PerformanceConfig.rendering.targetFPS,
             maxHistory: PerformanceConfig.memory.maxHistorySize,
             maxCache: PerformanceConfig.memory.maxCacheSize,
@@ -32,27 +32,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         
         // =====================================================================
-        // Ã‰TAPE 1: ACTIVER MODE PERFORMANCE
+        // ÉTAPE 1: ACTIVER MODE PERFORMANCE
         // =====================================================================
         
-        // âœ“ Ajouter classe performance-mode au body
+        // ✔ Ajouter classe performance-mode au body
         if (!PerformanceConfig.ui.enableTransitions) {
             document.body.classList.add('performance-mode');
-            console.log('âœ“ Performance mode activated (transitions disabled)');
+            console.log('✔ Performance mode activated (transitions disabled)');
         }
         
-        // âœ“ DÃ©sactiver smooth scroll
+        // ✔ Désactiver smooth scroll
         if (!PerformanceConfig.rendering.enableSmoothScrolling) {
             document.documentElement.style.scrollBehavior = 'auto';
             const mainContainer = document.querySelector('.app-main');
             if (mainContainer) {
                 mainContainer.style.scrollBehavior = 'auto';
             }
-            console.log('âœ“ Smooth scrolling disabled');
+            console.log('✔ Smooth scrolling disabled');
         }
         
         // =====================================================================
-        // Ã‰TAPE 2: VÃ‰RIFIER APPLICATION CLASS
+        // ÉTAPE 2: VÉRIFIER APPLICATION CLASS
         // =====================================================================
         
         if (typeof Application === 'undefined') {
@@ -60,17 +60,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // Ã‰TAPE 3: CRÃ‰ER INSTANCE APPLICATION
+        // ÉTAPE 3: CRÉER INSTANCE APPLICATION
         // =====================================================================
         
         const app = new Application();
         
-        // Rendre app globale pour accÃ¨s depuis la console et les autres scripts
+        // Rendre app globale pour accès depuis la console et les autres scripts
         window.app = app;
-        console.log('âœ“ Application instance created');
+        console.log('✔ Application instance created');
         
         // =====================================================================
-        // Ã‰TAPE 4: VÃ‰RIFIER MÃ‰THODE INIT
+        // ÉTAPE 4: VÉRIFIER MÉTHODE INIT
         // =====================================================================
         
         if (typeof app.init !== 'function') {
@@ -78,51 +78,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // Ã‰TAPE 5: AFFICHER LOADING INDICATOR
+        // ÉTAPE 5: AFFICHER LOADING INDICATOR
         // =====================================================================
         
         showLoadingIndicator();
         
         // =====================================================================
-        // Ã‰TAPE 6: INITIALISER L'APPLICATION AVEC TIMEOUT
+        // ÉTAPE 6: INITIALISER L'APPLICATION AVEC TIMEOUT
         // =====================================================================
         
-        console.log('âš™ï¸ Initializing application...');
+        console.log('⚙️ Initializing application...');
         
-        // NOUVEAU: Timeout de sÃ©curitÃ© pour forcer l'affichage aprÃ¨s 5 secondes
+        // NOUVEAU: Timeout de sécurité pour forcer l'affichage après 5 secondes
         let initTimeout = setTimeout(() => {
-            console.warn('âš ï¸ Initialization timeout - forcing interface display');
+            console.warn('⚠️ Initialization timeout - forcing interface display');
             forceShowInterface();
         }, 5000);
         
         try {
             await app.init();
             
-            // Annuler le timeout si l'init rÃ©ussit
+            // Annuler le timeout si l'init réussit
             clearTimeout(initTimeout);
             
-            // VÃ©rifier que l'initialisation a rÃ©ussi
+            // Vérifier que l'initialisation a réussi
             if (!app.state.initialized || !app.state.ready) {
-                console.warn('âš ï¸ Application initialization incomplete - showing interface anyway');
+                console.warn('⚠️ Application initialization incomplete - showing interface anyway');
                 forceShowInterface();
             } else {
                 // =====================================================================
-                // Ã‰TAPE 7: AFFICHER L'INTERFACE & MASQUER LOADING
+                // ÉTAPE 7: AFFICHER L'INTERFACE & MASQUER LOADING
                 // =====================================================================
                 
                 hideLoadingIndicator();
                 
-                // CRITIQUE: Afficher l'Ã©lÃ©ment #app qui est cachÃ© par dÃ©faut
+                // CRITIQUE: Afficher l'élément #app qui est caché par défaut
                 const appElement = document.getElementById('app');
                 if (appElement) {
                     appElement.style.display = 'block';
-                    console.log('âœ“ Application interface displayed');
+                    console.log('✔ Application interface displayed');
                 } else {
-                    console.warn('âš ï¸ #app element not found in DOM');
+                    console.warn('⚠️ #app element not found in DOM');
                 }
                 
-                console.log('âœ… MidiMind v3.1.0 initialized successfully (Performance Mode)');
-                console.log('ðŸ“Š Performance Stats:', {
+                console.log('✅ MidiMind v3.1.0 initialized successfully (Performance Mode)');
+                console.log('📊 Performance Stats:', {
                     antiAliasing: PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF',
                     targetFPS: PerformanceConfig.rendering.targetFPS,
                     maxNotes: PerformanceConfig.rendering.maxVisibleNotes,
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     historyLevels: PerformanceConfig.memory.maxHistorySize
                 });
                 
-                // Ã‰mettre Ã©vÃ©nement pour signaler que l'app est prÃªte
+                // Émettre événement pour signaler que l'app est prête
                 if (window.eventBus) {
                     window.eventBus.emit('app:ready', { 
                         app,
@@ -144,27 +144,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Annuler le timeout
             clearTimeout(initTimeout);
             
-            console.error('âŒ Application initialization failed:', initError);
+            console.error('❌ Application initialization failed:', initError);
             console.error('Stack trace:', initError.stack);
             
             // TOUJOURS afficher l'interface pour permettre le debug
             forceShowInterface();
             
-            // Afficher une erreur dÃ©taillÃ©e Ã  l'utilisateur
-            showErrorMessage(`Ã‰chec d'initialisation: ${initError.message}`);
+            // Afficher une erreur détaillée à l'utilisateur
+            showErrorMessage(`Échec d'initialisation: ${initError.message}`);
         }
         
         // =====================================================================
-        // Ã‰TAPE 8: AFFICHER INFO PERFORMANCE EN CONSOLE
+        // ÉTAPE 8: AFFICHER INFO PERFORMANCE EN CONSOLE
         // =====================================================================
         
         displayPerformanceInfo();
         
     } catch (error) {
-        console.error('âŒ Fatal error during startup:', error);
+        console.error('❌ Fatal error during startup:', error);
         hideLoadingIndicator();
         
-        // Forcer l'affichage mÃªme en cas d'erreur fatale
+        // Forcer l'affichage même en cas d'erreur fatale
         forceShowInterface();
         
         showErrorMessage(`Erreur fatale: ${error.message}`);
@@ -176,20 +176,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 // =============================================================================
 
 function forceShowInterface() {
-    console.log('ðŸ”§ Forcing interface display...');
+    console.log('🔧 Forcing interface display...');
     
     hideLoadingIndicator();
     
-    // Afficher l'Ã©lÃ©ment #app
+    // Afficher l'élément #app
     const appElement = document.getElementById('app');
     if (appElement) {
         appElement.style.display = 'block';
-        console.log('âœ“ Interface forcibly displayed');
+        console.log('✔ Interface forcibly displayed');
     } else {
-        console.error('âŒ Cannot find #app element');
+        console.error('❌ Cannot find #app element');
     }
     
-    // Afficher la page home par dÃ©faut
+    // Afficher la page home par défaut
     const homePage = document.getElementById('home');
     if (homePage) {
         homePage.style.display = 'block';
@@ -202,7 +202,7 @@ function forceShowInterface() {
             // Navigation manuelle minimale
             window.addEventListener('hashchange', handleBasicNavigation);
             handleBasicNavigation();
-            console.log('âœ“ Basic navigation initialized');
+            console.log('✔ Basic navigation initialized');
         } catch (e) {
             console.error('Failed to initialize basic navigation:', e);
         }
@@ -217,7 +217,7 @@ function handleBasicNavigation() {
     const hash = window.location.hash.slice(1) || 'home';
     const page = hash.split('/')[0];
     
-    console.log('ðŸ“ Basic navigation to:', page);
+    console.log('🔍 Basic navigation to:', page);
     
     // Masquer toutes les pages
     const pages = ['home', 'editor', 'routing', 'keyboard', 'instruments', 'system'];
@@ -229,14 +229,14 @@ function handleBasicNavigation() {
         }
     });
     
-    // Afficher la page demandÃ©e
+    // Afficher la page demandée
     const pageElement = document.getElementById(page);
     if (pageElement) {
         pageElement.style.display = 'block';
         pageElement.classList.add('active');
     }
     
-    // Mettre Ã  jour les liens de navigation
+    // Mettre à jour les liens de navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
         if (item.dataset.page === page) {
@@ -272,7 +272,7 @@ function hideLoadingIndicator() {
 // =============================================================================
 
 function showErrorMessage(message) {
-    // CrÃ©er un Ã©lÃ©ment d'erreur si nÃ©cessaire
+    // Créer un élément d'erreur si nécessaire
     let errorBox = document.getElementById('init-error-box');
     if (!errorBox) {
         errorBox = document.createElement('div');
@@ -295,10 +295,10 @@ function showErrorMessage(message) {
     }
     
     errorBox.innerHTML = `
-        <strong>âš ï¸ Erreur</strong><br>
+        <strong>⚠️ Erreur</strong><br>
         ${message}
         <br><br>
-        <small>Ouvrez la console (F12) pour plus de dÃ©tails</small>
+        <small>Ouvrez la console (F12) pour plus de détails</small>
     `;
 }
 
@@ -310,47 +310,47 @@ function displayPerformanceInfo() {
     if (typeof PerformanceConfig === 'undefined') return;
     
     const info = `
-â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-â•‘                                                        â•‘
-â•‘       ðŸŽ¹ MIDI MIND v3.1.0 - PERFORMANCE MODE ðŸš€       â•‘
-â•‘                                                        â•‘
-â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
-â•‘                                                        â•‘
-â•‘  RENDERING                                             â•‘
-â•‘  â€¢ Target FPS: ${PerformanceConfig.rendering.targetFPS.toString().padEnd(38)} â•‘
-â•‘  â€¢ Anti-aliasing: ${(PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF').padEnd(33)} â•‘
-â•‘  â€¢ Max notes visible: ${PerformanceConfig.rendering.maxVisibleNotes.toString().padEnd(28)} â•‘
-â•‘  â€¢ Animations: ${(PerformanceConfig.rendering.enableAnimations ? 'ON' : 'OFF').padEnd(37)} â•‘
-â•‘                                                        â•‘
-â•‘  MEMORY                                                â•‘
-â•‘  â€¢ Max cache: ${PerformanceConfig.memory.maxCacheSize.toString().padEnd(36)} MB â•‘
-â•‘  â€¢ History levels: ${PerformanceConfig.memory.maxHistorySize.toString().padEnd(31)} â•‘
-â•‘  â€¢ Aggressive GC: ${(PerformanceConfig.memory.aggressiveGC ? 'ON' : 'OFF').padEnd(34)} â•‘
-â•‘                                                        â•‘
-â•‘  KEYBOARD                                              â•‘
-â•‘  â€¢ Mode: ${PerformanceConfig.keyboard.mode.padEnd(43)} â•‘
-â•‘  â€¢ Recording: ${(PerformanceConfig.keyboard.enableRecording ? 'ON' : 'OFF').padEnd(38)} â•‘
-â•‘  â€¢ Playback: ${(PerformanceConfig.keyboard.enablePlayback ? 'ON' : 'OFF').padEnd(39)} â•‘
-â•‘                                                        â•‘
-â•‘  ROUTING                                               â•‘
-â•‘  â€¢ Complex routing: ${(PerformanceConfig.routing.allowComplexRouting ? 'ON' : 'OFF').padEnd(30)} â•‘
-â•‘  â€¢ Auto-assign: ${(PerformanceConfig.routing.enableAutoRouting ? 'ON' : 'OFF').padEnd(36)} â•‘
-â•‘  â€¢ Max routes: ${PerformanceConfig.routing.maxRoutes.toString().padEnd(37)} â•‘
-â•‘                                                        â•‘
-â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
-â•‘                                                        â•‘
-â•‘  ðŸ’¡ Tips:                                              â•‘
-â•‘  â€¢ Utilisez window.app pour accÃ©der Ã  l'application   â•‘
-â•‘  â€¢ Utilisez window.PerformanceConfig pour voir config â•‘
-â•‘  â€¢ Pressez F12 pour ouvrir DevTools                   â•‘
-â•‘                                                        â•‘
-â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+╔══════════════════════════════════════════════════════╗
+║                                                      ║
+║       🎹 MIDI MIND v3.1.0 - PERFORMANCE MODE 🚀      ║
+║                                                      ║
+╠══════════════════════════════════════════════════════╣
+║                                                      ║
+║  RENDERING                                           ║
+║  • Target FPS: ${PerformanceConfig.rendering.targetFPS.toString().padEnd(38)} ║
+║  • Anti-aliasing: ${(PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF').padEnd(33)} ║
+║  • Max notes visible: ${PerformanceConfig.rendering.maxVisibleNotes.toString().padEnd(28)} ║
+║  • Animations: ${(PerformanceConfig.rendering.enableAnimations ? 'ON' : 'OFF').padEnd(37)} ║
+║                                                      ║
+║  MEMORY                                              ║
+║  • Max cache: ${PerformanceConfig.memory.maxCacheSize.toString().padEnd(36)} MB ║
+║  • History levels: ${PerformanceConfig.memory.maxHistorySize.toString().padEnd(31)} ║
+║  • Aggressive GC: ${(PerformanceConfig.memory.aggressiveGC ? 'ON' : 'OFF').padEnd(34)} ║
+║                                                      ║
+║  KEYBOARD                                            ║
+║  • Mode: ${PerformanceConfig.keyboard.mode.padEnd(43)} ║
+║  • Recording: ${(PerformanceConfig.keyboard.enableRecording ? 'ON' : 'OFF').padEnd(38)} ║
+║  • Playback: ${(PerformanceConfig.keyboard.enablePlayback ? 'ON' : 'OFF').padEnd(39)} ║
+║                                                      ║
+║  ROUTING                                             ║
+║  • Complex routing: ${(PerformanceConfig.routing.allowComplexRouting ? 'ON' : 'OFF').padEnd(30)} ║
+║  • Auto-assign: ${(PerformanceConfig.routing.enableAutoRouting ? 'ON' : 'OFF').padEnd(36)} ║
+║  • Max routes: ${PerformanceConfig.routing.maxRoutes.toString().padEnd(37)} ║
+║                                                      ║
+╠══════════════════════════════════════════════════════╣
+║                                                      ║
+║  💡 Tips:                                            ║
+║  • Utilisez window.app pour accéder à l'application ║
+║  • Utilisez window.PerformanceConfig pour config    ║
+║  • Pressez F12 pour ouvrir DevTools                 ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
     `;
     
     console.log(info);
     
-    // Ajouter Ã©galement des mÃ©tadonnÃ©es pour debug
-    console.group('ðŸ“ Performance Configuration Details');
+    // Ajouter également des métadonnées pour debug
+    console.group('🔍 Performance Configuration Details');
     console.log('Rendering:', PerformanceConfig.rendering);
     console.log('Memory:', PerformanceConfig.memory);
     console.log('Editor:', PerformanceConfig.editor);
@@ -365,7 +365,7 @@ function displayPerformanceInfo() {
 // GESTION ERREURS GLOBALES
 // =============================================================================
 
-// Capturer les erreurs non gÃ©rÃ©es
+// Capturer les erreurs non gérées
 window.addEventListener('error', (event) => {
     const errorMessage = event.error && event.error.message 
         ? event.error.message 
@@ -386,9 +386,9 @@ window.addEventListener('error', (event) => {
     }
 });
 
-// Capturer les promesses rejetÃ©es
+// Capturer les promesses rejetées
 window.addEventListener('unhandledrejection', (event) => {
-    console.error('ðŸ”´ Unhandled promise rejection:', event.reason);
+    console.error('🔴 Unhandled promise rejection:', event.reason);
     
     if (window.app && window.app.debugConsole) {
         window.app.debugConsole.log('error', 
@@ -404,7 +404,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 window.debugUtils = {
     /**
-     * Affiche l'Ã©tat actuel de l'application
+     * Affiche l'état actuel de l'application
      */
     showAppState() {
         if (!window.app) {
@@ -412,7 +412,7 @@ window.debugUtils = {
             return;
         }
         
-        console.group('ðŸ“± Application State');
+        console.group('📱 Application State');
         console.log('Current Page:', window.location.hash || '#home');
         console.log('Initialized:', window.app.state?.initialized || false);
         console.log('Ready:', window.app.state?.ready || false);
@@ -440,7 +440,7 @@ window.debugUtils = {
             } : 'Not available'
         };
         
-        console.group('ðŸ“ Performance Statistics');
+        console.group('📊 Performance Statistics');
         console.table(stats);
         console.groupEnd();
     },
@@ -459,9 +459,9 @@ window.debugUtils = {
      */
     forceGC() {
         if (window.gc) {
-            console.log('ðŸ—‘ï¸ Running garbage collection...');
+            console.log('🗑️ Running garbage collection...');
             window.gc();
-            console.log('âœ“ GC complete');
+            console.log('✔ GC complete');
         } else {
             console.warn('GC not available. Start Chrome with --expose-gc flag.');
         }
@@ -476,9 +476,9 @@ window.debugUtils = {
 };
 
 // Afficher les utilitaires disponibles
-console.log('ðŸ”§ Debug utilities available: window.debugUtils');
-console.log('   â€¢ showAppState()');
-console.log('   â€¢ showPerformanceStats()');
-console.log('   â€¢ togglePerformanceMode()');
-console.log('   â€¢ forceGC()');
-console.log('   â€¢ forceShowInterface()');
+console.log('🔧 Debug utilities available: window.debugUtils');
+console.log('   • showAppState()');
+console.log('   • showPerformanceStats()');
+console.log('   • togglePerformanceMode()');
+console.log('   • forceGC()');
+console.log('   • forceShowInterface()');

@@ -1,28 +1,7 @@
 // ============================================================================
 // File: backend/src/midi/devices/MidiDevice.h
-// Version: 4.1.0
+// Version: 4.2.0
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Description:
-//   Abstract base class for all MIDI devices.
-//   Defines common interface for USB, Network, Bluetooth, and Virtual devices.
-//
-// Features:
-//   - Pure virtual interface
-//   - Connection management
-//   - Message sending/receiving
-//   - Device metadata
-//   - Statistics tracking
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Enhanced interface
-//   - Better metadata support
-//   - Improved statistics
-//
 // ============================================================================
 
 #pragma once
@@ -41,37 +20,25 @@ namespace midiMind {
 // ENUMERATIONS
 // ============================================================================
 
-/**
- * @enum DeviceType
- * @brief Type of MIDI device
- */
 enum class DeviceType {
-    USB,        ///< USB MIDI device (ALSA)
-    NETWORK,    ///< Network MIDI (RTP-MIDI, WiFi)
-    BLUETOOTH,  ///< Bluetooth MIDI (BLE)
-    VIRTUAL,    ///< Virtual MIDI device (ALSA Virtual)
-    UNKNOWN     ///< Unknown type
+    USB,
+    NETWORK,
+    BLUETOOTH,
+    VIRTUAL,
+    UNKNOWN
 };
 
-/**
- * @enum DeviceDirection
- * @brief Direction of MIDI communication
- */
 enum class DeviceDirection {
-    INPUT,      ///< Input only
-    OUTPUT,     ///< Output only
-    BIDIRECTIONAL  ///< Both input and output
+    INPUT,
+    OUTPUT,
+    BIDIRECTIONAL
 };
 
-/**
- * @enum DeviceStatus
- * @brief Connection status
- */
 enum class DeviceStatus {
-    DISCONNECTED,   ///< Not connected
-    CONNECTING,     ///< Connection in progress
-    CONNECTED,      ///< Connected and ready
-    ERROR           ///< Error state
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED,
+    ERROR
 };
 
 // ============================================================================
@@ -82,42 +49,10 @@ enum class DeviceStatus {
  * @class MidiDevice
  * @brief Abstract base class for all MIDI devices
  * 
- * Defines the common interface that all MIDI device implementations must follow.
- * Provides basic functionality for connection management, messaging, and metadata.
+ * Thread Safety: Methods are thread-safe unless noted otherwise.
+ * Statistics (messagesReceived_, messagesSent_) use atomics.
  * 
- * Implementation Classes:
- * - UsbMidiDevice (ALSA Sequencer)
- * - WifiMidiDevice (RTP-MIDI)
- * - BleMidiDevice (BLE MIDI)
- * - VirtualMidiDevice (ALSA Virtual)
- * 
- * Thread Safety:
- * - Implementations must be thread-safe
- * - sendMessage() must be callable from multiple threads
- * - receiveMessage() must be thread-safe
- * 
- * Example:
- * ```cpp
- * class MyMidiDevice : public MidiDevice {
- * public:
- *     MyMidiDevice(const std::string& id, const std::string& name)
- *         : MidiDevice(id, name, DeviceType::USB, DeviceDirection::BIDIRECTIONAL) {}
- *     
- *     bool connect() override {
- *         // Implementation
- *         status_ = DeviceStatus::CONNECTED;
- *         return true;
- *     }
- *     
- *     bool sendMessage(const MidiMessage& msg) override {
- *         // Implementation
- *         messagesSent_++;
- *         return true;
- *     }
- *     
- *     // ... other methods
- * };
- * ```
+ * Note: This class is not copyable or movable due to atomics.
  */
 class MidiDevice {
 public:
@@ -125,13 +60,6 @@ public:
     // CONSTRUCTOR / DESTRUCTOR
     // ========================================================================
     
-    /**
-     * @brief Constructor
-     * @param id Unique device identifier
-     * @param name Device name
-     * @param type Device type
-     * @param direction Communication direction
-     */
     MidiDevice(const std::string& id,
                const std::string& name,
                DeviceType type,
@@ -145,50 +73,43 @@ public:
         , messagesSent_(0)
     {}
     
-    /**
-     * @brief Virtual destructor
-     */
     virtual ~MidiDevice() = default;
     
-    // Disable copy
+    // Non-copyable
     MidiDevice(const MidiDevice&) = delete;
     MidiDevice& operator=(const MidiDevice&) = delete;
+    
+    // Non-movable (due to atomics and const members)
+    MidiDevice(MidiDevice&&) = delete;
+    MidiDevice& operator=(MidiDevice&&) = delete;
     
     // ========================================================================
     // PURE VIRTUAL METHODS (MUST BE IMPLEMENTED)
     // ========================================================================
     
     /**
-     * @brief Connect to device
-     * @return true if successful
-     * @note Must update status_
-     * @note Must be thread-safe
+     * @brief Connect to the device
+     * @return true if connection successful
      */
     virtual bool connect() = 0;
     
     /**
-     * @brief Disconnect from device
-     * @return true if successful
-     * @note Must update status_
-     * @note Must stop any reception threads
-     * @note Must be thread-safe
+     * @brief Disconnect from the device
+     * @return true if disconnection successful
      */
     virtual bool disconnect() = 0;
     
     /**
-     * @brief Send MIDI message
+     * @brief Send MIDI message to device
      * @param message Message to send
-     * @return true if successful
-     * @note Must increment messagesSent_ on success
-     * @note Must be thread-safe
+     * @return true if sent successfully
      */
     virtual bool sendMessage(const MidiMessage& message) = 0;
     
     /**
-     * @brief Receive MIDI message (if available)
-     * @return MidiMessage Received message or empty message
-     * @note Must increment messagesReceived_ when message received
-     * @note Must be thread-safe
+     * @brief Receive MIDI message from device
+     * @return MidiMessage Received message (empty if none available)
+     * @note Uses move semantics internally for efficiency
      */
     virtual MidiMessage receiveMessage() = 0;
     
@@ -198,62 +119,39 @@ public:
      */
     virtual bool isConnected() const = 0;
     
+    /**
+     * @brief Check if messages are available to read
+     * @return true if messages pending
+     */
+    virtual bool hasMessages() const = 0;
+    
+    /**
+     * @brief Request SysEx Identity from device
+     * @return true if request sent successfully
+     */
+    virtual bool requestIdentity() = 0;
+    
+    /**
+     * @brief Get device capabilities
+     * @return json Capabilities (channels, polyphony, etc.)
+     */
+    virtual json getCapabilities() const = 0;
+    
     // ========================================================================
     // VIRTUAL METHODS WITH DEFAULT IMPLEMENTATION
     // ========================================================================
     
     /**
-     * @brief Open device (alias for connect)
-     * @return true if successful
-     */
-    virtual bool open() {
-        return connect();
-    }
-    
-    /**
-     * @brief Close device (alias for disconnect)
-     */
-    virtual void close() {
-        disconnect();
-    }
-    
-    /**
-     * @brief Send message (alias for sendMessage)
-     * @param message Message to send
-     */
-    virtual void send(const MidiMessage& message) {
-        sendMessage(message);
-    }
-    
-    /**
-     * @brief Receive message (alias for receiveMessage)
-     * @return MidiMessage Received message
-     */
-    virtual MidiMessage receive() {
-        return receiveMessage();
-    }
-    
-    /**
-     * @brief Check if messages are available
-     * @return true if messages pending
-     * @note Default returns false
-     */
-    virtual bool hasMessages() const {
-        return false;
-    }
-    
-    /**
-     * @brief Get device port/address
-     * @return std::string Port or address (empty by default)
-     * @note USB: "128:0", Network: "192.168.1.42:5004", etc.
+     * @brief Get device port identifier
+     * @return std::string Port identifier (empty if not applicable)
      */
     virtual std::string getPort() const {
         return "";
     }
     
     /**
-     * @brief Get detailed device information
-     * @return json Device information
+     * @brief Get complete device information as JSON
+     * @return json Device info including ID, name, type, status, statistics
      */
     virtual json getInfo() const {
         return {
@@ -274,43 +172,19 @@ public:
     // ========================================================================
     
     /**
-     * @brief Get device ID
+     * @brief Get device ID (immutable after construction)
      */
     std::string getId() const { return id_; }
     
     /**
-     * @brief Get device name
+     * @brief Get device name (immutable after construction)
      */
     std::string getName() const { return name_; }
     
-    /**
-     * @brief Get device type
-     */
     DeviceType getType() const { return type_; }
-    
-    /**
-     * @brief Get direction
-     */
     DeviceDirection getDirection() const { return direction_; }
-    
-    /**
-     * @brief Get status
-     */
     DeviceStatus getStatus() const { return status_.load(); }
-    
-    /**
-     * @brief Check if open (alias for isConnected)
-     */
-    bool isOpen() const { return isConnected(); }
-    
-    /**
-     * @brief Get messages received count
-     */
     uint64_t getMessagesReceived() const { return messagesReceived_.load(); }
-    
-    /**
-     * @brief Get messages sent count
-     */
     uint64_t getMessagesSent() const { return messagesSent_.load(); }
     
     // ========================================================================
@@ -318,16 +192,13 @@ public:
     // ========================================================================
     
     /**
-     * @brief Reset statistics
+     * @brief Reset message statistics counters
      */
     void resetStatistics() {
         messagesReceived_ = 0;
         messagesSent_ = 0;
     }
     
-    /**
-     * @brief Convert device type to string
-     */
     static std::string deviceTypeToString(DeviceType type) {
         switch (type) {
             case DeviceType::USB: return "USB";
@@ -338,9 +209,6 @@ public:
         }
     }
     
-    /**
-     * @brief Convert device direction to string
-     */
     static std::string deviceDirectionToString(DeviceDirection dir) {
         switch (dir) {
             case DeviceDirection::INPUT: return "INPUT";
@@ -350,9 +218,6 @@ public:
         }
     }
     
-    /**
-     * @brief Convert device status to string
-     */
     static std::string deviceStatusToString(DeviceStatus status) {
         switch (status) {
             case DeviceStatus::DISCONNECTED: return "DISCONNECTED";
@@ -364,29 +229,15 @@ public:
     }
 
 protected:
-    // ========================================================================
-    // PROTECTED MEMBERS (accessible by derived classes)
-    // ========================================================================
+    // Immutable after construction (thread-safe reads)
+    const std::string id_;
+    const std::string name_;
+    const DeviceType type_;
+    const DeviceDirection direction_;
     
-    /// Unique device identifier
-    std::string id_;
-    
-    /// Device name
-    std::string name_;
-    
-    /// Device type
-    DeviceType type_;
-    
-    /// Communication direction
-    DeviceDirection direction_;
-    
-    /// Connection status (atomic for thread-safety)
+    // Mutable state (thread-safe via atomics)
     std::atomic<DeviceStatus> status_;
-    
-    /// Messages received counter (atomic)
     std::atomic<uint64_t> messagesReceived_;
-    
-    /// Messages sent counter (atomic)
     std::atomic<uint64_t> messagesSent_;
 };
 

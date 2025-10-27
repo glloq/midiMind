@@ -136,7 +136,8 @@ enum class ControllerType : uint8_t {
  * Represents a complete MIDI message with data and timestamp.
  * Provides type-safe creation and manipulation of MIDI messages.
  * 
- * Thread Safety: YES (immutable after creation)
+ * Thread Safety: Const methods are thread-safe. setTimestamp() requires
+ * external synchronization if called from multiple threads.
  * 
  * Example:
  * ```cpp
@@ -172,6 +173,12 @@ public:
      * @param data Raw MIDI data bytes
      */
     explicit MidiMessage(const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief Move constructor from raw data
+     * @param data Raw MIDI data bytes
+     */
+    explicit MidiMessage(std::vector<uint8_t>&& data);
     
     /**
      * @brief Constructor from single byte (system real-time)
@@ -460,7 +467,7 @@ public:
     /**
      * @brief Create from JSON
      * @param j JSON object
-     * @return MidiMessage Message
+     * @return MidiMessage Message (empty if parsing fails)
      */
     static MidiMessage fromJson(const json& j);
     
@@ -471,7 +478,7 @@ public:
     std::string toHexString() const;
     
     /**
-     * @brief Compare messages
+     * @brief Compare messages (includes timestamp)
      */
     bool operator==(const MidiMessage& other) const;
     bool operator!=(const MidiMessage& other) const { return !(*this == other); }

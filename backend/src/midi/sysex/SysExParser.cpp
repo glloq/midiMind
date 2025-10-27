@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/sysex/SysExParser.cpp
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -9,6 +9,11 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Fixed bounds checking in decode7BitTo32Bit()
+//   - Improved parseNoteMap() to avoid partial entries
+//   - Added validation in parseCustomIdentification()
 //
 // ============================================================================
 
@@ -181,10 +186,10 @@ std::optional<DeviceIdentity> SysExParser::parseIdentityReply(
 std::optional<CustomDeviceIdentity> SysExParser::parseCustomIdentification(
     const std::vector<uint8_t>& data) {
     
-    // Format: F0 7D 00 01 01 <version> <id[4]> <name[32]> <fw[3]> <features[4]> F7
-    // Minimum size: 1 + 1 + 1 + 1 + 1 + 1 + 4 + 32 + 3 + 4 + 1 = 50 bytes
+    // Format: F0 7D 00 01 01 <version> <id[5]> <name[32]> <fw[3]> <features[5]> F7
+    // Minimum size: 1 + 1 + 1 + 1 + 1 + 1 + 5 + 32 + 3 + 5 + 1 = 52 bytes
     
-    if (!isCustomSysEx(data) || data.size() < 50) {
+    if (!isCustomSysEx(data) || data.size() < 52) {
         return std::nullopt;
     }
     
@@ -203,19 +208,32 @@ std::optional<CustomDeviceIdentity> SysExParser::parseCustomIdentification(
     identity.blockVersion = data[pos++];
     
     // Device ID (32-bit, 7-bit encoded = 5 bytes)
+    // Validate we have enough bytes before calling decode
+    if (pos + 5 > data.size()) {
+        return std::nullopt;
+    }
     identity.deviceId = decode7BitTo32Bit(data, pos);
     pos += 5;
     
     // Device name (null-terminated, max 32 chars)
+    if (pos + 32 > data.size()) {
+        return std::nullopt;
+    }
     identity.deviceName = extractString(data, pos, 32);
     pos += 32;
     
     // Firmware version (3 bytes)
+    if (pos + 3 > data.size()) {
+        return std::nullopt;
+    }
     identity.firmwareVersion[0] = data[pos++];
     identity.firmwareVersion[1] = data[pos++];
     identity.firmwareVersion[2] = data[pos++];
     
     // Feature flags (32-bit, 7-bit encoded = 5 bytes)
+    if (pos + 5 > data.size()) {
+        return std::nullopt;
+    }
     identity.featureFlags = decode7BitTo32Bit(data, pos);
     
     return identity;
@@ -259,20 +277,27 @@ std::optional<NoteMap> SysExParser::parseNoteMap(
     // Each entry: <note> <channel> <nameLen> <name...> <velocity>
     noteMap.mappings.reserve(count);
     
-    for (uint8_t i = 0; i < count && pos < data.size() - 1; ++i) {
+    for (uint8_t i = 0; i < count; ++i) {
+        // Check minimum required bytes for entry header (note + channel + nameLen)
+        if (pos + 3 > data.size() - 1) {
+            break;  // Not enough data for complete entry
+        }
+        
         NoteMappingEntry entry;
         
         // MIDI note
-        if (pos >= data.size() - 1) break;
         entry.midiNote = data[pos++];
         
         // Channel
-        if (pos >= data.size() - 1) break;
         entry.channel = data[pos++];
         
         // Name length
-        if (pos >= data.size() - 1) break;
         uint8_t nameLen = data[pos++];
+        
+        // Validate we have enough bytes for name + velocity
+        if (pos + nameLen + 1 > data.size() - 1) {
+            break;  // Not enough data for complete entry
+        }
         
         // Name
         if (nameLen > 0) {
@@ -281,7 +306,6 @@ std::optional<NoteMap> SysExParser::parseNoteMap(
         }
         
         // Velocity
-        if (pos >= data.size() - 1) break;
         entry.velocity = data[pos++];
         
         noteMap.mappings.push_back(entry);
@@ -296,7 +320,8 @@ std::optional<NoteMap> SysExParser::parseNoteMap(
 
 uint32_t SysExParser::decode7BitTo32Bit(const std::vector<uint8_t>& data,
                                         size_t offset) {
-    if (offset + 4 >= data.size()) {
+    // Need 5 bytes: data[offset] through data[offset + 4]
+    if (offset + 5 > data.size()) {
         return 0;
     }
     

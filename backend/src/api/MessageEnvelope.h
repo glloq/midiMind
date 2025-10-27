@@ -1,8 +1,13 @@
 // ============================================================================
 // File: backend/src/api/MessageEnvelope.h
-// Version: 4.1.1 - CORRIGÉ
+// Version: 4.1.2 - CORRIGÉ
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.1.2:
+//   - Added noexcept to type checking methods
+//   - Added @throws documentation to getters
+//   - Added noexcept to payload checking methods
 //
 // Changes v4.1.1:
 //   - Fixed method signatures to match implementation
@@ -101,32 +106,56 @@ public:
     // TYPE CHECKING
     // ========================================================================
     
-    bool isRequest() const { return envelope_.type == protocol::MessageType::REQUEST; }
-    bool isResponse() const { return envelope_.type == protocol::MessageType::RESPONSE; }
-    bool isEvent() const { return envelope_.type == protocol::MessageType::EVENT; }
-    bool isError() const { return envelope_.type == protocol::MessageType::ERROR; }
+    bool isRequest() const noexcept { return envelope_.type == protocol::MessageType::REQUEST; }
+    bool isResponse() const noexcept { return envelope_.type == protocol::MessageType::RESPONSE; }
+    bool isEvent() const noexcept { return envelope_.type == protocol::MessageType::EVENT; }
+    bool isError() const noexcept { return envelope_.type == protocol::MessageType::ERROR; }
     
     // ========================================================================
     // PAYLOAD CHECKING
     // ========================================================================
     
-    bool hasRequest() const;
-    bool hasResponse() const;
-    bool hasEvent() const;
-    bool hasError() const;
+    bool hasRequest() const noexcept;
+    bool hasResponse() const noexcept;
+    bool hasEvent() const noexcept;
+    bool hasError() const noexcept;
     
     // ========================================================================
     // GETTERS
     // ========================================================================
     
-    const protocol::Envelope& getEnvelope() const { return envelope_; }
+    const protocol::Envelope& getEnvelope() const noexcept { return envelope_; }
+    
+    /**
+     * @brief Get request payload
+     * @return Request payload
+     * @throws std::runtime_error if message does not contain a request
+     */
     const protocol::Request& getRequest() const;
+    
+    /**
+     * @brief Get response payload
+     * @return Response payload
+     * @throws std::runtime_error if message does not contain a response
+     */
     const protocol::Response& getResponse() const;
+    
+    /**
+     * @brief Get event payload
+     * @return Event payload
+     * @throws std::runtime_error if message does not contain an event
+     */
     const protocol::Event& getEvent() const;
+    
+    /**
+     * @brief Get error payload
+     * @return Error payload
+     * @throws std::runtime_error if message does not contain an error
+     */
     const protocol::Error& getError() const;
     
-    std::string getId() const { return envelope_.id; }
-    protocol::MessageType getType() const { return envelope_.type; }
+    std::string getId() const noexcept { return envelope_.id; }
+    protocol::MessageType getType() const noexcept { return envelope_.type; }
     
     // ========================================================================
     // VALIDATION
@@ -150,5 +179,5 @@ private:
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE MessageEnvelope.h v4.1.1
+// END OF FILE MessageEnvelope.h v4.1.2
 // ============================================================================

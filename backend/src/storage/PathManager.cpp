@@ -11,9 +11,12 @@
 // Date: 2025-10-16
 //
 // Changes v4.1.0:
-//   - Updated to use FileManager::Unsafe namespace
-//   - Enhanced directory creation
-//   - Added migration paths support
+//   - Fixed TOCTOU race condition (removed access() check)
+//   - Added NULL check for getpwuid()
+//   - Added error checks for time functions
+//   - Added errno checking for stat()
+//   - Rewrote joinPath() for robustness
+//   - Enhanced directory creation with permission validation
 //
 // ============================================================================
 
@@ -23,11 +26,59 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <cerrno>
+#include <cstring>
 #include <ctime>
 #include <sstream>
 #include <iomanip>
 
 namespace midiMind {
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+std::string joinPath(const std::vector<std::string>& parts) {
+    if (parts.empty()) {
+        return "";
+    }
+    
+    std::string result;
+    
+    for (size_t i = 0; i < parts.size(); ++i) {
+        std::string part = parts[i];
+        
+        // Skip empty parts
+        if (part.empty()) {
+            continue;
+        }
+        
+        // For first part, keep leading slash if present
+        if (i == 0) {
+            result = part;
+        } else {
+            // Remove trailing slashes from result
+            while (result.length() > 1 && result.back() == '/') {
+                result.pop_back();
+            }
+            
+            // Remove leading slashes from part
+            while (!part.empty() && part[0] == '/') {
+                part.erase(0, 1);
+            }
+            
+            // Join with separator
+            if (!part.empty()) {
+                if (!result.empty() && result.back() != '/') {
+                    result += '/';
+                }
+                result += part;
+            }
+        }
+    }
+    
+    return result;
+}
 
 // ============================================================================
 // SINGLETON
@@ -48,17 +99,27 @@ PathManager::PathManager() {
     
     const char* varLibPath = "/var/lib/midimind";
     
-    // Check if we have write access to /var/lib/midimind
-    if (access(varLibPath, W_OK) == 0) {
+    // Try to create directory first - avoid TOCTOU race
+    // If creation succeeds, we know we have write access
+    if (FileManager::Unsafe::createDirectory(varLibPath, true)) {
         basePath_ = varLibPath;
+        Logger::debug("PathManager", "Using production path: " + std::string(varLibPath));
     } else {
         // Fall back to user home directory
         const char* homeDir = getenv("HOME");
         if (!homeDir) {
             struct passwd* pw = getpwuid(getuid());
-            homeDir = pw ? pw->pw_dir : "/home/pi";
+            if (pw && pw->pw_dir) {
+                homeDir = pw->pw_dir;
+            } else {
+                // Last resort fallback
+                homeDir = "/home/pi";
+                Logger::warning("PathManager", 
+                              "Could not determine home directory, using default: /home/pi");
+            }
         }
         basePath_ = std::string(homeDir) + "/MidiMind";
+        Logger::debug("PathManager", "Using development path: " + basePath_);
     }
     
     Logger::info("PathManager", "PathManager created");
@@ -102,6 +163,13 @@ void PathManager::initialize() {
             if (FileManager::Unsafe::createDirectory(dir, true)) {
                 Logger::info("PathManager", "  ✓ Created: " + dir);
                 created++;
+                
+                // Verify write permissions by attempting to access
+                if (access(dir.c_str(), W_OK) != 0) {
+                    Logger::warning("PathManager", 
+                                  "  ⚠ Created but not writable: " + dir + " (errno: " + 
+                                  std::to_string(errno) + ")");
+                }
             } else {
                 Logger::error("PathManager", "  ✗ Failed: " + dir);
                 failed++;
@@ -109,6 +177,13 @@ void PathManager::initialize() {
         } else {
             Logger::debug("PathManager", "  - Exists: " + dir);
             existing++;
+            
+            // Verify write permissions on existing directories
+            if (access(dir.c_str(), W_OK) != 0) {
+                Logger::warning("PathManager", 
+                              "  ⚠ Not writable: " + dir + " (errno: " + 
+                              std::to_string(errno) + ")");
+            }
         }
     }
     
@@ -192,10 +267,17 @@ std::string PathManager::getLogsPath() const {
 
 std::string PathManager::getLogFilePath() const {
     // Format: midimind_YYYY-MM-DD.log
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
+    std::time_t now = std::time(nullptr);
+    if (now == static_cast<std::time_t>(-1)) {
+        Logger::error("PathManager", "Failed to get current time");
+        return joinPath({getLogsPath(), "midimind.log"});  // Fallback
+    }
+    
     std::tm tm;
-    localtime_r(&time, &tm);
+    if (!localtime_r(&now, &tm)) {
+        Logger::error("PathManager", "Failed to convert time");
+        return joinPath({getLogsPath(), "midimind.log"});  // Fallback
+    }
     
     std::ostringstream oss;
     oss << "midimind_"
@@ -222,10 +304,17 @@ std::string PathManager::createDatabaseBackup() {
     Logger::info("PathManager", "Creating database backup...");
     
     // Generate backup filename with timestamp
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
+    std::time_t now = std::time(nullptr);
+    if (now == static_cast<std::time_t>(-1)) {
+        Logger::error("PathManager", "Failed to get current time for backup");
+        return "";
+    }
+    
     std::tm tm;
-    localtime_r(&time, &tm);
+    if (!localtime_r(&now, &tm)) {
+        Logger::error("PathManager", "Failed to convert time for backup");
+        return "";
+    }
     
     std::ostringstream oss;
     oss << "midimind_"
@@ -273,13 +362,22 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
     
     int deletedCount = 0;
     uint64_t maxAgeSeconds = static_cast<uint64_t>(maxAgeDays) * 24 * 3600;
-    uint64_t nowSeconds = static_cast<uint64_t>(std::time(nullptr));
+    
+    std::time_t nowTime = std::time(nullptr);
+    if (nowTime == static_cast<std::time_t>(-1)) {
+        Logger::error("PathManager", "Failed to get current time for cleanup");
+        return 0;
+    }
+    uint64_t nowSeconds = static_cast<uint64_t>(nowTime);
     
     for (const auto& filename : files) {
         std::string filepath = joinPath({directory, filename});
         
         struct stat fileStat;
         if (stat(filepath.c_str(), &fileStat) != 0) {
+            Logger::warning("PathManager", 
+                          "  Failed to stat file: " + filename + " (errno: " + 
+                          std::to_string(errno) + " - " + std::strerror(errno) + ")");
             continue;
         }
         
@@ -298,33 +396,6 @@ int PathManager::cleanOldFiles(const std::string& directory, int maxAgeDays) {
     Logger::info("PathManager", "✓ Cleaned " + std::to_string(deletedCount) + " old files");
     
     return deletedCount;
-}
-
-std::string PathManager::joinPath(const std::vector<std::string>& parts) {
-    if (parts.empty()) {
-        return "";
-    }
-    
-    std::string result = parts[0];
-    
-    for (size_t i = 1; i < parts.size(); ++i) {
-        // Remove trailing slash from result
-        while (!result.empty() && (result.back() == '/' || result.back() == '\\')) {
-            result.pop_back();
-        }
-        
-        // Remove leading slash from part
-        std::string part = parts[i];
-        while (!part.empty() && (part[0] == '/' || part[0] == '\\')) {
-            part.erase(0, 1);
-        }
-        
-        if (!part.empty()) {
-            result += "/" + part;
-        }
-    }
-    
-    return result;
 }
 
 } // namespace midiMind

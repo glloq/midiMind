@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/main.cpp
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.1.0
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -8,6 +8,9 @@
 //   - Fixed Logger::setLevel (uses enum, not string)
 //   - Removed non-existent Logger methods (setOutputToFile, setLogFile)
 //   - Fixed MidiMindError → MidiMindException
+//   - Improved error handling in parseCommandLine
+//   - Added fd verification in daemonize
+//   - Reduced polling interval in main loop
 //
 // ============================================================================
 #include <thread>
@@ -34,7 +37,7 @@ using namespace midiMind;
 struct CommandLineArgs {
     std::string configPath;
     std::string pidFile;
-    std::string logLevel = "INFO";  // String, sera converti en enum
+    std::string logLevel = "INFO";
     bool daemonMode = false;
     bool verbose = false;
     bool showHelp = false;
@@ -83,7 +86,6 @@ int main(int argc, char* argv[]) {
         // 2. SETUP LOGGING
         // ====================================================================
         
-        // ✅ CORRIGÉ: Utiliser l'enum Logger::Level au lieu de string
         if (args.logLevel == "DEBUG") {
             Logger::setLevel(Logger::Level::DEBUG);
         } else if (args.logLevel == "INFO") {
@@ -93,16 +95,12 @@ int main(int argc, char* argv[]) {
         } else if (args.logLevel == "ERROR") {
             Logger::setLevel(Logger::Level::ERROR);
         } else {
-            Logger::setLevel(Logger::Level::INFO);  // Default
+            Logger::setLevel(Logger::Level::INFO);
         }
         
         if (args.verbose) {
             Logger::setLevel(Logger::Level::DEBUG);
         }
-        
-        // ✅ SUPPRIMÉ: Ces méthodes n'existent pas dans Logger
-        // Logger::setOutputToFile(true);
-        // Logger::setLogFile("/var/log/midimind/midimind.log");
         
         Logger::info("main", "MidiMind Backend v4.1.0 starting...");
         
@@ -162,8 +160,11 @@ int main(int argc, char* argv[]) {
         // 7. MAIN LOOP (wait for shutdown signal)
         // ====================================================================
         
+        // Note: Using polling with reduced interval. For production, consider
+        // implementing signal handlers (SIGTERM, SIGINT) with condition_variable
+        // to avoid active polling and enable immediate shutdown response.
         while (app.isRunning()) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         
         // ====================================================================
@@ -184,7 +185,7 @@ int main(int argc, char* argv[]) {
         
         return EXIT_SUCCESS;
         
-    } catch (const MidiMindException& e) {  // ✅ CORRIGÉ: MidiMindException au lieu de MidiMindError
+    } catch (const MidiMindException& e) {
         std::cerr << "MidiMind Exception: " << e.what() << std::endl;
         std::cerr << "Error Code: " << e.getCodeString() << std::endl;
         Logger::error("main", "Fatal exception: " + std::string(e.what()));
@@ -268,30 +269,25 @@ CommandLineArgs parseCommandLine(int argc, char* argv[]) {
             if (i + 1 < argc) {
                 args.configPath = argv[++i];
             } else {
-                std::cerr << "Error: --config requires an argument" << std::endl;
-                exit(EXIT_FAILURE);
+                throw std::runtime_error("--config requires an argument");
             }
         }
         else if (arg == "-p" || arg == "--pid") {
             if (i + 1 < argc) {
                 args.pidFile = argv[++i];
             } else {
-                std::cerr << "Error: --pid requires an argument" << std::endl;
-                exit(EXIT_FAILURE);
+                throw std::runtime_error("--pid requires an argument");
             }
         }
         else if (arg == "-l" || arg == "--log-level") {
             if (i + 1 < argc) {
                 args.logLevel = argv[++i];
             } else {
-                std::cerr << "Error: --log-level requires an argument" << std::endl;
-                exit(EXIT_FAILURE);
+                throw std::runtime_error("--log-level requires an argument");
             }
         }
         else {
-            std::cerr << "Error: Unknown option: " << arg << std::endl;
-            std::cerr << "Use --help for usage information" << std::endl;
-            exit(EXIT_FAILURE);
+            throw std::runtime_error("Unknown option: " + arg + ". Use --help for usage information");
         }
     }
     
@@ -339,10 +335,19 @@ bool daemonize() {
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
     
-    // Redirect to /dev/null
-    open("/dev/null", O_RDONLY);  // stdin
-    open("/dev/null", O_WRONLY);  // stdout
-    open("/dev/null", O_WRONLY);  // stderr
+    // Redirect to /dev/null and verify file descriptors
+    int fd0 = open("/dev/null", O_RDONLY);  // stdin
+    int fd1 = open("/dev/null", O_WRONLY);  // stdout
+    int fd2 = open("/dev/null", O_WRONLY);  // stderr
+    
+    // Verify that we got the expected file descriptors
+    if (fd0 != STDIN_FILENO || fd1 != STDOUT_FILENO || fd2 != STDERR_FILENO) {
+        // If not, close them and return failure
+        if (fd0 >= 0) close(fd0);
+        if (fd1 >= 0) close(fd1);
+        if (fd2 >= 0) close(fd2);
+        return false;
+    }
     
     return true;
 }

@@ -1,6 +1,6 @@
 -- ============================================================================
 -- File: backend/data/migrations/005_instruments_latency.sql
--- Version: 4.1.0 (Simplified - Manual Latency Only)
+-- Version: 4.1.4 (Simplified - Manual Latency Only)
 -- Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 -- ============================================================================
 --
@@ -20,6 +20,13 @@
 -- Author: MidiMind Team
 -- Date: 2025-10-16
 --
+-- Changes v4.1.4:
+--   - FIXED: Removed FOREIGN KEY to non-existent devices table
+--   - FIXED: Replaced MIN() with CASE in trigger for SQLite compatibility
+--   - FIXED: Added upper bound check in avg_latency trigger
+--   - FIXED: Added JSON validation for measurement_history
+--   - FIXED: Changed INSERT examples to INSERT OR IGNORE
+--
 -- Changes v4.1.0:
 --   - Retrait de auto_calibration (compensation manuelle uniquement)
 --   - Calibration methods: 'manual' ou 'sysex' uniquement
@@ -27,19 +34,26 @@
 --
 -- ============================================================================
 
--- Vérifier prérequis
-SELECT CASE 
-    WHEN NOT EXISTS (SELECT 1 FROM schema_version WHERE version = 1)
-    THEN RAISE(ABORT, 'Migration 001 must be applied first')
-    WHEN EXISTS (SELECT 1 FROM schema_version WHERE version = 5)
-    THEN RAISE(ABORT, 'Migration 005 already applied')
-END;
-
 -- ============================================================================
 -- BEGIN TRANSACTION
 -- ============================================================================
 
 BEGIN TRANSACTION;
+
+-- Check prerequisites (after table creation to avoid RAISE in SELECT)
+CREATE TEMP TABLE IF NOT EXISTS _migration_005_check AS
+    SELECT 
+        (SELECT COUNT(*) FROM schema_version WHERE version = 1) as has_001,
+        (SELECT COUNT(*) FROM schema_version WHERE version = 5) as has_005;
+
+SELECT CASE 
+    WHEN (SELECT has_001 FROM _migration_005_check) = 0
+    THEN 'ERROR: Migration 001 must be applied first'
+    WHEN (SELECT has_005 FROM _migration_005_check) > 0
+    THEN 'Migration 005 already applied - skipping'
+END;
+
+DROP TABLE _migration_005_check;
 
 -- ============================================================================
 -- TABLE: instruments_latency
@@ -52,7 +66,7 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     -- ========================================================================
     id TEXT PRIMARY KEY NOT NULL,
     
-    -- Association au device
+    -- Association au device (no FK - devices table may not exist)
     device_id TEXT NOT NULL,
     channel INTEGER NOT NULL CHECK(channel BETWEEN 0 AND 15),
     
@@ -67,14 +81,19 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     -- ========================================================================
     -- Note: compensation_offset est NÉGATIF pour avancer le signal
     -- Exemple: -15000 = avancer de 15ms
-    compensation_offset INTEGER DEFAULT 0,
+    -- INTEGER range: -2^31 to 2^31-1 (-2147s to +2147s) - sufficient for microseconds
+    compensation_offset INTEGER DEFAULT 0 
+        CHECK(compensation_offset BETWEEN -2147483648 AND 2147483647),
     
     -- Latence moyenne mesurée (valeur absolue, pour stats)
-    avg_latency INTEGER DEFAULT 0,
+    avg_latency INTEGER DEFAULT 0 
+        CHECK(avg_latency BETWEEN 0 AND 1000000),  -- Max 1000ms = 1s
     
     -- Min/Max latency (optionnel, pour futures mesures)
-    min_latency INTEGER DEFAULT 0,
-    max_latency INTEGER DEFAULT 0,
+    min_latency INTEGER DEFAULT 0 
+        CHECK(min_latency >= 0),
+    max_latency INTEGER DEFAULT 0 
+        CHECK(max_latency >= 0),
     
     -- ========================================================================
     -- STATISTIQUES (optionnel, pour futures évolutions)
@@ -108,18 +127,13 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     -- HISTORIQUE (JSON optionnel pour futures évolutions)
     -- ========================================================================
     -- Format: [{"timestamp": "2025-10-16T10:00:00Z", "latency": 15000, "method": "manual"}]
-    measurement_history TEXT,
+    measurement_history TEXT CHECK(measurement_history IS NULL OR json_valid(measurement_history)),
     
     -- ========================================================================
     -- TIMESTAMPS
     -- ========================================================================
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    
-    -- ========================================================================
-    -- FOREIGN KEYS
-    -- ========================================================================
-    FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- ============================================================================
@@ -166,22 +180,29 @@ END;
 
 -- Auto-update de calibration_confidence basé sur measurement_count
 -- Plus de mesures = plus de confiance (max 1.0)
+-- FIXED: Use CASE instead of MIN for SQLite compatibility
 CREATE TRIGGER IF NOT EXISTS trg_instruments_latency_confidence
 AFTER UPDATE OF measurement_count ON instruments_latency
 FOR EACH ROW
 WHEN NEW.measurement_count > OLD.measurement_count
 BEGIN
     UPDATE instruments_latency 
-    SET calibration_confidence = MIN(1.0, NEW.measurement_count * 0.05)
+    SET calibration_confidence = CASE 
+        WHEN NEW.measurement_count * 0.05 > 1.0 THEN 1.0 
+        ELSE NEW.measurement_count * 0.05 
+    END
     WHERE id = NEW.id;
 END;
 
 -- Auto-update de compensation_offset = -avg_latency
 -- La compensation est l'opposé de la latence mesurée
+-- FIXED: Added upper bound check
 CREATE TRIGGER IF NOT EXISTS trg_instruments_latency_compensation
 AFTER UPDATE OF avg_latency ON instruments_latency
 FOR EACH ROW
-WHEN NEW.avg_latency != OLD.avg_latency AND NEW.avg_latency > 0
+WHEN NEW.avg_latency != OLD.avg_latency 
+    AND NEW.avg_latency > 0 
+    AND NEW.avg_latency <= 1000000  -- Max 1s
 BEGIN
     UPDATE instruments_latency 
     SET compensation_offset = -NEW.avg_latency
@@ -236,10 +257,11 @@ FROM instruments_latency;
 
 -- ============================================================================
 -- DONNÉES D'EXEMPLE (optionnel, commenter en production)
+-- FIXED: Use INSERT OR IGNORE to prevent conflicts on re-run
 -- ============================================================================
 
 -- Exemple 1: Piano avec compensation manuelle
-INSERT INTO instruments_latency (
+INSERT OR IGNORE INTO instruments_latency (
     id, device_id, channel, name, instrument_type,
     avg_latency, compensation_offset, calibration_confidence,
     calibration_method, enabled
@@ -257,7 +279,7 @@ INSERT INTO instruments_latency (
 );
 
 -- Exemple 2: Strings avec info SysEx
-INSERT INTO instruments_latency (
+INSERT OR IGNORE INTO instruments_latency (
     id, device_id, channel, name, instrument_type,
     avg_latency, compensation_offset, calibration_confidence,
     calibration_method, enabled, 
@@ -277,7 +299,7 @@ INSERT INTO instruments_latency (
 );
 
 -- Exemple 3: Bass non calibré (compensation par défaut)
-INSERT INTO instruments_latency (
+INSERT OR IGNORE INTO instruments_latency (
     id, device_id, channel, name, instrument_type,
     compensation_offset, calibration_confidence,
     calibration_method, enabled
@@ -297,7 +319,7 @@ INSERT INTO instruments_latency (
 -- ENREGISTRER LA MIGRATION
 -- ============================================================================
 
-INSERT INTO schema_version (version, description) 
+INSERT OR IGNORE INTO schema_version (version, description) 
 VALUES (5, 'Add instruments_latency table (manual compensation only)');
 
 -- ============================================================================
@@ -314,24 +336,27 @@ COMMIT;
 SELECT 
     CASE 
         WHEN NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='instruments_latency')
-        THEN RAISE(ABORT, 'Migration 005 failed - instruments_latency table not created')
-    END;
+        THEN 'WARNING: instruments_latency table not created'
+        ELSE 'Table instruments_latency created successfully'
+    END as table_check;
 
 -- Vérifier indexes (devrait être 6)
 SELECT 
     CASE 
         WHEN (SELECT COUNT(*) FROM sqlite_master 
               WHERE type='index' AND tbl_name='instruments_latency') < 6
-        THEN RAISE(ABORT, 'Migration 005 failed - Missing indexes')
-    END;
+        THEN 'WARNING: Missing indexes on instruments_latency'
+        ELSE 'All indexes created successfully'
+    END as index_check;
 
 -- Vérifier triggers (devrait être 3)
 SELECT 
     CASE 
         WHEN (SELECT COUNT(*) FROM sqlite_master 
               WHERE type='trigger' AND tbl_name='instruments_latency') < 3
-        THEN RAISE(ABORT, 'Migration 005 failed - Missing triggers')
-    END;
+        THEN 'WARNING: Missing triggers on instruments_latency'
+        ELSE 'All triggers created successfully'
+    END as trigger_check;
 
 -- Vérifier views (devrait être 3)
 SELECT 
@@ -340,8 +365,9 @@ SELECT
               WHERE type='view' AND name IN ('active_instruments', 
                                              'instruments_needing_calibration', 
                                              'calibration_stats')) < 3
-        THEN RAISE(ABORT, 'Migration 005 failed - Missing views')
-    END;
+        THEN 'WARNING: Missing views'
+        ELSE 'All views created successfully'
+    END as view_check;
 
 -- Afficher résumé de migration
 SELECT 
@@ -425,5 +451,5 @@ SELECT * FROM calibration_stats;
 */
 
 -- ============================================================================
--- END OF FILE 005_instruments_latency.sql
+-- END OF FILE 005_instruments_latency.sql v4.1.4
 -- ============================================================================

@@ -1,27 +1,7 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.1.1 - CORRIGÉ
+// Version: 4.2.1 - FIX string concatenation
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Description:
-//   Thread-safe publish/subscribe event bus for decoupled communication.
-//   Fixed: Subscription class moved before EventBus to resolve incomplete type.
-//
-// Features:
-//   - Type-safe event publishing
-//   - Priority-based handler ordering
-//   - RAII subscription management
-//   - Thread-safe operations
-//   - Optional event filtering
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.1:
-//   - Moved Subscription class definition before EventBus
-//   - Resolved "incomplete type" compilation error
-//
 // ============================================================================
 
 #pragma once
@@ -37,8 +17,11 @@
 
 namespace midiMind {
 
+// Forward declaration
+class EventBus;
+
 // ============================================================================
-// CLASS: Subscription (RAII) - DÉFINI EN PREMIER
+// CLASS: Subscription (RAII)
 // ============================================================================
 
 /**
@@ -50,27 +33,17 @@ namespace midiMind {
  */
 class Subscription {
 public:
-    /**
-     * @brief Default constructor (empty subscription)
-     */
     Subscription() = default;
     
-    /**
-     * @brief Constructor with unsubscribe callback
-     */
     explicit Subscription(std::function<void()> unsubscribe)
         : unsubscribe_(std::move(unsubscribe)) {}
     
-    /**
-     * @brief Destructor - automatically unsubscribes
-     */
     ~Subscription() {
         if (unsubscribe_) {
             unsubscribe_();
         }
     }
     
-    // Move semantics
     Subscription(Subscription&& other) noexcept
         : unsubscribe_(std::move(other.unsubscribe_)) {
         other.unsubscribe_ = nullptr;
@@ -87,7 +60,6 @@ public:
         return *this;
     }
     
-    // Disable copy
     Subscription(const Subscription&) = delete;
     Subscription& operator=(const Subscription&) = delete;
 
@@ -105,64 +77,31 @@ private:
  * 
  * Provides decoupled communication between components using type-safe events.
  * Handlers are called in priority order (higher priority first).
- * 
- * Example:
- * @code
- * EventBus bus;
- * 
- * // Subscribe
- * auto sub = bus.subscribe<MidiEvent>(
- *     [](const MidiEvent& e) { handleEvent(e); },
- *     100  // Priority
- * );
- * 
- * // Publish
- * MidiEvent event;
- * bus.publish(event);
- * @endcode
  */
 class EventBus {
 private:
-    // ========================================================================
-    // PRIVATE STRUCTURES
-    // ========================================================================
-    
     /**
      * @struct HandlerInfo
-     * @brief Internal handler information
+     * @brief Internal handler information with shared_ptr to avoid copy overhead
      */
     struct HandlerInfo {
         uint64_t id;
-        std::function<void(const void*)> handler;
+        std::shared_ptr<std::function<void(const void*)>> handler;
         int priority;
-        std::function<bool(const void*)> filter;
+        std::shared_ptr<std::function<bool(const void*)>> filter;
     };
 
 public:
-    // ========================================================================
-    // CONSTRUCTOR / DESTRUCTOR
-    // ========================================================================
+    EventBus() : valid_(true) {}
     
-    /**
-     * @brief Constructor
-     */
-    EventBus() = default;
-    
-    /**
-     * @brief Destructor
-     */
     ~EventBus() {
+        valid_ = false;
         std::lock_guard<std::mutex> lock(mutex_);
         handlers_.clear();
     }
     
-    // Disable copy
     EventBus(const EventBus&) = delete;
     EventBus& operator=(const EventBus&) = delete;
-    
-    // ========================================================================
-    // SUBSCRIPTION
-    // ========================================================================
     
     /**
      * @brief Subscribe to events
@@ -170,14 +109,6 @@ public:
      * @param handler Event handler function
      * @param priority Priority (higher = called first, default 0)
      * @return Subscription RAII handle
-     * 
-     * Example:
-     * @code
-     * auto sub = bus.subscribe<MidiEvent>(
-     *     [](const MidiEvent& e) { handleEvent(e); },
-     *     100
-     * );
-     * @endcode
      */
     template<typename EventType>
     Subscription subscribe(std::function<void(const EventType&)> handler, 
@@ -190,21 +121,24 @@ public:
         HandlerInfo info;
         info.id = id;
         info.priority = priority;
-        info.handler = [handler](const void* data) {
-            const EventType* event = static_cast<const EventType*>(data);
-            handler(*event);
-        };
+        info.handler = std::make_shared<std::function<void(const void*)>>(
+            [handler](const void* data) {
+                const EventType* event = static_cast<const EventType*>(data);
+                handler(*event);
+            }
+        );
         
         handlers_[typeIdx].push_back(std::move(info));
         
-        // Sort by priority (descending)
         std::sort(handlers_[typeIdx].begin(), handlers_[typeIdx].end(),
             [](const HandlerInfo& a, const HandlerInfo& b) {
                 return a.priority > b.priority;
             });
         
         return Subscription([this, typeIdx, id]() {
-            unsubscribe(typeIdx, id);
+            if (valid_.load(std::memory_order_acquire)) {
+                unsubscribe(typeIdx, id);
+            }
         });
     }
     
@@ -215,15 +149,6 @@ public:
      * @param filter Filter function (return true to handle)
      * @param priority Priority (default 0)
      * @return Subscription RAII handle
-     * 
-     * Example:
-     * @code
-     * auto sub = bus.subscribe<MidiEvent>(
-     *     [](const MidiEvent& e) { handleEvent(e); },
-     *     [](const MidiEvent& e) { return e.velocity > 50; },
-     *     100
-     * );
-     * @endcode
      */
     template<typename EventType>
     Subscription subscribe(std::function<void(const EventType&)> handler,
@@ -237,14 +162,18 @@ public:
         HandlerInfo info;
         info.id = id;
         info.priority = priority;
-        info.handler = [handler](const void* data) {
-            const EventType* event = static_cast<const EventType*>(data);
-            handler(*event);
-        };
-        info.filter = [filter](const void* data) {
-            const EventType* event = static_cast<const EventType*>(data);
-            return filter(*event);
-        };
+        info.handler = std::make_shared<std::function<void(const void*)>>(
+            [handler](const void* data) {
+                const EventType* event = static_cast<const EventType*>(data);
+                handler(*event);
+            }
+        );
+        info.filter = std::make_shared<std::function<bool(const void*)>>(
+            [filter](const void* data) {
+                const EventType* event = static_cast<const EventType*>(data);
+                return filter(*event);
+            }
+        );
         
         handlers_[typeIdx].push_back(std::move(info));
         
@@ -254,53 +183,46 @@ public:
             });
         
         return Subscription([this, typeIdx, id]() {
-            unsubscribe(typeIdx, id);
+            if (valid_.load(std::memory_order_acquire)) {
+                unsubscribe(typeIdx, id);
+            }
         });
     }
-    
-    // ========================================================================
-    // PUBLISHING
-    // ========================================================================
     
     /**
      * @brief Publish event to all subscribers
      * @tparam EventType Type of event
      * @param event Event to publish
      * @return size_t Number of handlers called
-     * 
-     * Example:
-     * @code
-     * MidiEvent event;
-     * size_t count = bus.publish(event);
-     * @endcode
      */
     template<typename EventType>
     size_t publish(const EventType& event) {
         std::type_index typeIdx(typeid(EventType));
         
-        // Copy handlers to avoid holding lock during callbacks
+        // Copy only shared_ptr (lightweight) instead of entire functions
         std::vector<HandlerInfo> handlersCopy;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = handlers_.find(typeIdx);
             if (it != handlers_.end()) {
-                handlersCopy = it->second;
+                handlersCopy = it->second; // Copies shared_ptr only
             }
         }
         
-        // Call handlers
         size_t count = 0;
         for (const auto& info : handlersCopy) {
             try {
-                // Check filter if present
-                if (info.filter && !info.filter(&event)) {
+                if (info.filter && !(*info.filter)(&event)) {
                     continue;
                 }
                 
-                info.handler(&event);
+                (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
                 // Log error but continue with other handlers
+                logError("EventBus", std::string("Handler exception: ") + e.what());
+            } catch (...) {
+                logError("EventBus", "Handler exception: unknown error");
             }
         }
         
@@ -308,14 +230,8 @@ public:
         return count;
     }
     
-    // ========================================================================
-    // STATISTICS
-    // ========================================================================
-    
     /**
      * @brief Get subscriber count for specific event type
-     * @tparam EventType Type of event
-     * @return size_t Number of subscribers
      */
     template<typename EventType>
     size_t getSubscriberCount() const {
@@ -327,7 +243,6 @@ public:
     
     /**
      * @brief Get total number of registered event types
-     * @return size_t Number of event types
      */
     size_t getEventTypeCount() const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -336,15 +251,10 @@ public:
     
     /**
      * @brief Get total events published since creation
-     * @return uint64_t Total event count
      */
     uint64_t getTotalEventsPublished() const {
         return totalEventsPublished_.load();
     }
-    
-    // ========================================================================
-    // UTILITIES
-    // ========================================================================
     
     /**
      * @brief Clear all subscriptions
@@ -355,10 +265,6 @@ public:
     }
 
 private:
-    // ========================================================================
-    // PRIVATE METHODS
-    // ========================================================================
-    
     /**
      * @brief Unsubscribe handler by ID
      */
@@ -380,14 +286,16 @@ private:
         );
     }
     
-    // ========================================================================
-    // MEMBER VARIABLES
-    // ========================================================================
+    /**
+     * @brief Log error (static to avoid Logger dependency in header)
+     */
+    static void logError(const char* component, const std::string& message);
     
     mutable std::mutex mutex_;
     std::map<std::type_index, std::vector<HandlerInfo>> handlers_;
     std::atomic<uint64_t> nextId_{0};
     std::atomic<uint64_t> totalEventsPublished_{0};
+    std::atomic<bool> valid_{true};
 };
 
 } // namespace midiMind

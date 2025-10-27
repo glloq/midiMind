@@ -1,29 +1,7 @@
 // ============================================================================
 // File: backend/src/midi/MidiRouter.h
-// Version: 4.1.0
+// Version: 4.2.0 - EventBus Integration
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Description:
-//   MIDI message routing system with filtering and transformation.
-//   Routes MIDI messages from sources to destinations based on rules.
-//
-// Features:
-//   - Rule-based routing with priorities
-//   - Channel, note, velocity filtering
-//   - Multi-destination support (layering)
-//   - Instrument-level latency compensation
-//   - Statistics and monitoring
-//   - Thread-safe operations
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Integration with LatencyCompensator
-//   - Per-instrument compensation
-//   - Enhanced routing statistics
-//
 // ============================================================================
 
 #pragma once
@@ -34,161 +12,84 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <atomic>
 #include <shared_mutex>
+#include <mutex>
 #include <functional>
-#include <optional>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace midiMind {
 
-// Forward declaration
+// Forward declarations
 class MidiDevice;
+class EventBus;
 
 // ============================================================================
-// STRUCTURE: MidiRoute
+// STRUCTURES
 // ============================================================================
 
 /**
  * @struct MidiRoute
- * @brief Defines a routing rule from source to destination
+ * @brief Route definition for MIDI message routing
  */
 struct MidiRoute {
-    /// Unique route ID
-    std::string id;
-    
-    /// Route name
-    std::string name;
-    
-    /// Source device ID (empty = any)
-    std::string sourceDeviceId;
-    
-    /// Destination device ID
-    std::string destinationDeviceId;
-    
-    /// Instrument ID (for latency compensation)
-    std::string instrumentId;
-    
-    /// Priority (higher = processed first)
-    int priority;
-    
-    /// Enabled flag
-    bool enabled;
+    std::string id;                    // Unique route identifier
+    std::string name;                  // Human-readable name
+    std::string sourceDeviceId;        // Source device (empty = any)
+    std::string destinationDeviceId;   // Destination device
+    int priority;                      // Priority (higher = first)
+    bool enabled;                      // Route enabled/disabled
     
     // Filters
-    std::vector<uint8_t> channelFilter;        ///< Allowed channels (empty = all)
-    std::vector<std::string> messageTypeFilter; ///< Allowed types (empty = all)
-    std::optional<uint8_t> minNote;            ///< Minimum note (inclusive)
-    std::optional<uint8_t> maxNote;            ///< Maximum note (inclusive)
-    std::optional<uint8_t> minVelocity;        ///< Minimum velocity
-    std::optional<uint8_t> maxVelocity;        ///< Maximum velocity
+    std::vector<uint8_t> channelFilter;     // Empty = all channels
+    std::vector<uint8_t> messageTypeFilter; // Empty = all types
     
     // Transformations
-    std::optional<int8_t> channelTransform;    ///< Channel offset
-    std::optional<int8_t> transposeTransform;  ///< Transpose semitones
-    std::optional<float> velocityScale;        ///< Velocity multiplier
+    int8_t channelTransform;           // Channel offset (-16 to +16, 0 = no change)
+    int8_t velocityTransform;          // Velocity offset (-127 to +127, 0 = no change)
+    int8_t transposeTransform;         // Transpose semitones (-127 to +127, 0 = no change)
     
-    /**
-     * @brief Constructor
-     */
     MidiRoute()
         : priority(50)
         , enabled(true)
+        , channelTransform(0)
+        , velocityTransform(0)
+        , transposeTransform(0)
     {}
-    
-    /**
-     * @brief Convert to JSON
-     */
-    json toJson() const {
-        json j = {
-            {"id", id},
-            {"name", name},
-            {"source_device_id", sourceDeviceId},
-            {"destination_device_id", destinationDeviceId},
-            {"instrument_id", instrumentId},
-            {"priority", priority},
-            {"enabled", enabled}
-        };
-        
-        if (!channelFilter.empty()) j["channel_filter"] = channelFilter;
-        if (!messageTypeFilter.empty()) j["message_type_filter"] = messageTypeFilter;
-        if (minNote.has_value()) j["min_note"] = minNote.value();
-        if (maxNote.has_value()) j["max_note"] = maxNote.value();
-        if (minVelocity.has_value()) j["min_velocity"] = minVelocity.value();
-        if (maxVelocity.has_value()) j["max_velocity"] = maxVelocity.value();
-        
-        return j;
-    }
-    
-    /**
-     * @brief Create from JSON
-     */
-    static MidiRoute fromJson(const json& j) {
-        MidiRoute route;
-        
-        route.id = j.value("id", "");
-        route.name = j.value("name", "");
-        route.sourceDeviceId = j.value("source_device_id", "");
-        route.destinationDeviceId = j.value("destination_device_id", "");
-        route.instrumentId = j.value("instrument_id", "");
-        route.priority = j.value("priority", 50);
-        route.enabled = j.value("enabled", true);
-        
-        if (j.contains("channel_filter")) {
-            route.channelFilter = j["channel_filter"].get<std::vector<uint8_t>>();
-        }
-        if (j.contains("message_type_filter")) {
-            route.messageTypeFilter = j["message_type_filter"].get<std::vector<std::string>>();
-        }
-        if (j.contains("min_note")) route.minNote = j["min_note"];
-        if (j.contains("max_note")) route.maxNote = j["max_note"];
-        if (j.contains("min_velocity")) route.minVelocity = j["min_velocity"];
-        if (j.contains("max_velocity")) route.maxVelocity = j["max_velocity"];
-        
-        return route;
-    }
 };
-
-// ============================================================================
-// STRUCTURE: RouteStatistics
-// ============================================================================
 
 /**
  * @struct RouteStatistics
- * @brief Statistics for a single route
+ * @brief Statistics for a specific route
  */
 struct RouteStatistics {
     std::string routeId;
     std::string routeName;
-    uint64_t messagesRouted;
-    uint64_t messagesDropped;
-    int64_t avgCompensation;
-    uint64_t lastMessageTime;
+    std::atomic<uint64_t> messagesRouted{0};
+    std::atomic<uint64_t> lastMessageTime{0};
+    std::atomic<int64_t> avgCompensation{0};
     
-    /**
-     * @brief Constructor
-     */
-    RouteStatistics()
-        : messagesRouted(0)
-        , messagesDropped(0)
-        , avgCompensation(0)
-        , lastMessageTime(0)
-    {}
-    
-    /**
-     * @brief Convert to JSON
-     */
     json toJson() const {
-        return {
+        return json{
             {"route_id", routeId},
             {"route_name", routeName},
-            {"messages_routed", messagesRouted},
-            {"messages_dropped", messagesDropped},
-            {"avg_compensation_us", avgCompensation},
-            {"last_message_time", lastMessageTime}
+            {"messages_routed", messagesRouted.load()},
+            {"last_message_time", lastMessageTime.load()},
+            {"avg_compensation_us", avgCompensation.load()}
         };
     }
+};
+
+/**
+ * @struct GlobalRoutingStatistics
+ * @brief Global routing statistics
+ */
+struct GlobalRoutingStatistics {
+    std::atomic<uint64_t> totalMessages{0};
+    std::atomic<uint64_t> routedMessages{0};
+    std::atomic<uint64_t> droppedMessages{0};
 };
 
 // ============================================================================
@@ -197,38 +98,14 @@ struct RouteStatistics {
 
 /**
  * @class MidiRouter
- * @brief Routes MIDI messages with filtering and latency compensation
+ * @brief Routes MIDI messages with filtering, transformation, and latency compensation
  * 
- * Thread Safety:
- * - All public methods are thread-safe
- * - Uses shared_mutex for read/write locking
+ * Thread Safety: All methods are thread-safe using shared_mutex for read/write locks.
  * 
- * Example:
- * ```cpp
- * MidiRouter router(latencyCompensator);
- * 
- * // Create route
- * MidiRoute route;
- * route.id = "piano_route";
- * route.sourceDeviceId = "keyboard";
- * route.destinationDeviceId = "synth";
- * route.instrumentId = "piano_001";
- * route.channelFilter = {0, 1};  // Channels 1-2
- * 
- * router.addRoute(std::make_shared<MidiRoute>(route));
- * 
- * // Route message
- * auto msg = MidiMessage::noteOn(0, 60, 100);
- * router.route(msg);
- * ```
+ * EventBus Integration: Publishes RouteAddedEvent and RouteRemovedEvent.
  */
 class MidiRouter {
 public:
-    // ========================================================================
-    // TYPE DEFINITIONS
-    // ========================================================================
-    
-    /// Message callback function
     using MessageCallback = std::function<void(const MidiMessage&, const std::string& deviceId)>;
     
     // ========================================================================
@@ -237,9 +114,11 @@ public:
     
     /**
      * @brief Constructor
-     * @param compensator Latency compensator (optional)
+     * @param compensator Optional latency compensator
+     * @param eventBus Optional EventBus for publishing events
      */
-    explicit MidiRouter(LatencyCompensator* compensator = nullptr);
+    explicit MidiRouter(LatencyCompensator* compensator = nullptr,
+                       std::shared_ptr<EventBus> eventBus = nullptr);
     
     /**
      * @brief Destructor
@@ -255,55 +134,96 @@ public:
     // ========================================================================
     
     /**
-     * @brief Route message through matching routes
-     * @param message MIDI message
-     * @note Applies filters, transformations, and latency compensation
+     * @brief Route a MIDI message through configured routes
+     * @param message MIDI message to route
      */
     void route(const MidiMessage& message);
     
     /**
-     * @brief Route message to specific device (bypass routes)
-     * @param message MIDI message
+     * @brief Route directly to a specific device (bypass routing table)
+     * @param message MIDI message to send
      * @param deviceId Destination device ID
      */
     void routeTo(const MidiMessage& message, const std::string& deviceId);
+    
+    /**
+     * @brief Set callback for routed messages
+     * @param callback Function to call when message is routed
+     */
+    void setMessageCallback(MessageCallback callback);
     
     // ========================================================================
     // ROUTE MANAGEMENT
     // ========================================================================
     
     /**
-     * @brief Add route
+     * @brief Add a route
      * @param route Route to add
      */
     void addRoute(std::shared_ptr<MidiRoute> route);
     
     /**
-     * @brief Remove route
+     * @brief Add a simple route (device to device)
+     * @param sourceDeviceId Source device ID (empty = any)
+     * @param destinationDeviceId Destination device ID
+     * @return bool true if added successfully
+     */
+    bool addRoute(const std::string& sourceDeviceId, 
+                  const std::string& destinationDeviceId);
+    
+    /**
+     * @brief Remove a route by ID
      * @param id Route ID
-     * @return true if removed
+     * @return bool true if removed
      */
     bool removeRoute(const std::string& id);
     
     /**
-     * @brief Get route by ID
+     * @brief Remove a route by device IDs
+     * @param sourceDeviceId Source device ID
+     * @param destinationDeviceId Destination device ID
+     * @return bool true if removed
+     */
+    bool removeRoute(const std::string& sourceDeviceId,
+                     const std::string& destinationDeviceId);
+    
+    /**
+     * @brief Get a route by ID
      * @param id Route ID
-     * @return Route or nullptr
+     * @return std::shared_ptr<MidiRoute> Route or nullptr
      */
     std::shared_ptr<MidiRoute> getRoute(const std::string& id) const;
     
     /**
      * @brief Get all routes
-     * @return Vector of routes
+     * @return std::vector<std::shared_ptr<MidiRoute>> All routes
      */
     std::vector<std::shared_ptr<MidiRoute>> getRoutes() const;
     
     /**
-     * @brief Enable/disable route
+     * @brief Enable/disable a route
      * @param id Route ID
-     * @param enabled State
+     * @param enabled true to enable, false to disable
      */
     void setRouteEnabled(const std::string& id, bool enabled);
+    
+    /**
+     * @brief Enable a route
+     * @param sourceDeviceId Source device ID
+     * @param destinationDeviceId Destination device ID
+     * @return bool true if enabled
+     */
+    bool enableRoute(const std::string& sourceDeviceId,
+                     const std::string& destinationDeviceId);
+    
+    /**
+     * @brief Disable a route
+     * @param sourceDeviceId Source device ID
+     * @param destinationDeviceId Destination device ID
+     * @return bool true if disabled
+     */
+    bool disableRoute(const std::string& sourceDeviceId,
+                      const std::string& destinationDeviceId);
     
     /**
      * @brief Clear all routes
@@ -315,21 +235,21 @@ public:
     // ========================================================================
     
     /**
-     * @brief Register device
+     * @brief Register a MIDI device
      * @param device Device to register
      */
     void registerDevice(std::shared_ptr<MidiDevice> device);
     
     /**
-     * @brief Unregister device
+     * @brief Unregister a MIDI device
      * @param deviceId Device ID
      */
     void unregisterDevice(const std::string& deviceId);
     
     /**
-     * @brief Get device
+     * @brief Get a registered device
      * @param deviceId Device ID
-     * @return Device or nullptr
+     * @return std::shared_ptr<MidiDevice> Device or nullptr
      */
     std::shared_ptr<MidiDevice> getDevice(const std::string& deviceId) const;
     
@@ -339,26 +259,21 @@ public:
     
     /**
      * @brief Set latency compensator
-     * @param compensator Compensator instance
+     * @param compensator Latency compensator
      */
-    void setLatencyCompensator(LatencyCompensator* compensator) {
-        compensator_ = compensator;
-    }
+    void setLatencyCompensator(LatencyCompensator* compensator);
     
     /**
-     * @brief Enable/disable instrument compensation
-     * @param enabled State
+     * @brief Enable/disable instrument-specific compensation
+     * @param enabled true to enable
      */
-    void setInstrumentCompensationEnabled(bool enabled) {
-        instrumentCompensationEnabled_ = enabled;
-    }
+    void setInstrumentCompensationEnabled(bool enabled);
     
     /**
      * @brief Check if instrument compensation is enabled
+     * @return bool true if enabled
      */
-    bool isInstrumentCompensationEnabled() const {
-        return instrumentCompensationEnabled_;
-    }
+    bool isInstrumentCompensationEnabled() const;
     
     // ========================================================================
     // STATISTICS
@@ -367,13 +282,13 @@ public:
     /**
      * @brief Get route statistics
      * @param routeId Route ID
-     * @return Statistics
+     * @return RouteStatistics Statistics for the route
      */
     RouteStatistics getRouteStatistics(const std::string& routeId) const;
     
     /**
-     * @brief Get all statistics
-     * @return JSON with all stats
+     * @brief Get global statistics
+     * @return json Statistics as JSON
      */
     json getStatistics() const;
     
@@ -383,17 +298,15 @@ public:
     void resetStatistics();
     
     // ========================================================================
-    // CALLBACKS
+    // EVENTBUS
     // ========================================================================
     
     /**
-     * @brief Set message callback
-     * @param callback Callback function
+     * @brief Set EventBus for publishing events
+     * @param eventBus EventBus instance
      */
-    void setMessageCallback(MessageCallback callback) {
-        messageCallback_ = callback;
-    }
-    
+    void setEventBus(std::shared_ptr<EventBus> eventBus);
+
 private:
     // ========================================================================
     // PRIVATE METHODS
@@ -407,7 +320,8 @@ private:
     /**
      * @brief Apply transformations to message
      */
-    MidiMessage applyTransformations(const MidiMessage& message, const MidiRoute& route) const;
+    MidiMessage applyTransformations(const MidiMessage& message, 
+                                    const MidiRoute& route) const;
     
     /**
      * @brief Get compensation for route
@@ -428,33 +342,37 @@ private:
     // MEMBER VARIABLES
     // ========================================================================
     
-    /// Routes (sorted by priority)
+    /// Routes
     std::vector<std::shared_ptr<MidiRoute>> routes_;
     
-    /// Devices (deviceId -> device)
+    /// Registered devices
     std::unordered_map<std::string, std::shared_ptr<MidiDevice>> devices_;
     
-    /// Route statistics (routeId -> stats)
-    mutable std::unordered_map<std::string, RouteStatistics> routeStats_;
+    /// Route statistics
+    std::unordered_map<std::string, RouteStatistics> routeStats_;
+    
+    /// Global statistics
+    GlobalRoutingStatistics globalStats_;
     
     /// Latency compensator
-    LatencyCompensator* compensator_;
+    std::atomic<LatencyCompensator*> compensator_;
     
     /// Instrument compensation enabled
-    bool instrumentCompensationEnabled_;
+    std::atomic<bool> instrumentCompensationEnabled_;
     
     /// Message callback
     MessageCallback messageCallback_;
+    std::mutex callbackMutex_;
     
-    /// Read/write mutex
+    /// Thread safety
     mutable std::shared_mutex mutex_;
     
-    /// Global statistics
-    struct {
-        uint64_t totalMessages;
-        uint64_t routedMessages;
-        uint64_t droppedMessages;
-    } globalStats_;
+    /// EventBus for publishing events
+    std::shared_ptr<EventBus> eventBus_;
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE MidiRouter.h
+// ============================================================================

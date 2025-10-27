@@ -26,21 +26,39 @@
 // Date: 2025-10-16
 //
 // Changes v4.1.0:
-//   - Updated to use FileManager::Unsafe namespace
-//   - Enhanced path validation
+//   - Enhanced path validation and permissions checks
 //   - Added migration paths
 //   - Thread-safe operations
+//   - joinPath() moved to free function
 //
 // ============================================================================
 
 #pragma once
 
 #include <string>
+#include <vector>
 #include <mutex>
 #include "../core/Logger.h"
 #include "FileManager.h"
 
 namespace midiMind {
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * @brief Join path components
+ * @param parts Path components to join
+ * @return Joined path with platform-specific separator
+ * @note Handles leading/trailing slashes correctly
+ * @note Thread-safe (no shared state)
+ */
+std::string joinPath(const std::vector<std::string>& parts);
+
+// ============================================================================
+// CLASS: PathManager
+// ============================================================================
 
 /**
  * @class PathManager
@@ -49,6 +67,11 @@ namespace midiMind {
  * Singleton class that manages all filesystem paths used by MidiMind.
  * Ensures consistent path structure across the application.
  * 
+ * Base Path Selection:
+ * - Production: /var/lib/midimind (if writable)
+ * - Development: $HOME/MidiMind (fallback)
+ * - Can be changed with setBasePath() after construction
+ * 
  * Thread Safety:
  * - All public methods are thread-safe
  * - Uses internal mutex for synchronization
@@ -56,7 +79,7 @@ namespace midiMind {
  * Example:
  * ```cpp
  * PathManager& pm = PathManager::instance();
- * pm.initialize();
+ * pm.initialize();  // Creates directories and checks permissions
  * 
  * std::string configPath = pm.getConfigFilePath();
  * std::string dbPath = pm.getDatabasePath();
@@ -72,6 +95,7 @@ public:
     /**
      * @brief Get singleton instance
      * @return Reference to PathManager instance
+     * @note Thread-safe initialization guaranteed by C++11
      */
     static PathManager& instance();
     
@@ -86,7 +110,9 @@ public:
     /**
      * @brief Initialize directory structure
      * @note Creates all required directories
+     * @note Validates write permissions on each directory
      * @note Thread-safe
+     * @throws May log errors if directory creation fails
      */
     void initialize();
     
@@ -94,6 +120,7 @@ public:
      * @brief Set base path
      * @param basePath Base directory path (default: /var/lib/midimind)
      * @note Thread-safe
+     * @warning Changing base path after initialize() may cause issues
      */
     void setBasePath(const std::string& basePath);
     
@@ -190,6 +217,7 @@ public:
      * @brief Get current log file path
      * @return Path to current log file (dated)
      * @note Format: midimind_YYYY-MM-DD.log
+     * @note Returns empty string if time functions fail
      */
     std::string getLogFilePath() const;
     
@@ -205,7 +233,7 @@ public:
     
     /**
      * @brief Create database backup
-     * @return Path to created backup file
+     * @return Path to created backup file (empty string on failure)
      * @note Format: midimind_YYYY-MM-DD_HH-MM-SS.db
      * @note Thread-safe
      */
@@ -221,16 +249,9 @@ public:
      * @param maxAgeDays Maximum file age in days
      * @return Number of files deleted
      * @note Thread-safe
+     * @note Skips files that cannot be stat()'d or deleted
      */
     int cleanOldFiles(const std::string& directory, int maxAgeDays);
-    
-    /**
-     * @brief Join path components
-     * @param parts Path components to join
-     * @return Joined path
-     * @note Uses platform-specific separator
-     */
-    static std::string joinPath(const std::vector<std::string>& parts);
     
 private:
     // ========================================================================
@@ -244,7 +265,7 @@ private:
     // MEMBER VARIABLES
     // ========================================================================
     
-    /// Base path for all application data
+    /// Base path for all application data (can be changed via setBasePath)
     std::string basePath_;
     
     /// Mutex for thread-safety

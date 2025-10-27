@@ -11,9 +11,11 @@
 // Date: 2025-10-16
 //
 // Changes v4.1.0:
-//   - Simplified implementation
-//   - Better drift compensation algorithm
-//   - Enhanced logging
+//   - Fixed race condition in start() (check started_ inside lock)
+//   - Changed drift storage to int64_t (nano-ppm) for lock-free guarantee
+//   - Added epsilon checks before divisions
+//   - Improved drift compensation algorithm to avoid floating-point accumulation
+//   - Renamed mutex_ → controlMutex_
 //
 // ============================================================================
 
@@ -21,14 +23,26 @@
 #include "../core/Logger.h"
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 namespace midiMind {
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Minimum time value to avoid division by near-zero
+static constexpr uint64_t EPSILON_US = 1;
+
+// Conversion factor: ppm to nano-ppm (for integer atomic storage)
+static constexpr int64_t PPM_TO_NANO_PPM = 1000;
 
 // ============================================================================
 // SINGLETON
 // ============================================================================
 
 TimestampManager& TimestampManager::instance() {
+    // Thread-safe initialization guaranteed by C++11
     static TimestampManager instance;
     return instance;
 }
@@ -42,7 +56,7 @@ TimestampManager::TimestampManager()
     , started_(false)
     , syncOffset_(0)
     , driftCompensationEnabled_(false)
-    , driftFactor_(0.0)
+    , driftFactorNanoPpm_(0)
     , lastDriftMeasurement_(0)
 {
     Logger::info("TimestampManager", "TimestampManager created");
@@ -53,9 +67,10 @@ TimestampManager::TimestampManager()
 // ============================================================================
 
 void TimestampManager::start() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(controlMutex_);
     
-    if (started_.load(std::memory_order_acquire)) {
+    // Check started_ AFTER acquiring lock to avoid race condition
+    if (started_.load(std::memory_order_relaxed)) {
         Logger::warning("TimestampManager", "Already started");
         return;
     }
@@ -69,7 +84,7 @@ void TimestampManager::start() {
 }
 
 void TimestampManager::reset() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(controlMutex_);
     
     Logger::info("TimestampManager", "Resetting timestamp manager");
     
@@ -78,7 +93,7 @@ void TimestampManager::reset() {
     
     // Reset corrections
     syncOffset_.store(0, std::memory_order_release);
-    driftFactor_.store(0.0, std::memory_order_release);
+    driftFactorNanoPpm_.store(0, std::memory_order_release);
     lastDriftMeasurement_.store(0, std::memory_order_release);
     
     Logger::info("TimestampManager", "✓ Reset complete");
@@ -111,6 +126,18 @@ uint64_t TimestampManager::systemNow() const {
 // DRIFT COMPENSATION
 // ============================================================================
 
+void TimestampManager::setDriftFactor(double driftPpm) {
+    // Convert ppm to nano-ppm and store as int64_t for lock-free atomic
+    int64_t nanoPpm = static_cast<int64_t>(driftPpm * PPM_TO_NANO_PPM);
+    driftFactorNanoPpm_.store(nanoPpm, std::memory_order_release);
+}
+
+double TimestampManager::getDriftFactor() const {
+    // Convert nano-ppm back to ppm
+    int64_t nanoPpm = driftFactorNanoPpm_.load(std::memory_order_acquire);
+    return static_cast<double>(nanoPpm) / PPM_TO_NANO_PPM;
+}
+
 double TimestampManager::calculateDrift() const {
     if (!started_.load(std::memory_order_acquire)) {
         return 0.0;
@@ -128,7 +155,7 @@ double TimestampManager::calculateDrift() const {
     // Calculate drift since last measurement
     uint64_t elapsed = currentTime - lastMeasurement;
     
-    if (elapsed == 0) {
+    if (elapsed < EPSILON_US) {
         return 0.0;
     }
     
@@ -141,9 +168,11 @@ double TimestampManager::calculateDrift() const {
     // drift = (rawElapsed - correctedElapsed) / correctedElapsed * 1000000
     double drift = 0.0;
     
-    if (currentTime > 0) {
-        drift = static_cast<double>(rawElapsed - currentTime) / 
-                static_cast<double>(currentTime) * 1000000.0;
+    // Ensure we don't divide by near-zero
+    if (currentTime > EPSILON_US) {
+        double rawElapsedD = static_cast<double>(rawElapsed);
+        double currentTimeD = static_cast<double>(currentTime);
+        drift = (rawElapsedD - currentTimeD) / currentTimeD * 1000000.0;
     }
     
     // Update last measurement
@@ -169,7 +198,7 @@ std::string TimestampManager::getStats() const {
     oss << "  Drift compensation: " 
         << (driftCompensationEnabled_.load() ? "ENABLED" : "DISABLED") << "\n";
     oss << "  Drift factor: " << std::fixed << std::setprecision(2)
-        << driftFactor_.load() << " ppm\n";
+        << getDriftFactor() << " ppm\n";
     
     return oss.str();
 }
@@ -198,13 +227,30 @@ uint64_t TimestampManager::applyCorrections(uint64_t raw) const {
     
     // Apply drift compensation if enabled
     if (driftCompensationEnabled_.load(std::memory_order_acquire)) {
-        double drift = driftFactor_.load(std::memory_order_acquire);
+        int64_t nanoPpm = driftFactorNanoPpm_.load(std::memory_order_acquire);
         
-        // drift is in ppm (parts per million)
-        // Apply correction: corrected * (1 + drift/1000000)
-        corrected = static_cast<int64_t>(
-            corrected * (1.0 + drift / 1000000.0)
-        );
+        if (nanoPpm != 0 && corrected > 0) {
+            // Convert nano-ppm to correction factor
+            // correction = time * (drift_nano_ppm / 1000000000)
+            // 
+            // To avoid floating-point accumulation and overflow, split calculation:
+            // corrected_new = corrected + (corrected / 1000) * (drift_nano_ppm / 1000000)
+            //
+            // This limits intermediate values and prevents overflow on 64-bit platforms
+            
+            int64_t correctedMs = corrected / 1000;  // Convert to milliseconds
+            int64_t driftPpm = nanoPpm / 1000000;    // Convert nano-ppm to ppm/1000
+            
+            // Calculate correction in microseconds
+            int64_t correction = (correctedMs * driftPpm) / 1000;
+            
+            corrected += correction;
+            
+            // Ensure result is still positive after correction
+            if (corrected < 0) {
+                corrected = 0;
+            }
+        }
     }
     
     return static_cast<uint64_t>(corrected);

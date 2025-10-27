@@ -5,8 +5,10 @@
 // ============================================================================
 //
 // Changes v4.1.2:
-//   - Fixed unused variable warning in resetStatistics()
-//   - Added [[maybe_unused]] attribute to suppress warning
+//   - Fixed deadlock issues with callbacks
+//   - Fixed double-locking issues with chain methods
+//   - Removed unnecessary empty loop in resetStatistics
+//   - process() no longer holds mutex during long operations
 //
 // ============================================================================
 
@@ -30,6 +32,7 @@ ProcessorManager::ProcessorManager()
     Logger::info("ProcessorManager", "  Initializing ProcessorManager");
     Logger::info("ProcessorManager", "========================================");
     
+    // Safe to call without mutex - we're in constructor
     initializePresets();
     
     Logger::info("ProcessorManager", "✓ ProcessorManager initialized");
@@ -47,26 +50,41 @@ std::vector<MidiMessage> ProcessorManager::processMessage(
     const MidiMessage& input,
     const std::string& chainId)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
-        return {input};
+    // FIX: Copy chain pointer under lock, then process without lock
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return {input};
+        }
+        
+        chain = it->second;
+        if (!chain) {
+            return {input};
+        }
     }
     
-    auto chain = it->second;
-    if (!chain || !chain->isEnabled()) {
+    // Process without holding mutex_ (chain->process is thread-safe)
+    if (!chain->isEnabled()) {
         return {input};
     }
     
     auto outputs = chain->process(input);
     messagesProcessed_++;
     
-    // Call output callback if set
-    if (messageOutputCallback_) {
+    // FIX: Copy callback and call without holding any lock
+    MessageOutputCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(callbackMutex_);
+        callback = messageOutputCallback_;
+    }
+    
+    if (callback) {
         for (const auto& output : outputs) {
-            messageOutputCallback_(output, chainId);
+            callback(output, chainId);
         }
     }
     
@@ -76,12 +94,22 @@ std::vector<MidiMessage> ProcessorManager::processMessage(
 std::map<std::string, std::vector<MidiMessage>> 
 ProcessorManager::processMessageAllChains(const MidiMessage& input)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Copy all chains under lock, then process without lock
+    std::vector<std::pair<std::string, std::shared_ptr<ProcessorChain>>> chainsCopy;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        chainsCopy.reserve(chains_.size());
+        for (const auto& [chainId, chain] : chains_) {
+            if (chain) {
+                chainsCopy.emplace_back(chainId, chain);
+            }
+        }
+    }
     
     std::map<std::string, std::vector<MidiMessage>> results;
     
-    for (const auto& [chainId, chain] : chains_) {
-        if (chain && chain->isEnabled()) {
+    for (const auto& [chainId, chain] : chainsCopy) {
+        if (chain->isEnabled()) {
             results[chainId] = chain->process(input);
         }
     }
@@ -156,15 +184,26 @@ std::vector<std::string> ProcessorManager::listChains() const {
 bool ProcessorManager::renameChain(const std::string& chainId, 
                                    const std::string& newName)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Get chain pointer, then call setName without holding manager mutex
+    // (setName has its own mutex in ProcessorChain)
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
+    }
     
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+    if (!chain) {
         return false;
     }
     
-    it->second->setName(newName);
+    chain->setName(newName);
     
     Logger::info("ProcessorManager", 
                 "Renamed chain " + chainId + " to: " + newName);
@@ -173,15 +212,26 @@ bool ProcessorManager::renameChain(const std::string& chainId,
 }
 
 bool ProcessorManager::setChainEnabled(const std::string& chainId, bool enabled) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Get chain pointer, then call setEnabled without holding manager mutex
+    // (setEnabled is atomic in ProcessorChain)
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
+    }
     
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+    if (!chain) {
         return false;
     }
     
-    it->second->setEnabled(enabled);
+    chain->setEnabled(enabled);
     
     Logger::info("ProcessorManager", 
                 "Chain " + chainId + " " + 
@@ -200,8 +250,8 @@ std::shared_ptr<MidiProcessor> ProcessorManager::createProcessor(
 {
     std::shared_ptr<MidiProcessor> processor;
     
-    // TODO: Implement actual processor creation when processor classes are available
-    // For now, return nullptr with logging
+    // NOTE: This is a stub implementation. Concrete processor classes
+    // need to be implemented. For now, we log the attempt and return nullptr.
     
     std::string typeName;
     switch (type) {
@@ -255,7 +305,13 @@ std::shared_ptr<MidiProcessor> ProcessorManager::createProcessor(
     
     // Apply configuration if processor was created
     if (processor && !config.empty()) {
-        processor->fromJson(config);
+        try {
+            processor->fromJson(config);
+        } catch (const std::exception& e) {
+            Logger::error("ProcessorManager", 
+                "Failed to configure processor: " + std::string(e.what()));
+            return nullptr;
+        }
     }
     
     return processor;
@@ -265,73 +321,103 @@ bool ProcessorManager::addProcessorToChain(
     const std::string& chainId,
     std::shared_ptr<MidiProcessor> processor)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
-        return false;
-    }
-    
     if (!processor) {
         Logger::error("ProcessorManager", "Cannot add null processor");
         return false;
     }
     
-    bool added = it->second->addProcessor(processor);
-    
-    if (added) {
-        Logger::info("ProcessorManager", 
-                    "Added processor to chain " + chainId);
+    // FIX: Get chain pointer, then call addProcessor without holding manager mutex
+    // (addProcessor has its own mutex in ProcessorChain)
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
     }
     
-    return added;
+    if (!chain) {
+        return false;
+    }
+    
+    bool success = chain->addProcessor(processor);
+    
+    if (success) {
+        Logger::info("ProcessorManager", 
+                    "Added processor to chain: " + chainId);
+    }
+    
+    return success;
 }
 
 bool ProcessorManager::removeProcessorFromChain(
     const std::string& chainId,
     size_t processorIndex)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Get chain pointer, then call removeProcessor without holding manager mutex
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
+    }
     
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+    if (!chain) {
         return false;
     }
     
-    bool removed = it->second->removeProcessor(processorIndex);
+    bool success = chain->removeProcessor(processorIndex);
     
-    if (removed) {
+    if (success) {
         Logger::info("ProcessorManager", 
-                    "Removed processor " + std::to_string(processorIndex) + 
-                    " from chain " + chainId);
+                    "Removed processor from chain: " + chainId);
     }
     
-    return removed;
+    return success;
 }
 
-bool ProcessorManager::moveProcessor(const std::string& chainId,
-                                    size_t fromIndex,
-                                    size_t toIndex)
+bool ProcessorManager::moveProcessor(
+    const std::string& chainId,
+    size_t fromIndex,
+    size_t toIndex)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Get chain pointer, then call moveProcessor without holding manager mutex
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
+    }
     
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+    if (!chain) {
         return false;
     }
     
-    bool moved = it->second->moveProcessor(fromIndex, toIndex);
+    bool success = chain->moveProcessor(fromIndex, toIndex);
     
-    if (moved) {
+    if (success) {
         Logger::info("ProcessorManager", 
-                    "Moved processor in chain " + chainId + " from " + 
-                    std::to_string(fromIndex) + " to " + std::to_string(toIndex));
+                    "Moved processor in chain: " + chainId);
     }
     
-    return moved;
+    return success;
 }
 
 // ============================================================================
@@ -343,28 +429,25 @@ std::string ProcessorManager::loadPreset(const std::string& presetName) {
     
     auto it = presets_.find(presetName);
     if (it == presets_.end()) {
-        Logger::warning("ProcessorManager", "Preset not found: " + presetName);
+        Logger::error("ProcessorManager", "Preset not found: " + presetName);
         return "";
     }
     
-    const json& presetConfig = it->second;
+    const json& preset = it->second;
     
-    // Create chain
+    std::string name = preset.value("name", presetName);
     std::string chainId = generateChainId();
-    std::string chainName = presetConfig.value("name", presetName);
     
-    auto chain = std::make_shared<ProcessorChain>(chainName);
+    auto chain = std::make_shared<ProcessorChain>(name);
     
-    // Add processors from preset
-    if (presetConfig.contains("processors") && 
-        presetConfig["processors"].is_array()) {
-        
-        for (const auto& processorConfig : presetConfig["processors"]) {
-            std::string type = processorConfig.value("type", "");
+    // Load processors from preset
+    if (preset.contains("processors") && preset["processors"].is_array()) {
+        for (const auto& procConfig : preset["processors"]) {
+            std::string type = procConfig.value("type", "");
             
             auto processor = createProcessorFromType(type);
             if (processor) {
-                processor->fromJson(processorConfig);
+                processor->fromJson(procConfig);
                 chain->addProcessor(processor);
             }
         }
@@ -384,28 +467,45 @@ std::vector<std::string> ProcessorManager::listPresets() const {
     std::vector<std::string> presetNames;
     presetNames.reserve(presets_.size());
     
-    for (const auto& [name, config] : presets_) {
+    for (const auto& [name, preset] : presets_) {
         presetNames.push_back(name);
     }
     
     return presetNames;
 }
 
-bool ProcessorManager::savePreset(const std::string& chainId,
+bool ProcessorManager::savePreset(const std::string& chainId, 
                                   const std::string& presetName)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // FIX: Get chain pointer, call toJson, then store under lock
+    std::shared_ptr<ProcessorChain> chain;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = chains_.find(chainId);
+        if (it == chains_.end()) {
+            Logger::error("ProcessorManager", "Chain not found: " + chainId);
+            return false;
+        }
+        
+        chain = it->second;
+    }
     
-    auto it = chains_.find(chainId);
-    if (it == chains_.end()) {
-        Logger::warning("ProcessorManager", "Chain not found: " + chainId);
+    if (!chain) {
         return false;
     }
     
-    presets_[presetName] = it->second->toJson();
+    // Call toJson without holding manager mutex (chain has its own mutex)
+    json presetJson = chain->toJson();
+    
+    // Store preset
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        presets_[presetName] = presetJson;
+    }
     
     Logger::info("ProcessorManager", 
-                "Saved preset: " + presetName + " from chain " + chainId);
+                "Saved preset: " + presetName + " from chain: " + chainId);
     
     return true;
 }
@@ -431,11 +531,14 @@ bool ProcessorManager::deletePreset(const std::string& presetName) {
 // ============================================================================
 
 bool ProcessorManager::saveToFile(const std::string& filepath) const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Get JSON without holding mutex during file I/O
+    json j;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        j = toJson();
+    }
     
     try {
-        json j = toJson();
-        
         std::ofstream file(filepath);
         if (!file.is_open()) {
             Logger::error("ProcessorManager", 
@@ -488,8 +591,10 @@ bool ProcessorManager::loadFromFile(const std::string& filepath) {
 json ProcessorManager::toJson() const {
     json j;
     
+    // FIX: chains_ already protected by caller's mutex lock
     j["chains"] = json::object();
     for (const auto& [chainId, chain] : chains_) {
+        // chain->toJson() is thread-safe (has its own mutex)
         j["chains"][chainId] = chain->toJson();
     }
     
@@ -512,6 +617,7 @@ void ProcessorManager::fromJson(const json& j) {
             for (auto& [chainId, chainConfig] : j["chains"].items()) {
                 
                 auto chain = std::make_shared<ProcessorChain>();
+                // chain->fromJson() is thread-safe (has its own mutex)
                 chain->fromJson(chainConfig);
                 
                 chains_[chainId] = chain;
@@ -537,7 +643,7 @@ void ProcessorManager::fromJson(const json& j) {
 // ============================================================================
 
 void ProcessorManager::setMessageOutputCallback(MessageOutputCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(callbackMutex_);
     messageOutputCallback_ = callback;
 }
 
@@ -567,15 +673,10 @@ json ProcessorManager::getStatistics() const {
 }
 
 void ProcessorManager::resetStatistics() {
+    // FIX: Removed unnecessary empty loop
     std::lock_guard<std::mutex> lock(mutex_);
     
     messagesProcessed_ = 0;
-    
-    // ✅ CORRIGÉ: Suppression du warning pour variable non utilisée
-    for ([[maybe_unused]] auto& [id, chain] : chains_) {
-        // Reset chain statistics if implemented
-        // Pour l'instant, on ne fait rien avec id et chain
-    }
     
     Logger::info("ProcessorManager", "Statistics reset");
 }
@@ -590,6 +691,7 @@ std::string ProcessorManager::generateChainId() {
 }
 
 void ProcessorManager::initializePresets() {
+    // Note: Called from constructor, no mutex needed
     Logger::info("ProcessorManager", "Initializing presets...");
     
     // Preset: Transpose Up
@@ -662,7 +764,8 @@ void ProcessorManager::initializePresets() {
 std::shared_ptr<MidiProcessor> ProcessorManager::createProcessorFromType(
     const std::string& type)
 {
-    // TODO: Implement when processor classes are available
+    // NOTE: This is a stub implementation. Will be implemented when
+    // concrete processor classes are available.
     Logger::warning("ProcessorManager", 
                 "Processor creation not yet implemented: " + type);
     return nullptr;

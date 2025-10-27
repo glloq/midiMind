@@ -16,6 +16,8 @@
 //   - Complete validation implementation
 //   - Automatic End-of-Track insertion
 //   - Running status optimization
+//   - Performance improvements (reduced copies)
+//   - Safety improvements in VLQ encoding
 //
 // ============================================================================
 
@@ -91,7 +93,8 @@ std::vector<uint8_t> MidiFileWriter::writeToBuffer(const MidiFile& midiFile) {
     
     writeToStream(buffer, midiFile);
     
-    std::string str = buffer.str();
+    // Use move semantics to avoid copy
+    std::string str = std::move(buffer.str());
     std::vector<uint8_t> result(str.begin(), str.end());
     
     Logger::debug("MidiFileWriter",
@@ -102,6 +105,9 @@ std::vector<uint8_t> MidiFileWriter::writeToBuffer(const MidiFile& midiFile) {
 
 bool MidiFileWriter::validate(const MidiFile& midiFile, 
                               std::string& errorMessage) const {
+    // Clear error message at start
+    errorMessage.clear();
+    
     // Check format
     if (midiFile.header.format > 2) {
         errorMessage = "Invalid format: " + 
@@ -161,16 +167,20 @@ void MidiFileWriter::writeToStream(std::ostream& stream,
     
     // Write tracks
     for (const auto& track : midiFile.tracks) {
-        MidiTrack trackToWrite = track;
-        
-        // Add End-of-Track if needed
-        if (autoEndOfTrack_ && !hasEndOfTrack(trackToWrite)) {
+        // Check if we need to add End-of-Track
+        if (autoEndOfTrack_ && !hasEndOfTrack(track)) {
             Logger::debug("MidiFileWriter", "Adding End-of-Track");
+            
+            // Create modified track with End-of-Track
+            MidiTrack trackCopy = track;
             MidiEvent endEvent = createEndOfTrackEvent(0);
-            trackToWrite.events.push_back(endEvent);
+            trackCopy.events.push_back(endEvent);
+            
+            writeTrack(stream, trackCopy);
+        } else {
+            // Write track as-is without copy
+            writeTrack(stream, track);
         }
-        
-        writeTrack(stream, trackToWrite);
     }
 }
 
@@ -255,8 +265,8 @@ void MidiFileWriter::writeTrack(std::ostream& stream, const MidiTrack& track) {
         eventsWritten_++;
     }
     
-    // Get track data as string
-    std::string trackDataStr = trackData.str();
+    // Get track data as string (use move to avoid copy)
+    std::string trackDataStr = std::move(trackData.str());
     
     // Write track length
     writeUint32BE(stream, static_cast<uint32_t>(trackDataStr.size()));
@@ -291,6 +301,14 @@ void MidiFileWriter::writeUint16BE(std::ostream& stream, uint16_t value) {
 
 void MidiFileWriter::writeVLQ(std::ostream& stream, uint32_t value) {
     // Variable Length Quantity encoding (MIDI standard)
+    // Maximum 4 bytes: 0x0FFFFFFF (268,435,455)
+    
+    // Check if value is within valid range for VLQ
+    if (value > 0x0FFFFFFF) {
+        THROW_ERROR(ErrorCode::INVALID_ARGUMENT, 
+                   "Value too large for MIDI VLQ encoding: " + std::to_string(value));
+    }
+    
     uint32_t buffer = value & 0x7F;
     
     while ((value >>= 7) > 0) {
@@ -299,16 +317,26 @@ void MidiFileWriter::writeVLQ(std::ostream& stream, uint32_t value) {
         buffer += (value & 0x7F);
     }
     
-    // Write bytes
-    while (true) {
+    // Write bytes with safety counter to prevent infinite loop
+    int bytesWritten = 0;
+    const int MAX_VLQ_BYTES = 4;
+    
+    while (bytesWritten < MAX_VLQ_BYTES) {
         stream.put(static_cast<char>(buffer & 0xFF));
         bytesWritten_++;
+        bytesWritten++;
         
         if (buffer & 0x80) {
             buffer >>= 8;
         } else {
             break;
         }
+    }
+    
+    // This should never happen with proper input validation, but catch it
+    if (bytesWritten >= MAX_VLQ_BYTES && (buffer & 0x80)) {
+        THROW_ERROR(ErrorCode::INTERNAL_ERROR, 
+                   "VLQ encoding exceeded maximum bytes");
     }
 }
 

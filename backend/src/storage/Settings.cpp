@@ -11,9 +11,10 @@
 // Date: 2025-10-16
 //
 // Changes v4.1.0:
-//   - Simplified implementation
-//   - Better error handling
-//   - Enhanced logging
+//   - Changed cache from std::map to std::unordered_map
+//   - Added safe row field access with contains() check
+//   - Fixed ::tolower to use static_cast<unsigned char> for safety
+//   - Enhanced error handling
 //
 // ============================================================================
 
@@ -57,6 +58,12 @@ bool Settings::load() {
         
         size_t count = 0;
         for (const auto& row : result.rows) {
+            // Safely check if required fields exist
+            if (row.count("key") == 0 || row.count("value") == 0) {
+                Logger::warning("Settings", "Row missing required fields, skipping");
+                continue;
+            }
+            
             std::string key = row.at("key");
             std::string value = row.at("value");
             
@@ -81,9 +88,8 @@ bool Settings::save() {
     int count = 0;
     
     bool success = database_.transaction([this, &count]() {
-        // ✅ Utiliser cache_ au lieu de settings_
         for (const auto& [key, value] : cache_) {
-            // ✅ Construire explicitement le vecteur
+            // Construct parameter vector explicitly
             std::vector<std::string> params;
             params.push_back(key);
             params.push_back(value);
@@ -144,8 +150,11 @@ int Settings::getInt(const std::string& key, int defaultValue) {
     if (it != cache_.end()) {
         try {
             return std::stoi(it->second);
-        } catch (const std::exception& e) {
+        } catch (const std::invalid_argument& e) {
             Logger::warning("Settings", "Invalid int for '" + key + "': " + it->second);
+            return defaultValue;
+        } catch (const std::out_of_range& e) {
+            Logger::warning("Settings", "Int out of range for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
@@ -161,7 +170,9 @@ bool Settings::getBool(const std::string& key, bool defaultValue) {
         std::string value = it->second;
         
         // Convert to lowercase for comparison
-        std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+        // Use static_cast<unsigned char> to avoid undefined behavior with negative chars
+        std::transform(value.begin(), value.end(), value.begin(), 
+                      [](unsigned char c) { return std::tolower(c); });
         
         if (value == "true" || value == "1" || value == "yes" || value == "on") {
             return true;
@@ -184,8 +195,11 @@ double Settings::getDouble(const std::string& key, double defaultValue) {
     if (it != cache_.end()) {
         try {
             return std::stod(it->second);
-        } catch (const std::exception& e) {
+        } catch (const std::invalid_argument& e) {
             Logger::warning("Settings", "Invalid double for '" + key + "': " + it->second);
+            return defaultValue;
+        } catch (const std::out_of_range& e) {
+            Logger::warning("Settings", "Double out of range for '" + key + "': " + it->second);
             return defaultValue;
         }
     }
@@ -200,8 +214,13 @@ json Settings::getJson(const std::string& key, const json& defaultValue) {
     if (it != cache_.end()) {
         try {
             return json::parse(it->second);
+        } catch (const json::parse_error& e) {
+            Logger::warning("Settings", "Invalid JSON for '" + key + "': " + 
+                          std::string(e.what()));
+            return defaultValue;
         } catch (const std::exception& e) {
-            Logger::warning("Settings", "Invalid JSON for '" + key + "': " + it->second);
+            Logger::warning("Settings", "Error parsing JSON for '" + key + "': " + 
+                          std::string(e.what()));
             return defaultValue;
         }
     }

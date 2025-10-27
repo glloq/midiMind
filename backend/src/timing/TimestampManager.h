@@ -22,7 +22,8 @@
 //   - Simplified API
 //   - Enhanced precision
 //   - Better drift compensation
-//   - Removed unused features
+//   - Fixed atomic<double> → atomic<int64_t> for lock-free guarantee
+//   - Documented precision loss in ms conversions
 //
 // ============================================================================
 
@@ -57,10 +58,12 @@ namespace midiMind {
  * Thread Safety:
  * - All public methods are thread-safe
  * - Uses atomic operations for performance
+ * - Singleton initialization is thread-safe (C++11 guarantee)
  * 
  * Precision:
  * - Typical: < 1µs on Raspberry Pi 4
  * - Used for high-precision latency measurements
+ * - Note: ms conversions truncate precision (1000µs → 1ms)
  * 
  * Example:
  * ```cpp
@@ -70,7 +73,7 @@ namespace midiMind {
  * // Get current timestamp (microseconds)
  * uint64_t now = tm.now();
  * 
- * // Get current timestamp (milliseconds)
+ * // Get current timestamp (milliseconds - precision loss)
  * uint64_t nowMs = tm.nowMs();
  * 
  * // Calculate elapsed time
@@ -86,6 +89,7 @@ public:
     /**
      * @brief Get singleton instance
      * @return Reference to TimestampManager instance
+     * @note Thread-safe initialization guaranteed by C++11
      */
     static TimestampManager& instance();
     
@@ -101,12 +105,14 @@ public:
      * @brief Start the reference clock
      * @note Sets reference point (t=0)
      * @note Should be called once at application startup
+     * @note Thread-safe: multiple calls are safe, only first has effect
      */
     void start();
     
     /**
      * @brief Reset the clock
      * @note Resets counter to zero
+     * @note Thread-safe
      */
     void reset();
     
@@ -126,6 +132,7 @@ public:
      * @brief Get current timestamp in microseconds
      * @return uint64_t Microseconds since start()
      * @note Typical precision: < 1µs on Raspberry Pi 4
+     * @note Returns 0 if not started
      */
     uint64_t now() const;
     
@@ -142,6 +149,8 @@ public:
     /**
      * @brief Get current timestamp in milliseconds
      * @return uint64_t Milliseconds since start()
+     * @warning Precision loss: µs → ms (truncates sub-millisecond values)
+     * @note For high precision, use now() instead
      */
     uint64_t nowMs() const {
         return now() / 1000;
@@ -150,6 +159,7 @@ public:
     /**
      * @brief Get system timestamp in milliseconds (Unix epoch)
      * @return uint64_t Milliseconds since 1970-01-01 00:00:00 UTC
+     * @warning Precision loss: µs → ms (truncates sub-millisecond values)
      */
     uint64_t systemNowMs() const {
         return systemNow() / 1000;
@@ -163,7 +173,7 @@ public:
      * @brief Calculate elapsed time between two timestamps (µs)
      * @param start Start timestamp (µs)
      * @param end End timestamp (µs)
-     * @return uint64_t Difference in microseconds
+     * @return uint64_t Difference in microseconds (0 if end < start)
      */
     uint64_t elapsed(uint64_t start, uint64_t end) const {
         return (end >= start) ? (end - start) : 0;
@@ -174,9 +184,10 @@ public:
      * @param start Start timestamp (ms)
      * @param end End timestamp (ms)
      * @return uint64_t Difference in milliseconds
+     * @warning Operates on milliseconds, not microseconds
      */
     uint64_t elapsedMs(uint64_t start, uint64_t end) const {
-        return elapsed(start, end) / 1000;
+        return elapsed(start, end);
     }
     
     // ========================================================================
@@ -224,18 +235,15 @@ public:
      * @brief Set drift factor
      * @param driftPpm Drift in parts per million (ppm)
      * @note Typical values on Raspberry Pi: < 50 ppm
+     * @note Stored as nano-ppm internally for lock-free atomic operations
      */
-    void setDriftFactor(double driftPpm) {
-        driftFactor_.store(driftPpm, std::memory_order_release);
-    }
+    void setDriftFactor(double driftPpm);
     
     /**
      * @brief Get drift factor
      * @return double Drift in parts per million (ppm)
      */
-    double getDriftFactor() const {
-        return driftFactor_.load(std::memory_order_acquire);
-    }
+    double getDriftFactor() const;
     
     /**
      * @brief Calculate current drift
@@ -280,6 +288,8 @@ private:
     
     /**
      * @brief Apply offset and drift compensation
+     * @param raw Raw timestamp delta
+     * @return Corrected timestamp
      */
     uint64_t applyCorrections(uint64_t raw) const;
     
@@ -299,14 +309,15 @@ private:
     /// Drift compensation enabled
     std::atomic<bool> driftCompensationEnabled_;
     
-    /// Drift factor (ppm)
-    std::atomic<double> driftFactor_;
+    /// Drift factor (stored as nano-ppm: ppm * 1000 for lock-free atomic)
+    /// Range: -2^63 to 2^63-1 nano-ppm = ±9.2e18 ppm
+    std::atomic<int64_t> driftFactorNanoPpm_;
     
     /// Last drift measurement (µs)
     mutable std::atomic<uint64_t> lastDriftMeasurement_;
     
-    /// Mutex for critical operations
-    mutable std::mutex mutex_;
+    /// Mutex for start/reset operations
+    std::mutex controlMutex_;
 };
 
 // ============================================================================
@@ -325,6 +336,7 @@ inline uint64_t getTimestampUs() {
 /**
  * @brief Get fast timestamp (milliseconds)
  * @return uint64_t Current timestamp in ms
+ * @warning Precision loss: µs → ms truncation
  * @note Optimized inline version for performance-critical code
  */
 inline uint64_t getTimestampMs() {

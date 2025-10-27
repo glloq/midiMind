@@ -14,6 +14,7 @@
 //   - Added instrument-level compensation
 //   - Database integration
 //   - Sync score calculation
+//   - Fixed thread-safety issues
 //
 // ============================================================================
 
@@ -99,6 +100,8 @@ LatencyCompensator::LatencyCompensator(InstrumentDatabase& instrumentDb)
     , historySize_(100)
     , outlierDetectionEnabled_(true)
     , outlierThreshold_(3.0)
+    , enabled_(true)
+    , globalOffsetMs_(0.0)
 {
     Logger::info("LatencyCompensator", "LatencyCompensator created");
     
@@ -197,8 +200,9 @@ void LatencyCompensator::recordDeviceLatency(const std::string& deviceId, uint64
     
     DeviceLatencyProfile& profile = it->second;
     
-    // Detect outliers
-    if (outlierDetectionEnabled_ && isOutlier(profile, latencyUs)) {
+    // Detect outliers (load atomic value)
+    bool outlierDetection = outlierDetectionEnabled_.load();
+    if (outlierDetection && isOutlier(profile, latencyUs)) {
         Logger::debug("LatencyCompensator", 
                      "Outlier detected for " + deviceId + ": " + 
                      std::to_string(latencyUs) + "µs");
@@ -238,10 +242,11 @@ void LatencyCompensator::setDeviceCompensation(const std::string& deviceId, int6
         it->second.autoCompensation = false;
         
         Logger::info("LatencyCompensator", 
-                    "Manual device compensation set for " + deviceId + ": " + 
+                    deviceId + " manual compensation set to " + 
                     std::to_string(offsetUs) + "µs");
     }
 }
+
 // ============================================================================
 // INSTRUMENT LATENCY MEASUREMENT
 // ============================================================================
@@ -258,17 +263,70 @@ void LatencyCompensator::recordInstrumentLatency(const std::string& instrumentId
     
     InstrumentLatencyProfile& profile = it->second;
     
-    // Add measurement
-    profile.addMeasurement(latencyUs);
+    // Add calibration point
+    CalibrationPoint point;
+    point.timestamp = std::time(nullptr);
+    point.measuredLatency = latencyUs;
+    point.confidence = 0.9;  // High confidence for manual measurement
+    point.method = "manual";
     
-    // Update total compensation if auto-calibration enabled
-    if (profile.autoCalibration) {
-        profile.calculateTotalCompensation();
+    profile.calibrationHistory.push_back(point);
+    
+    // Limit history size
+    size_t historySize = historySize_.load();
+    if (profile.calibrationHistory.size() > historySize) {
+        profile.calibrationHistory.erase(profile.calibrationHistory.begin());
     }
+    
+    // Update statistics
+    profile.measurementCount++;
+    
+    // Update min/max
+    if (latencyUs < profile.minLatency) {
+        profile.minLatency = latencyUs;
+    }
+    if (latencyUs > profile.maxLatency) {
+        profile.maxLatency = latencyUs;
+    }
+    
+    // Recalculate average latency
+    uint64_t sum = 0;
+    for (const auto& p : profile.calibrationHistory) {
+        sum += p.measuredLatency;
+    }
+    profile.avgLatency = sum / profile.calibrationHistory.size();
+    
+    // Calculate standard deviation
+    if (profile.calibrationHistory.size() > 1) {
+        double variance = 0.0;
+        for (const auto& p : profile.calibrationHistory) {
+            double diff = static_cast<double>(p.measuredLatency) - 
+                         static_cast<double>(profile.avgLatency);
+            variance += diff * diff;
+        }
+        variance /= profile.calibrationHistory.size();
+        profile.stdDeviation = std::sqrt(variance);
+        profile.jitter = profile.stdDeviation;  // Jitter ≈ stddev for now
+    }
+    
+    // Update compensation if auto calibration enabled
+    if (profile.autoCalibration) {
+        profile.totalCompensation = -static_cast<int64_t>(profile.avgLatency);
+    }
+    
+    // Update calibration confidence
+    if (profile.measurementCount >= 10) {
+        profile.calibrationConfidence = std::min(1.0, 
+            0.5 + (0.5 * std::min(profile.measurementCount, 50UL) / 50.0));
+    } else {
+        profile.calibrationConfidence = profile.measurementCount * 0.05;
+    }
+    
+    profile.lastCalibration = std::time(nullptr);
     
     Logger::debug("LatencyCompensator", 
                  instrumentId + " latency: " + std::to_string(latencyUs) + "µs, " +
-                 "compensation: " + std::to_string(profile.totalCompensation) + "µs");
+                 "avg: " + std::to_string(profile.avgLatency) + "µs");
 }
 
 int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrumentId) const {
@@ -276,29 +334,16 @@ int64_t LatencyCompensator::getInstrumentCompensation(const std::string& instrum
     
     auto it = instruments_.find(instrumentId);
     if (it == instruments_.end()) {
-        // Fallback to device compensation
-        Logger::debug("LatencyCompensator", 
-                     "Instrument not found, using device compensation: " + instrumentId);
-        
-        // Try to extract device ID from instrument ID
-        // Format: "instrumentName_deviceId_channel"
-        size_t lastUnderscore = instrumentId.find_last_of('_');
-        if (lastUnderscore != std::string::npos) {
-            size_t secondLastUnderscore = instrumentId.find_last_of('_', lastUnderscore - 1);
-            if (secondLastUnderscore != std::string::npos) {
-                std::string deviceId = instrumentId.substr(
-                    secondLastUnderscore + 1, 
-                    lastUnderscore - secondLastUnderscore - 1
-                );
-                
-                return getDeviceCompensation(deviceId);
-            }
-        }
-        
         return 0;
     }
     
-    return it->second.totalCompensation;
+    const InstrumentLatencyProfile& profile = it->second;
+    
+    if (!profile.enabled) {
+        return 0;
+    }
+    
+    return profile.totalCompensation;
 }
 
 void LatencyCompensator::setInstrumentCompensation(const std::string& instrumentId, 
@@ -311,16 +356,10 @@ void LatencyCompensator::setInstrumentCompensation(const std::string& instrument
         it->second.autoCalibration = false;
         
         Logger::info("LatencyCompensator", 
-                    "Manual instrument compensation set for " + instrumentId + ": " + 
+                    instrumentId + " manual compensation set to " + 
                     std::to_string(offsetUs) + "µs");
     }
 }
-
-// ============================================================================
-// CALIBRATION
-// ============================================================================
-
-
 
 // ============================================================================
 // PROFILES
@@ -339,6 +378,7 @@ DeviceLatencyProfile LatencyCompensator::getDeviceProfile(const std::string& dev
 
 InstrumentLatencyProfile LatencyCompensator::getInstrumentProfile(
     const std::string& instrumentId) const {
+    
     std::lock_guard<std::mutex> lock(instrumentMutex_);
     
     auto it = instruments_.find(instrumentId);
@@ -369,14 +409,16 @@ std::vector<InstrumentLatencyProfile> LatencyCompensator::getAllInstrumentProfil
 bool LatencyCompensator::saveInstrumentProfiles() {
     std::lock_guard<std::mutex> lock(instrumentMutex_);
     
-    Logger::info("LatencyCompensator", "Saving instrument profiles to database...");
+    Logger::info("LatencyCompensator", 
+                "Saving " + std::to_string(instruments_.size()) + " instrument profiles...");
     
     int savedCount = 0;
     int failedCount = 0;
     
     for (const auto& [id, profile] : instruments_) {
         // Convert to database entry
-        InstrumentLatencyEntry entry;
+        InstrumentDatabaseEntry entry;
+        
         entry.id = profile.instrumentId;
         entry.deviceId = profile.deviceId;
         entry.channel = profile.midiChannel;
@@ -393,9 +435,9 @@ bool LatencyCompensator::saveInstrumentProfiles() {
         entry.autoCalibration = profile.autoCalibration;
         entry.enabled = profile.enabled;
         
-        // Format timestamps
+        // Format timestamp
         if (profile.lastCalibration > 0) {
-            char buffer[32];
+            char buffer[80];
             std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", 
                          std::localtime(&profile.lastCalibration));
             entry.lastCalibration = buffer;
@@ -614,11 +656,14 @@ bool LatencyCompensator::isOutlier(const DeviceLatencyProfile& profile,
         return false;  // Not enough data
     }
     
+    // Load atomic threshold
+    double threshold = outlierThreshold_.load();
+    
     // Use 3-sigma rule
     double deviation = std::abs(static_cast<double>(latency) - 
                                static_cast<double>(profile.averageLatency));
     
-    return (deviation > outlierThreshold_ * profile.jitter);
+    return (deviation > threshold * profile.jitter);
 }
 
 void LatencyCompensator::updateDeviceStatistics(DeviceLatencyProfile& profile) {

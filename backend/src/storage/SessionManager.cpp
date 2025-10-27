@@ -1,404 +1,511 @@
 // ============================================================================
-// File: backend/src/storage/SessionManager.h
-// Version: 4.1.0
+// File: backend/src/storage/SessionManager.cpp
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Manager for application sessions (complete state snapshots)
-//
-// Features:
-//   - Create, load, save, delete sessions
-//   - Complete application state capture
-//   - Auto-save with configurable interval
-//   - Import/export JSON files
-//   - Active session management
-//   - Search and statistics
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Enhanced auto-save mechanism
-//   - Better state management
-//   - Improved error handling
-//   - Session duplication
+// Changes v4.1.1:
+//   - Fixed double-locking in update() and save() methods
+//   - Added existsUnsafe() to avoid recursive lock acquisition
+//   - Replaced polling loop in autoSaveThread with condition_variable
+//   - Better thread lifecycle management
 //
 // ============================================================================
 
-
-#include "../core/Error.h"
-#include "Database.h"
-#include <string>
-#include <vector>
-#include <memory>
-#include <mutex>
-#include <atomic>
-#include <thread>
-#include <optional>
-#include <functional>
-#include <nlohmann/json.hpp>
-
-using json = nlohmann::json;
+#include "SessionManager.h"
+#include "../core/Logger.h"
+#include "../core/TimeUtils.h"
+#include <fstream>
+#include <chrono>
+#include <algorithm>
 
 namespace midiMind {
 
 // ============================================================================
-// STRUCTURES
+// Session Structure Implementation
 // ============================================================================
 
-/**
- * @struct Session
- * @brief Complete application session
- */
-struct Session {
-    int id = 0;                ///< Database ID
-    std::string name;          ///< Session name
-    json data;                 ///< Complete configuration
-    std::string createdAt;     ///< Creation timestamp
-    std::string updatedAt;     ///< Last update timestamp
-    
-    /**
-     * @brief Convert to JSON
-     */
-    json toJson() const;
-    
-    /**
-     * @brief Create from JSON
-     */
-    static Session fromJson(const json& j);
-};
+json Session::toJson() const {
+    return {
+        {"id", id},
+        {"name", name},
+        {"data", data},
+        {"created_at", createdAt},
+        {"updated_at", updatedAt}
+    };
+}
+
+Session Session::fromJson(const json& j) {
+    Session session;
+    session.id = j.value("id", 0);
+    session.name = j.value("name", "");
+    session.data = j.value("data", json::object());
+    session.createdAt = j.value("created_at", "");
+    session.updatedAt = j.value("updated_at", "");
+    return session;
+}
 
 // ============================================================================
-// CLASS: SessionManager
+// SessionManager Implementation
 // ============================================================================
 
-/**
- * @class SessionManager
- * @brief Manager for application sessions
- * 
- * Manages complete application state snapshots.
- * A session contains:
- * - All settings
- * - MIDI configuration (routes, devices)
- * - Active presets
- * - Processor states
- * - Player state
- * 
- * Thread Safety: YES (all public methods are thread-safe)
- * 
- * Database Schema:
- * ```sql
- * CREATE TABLE sessions (
- *     id INTEGER PRIMARY KEY AUTOINCREMENT,
- *     name TEXT NOT NULL,
- *     data TEXT NOT NULL,
- *     created_at TEXT NOT NULL,
- *     updated_at TEXT NOT NULL
- * );
- * ```
- * 
- * Example:
- * ```cpp
- * auto db = std::make_shared<Database>("midimind.db");
- * db->open();
- * 
- * SessionManager manager(db);
- * 
- * // Create session
- * json sessionData = {
- *     {"midi_routes", {...}},
- *     {"devices", {...}},
- *     {"settings", {...}}
- * };
- * 
- * int id = manager.create("My Session", sessionData);
- * 
- * // Set as active
- * manager.setActive(id);
- * 
- * // Enable auto-save
- * manager.setAutoSave(true, 300); // Every 5 minutes
- * 
- * // Load session
- * auto session = manager.load(id);
- * ```
- */
-class SessionManager {
-public:
-    // ========================================================================
-    // TYPES
-    // ========================================================================
+SessionManager::SessionManager(Database& database)
+    : database_(database)
+    , activeSessionId_(0)
+    , autoSaveEnabled_(false)
+    , autoSaveInterval_(300)
+    , stopAutoSave_(false)
+{
+    if (!database_.isOpen()) {
+        throw MidiMindException(ErrorCode::DATABASE_ERROR, "Database not opened");
+    }
     
-    /**
-     * @brief Callback for auto-save
-     * Should capture current state and return it
-     */
-    using AutoSaveCallback = std::function<json()>;
-    
-    // ========================================================================
-    // CONSTRUCTOR / DESTRUCTOR
-    // ========================================================================
-    
-    /**
-     * @brief Constructor
-     * @param database Shared pointer to database
-     * @throws MidiMindException if database not opened
-     */
-    explicit SessionManager(std::shared_ptr<Database> database);
-    
-    /**
-     * @brief Destructor
-     * @note Stops auto-save thread gracefully
-     */
-    ~SessionManager();
-    
-    // Disable copy
-    SessionManager(const SessionManager&) = delete;
-    SessionManager& operator=(const SessionManager&) = delete;
-    
-    // ========================================================================
-    // CRUD - CREATE
-    // ========================================================================
-    
-    /**
-     * @brief Create new session
-     * @param name Session name
-     * @param data Session data
-     * @return int Session ID
-     * @throws MidiMindException on database error
-     * @note Thread-safe
-     */
-    int create(const std::string& name, const json& data);
-    
-    // ========================================================================
-    // CRUD - READ
-    // ========================================================================
-    
-    /**
-     * @brief Load session
-     * @param id Session ID
-     * @return Session or std::nullopt if not found
-     * @note Thread-safe
-     */
-    std::optional<Session> load(int id);
-    
-    /**
-     * @brief List all sessions
-     * @return Vector of sessions (without full data)
-     * @note Thread-safe
-     * @note Returns only metadata for performance
-     */
-    std::vector<Session> list();
-    
-    /**
-     * @brief Search sessions by name
-     * @param query Search query
-     * @return Vector of matching sessions
-     * @note Thread-safe
-     * @note Case-insensitive search
-     */
-    std::vector<Session> search(const std::string& query);
-    
-    /**
-     * @brief Check if session exists
-     * @param id Session ID
-     * @return true if exists
-     * @note Thread-safe
-     */
-    bool exists(int id);
-    
-    // ========================================================================
-    // CRUD - UPDATE
-    // ========================================================================
-    
-    /**
-     * @brief Update session
-     * @param id Session ID
-     * @param name New name
-     * @param data New data
-     * @throws MidiMindException if session not found
-     * @note Thread-safe
-     */
-    void update(int id, const std::string& name, const json& data);
-    
-    /**
-     * @brief Save session data only (keep name)
-     * @param id Session ID
-     * @param data New data
-     * @throws MidiMindException if session not found
-     * @note Thread-safe
-     */
-    void save(int id, const json& data);
-    
-    // ========================================================================
-    // CRUD - DELETE
-    // ========================================================================
-    
-    /**
-     * @brief Delete session
-     * @param id Session ID
-     * @return true if deleted
-     * @note Thread-safe
-     * @note Cannot delete active session
-     */
-    bool remove(int id);
-    
-    /**
-     * @brief Cleanup old sessions
-     * @param daysOld Delete sessions older than this many days
-     * @return int Number of sessions deleted
-     * @note Thread-safe
-     */
-    int cleanup(int daysOld = 30);
-    
-    // ========================================================================
-    // ACTIVE SESSION
-    // ========================================================================
-    
-    /**
-     * @brief Set active session
-     * @param id Session ID
-     * @note Thread-safe
-     */
-    void setActive(int id);
-    
-    /**
-     * @brief Get active session ID
-     * @return int Active session ID (0 if none)
-     * @note Thread-safe
-     */
-    int getActive() const;
-    
-    /**
-     * @brief Get active session data
-     * @return json Session data or empty if no active session
-     * @note Thread-safe
-     */
-    json getActiveData();
-    
-    /**
-     * @brief Save current state to active session
-     * @param data Current state
-     * @note Thread-safe
-     * @note Does nothing if no active session
-     */
-    void saveActive(const json& data);
-    
-    // ========================================================================
-    // AUTO-SAVE
-    // ========================================================================
-    
-    /**
-     * @brief Enable/disable auto-save
-     * @param enabled Enable auto-save
-     * @param intervalSec Interval in seconds (default 300 = 5 min)
-     * @note Thread-safe
-     * @note Starts/stops auto-save thread
-     */
-    void setAutoSave(bool enabled, uint32_t intervalSec = 300);
-    
-    /**
-     * @brief Check if auto-save is enabled
-     * @return true if enabled
-     * @note Thread-safe
-     */
-    bool isAutoSaveEnabled() const;
-    
-    /**
-     * @brief Get auto-save interval
-     * @return uint32_t Interval in seconds
-     * @note Thread-safe
-     */
-    uint32_t getAutoSaveInterval() const;
-    
-    /**
-     * @brief Set auto-save callback
-     * @param callback Function that captures current state
-     * @note Thread-safe
-     * @note Callback will be called from auto-save thread
-     */
-    void setAutoSaveCallback(AutoSaveCallback callback);
-    
-    // ========================================================================
-    // IMPORT / EXPORT
-    // ========================================================================
-    
-    /**
-     * @brief Export session to JSON file
-     * @param id Session ID
-     * @param filepath File path
-     * @return true if exported
-     * @note Thread-safe
-     */
-    bool exportToFile(int id, const std::string& filepath);
-    
-    /**
-     * @brief Import session from JSON file
-     * @param filepath File path
-     * @return int Session ID or -1 on error
-     * @note Thread-safe
-     */
-    int importFromFile(const std::string& filepath);
-    
-    // ========================================================================
-    // UTILITIES
-    // ========================================================================
-    
-    /**
-     * @brief Duplicate session
-     * @param id Source session ID
-     * @param newName Name for duplicate (optional)
-     * @return int New session ID or -1 on error
-     * @note Thread-safe
-     */
-    int duplicate(int id, const std::string& newName = "");
-    
-    /**
-     * @brief Get session count
-     * @return size_t Number of sessions
-     * @note Thread-safe
-     */
-    size_t count() const;
-    
-    /**
-     * @brief Get statistics
-     * @return json Statistics
-     * @note Thread-safe
-     */
-    json getStatistics() const;
+    Logger::info("SessionManager", "Initialized");
+}
 
-private:
-    // ========================================================================
-    // PRIVATE METHODS
-    // ========================================================================
+SessionManager::~SessionManager() {
+    // Stop auto-save thread
+    stopAutoSave_ = true;
+    autoSaveCv_.notify_all();  // Wake up thread immediately
     
-    /**
-     * @brief Auto-save thread function
-     */
-    void autoSaveThread();
+    if (autoSaveThread_.joinable()) {
+        autoSaveThread_.join();
+    }
     
-    // ========================================================================
-    // MEMBER VARIABLES
-    // ========================================================================
+    Logger::info("SessionManager", "Destroyed");
+}
+
+// ============================================================================
+// CRUD - CREATE
+// ============================================================================
+
+int SessionManager::create(const std::string& name, const json& data) {
+    std::lock_guard<std::mutex> lock(mutex_);
     
-    /// Database connection
-    std::shared_ptr<Database> database_;
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string dataStr = data.dump();
     
-    /// Active session ID
-    std::atomic<int> activeSessionId_;
+    std::string query = 
+        "INSERT INTO sessions (name, data, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?)";
     
-    /// Auto-save configuration
-    std::atomic<bool> autoSaveEnabled_;
-    std::atomic<uint32_t> autoSaveInterval_;
-    std::thread autoSaveThread_;
-    std::atomic<bool> stopAutoSave_;
+    int id = database_.executeInsert(query, {name, dataStr, timestamp, timestamp});
     
-    /// Auto-save callback
-    AutoSaveCallback autoSaveCallback_;
+    Logger::info("SessionManager", "Created session: " + name + " (ID: " + std::to_string(id) + ")");
     
-    /// Thread safety
-    mutable std::mutex mutex_;
-};
+    return id;
+}
+
+// ============================================================================
+// CRUD - READ
+// ============================================================================
+
+std::optional<Session> SessionManager::load(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string query = "SELECT id, name, data, created_at, updated_at FROM sessions WHERE id = ?";
+    auto results = database_.executeQuery(query, {std::to_string(id)});
+    
+    if (results.empty()) {
+        return std::nullopt;
+    }
+    
+    Session session;
+    session.id = std::stoi(results[0][0]);
+    session.name = results[0][1];
+    session.data = json::parse(results[0][2]);
+    session.createdAt = results[0][3];
+    session.updatedAt = results[0][4];
+    
+    return session;
+}
+
+std::vector<Session> SessionManager::list() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string query = "SELECT id, name, created_at, updated_at FROM sessions ORDER BY updated_at DESC";
+    auto results = database_.executeQuery(query);
+    
+    std::vector<Session> sessions;
+    for (const auto& row : results) {
+        Session session;
+        session.id = std::stoi(row[0]);
+        session.name = row[1];
+        session.createdAt = row[2];
+        session.updatedAt = row[3];
+        // data is intentionally not loaded for performance
+        sessions.push_back(session);
+    }
+    
+    return sessions;
+}
+
+std::vector<Session> SessionManager::search(const std::string& query) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string sql = 
+        "SELECT id, name, created_at, updated_at FROM sessions "
+        "WHERE name LIKE ? ORDER BY updated_at DESC";
+    
+    std::string searchPattern = "%" + query + "%";
+    auto results = database_.executeQuery(sql, {searchPattern});
+    
+    std::vector<Session> sessions;
+    for (const auto& row : results) {
+        Session session;
+        session.id = std::stoi(row[0]);
+        session.name = row[1];
+        session.createdAt = row[2];
+        session.updatedAt = row[3];
+        sessions.push_back(session);
+    }
+    
+    return sessions;
+}
+
+bool SessionManager::exists(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return existsUnsafe(id);
+}
+
+// ============================================================================
+// CRUD - UPDATE
+// ============================================================================
+
+void SessionManager::update(int id, const std::string& name, const json& data) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Use existsUnsafe to avoid double-locking
+    if (!existsUnsafe(id)) {
+        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+    }
+    
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string dataStr = data.dump();
+    
+    std::string query = 
+        "UPDATE sessions SET name = ?, data = ?, updated_at = ? WHERE id = ?";
+    
+    database_.executeUpdate(query, {name, dataStr, timestamp, std::to_string(id)});
+    
+    Logger::info("SessionManager", "Updated session: " + name + " (ID: " + std::to_string(id) + ")");
+}
+
+void SessionManager::save(int id, const json& data) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Use existsUnsafe to avoid double-locking
+    if (!existsUnsafe(id)) {
+        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+    }
+    
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string dataStr = data.dump();
+    
+    std::string query = 
+        "UPDATE sessions SET data = ?, updated_at = ? WHERE id = ?";
+    
+    database_.executeUpdate(query, {dataStr, timestamp, std::to_string(id)});
+}
+
+// ============================================================================
+// CRUD - DELETE
+// ============================================================================
+
+bool SessionManager::remove(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Cannot delete active session
+    if (id == activeSessionId_.load()) {
+        Logger::warning("SessionManager", "Cannot delete active session");
+        return false;
+    }
+    
+    std::string query = "DELETE FROM sessions WHERE id = ?";
+    int affected = database_.executeUpdate(query, {std::to_string(id)});
+    
+    if (affected > 0) {
+        Logger::info("SessionManager", "Deleted session ID: " + std::to_string(id));
+        return true;
+    }
+    
+    return false;
+}
+
+int SessionManager::cleanup(int daysOld) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string query = 
+        "DELETE FROM sessions WHERE id != ? AND "
+        "julianday('now') - julianday(updated_at) > ?";
+    
+    int activeId = activeSessionId_.load();
+    int affected = database_.executeUpdate(query, {
+        std::to_string(activeId),
+        std::to_string(daysOld)
+    });
+    
+    if (affected > 0) {
+        Logger::info("SessionManager", "Cleaned up " + std::to_string(affected) + " old sessions");
+    }
+    
+    return affected;
+}
+
+// ============================================================================
+// ACTIVE SESSION
+// ============================================================================
+
+void SessionManager::setActive(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (id != 0 && !existsUnsafe(id)) {
+        throw MidiMindException(ErrorCode::NOT_FOUND, "Session not found: " + std::to_string(id));
+    }
+    
+    activeSessionId_ = id;
+    Logger::info("SessionManager", "Active session set to ID: " + std::to_string(id));
+}
+
+int SessionManager::getActive() const {
+    return activeSessionId_.load();
+}
+
+json SessionManager::getActiveData() {
+    int activeId = activeSessionId_.load();
+    
+    if (activeId == 0) {
+        return json::object();
+    }
+    
+    auto session = load(activeId);
+    if (!session) {
+        return json::object();
+    }
+    
+    return session->data;
+}
+
+void SessionManager::saveActive(const json& data) {
+    int activeId = activeSessionId_.load();
+    
+    if (activeId == 0) {
+        return;
+    }
+    
+    try {
+        save(activeId, data);
+    } catch (const std::exception& e) {
+        Logger::error("SessionManager", "Failed to save active session: " + std::string(e.what()));
+    }
+}
+
+// ============================================================================
+// AUTO-SAVE
+// ============================================================================
+
+void SessionManager::setAutoSave(bool enabled, uint32_t intervalSec) {
+    autoSaveEnabled_ = enabled;
+    autoSaveInterval_ = intervalSec;
+    
+    if (enabled) {
+        if (autoSaveThread_.joinable()) {
+            stopAutoSave_ = true;
+            autoSaveCv_.notify_all();
+            autoSaveThread_.join();
+            stopAutoSave_ = false;
+        }
+        
+        autoSaveThread_ = std::thread(&SessionManager::autoSaveThread, this);
+        Logger::info("SessionManager", "Auto-save enabled (interval: " + std::to_string(intervalSec) + "s)");
+    } else {
+        if (autoSaveThread_.joinable()) {
+            stopAutoSave_ = true;
+            autoSaveCv_.notify_all();
+            autoSaveThread_.join();
+            stopAutoSave_ = false;
+        }
+        Logger::info("SessionManager", "Auto-save disabled");
+    }
+}
+
+bool SessionManager::isAutoSaveEnabled() const {
+    return autoSaveEnabled_.load();
+}
+
+uint32_t SessionManager::getAutoSaveInterval() const {
+    return autoSaveInterval_.load();
+}
+
+void SessionManager::setAutoSaveCallback(AutoSaveCallback callback) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    autoSaveCallback_ = callback;
+}
+
+void SessionManager::autoSaveThread() {
+    Logger::info("SessionManager", "Auto-save thread started");
+    
+    while (!stopAutoSave_.load()) {
+        // Wait for interval or stop signal using condition_variable
+        std::unique_lock<std::mutex> lock(autoSaveMutex_);
+        auto interval = std::chrono::seconds(autoSaveInterval_.load());
+        
+        // Wait with timeout - wakes up on timeout or notify
+        if (autoSaveCv_.wait_for(lock, interval, [this]() { 
+            return stopAutoSave_.load(); 
+        })) {
+            // Woke up due to stop signal
+            break;
+        }
+        
+        // Check if auto-save still enabled
+        if (!autoSaveEnabled_.load()) {
+            continue;
+        }
+        
+        // Get callback under lock and execute
+        AutoSaveCallback callback;
+        {
+            std::lock_guard<std::mutex> callbackLock(mutex_);
+            callback = autoSaveCallback_;
+        }
+        
+        if (callback) {
+            try {
+                json data = callback();
+                saveActive(data);
+                Logger::debug("SessionManager", "Auto-save completed");
+            } catch (const std::exception& e) {
+                Logger::error("SessionManager", "Auto-save failed: " + std::string(e.what()));
+            }
+        }
+    }
+    
+    Logger::info("SessionManager", "Auto-save thread stopped");
+}
+
+// ============================================================================
+// IMPORT / EXPORT
+// ============================================================================
+
+bool SessionManager::exportToFile(int id, const std::string& filepath) {
+    auto session = load(id);
+    if (!session) {
+        Logger::error("SessionManager", "Session not found for export: " + std::to_string(id));
+        return false;
+    }
+    
+    try {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            Logger::error("SessionManager", "Failed to open file for export: " + filepath);
+            return false;
+        }
+        
+        file << session->toJson().dump(2);
+        file.close();
+        
+        Logger::info("SessionManager", "Exported session to: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        Logger::error("SessionManager", "Export failed: " + std::string(e.what()));
+        return false;
+    }
+}
+
+int SessionManager::importFromFile(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            Logger::error("SessionManager", "Failed to open file for import: " + filepath);
+            return -1;
+        }
+        
+        json j;
+        file >> j;
+        file.close();
+        
+        Session session = Session::fromJson(j);
+        
+        // Create new session with imported data
+        int newId = create(session.name + " (imported)", session.data);
+        
+        Logger::info("SessionManager", "Imported session from: " + filepath);
+        return newId;
+    } catch (const std::exception& e) {
+        Logger::error("SessionManager", "Import failed: " + std::string(e.what()));
+        return -1;
+    }
+}
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+int SessionManager::duplicate(int id, const std::string& newName) {
+    auto session = load(id);
+    if (!session) {
+        Logger::error("SessionManager", "Session not found for duplication: " + std::to_string(id));
+        return -1;
+    }
+    
+    std::string name = newName.empty() ? session->name + " (copy)" : newName;
+    
+    try {
+        int newId = create(name, session->data);
+        Logger::info("SessionManager", "Duplicated session ID " + std::to_string(id) + " to " + std::to_string(newId));
+        return newId;
+    } catch (const std::exception& e) {
+        Logger::error("SessionManager", "Duplication failed: " + std::string(e.what()));
+        return -1;
+    }
+}
+
+size_t SessionManager::count() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    std::string query = "SELECT COUNT(*) FROM sessions";
+    auto results = database_.executeQuery(query);
+    
+    if (results.empty()) {
+        return 0;
+    }
+    
+    return static_cast<size_t>(std::stoi(results[0][0]));
+}
+
+json SessionManager::getStatistics() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    json stats = {
+        {"total_sessions", count()},
+        {"active_session_id", activeSessionId_.load()},
+        {"auto_save_enabled", autoSaveEnabled_.load()},
+        {"auto_save_interval", autoSaveInterval_.load()}
+    };
+    
+    // Get most recent session
+    std::string query = "SELECT name, updated_at FROM sessions ORDER BY updated_at DESC LIMIT 1";
+    auto results = database_.executeQuery(query);
+    
+    if (!results.empty()) {
+        stats["most_recent_session"] = results[0][0];
+        stats["most_recent_update"] = results[0][1];
+    }
+    
+    return stats;
+}
+
+// ============================================================================
+// PRIVATE METHODS
+// ============================================================================
+
+bool SessionManager::existsUnsafe(int id) const {
+    // Must be called with mutex_ locked
+    std::string query = "SELECT COUNT(*) FROM sessions WHERE id = ?";
+    auto results = database_.executeQuery(query, {std::to_string(id)});
+    
+    return !results.empty() && std::stoi(results[0][0]) > 0;
+}
 
 } // namespace midiMind

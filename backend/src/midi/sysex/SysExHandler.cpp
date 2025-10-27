@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/sysex/SysExHandler.cpp
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -10,6 +10,10 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Fixed std::min type warnings
+//   - Used atomic operations for configuration
 //
 // ============================================================================
 
@@ -62,7 +66,8 @@ void SysExHandler::handleSysExMessage(const std::vector<uint8_t>& data,
     // Log received message
     std::stringstream ss;
     ss << "Received SysEx from " << deviceId << " (" << data.size() << " bytes): ";
-    for (size_t i = 0; i < std::min(data.size(), size_t(16)); ++i) {
+    size_t logLimit = std::min(data.size(), static_cast<size_t>(16));
+    for (size_t i = 0; i < logLimit; ++i) {
         ss << std::hex << std::setw(2) << std::setfill('0') 
            << static_cast<int>(data[i]) << " ";
     }
@@ -349,7 +354,8 @@ bool SysExHandler::sendSysEx(const std::string& deviceId,
     // Log sent message
     std::stringstream ss;
     ss << "Sending SysEx to " << deviceId << " (" << data.size() << " bytes): ";
-    for (size_t i = 0; i < std::min(data.size(), size_t(16)); ++i) {
+    size_t logLimit = std::min(data.size(), static_cast<size_t>(16));
+    for (size_t i = 0; i < logLimit; ++i) {
         ss << std::hex << std::setw(2) << std::setfill('0')
            << static_cast<int>(data[i]) << " ";
     }

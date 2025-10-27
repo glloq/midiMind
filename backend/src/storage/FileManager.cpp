@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/storage/FileManager.cpp
-// Version: 4.1.0
+// Version: 4.4.0 - SECURE
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -9,14 +9,11 @@
 //   Combines fast unsafe operations (internal) with secure validated
 //   operations (public API).
 //
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - All unsafe operations now use FileManager::Unsafe:: namespace
-//   - Enhanced path validation with canonical resolution
-//   - Improved filename sanitization
-//   - Thread-safe operations
+// Changes v4.4.0:
+//   - Fixed: buildFullPath() for canonical path validation
+//   - Fixed: downloadFile() distinguishes empty file vs read error
+//   - Fixed: All path concatenations use buildFullPath()
+//   - Fixed: Proper error propagation
 //
 // ============================================================================
 
@@ -127,26 +124,26 @@ std::string FileManager::uploadFile(const std::vector<uint8_t>& data,
     Logger::debug("FileManager", "  Original: " + filename);
     Logger::debug("FileManager", "  Sanitized: " + safeName);
     
-    // 3. Build destination path
+    // 3. Build destination path with validation
     std::string relPath = directoryTypeToString(destDir) + "/" + safeName;
+    std::string destPath;
     
-    // 4. Validate path
-    if (!validatePath(relPath)) {
+    try {
+        destPath = buildFullPath(relPath);
+    } catch (const std::exception& e) {
         THROW_ERROR(ErrorCode::VALIDATION_FAILED,
                    "Invalid or unsafe path: " + relPath);
     }
     
-    std::string destPath = getDirectoryPath(destDir) + "/" + safeName;
-    
     Logger::debug("FileManager", "  Destination: " + destPath);
     
-    // 5. Check if file exists
+    // 4. Check if file exists
     if (!overwrite && Unsafe::exists(destPath)) {
         THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS,
                    "File already exists: " + safeName);
     }
     
-    // 6. Write file
+    // 5. Write file
     if (!Unsafe::writeBinaryFile(destPath, data)) {
         THROW_ERROR(ErrorCode::STORAGE_IO_ERROR,
                    "Failed to write file: " + destPath);
@@ -163,13 +160,14 @@ std::vector<uint8_t> FileManager::downloadFile(const std::string& filepath) {
     
     Logger::info("FileManager", "Downloading file: " + filepath);
     
-    // Validate path
-    if (!isPathSafe(filepath)) {
+    // Build and validate full path
+    std::string fullPath;
+    try {
+        fullPath = buildFullPath(filepath);
+    } catch (const std::exception& e) {
         THROW_ERROR(ErrorCode::VALIDATION_FAILED,
                    "Invalid or unsafe path: " + filepath);
     }
-    
-    std::string fullPath = rootPath_ + "/" + filepath;
     
     // Check if file exists
     if (!Unsafe::exists(fullPath)) {
@@ -177,11 +175,22 @@ std::vector<uint8_t> FileManager::downloadFile(const std::string& filepath) {
                    "File not found: " + filepath);
     }
     
+    // Get file size to distinguish empty file from read error
+    size_t expectedSize = Unsafe::fileSize(fullPath);
+    
     // Read file
     auto data = Unsafe::readBinaryFile(fullPath);
     
-    if (data.empty()) {
-        Logger::warning("FileManager", "File is empty or read failed: " + filepath);
+    // Verify read was successful
+    if (data.size() != expectedSize) {
+        if (expectedSize == 0 && data.empty()) {
+            Logger::info("FileManager", "File is empty (0 bytes)");
+        } else {
+            THROW_ERROR(ErrorCode::STORAGE_IO_ERROR,
+                       "File read failed or incomplete: expected " + 
+                       std::to_string(expectedSize) + " bytes, got " + 
+                       std::to_string(data.size()));
+        }
     }
     
     Logger::info("FileManager", 
@@ -199,13 +208,14 @@ bool FileManager::deleteFile(const std::string& filepath) {
     
     Logger::info("FileManager", "Deleting file: " + filepath);
     
-    // Validate path
-    if (!isPathSafe(filepath)) {
+    // Build and validate full path
+    std::string fullPath;
+    try {
+        fullPath = buildFullPath(filepath);
+    } catch (const std::exception& e) {
         Logger::error("FileManager", "Invalid or unsafe path: " + filepath);
         return false;
     }
-    
-    std::string fullPath = rootPath_ + "/" + filepath;
     
     // Check if file exists
     if (!Unsafe::exists(fullPath)) {
@@ -228,14 +238,15 @@ bool FileManager::copyFile(const std::string& source, const std::string& dest) {
     
     Logger::info("FileManager", "Copying file: " + source + " -> " + dest);
     
-    // Validate paths
-    if (!isPathSafe(source) || !isPathSafe(dest)) {
+    // Build and validate both paths
+    std::string sourcePath, destPath;
+    try {
+        sourcePath = buildFullPath(source);
+        destPath = buildFullPath(dest);
+    } catch (const std::exception& e) {
         Logger::error("FileManager", "Invalid or unsafe path");
         return false;
     }
-    
-    std::string sourcePath = rootPath_ + "/" + source;
-    std::string destPath = rootPath_ + "/" + dest;
     
     // Check source exists
     if (!Unsafe::exists(sourcePath)) {
@@ -258,14 +269,15 @@ bool FileManager::moveFile(const std::string& source, const std::string& dest) {
     
     Logger::info("FileManager", "Moving file: " + source + " -> " + dest);
     
-    // Validate paths
-    if (!isPathSafe(source) || !isPathSafe(dest)) {
+    // Build and validate both paths
+    std::string sourcePath, destPath;
+    try {
+        sourcePath = buildFullPath(source);
+        destPath = buildFullPath(dest);
+    } catch (const std::exception& e) {
         Logger::error("FileManager", "Invalid or unsafe path");
         return false;
     }
-    
-    std::string sourcePath = rootPath_ + "/" + source;
-    std::string destPath = rootPath_ + "/" + dest;
     
     // Check source exists
     if (!Unsafe::exists(sourcePath)) {
@@ -319,13 +331,14 @@ std::vector<FileInfo> FileManager::listFiles(DirectoryType dirType) {
 std::optional<FileInfo> FileManager::getFileInfo(const std::string& filepath) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Validate path
-    if (!isPathSafe(filepath)) {
+    // Build and validate full path
+    std::string fullPath;
+    try {
+        fullPath = buildFullPath(filepath);
+    } catch (const std::exception& e) {
         Logger::error("FileManager", "Invalid or unsafe path: " + filepath);
         return std::nullopt;
     }
-    
-    std::string fullPath = rootPath_ + "/" + filepath;
     
     if (!Unsafe::exists(fullPath)) {
         Logger::warning("FileManager", "File not found: " + filepath);
@@ -355,6 +368,44 @@ std::string FileManager::getDirectoryPath(DirectoryType dirType) const {
 // ============================================================================
 // VALIDATION
 // ============================================================================
+
+std::string FileManager::buildFullPath(const std::string& relativePath) const {
+    // 1. Basic validation
+    if (relativePath.empty()) {
+        throw std::runtime_error("Empty path");
+    }
+    
+    // 2. Check for absolute paths (not allowed)
+    if (!relativePath.empty() && (relativePath[0] == '/' || relativePath[0] == '\\')) {
+        throw std::runtime_error("Absolute path not allowed");
+    }
+    
+    // 3. Build full path
+    std::string fullPath = rootPath_ + "/" + relativePath;
+    
+    // 4. Resolve to canonical path
+    try {
+        fs::path canonical = fs::weakly_canonical(fullPath);
+        fs::path rootCanonical = fs::weakly_canonical(rootPath_);
+        
+        // 5. Verify path stays within root
+        std::string canonicalStr = canonical.string();
+        std::string rootStr = rootCanonical.string();
+        
+        // Ensure both paths use same separator
+        std::replace(canonicalStr.begin(), canonicalStr.end(), '\\', '/');
+        std::replace(rootStr.begin(), rootStr.end(), '\\', '/');
+        
+        if (canonicalStr.find(rootStr) != 0) {
+            throw std::runtime_error("Path escapes root directory");
+        }
+        
+        return canonical.string();
+        
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Path validation failed: " + std::string(e.what()));
+    }
+}
 
 std::string FileManager::sanitizeFilename(const std::string& filename) const {
     if (filename.empty()) {
@@ -420,67 +471,13 @@ std::string FileManager::sanitizeFilename(const std::string& filename) const {
 }
 
 bool FileManager::validatePath(const std::string& path) const {
-    if (path.empty()) {
-        return false;
-    }
-    
-    // 1. Check for absolute paths (not allowed)
-    if (!path.empty() && (path[0] == '/' || path[0] == '\\')) {
-        Logger::warning("FileManager", "Absolute path not allowed: " + path);
-        return false;
-    }
-    
-    // 2. Check for drive letters (Windows)
-    if (path.length() >= 2 && path[1] == ':') {
-        Logger::warning("FileManager", "Drive letter not allowed: " + path);
-        return false;
-    }
-    
-    // 3. Check for path traversal
-    if (path.find("..") != std::string::npos) {
-        Logger::warning("FileManager", "Path traversal detected: " + path);
-        return false;
-    }
-    
-    // 4. Check for null bytes
-    if (path.find('\0') != std::string::npos) {
-        Logger::warning("FileManager", "Null byte in path: " + path);
-        return false;
-    }
-    
-    // 5. Check for dangerous patterns
-    const std::vector<std::string> dangerous = {
-        "//", "\\\\", "./", ".\\", "~/", "~\\"
-    };
-    
-    for (const auto& pattern : dangerous) {
-        if (path.find(pattern) != std::string::npos) {
-            Logger::warning("FileManager", "Dangerous pattern in path: " + pattern);
-            return false;
-        }
-    }
-    
-    // 6. Try to resolve canonical path
     try {
-        std::string fullPath = rootPath_ + "/" + path;
-        fs::path canonical = fs::weakly_canonical(fullPath);
-        fs::path rootCanonical = fs::weakly_canonical(rootPath_);
-        
-        // Check if canonical path is under root
-        std::string canonicalStr = canonical.string();
-        std::string rootStr = rootCanonical.string();
-        
-        if (canonicalStr.find(rootStr) != 0) {
-            Logger::warning("FileManager", "Path escapes root: " + path);
-            return false;
-        }
-        
+        buildFullPath(path);
+        return true;
     } catch (const std::exception& e) {
-        Logger::warning("FileManager", "Cannot resolve path: " + std::string(e.what()));
+        Logger::warning("FileManager", "Path validation failed: " + std::string(e.what()));
         return false;
     }
-    
-    return true;
 }
 
 bool FileManager::isPathSafe(const std::string& path) const {
@@ -566,6 +563,7 @@ std::optional<FileInfo> FileManager::parseFileInfo(const std::string& filepath,
         fs::path p(filepath);
         
         info.name = p.filename().string();
+        info.id = p.filename().string();  // Set ID to filename
         info.path = filepath;
         info.extension = Unsafe::getExtension(filepath);
         info.size = Unsafe::fileSize(filepath);
@@ -599,8 +597,189 @@ std::string FileManager::directoryTypeToString(DirectoryType type) const {
     }
 }
 
+// ============================================================================
+// BASE64 ENCODING/DECODING
+// ============================================================================
+
+// Base64 encoding table
+static const std::string base64_chars = 
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
+std::string FileManager::base64Encode(const std::vector<uint8_t>& data) const {
+    std::string encoded;
+    int val = 0;
+    int valb = -6;
+    
+    for (uint8_t c : data) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            encoded.push_back(base64_chars[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    
+    if (valb > -6) {
+        encoded.push_back(base64_chars[((val << 8) >> (valb + 8)) & 0x3F]);
+    }
+    
+    while (encoded.size() % 4) {
+        encoded.push_back('=');
+    }
+    
+    return encoded;
+}
+
+std::vector<uint8_t> FileManager::base64Decode(const std::string& encoded) const {
+    std::vector<uint8_t> decoded;
+    std::vector<int> T(256, -1);
+    
+    for (int i = 0; i < 64; i++) {
+        T[base64_chars[i]] = i;
+    }
+    
+    int val = 0;
+    int valb = -8;
+    
+    for (unsigned char c : encoded) {
+        if (T[c] == -1) break;
+        val = (val << 6) + T[c];
+        valb += 6;
+        if (valb >= 0) {
+            decoded.push_back(char((val >> valb) & 0xFF));
+            valb -= 8;
+        }
+    }
+    
+    return decoded;
+}
+
+FileInfo FileManager::uploadFileBase64(const std::string& filename, 
+                                       const std::string& base64Data) {
+    Logger::info("FileManager", "Upload base64: " + filename);
+    
+    // Decode base64
+    auto binaryData = base64Decode(base64Data);
+    
+    // Upload using existing method
+    std::string destPath = uploadFile(binaryData, filename, 
+                                     DirectoryType::UPLOADS, false);
+    
+    // Get file info
+    auto fileInfo = getFileInfo("uploads/" + sanitizeFilename(filename));
+    
+    if (!fileInfo.has_value()) {
+        THROW_ERROR(ErrorCode::STORAGE_IO_ERROR, 
+                   "Failed to get uploaded file info");
+    }
+    
+    // Set ID to filename
+    fileInfo->id = sanitizeFilename(filename);
+    
+    return fileInfo.value();
+}
+
+std::string FileManager::downloadFileBase64(const std::string& fileId) {
+    Logger::info("FileManager", "Download base64: " + fileId);
+    
+    std::string filepath = "uploads/" + fileId;
+    auto binaryData = downloadFile(filepath);
+    
+    return base64Encode(binaryData);
+}
+
+bool FileManager::renameFile(const std::string& fileId, const std::string& newName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    Logger::info("FileManager", "Rename: " + fileId + " -> " + newName);
+    
+    std::string sanitizedNew = sanitizeFilename(newName);
+    
+    // Build validated paths
+    std::string sourcePath, destPath;
+    try {
+        sourcePath = buildFullPath("uploads/" + fileId);
+        destPath = buildFullPath("uploads/" + sanitizedNew);
+    } catch (const std::exception& e) {
+        Logger::error("FileManager", "Invalid path: " + std::string(e.what()));
+        return false;
+    }
+    
+    if (!Unsafe::exists(sourcePath)) {
+        Logger::error("FileManager", "Source not found: " + fileId);
+        return false;
+    }
+    
+    if (Unsafe::exists(destPath)) {
+        Logger::error("FileManager", "Destination already exists: " + sanitizedNew);
+        return false;
+    }
+    
+    bool success = Unsafe::moveFile(sourcePath, destPath);
+    
+    if (success) {
+        Logger::info("FileManager", "✓ File renamed");
+    } else {
+        Logger::error("FileManager", "Failed to rename");
+    }
+    
+    return success;
+}
+
+FileInfo FileManager::copyFileByName(const std::string& fileId, 
+                                     const std::string& newName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    Logger::info("FileManager", "Copy: " + fileId + " -> " + newName);
+    
+    std::string sanitizedNew = sanitizeFilename(newName);
+    
+    // Build validated paths
+    std::string sourcePath, destPath;
+    try {
+        sourcePath = buildFullPath("uploads/" + fileId);
+        destPath = buildFullPath("uploads/" + sanitizedNew);
+    } catch (const std::exception& e) {
+        THROW_ERROR(ErrorCode::VALIDATION_FAILED, 
+                   "Invalid path: " + std::string(e.what()));
+    }
+    
+    if (!Unsafe::exists(sourcePath)) {
+        THROW_ERROR(ErrorCode::FILE_NOT_FOUND, "Source not found: " + fileId);
+    }
+    
+    if (Unsafe::exists(destPath)) {
+        THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS, 
+                   "Destination already exists: " + sanitizedNew);
+    }
+    
+    if (!Unsafe::copyFile(sourcePath, destPath)) {
+        THROW_ERROR(ErrorCode::STORAGE_IO_ERROR, "Failed to copy file");
+    }
+    
+    Logger::info("FileManager", "✓ File copied");
+    
+    // Get new file info
+    auto fileInfo = parseFileInfo(destPath, DirectoryType::UPLOADS);
+    
+    if (!fileInfo.has_value()) {
+        THROW_ERROR(ErrorCode::STORAGE_IO_ERROR, 
+                   "Failed to get copied file info");
+    }
+    
+    fileInfo->id = sanitizedNew;
+    
+    return fileInfo.value();
+}
+
+std::vector<FileInfo> FileManager::listFiles() {
+    return listFiles(DirectoryType::UPLOADS);
+}
+
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE FileManager.cpp
+// END OF FILE FileManager.cpp v4.4.0
 // ============================================================================

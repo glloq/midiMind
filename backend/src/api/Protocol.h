@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/api/Protocol.h
-// Version: 4.1.3
+// Version: 4.1.4
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -9,6 +9,11 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-17
+//
+// Changes v4.1.4:
+//   - FIXED: Thread-safe generateUUID() with thread_local
+//   - FIXED: Thread-safe getISO8601Timestamp() using localtime_r/gmtime_r
+//   - FIXED: All struct constructors initialize all members
 //
 // Changes v4.1.3:
 //   - FIXED: Functions declared BEFORE structures that use them
@@ -139,11 +144,16 @@ inline EventPriority stringToEventPriority(const std::string& str) {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * @brief Generate UUID (thread-safe)
+ * @note Uses thread_local for thread safety
+ */
 inline std::string generateUUID() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
-    static std::uniform_int_distribution<> dis2(8, 11);
+    // Thread-local random generators for thread safety
+    thread_local std::random_device rd;
+    thread_local std::mt19937 gen(rd());
+    thread_local std::uniform_int_distribution<> dis(0, 15);
+    thread_local std::uniform_int_distribution<> dis2(8, 11);
     
     std::stringstream ss;
     ss << std::hex;
@@ -176,14 +186,27 @@ inline std::string generateUUID() {
     return ss.str();
 }
 
+/**
+ * @brief Get ISO 8601 timestamp (thread-safe)
+ * @note Uses gmtime_r on POSIX systems for thread safety
+ */
 inline std::string getISO8601Timestamp() {
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         now.time_since_epoch()) % 1000;
     
+    std::tm tm_buf;
+#ifdef _WIN32
+    // Windows: gmtime_s
+    gmtime_s(&tm_buf, &time_t_now);
+#else
+    // POSIX: gmtime_r (thread-safe)
+    gmtime_r(&time_t_now, &tm_buf);
+#endif
+    
     std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t_now), "%Y-%m-%dT%H:%M:%S");
+    ss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%S");
     ss << '.' << std::setfill('0') << std::setw(3) << ms.count() << 'Z';
     
     return ss.str();
@@ -200,7 +223,9 @@ struct Envelope {
     std::string version;
     
     Envelope() 
-        : type(MessageType::REQUEST)
+        : id("")
+        , type(MessageType::REQUEST)
+        , timestamp("")
         , version("1.0") {}
     
     json toJson() const {
@@ -229,7 +254,9 @@ struct Request {
     int timeout;
     
     Request() 
-        : params(json::object())
+        : id("")
+        , command("")
+        , params(json::object())
         , timeout(0) {}
     
     json toJson() const {
@@ -260,8 +287,10 @@ struct Response {
     int latency;
     
     Response() 
-        : success(true)
+        : requestId("")
+        , success(true)
         , data(json::object())
+        , errorMessage("")
         , errorCode(ErrorCode::UNKNOWN)
         , latency(0) {}
     
@@ -305,8 +334,10 @@ struct Event {
     std::string source;
     
     Event() 
-        : data(json::object())
-        , priority(EventPriority::NORMAL) {}
+        : name("")
+        , data(json::object())
+        , priority(EventPriority::NORMAL)
+        , source("") {}
     
     json toJson() const {
         json j;
@@ -336,8 +367,10 @@ struct Error {
     
     Error() 
         : code(ErrorCode::UNKNOWN)
+        , message("")
         , details(json::object())
-        , retryable(false) {}
+        , retryable(false)
+        , requestId("") {}
     
     json toJson() const {
         json j;
@@ -364,5 +397,5 @@ struct Error {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Protocol.h v4.1.3
+// END OF FILE Protocol.h v4.1.4
 // ============================================================================

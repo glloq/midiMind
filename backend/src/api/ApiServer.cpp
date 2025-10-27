@@ -1,16 +1,20 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.1.2 - CORRIGÉ
+// Version: 4.2.0
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.2:
-//   - Fixed listen() to bind on 0.0.0.0 instead of localhost
+// Changes v4.2.0:
+//   - Added EventBus integration
+//   - Implemented event subscriptions
+//   - Broadcasting events to WebSocket clients
 //
 // ============================================================================
 
 #include "ApiServer.h"
 #include "../core/Logger.h"
+#include "../core/TimeUtils.h"
+#include "../events/Events.h"
 #include <functional>
 
 namespace midiMind {
@@ -19,20 +23,19 @@ namespace midiMind {
 // CONSTRUCTOR / DESTRUCTOR
 // ============================================================================
 
-ApiServer::ApiServer()
+ApiServer::ApiServer(std::shared_ptr<EventBus> eventBus)
     : running_(false)
     , port_(8080)
+    , eventBus_(eventBus)
 {
     Logger::info("ApiServer", "Creating WebSocket server...");
     
-    // Configure WebSocket server
     server_.set_access_channels(websocketpp::log::alevel::none);
     server_.set_error_channels(websocketpp::log::elevel::none);
     
     server_.init_asio();
     server_.set_reuse_addr(true);
     
-    // Set handlers
     server_.set_open_handler(
         std::bind(&ApiServer::onOpen, this, std::placeholders::_1)
     );
@@ -50,7 +53,6 @@ ApiServer::ApiServer()
         std::bind(&ApiServer::onFail, this, std::placeholders::_1)
     );
     
-    // Initialize statistics
     stats_.startTime = std::chrono::steady_clock::now();
     stats_.activeConnections = 0;
     stats_.totalConnections = 0;
@@ -58,11 +60,167 @@ ApiServer::ApiServer()
     stats_.messagesReceived = 0;
     stats_.errorCount = 0;
     
+    if (eventBus_) {
+        setupEventSubscriptions();
+    }
+    
     Logger::info("ApiServer", "✓ WebSocket server created");
 }
 
 ApiServer::~ApiServer() {
     stop();
+}
+
+// ============================================================================
+// EVENT BUS
+// ============================================================================
+
+void ApiServer::setEventBus(std::shared_ptr<EventBus> eventBus) {
+    eventBus_ = eventBus;
+    eventSubscriptions_.clear();
+    
+    if (eventBus_) {
+        setupEventSubscriptions();
+    }
+    
+    Logger::info("ApiServer", "EventBus configured");
+}
+
+void ApiServer::setupEventSubscriptions() {
+    if (!eventBus_) return;
+    
+    Logger::info("ApiServer", "Setting up event subscriptions...");
+    
+    // 1. MIDI Message Received
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::MidiMessageReceivedEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"device_id", event.deviceId},
+                    {"device_name", event.deviceName},
+                    {"message", {
+                        {"status", event.message.getStatus()},
+                        {"data1", event.message.getData1()},
+                        {"data2", event.message.getData2()}
+                    }},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("midi:message:received", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 2. Device Connected
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::DeviceConnectedEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"device_id", event.deviceId},
+                    {"device_name", event.deviceName},
+                    {"device_type", event.deviceType},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("device:connected", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 3. Device Disconnected
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::DeviceDisconnectedEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"device_id", event.deviceId},
+                    {"device_name", event.deviceName},
+                    {"reason", event.reason},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("device:disconnected", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 4. Playback State Changed
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::PlaybackStateChangedEvent>(
+            [this](const auto& event) {
+                std::string stateStr;
+                switch (event.state) {
+                    case events::PlaybackStateChangedEvent::State::PLAYING:
+                        stateStr = "playing";
+                        break;
+                    case events::PlaybackStateChangedEvent::State::PAUSED:
+                        stateStr = "paused";
+                        break;
+                    case events::PlaybackStateChangedEvent::State::STOPPED:
+                    default:
+                        stateStr = "stopped";
+                        break;
+                }
+                
+                json data = {
+                    {"state", stateStr},
+                    {"filepath", event.filepath},
+                    {"position", event.position},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("playback:state", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 5. Playback Progress
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::PlaybackProgressEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"position", event.position},
+                    {"duration", event.duration},
+                    {"percentage", event.percentage},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("playback:progress", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 6. Route Added
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::RouteAddedEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"source", event.source},
+                    {"destination", event.destination},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("route:added", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    // 7. Route Removed
+    eventSubscriptions_.push_back(
+        eventBus_->subscribe<events::RouteRemovedEvent>(
+            [this](const auto& event) {
+                json data = {
+                    {"source", event.source},
+                    {"destination", event.destination},
+                    {"timestamp", event.timestamp}
+                };
+                auto envelope = MessageEnvelope::createEvent("route:removed", data);
+                broadcast(envelope);
+            }
+        )
+    );
+    
+    Logger::info("ApiServer", "✓ Event subscriptions configured (" + 
+                std::to_string(eventSubscriptions_.size()) + " events)");
 }
 
 // ============================================================================
@@ -82,10 +240,8 @@ void ApiServer::start(int port) {
         port_ = port;
         running_ = true;
         
-        // Start server thread
         serverThread_ = std::thread(&ApiServer::serverThread, this);
         
-        // Wait for server to be ready
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         
         Logger::info("ApiServer", "✓ WebSocket server started successfully");
@@ -109,7 +265,6 @@ void ApiServer::stop() {
     running_ = false;
     
     try {
-        // Close all connections
         {
             std::lock_guard<std::mutex> lock(connectionsMutex_);
             
@@ -126,10 +281,8 @@ void ApiServer::stop() {
             connections_.clear();
         }
         
-        // Stop server
         server_.stop();
         
-        // Wait for server thread
         if (serverThread_.joinable()) {
             serverThread_.join();
         }
@@ -149,7 +302,9 @@ size_t ApiServer::getClientCount() const {
 
 ApiServer::Stats ApiServer::getStats() const {
     std::lock_guard<std::mutex> lock(statsMutex_);
-    return stats_;
+    Stats copy = stats_;
+    copy.activeConnections = getClientCount();
+    return copy;
 }
 
 // ============================================================================
@@ -158,11 +313,9 @@ ApiServer::Stats ApiServer::getStats() const {
 
 bool ApiServer::sendTo(connection_hdl hdl, const MessageEnvelope& message) {
     try {
-        std::string jsonStr = message.toString();
+        std::string payload = message.serialize();
+        server_.send(hdl, payload, websocketpp::frame::opcode::text);
         
-        server_.send(hdl, jsonStr, websocketpp::frame::opcode::text);
-        
-        // Update statistics
         {
             std::lock_guard<std::mutex> lock(statsMutex_);
             stats_.messagesSent++;
@@ -170,66 +323,59 @@ bool ApiServer::sendTo(connection_hdl hdl, const MessageEnvelope& message) {
         
         return true;
         
-    } catch (const websocketpp::exception& e) {
-        Logger::error("ApiServer", 
-                     "WebSocket error sending message: " + std::string(e.what()));
-        
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.errorCount++;
-        
-        return false;
-        
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
-                     "Error sending message: " + std::string(e.what()));
+                     "Failed to send message: " + std::string(e.what()));
         
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.errorCount++;
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            stats_.errorCount++;
+        }
         
         return false;
     }
 }
 
 bool ApiServer::sendError(connection_hdl hdl,
-                         const std::string& requestId,
-                         protocol::ErrorCode code,
-                         const std::string& message,
-                         const json& details) {
-    
-    auto errorMsg = MessageEnvelope::createErrorResponse(
-        requestId, code, message, details);
-    
-    return sendTo(hdl, errorMsg);
+                          const std::string& requestId,
+                          protocol::ErrorCode code,
+                          const std::string& message,
+                          const json& details) {
+    auto envelope = MessageEnvelope::createError(requestId, code, message, details);
+    return sendTo(hdl, envelope);
 }
 
 void ApiServer::broadcast(const MessageEnvelope& message) {
     std::lock_guard<std::mutex> lock(connectionsMutex_);
     
-    std::string jsonStr = message.toString();
+    std::string payload = message.serialize();
     
     for (auto& hdl : connections_) {
         try {
-            server_.send(hdl, jsonStr, websocketpp::frame::opcode::text);
+            server_.send(hdl, payload, websocketpp::frame::opcode::text);
             
-            std::lock_guard<std::mutex> statsLock(statsMutex_);
-            stats_.messagesSent++;
+            {
+                std::lock_guard<std::mutex> statsLock(statsMutex_);
+                stats_.messagesSent++;
+            }
             
         } catch (const std::exception& e) {
             Logger::warning("ApiServer", 
-                        "Error broadcasting to client: " + std::string(e.what()));
+                          "Failed to broadcast to client: " + std::string(e.what()));
             
-            std::lock_guard<std::mutex> statsLock(statsMutex_);
-            stats_.errorCount++;
+            {
+                std::lock_guard<std::mutex> statsLock(statsMutex_);
+                stats_.errorCount++;
+            }
         }
     }
 }
 
 void ApiServer::broadcastEvent(const std::string& name,
-                              const json& data,
-                              protocol::EventPriority priority) {
-    
-    auto event = MessageEnvelope::createEvent(name, data, priority);
-    broadcast(event);
+                               const json& data,
+                               protocol::EventPriority priority) {
+    auto envelope = MessageEnvelope::createEvent(name, data, priority);
+    broadcast(envelope);
 }
 
 // ============================================================================
@@ -237,118 +383,65 @@ void ApiServer::broadcastEvent(const std::string& name,
 // ============================================================================
 
 void ApiServer::onOpen(connection_hdl hdl) {
-    {
-        std::lock_guard<std::mutex> lock(connectionsMutex_);
-        connections_.insert(hdl);
-    }
+    std::lock_guard<std::mutex> lock(connectionsMutex_);
+    connections_.insert(hdl);
     
     {
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.activeConnections = connections_.size();
+        std::lock_guard<std::mutex> statsLock(statsMutex_);
         stats_.totalConnections++;
     }
     
-    // Get client info
-    try {
-        auto con = server_.get_con_from_hdl(hdl);
-        std::string remote = con->get_remote_endpoint();
-        
-        Logger::info("ApiServer", "Client connected: " + remote);
-        
-    } catch (const std::exception& e) {
-        Logger::warning("ApiServer", "Client connected (unknown address)");
-    }
+    Logger::info("ApiServer", 
+                "Client connected (total: " + 
+                std::to_string(connections_.size()) + ")");
 }
 
 void ApiServer::onClose(connection_hdl hdl) {
-    {
-        std::lock_guard<std::mutex> lock(connectionsMutex_);
-        connections_.erase(hdl);
-    }
+    std::lock_guard<std::mutex> lock(connectionsMutex_);
+    connections_.erase(hdl);
     
-    {
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.activeConnections = connections_.size();
-    }
-    
-    Logger::info("ApiServer", "Client disconnected");
+    Logger::info("ApiServer", 
+                "Client disconnected (remaining: " + 
+                std::to_string(connections_.size()) + ")");
 }
 
 void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
-    // Update statistics
-    {
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.messagesReceived++;
-    }
-    
     try {
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            stats_.messagesReceived++;
+        }
+        
         std::string payload = msg->get_payload();
+        auto envelope = MessageEnvelope::deserialize(payload);
         
-        Logger::debug("ApiServer", "Received message: " + 
-                     payload.substr(0, 100) + (payload.size() > 100 ? "..." : ""));
-        
-        // Parse message
-        auto messageOpt = MessageEnvelope::fromString(payload);
-        
-        if (!messageOpt) {
-            Logger::error("ApiServer", "Failed to parse message");
-            
-            sendError(hdl, "", 
-                     protocol::ErrorCode::INVALID_MESSAGE,
-                     "Failed to parse message");
-            return;
+        if (envelope.type == "request") {
+            processRequest(hdl, envelope);
         }
-        
-        auto& message = *messageOpt;
-        
-        // Validate message
-        if (!message.isValid()) {
-            Logger::error("ApiServer", "Invalid message");
-            
-            auto errors = message.getValidationErrors();
-            json errorDetails;
-            errorDetails["validation_errors"] = errors;
-            
-            sendError(hdl, message.getId(),
-                     protocol::ErrorCode::INVALID_MESSAGE,
-                     "Message validation failed",
-                     errorDetails);
-            return;
-        }
-        
-        // Process based on type
-        if (message.isRequest()) {
-            processRequest(hdl, message);
-            
-        } else {
-            Logger::warning("ApiServer", "Received non-request message, ignoring");
+        else if (envelope.type == "ping") {
+            auto pong = MessageEnvelope::createPong(envelope.requestId);
+            sendTo(hdl, pong);
         }
         
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
                      "Error processing message: " + std::string(e.what()));
         
-        sendError(hdl, "",
-                 protocol::ErrorCode::INTERNAL_ERROR,
-                 "Internal server error",
-                 {{"error", e.what()}});
-        
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.errorCount++;
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            stats_.errorCount++;
+        }
     }
 }
 
 void ApiServer::onFail(connection_hdl hdl) {
     Logger::warning("ApiServer", "Connection failed");
     
-    {
-        std::lock_guard<std::mutex> lock(connectionsMutex_);
-        connections_.erase(hdl);
-    }
+    std::lock_guard<std::mutex> lock(connectionsMutex_);
+    connections_.erase(hdl);
     
     {
-        std::lock_guard<std::mutex> lock(statsMutex_);
-        stats_.activeConnections = connections_.size();
+        std::lock_guard<std::mutex> statsLock(statsMutex_);
         stats_.errorCount++;
     }
 }
@@ -358,131 +451,47 @@ void ApiServer::onFail(connection_hdl hdl) {
 // ============================================================================
 
 void ApiServer::serverThread() {
-    Logger::debug("ApiServer", "Server thread started");
+    Logger::info("ApiServer", "Server thread started");
     
     try {
-        // Listen on 0.0.0.0 to accept connections from any interface
-        boost::asio::ip::tcp::endpoint endpoint(
-            boost::asio::ip::tcp::v4(), port_);
-        
-        server_.listen(endpoint);
-        
-        // Start accepting connections
+        server_.listen(port_);
         server_.start_accept();
-        
-        Logger::info("ApiServer", "WebSocket server listening on 0.0.0.0:" + 
-                    std::to_string(port_));
-        
-        // Run event loop
         server_.run();
-        
-    } catch (const websocketpp::exception& e) {
-        Logger::error("ApiServer", 
-                     "WebSocket error: " + std::string(e.what()));
-        running_ = false;
-        
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
                      "Server thread error: " + std::string(e.what()));
-        running_ = false;
     }
     
-    Logger::debug("ApiServer", "Server thread stopped");
+    Logger::info("ApiServer", "Server thread stopped");
 }
 
 void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& message) {
-    auto startTime = std::chrono::steady_clock::now();
-    
-    const protocol::Request& request = message.getRequest();
-    
-    Logger::debug("ApiServer", "Processing request: " + request.command + 
-                 " (ID: " + request.id + ")");
-    
-    // Check if callback is registered
     if (!commandCallback_) {
-        Logger::error("ApiServer", "No command callback registered");
-        
-        sendError(hdl, request.id,
+        sendError(hdl, message.requestId, 
                  protocol::ErrorCode::INTERNAL_ERROR,
-                 "Command handler not initialized");
+                 "No command handler configured");
         return;
     }
     
     try {
-        // Build command JSON for callback
-        json commandJson = {
-            {"command", request.command},
-            {"params", request.params}
-        };
+        json result = commandCallback_(message.data);
         
-        // Call command handler
-        json result = commandCallback_(commandJson);
+        auto response = MessageEnvelope::createResponse(
+            message.requestId,
+            result
+        );
         
-        // Calculate latency
-        auto endTime = std::chrono::steady_clock::now();
-        int latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-            endTime - startTime).count();
-        
-        // Create response based on result
-        MessageEnvelope response;
-        
-        if (result.value("success", false)) {
-            // Success response
-            json data = result.contains("data") ? result["data"] : json::object();
-            
-            response = MessageEnvelope::createSuccessResponse(
-                request.id, data, latency);
-            
-            Logger::debug("ApiServer", 
-                         "Command succeeded: " + request.command + 
-                         " (latency: " + std::to_string(latency) + "ms)");
-        } else {
-            // Error response
-            std::string errorMsg = result.value("error", "Command failed");
-            std::string errorCodeStr = result.value("error_code", "COMMAND_FAILED");
-            
-            // Map error code string to enum
-            protocol::ErrorCode code = protocol::ErrorCode::COMMAND_FAILED;
-            
-            if (errorCodeStr == "UNKNOWN_COMMAND") {
-                code = protocol::ErrorCode::UNKNOWN_COMMAND;
-            } else if (errorCodeStr == "INVALID_PARAMS") {
-                code = protocol::ErrorCode::INVALID_PARAMS;
-            } else if (errorCodeStr == "DEVICE_NOT_FOUND") {
-                code = protocol::ErrorCode::DEVICE_NOT_FOUND;
-            } else if (errorCodeStr == "DEVICE_BUSY") {
-                code = protocol::ErrorCode::DEVICE_BUSY;
-            } else if (errorCodeStr == "INTERNAL_ERROR") {
-                code = protocol::ErrorCode::INTERNAL_ERROR;
-            }
-            
-            json details = result.contains("details") ? 
-                          result["details"] : json::object();
-            
-            response = MessageEnvelope::createErrorResponse(
-                request.id, code, errorMsg, details);
-            
-            Logger::warning("ApiServer", 
-                        "Command failed: " + request.command + 
-                        " - " + errorMsg);
-        }
-        
-        // Send response
         sendTo(hdl, response);
         
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
-                     "Error executing command: " + std::string(e.what()));
+                     "Command processing error: " + std::string(e.what()));
         
-        sendError(hdl, request.id,
-                 protocol::ErrorCode::INTERNAL_ERROR,
+        sendError(hdl, message.requestId,
+                 protocol::ErrorCode::COMMAND_FAILED,
                  "Command execution failed",
                  {{"error", e.what()}});
     }
 }
 
 } // namespace midiMind
-
-// ============================================================================
-// END OF FILE ApiServer.cpp v4.1.2
-// ============================================================================

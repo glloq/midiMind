@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/MidiValidator.h
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -16,6 +16,10 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Added constexpr and noexcept where appropriate
+//   - Optimized static validation methods
 //
 // Changes v4.1.0:
 //   - Enhanced validation rules
@@ -119,14 +123,14 @@ struct ValidationResult {
     /**
      * @brief Check if has any issues
      */
-    bool hasIssues() const {
+    bool hasIssues() const noexcept {
         return !errors.empty() || !warnings.empty() || !infos.empty();
     }
     
     /**
      * @brief Get total issue count
      */
-    size_t getIssueCount() const {
+    size_t getIssueCount() const noexcept {
         return errors.size() + warnings.size() + infos.size();
     }
     
@@ -135,6 +139,7 @@ struct ValidationResult {
      */
     std::vector<std::string> getAllMessages() const {
         std::vector<std::string> messages;
+        messages.reserve(getIssueCount());
         
         for (const auto& error : errors) {
             messages.push_back(error.toString());
@@ -221,7 +226,7 @@ public:
      * @param value Value to check
      * @return true if valid
      */
-    static bool isValidMidiValue(int value) {
+    static constexpr bool isValidMidiValue(int value) noexcept {
         return value >= 0 && value <= 127;
     }
     
@@ -230,7 +235,7 @@ public:
      * @param note Note number
      * @return true if valid
      */
-    static bool isValidNote(int note) {
+    static constexpr bool isValidNote(int note) noexcept {
         return isValidMidiValue(note);
     }
     
@@ -239,7 +244,7 @@ public:
      * @param velocity Velocity value
      * @return true if valid
      */
-    static bool isValidVelocity(int velocity) {
+    static constexpr bool isValidVelocity(int velocity) noexcept {
         return isValidMidiValue(velocity);
     }
     
@@ -248,7 +253,7 @@ public:
      * @param channel Channel number
      * @return true if valid
      */
-    static bool isValidChannel(int channel) {
+    static constexpr bool isValidChannel(int channel) noexcept {
         return channel >= 0 && channel <= 15;
     }
     
@@ -257,7 +262,7 @@ public:
      * @param controller Controller number
      * @return true if valid
      */
-    static bool isValidController(int controller) {
+    static constexpr bool isValidController(int controller) noexcept {
         return isValidMidiValue(controller);
     }
     
@@ -266,7 +271,7 @@ public:
      * @param program Program number
      * @return true if valid
      */
-    static bool isValidProgram(int program) {
+    static constexpr bool isValidProgram(int program) noexcept {
         return isValidMidiValue(program);
     }
     
@@ -275,7 +280,7 @@ public:
      * @param value Pitch bend value
      * @return true if valid
      */
-    static bool isValidPitchBend(int value) {
+    static constexpr bool isValidPitchBend(int value) noexcept {
         return value >= -8192 && value <= 8191;
     }
     
@@ -284,7 +289,7 @@ public:
      * @param status Status byte
      * @return true if valid
      */
-    static bool isValidStatusByte(uint8_t status) {
+    static constexpr bool isValidStatusByte(uint8_t status) noexcept {
         return status >= 0x80;
     }
     
@@ -293,7 +298,7 @@ public:
      * @param data Data byte
      * @return true if valid
      */
-    static bool isValidDataByte(uint8_t data) {
+    static constexpr bool isValidDataByte(uint8_t data) noexcept {
         return data <= 0x7F;
     }
     
@@ -330,7 +335,7 @@ public:
      * @param note Note number
      * @return true if in piano range
      */
-    static bool isInPianoRange(int note) {
+    static constexpr bool isInPianoRange(int note) noexcept {
         return note >= 21 && note <= 108;
     }
     
@@ -339,7 +344,7 @@ public:
      * @param note Note number
      * @return true if likely audible
      */
-    static bool isInAudibleRange(int note) {
+    static constexpr bool isInAudibleRange(int note) noexcept {
         return note >= 12 && note <= 120;  // ~16Hz to ~8.4kHz
     }
     

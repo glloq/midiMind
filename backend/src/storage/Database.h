@@ -1,31 +1,12 @@
 // ============================================================================
 // File: backend/src/storage/Database.h
-// Version: 4.1.1 - CORRIGÉ
+// Version: 4.2.1 - DEADLOCK FIX
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   High-performance SQLite3 wrapper with modern C++ API.
-//   Handles all database operations with thread-safety and automatic migrations.
-//
-// Features:
-//   - Connection management (open/close)
-//   - Parameterized queries (SQL injection protection)
-//   - Transactions (ACID compliant)
-//   - Automatic schema migrations
-//   - Backup and optimization
-//   - Thread-safe operations
-//
-// Dependencies:
-//   - SQLite3 (libsqlite3)
-//   - Logger
-//   - Error handling
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.1:
-//   - Fixed: queryScalar, getTables, getSchemaVersion now const
+// Corrections v4.2.1:
+//   - Added queryScalarUnlocked() for internal use
+//   - Fixed deadlock issues by separating locked/unlocked methods
 //
 // ============================================================================
 
@@ -36,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <atomic>
 #include <functional>
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
@@ -182,13 +164,20 @@ public:
      * @return true if connected
      * @note Thread-safe
      */
-    bool isConnected() const { return isConnected_; }
+    bool isConnected() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return isConnected_;
+    }
     
     /**
      * @brief Get database file path
      * @return Database file path
+     * @note Thread-safe
      */
-    std::string getPath() const { return filepath_; }
+    std::string getPath() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return filepath_;
+    }
     
     // ========================================================================
     // QUERY EXECUTION
@@ -236,7 +225,6 @@ public:
      * @param params Parameter values (optional)
      * @return String value (empty if no result)
      * @note Thread-safe
-     * @note FIXED: Now const
      * 
      * Example:
      * ```cpp
@@ -265,7 +253,7 @@ public:
      * });
      * ```
      */
-    bool transaction(std::function<void()> func);
+    bool transaction(const std::function<void()>& func);
     
     /**
      * @brief Begin transaction manually
@@ -303,7 +291,6 @@ public:
      * @brief Get current schema version
      * @return Schema version number
      * @note Thread-safe
-     * @note FIXED: Now const
      */
     int getSchemaVersion() const;
     
@@ -319,7 +306,6 @@ public:
      * @brief Get list of all tables
      * @return Vector of table names
      * @note Thread-safe
-     * @note FIXED: Now const
      */
     std::vector<std::string> getTables() const;
     
@@ -327,6 +313,7 @@ public:
      * @brief Truncate table (delete all rows)
      * @param tableName Table name
      * @note Thread-safe
+     * @note Validates table name to prevent SQL injection
      */
     void truncateTable(const std::string& tableName);
     
@@ -386,6 +373,13 @@ private:
                                    bool isQuery);
     
     /**
+     * @brief Query single scalar value (internal, assumes mutex locked)
+     * @note NOT thread-safe, caller must hold mutex_
+     */
+    std::string queryScalarUnlocked(const std::string& sql,
+                                    const std::vector<std::string>& params = {}) const;
+    
+    /**
      * @brief Get migration files sorted by version
      */
     std::vector<std::string> getMigrationFiles(const std::string& dir);
@@ -395,19 +389,27 @@ private:
      */
     bool executeMigration(const std::string& filepath, int version);
     
+    /**
+     * @brief Initialize schema version table (non-const helper)
+     */
+    void initSchemaVersionTable();
+    
     // ========================================================================
     // MEMBER VARIABLES
     // ========================================================================
     
-    mutable std::mutex mutex_;         ///< Thread synchronization
-    sqlite3* db_ = nullptr;            ///< SQLite database handle
-    std::string filepath_;             ///< Database file path
-    bool isConnected_ = false;         ///< Connection status
+    mutable std::mutex mutex_;                  ///< Thread synchronization
+    sqlite3* db_ = nullptr;                     ///< SQLite database handle
+    std::string filepath_;                      ///< Database file path
+    bool isConnected_ = false;                  ///< Connection status
     
-    // Statistics
-    mutable uint64_t queryCount_ = 0;  ///< Total queries executed
-    mutable uint64_t errorCount_ = 0;  ///< Total errors encountered
+    // Statistics (atomic for thread-safe increment)
+    mutable std::atomic<uint64_t> queryCount_{0};  ///< Total queries executed
+    mutable std::atomic<uint64_t> errorCount_{0};  ///< Total errors encountered
 };
 
 } // namespace midiMind
 
+// ============================================================================
+// END OF FILE Database.h v4.2.1
+// ============================================================================

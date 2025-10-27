@@ -5,7 +5,7 @@
 // ============================================================================
 //
 // Description:
-//   Complete implementation of MIDI file reader
+//   Complete implementation of MIDI file reader with enhanced security
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
@@ -14,8 +14,11 @@
 //   - Complete implementation of all methods
 //   - Enhanced error handling
 //   - Better validation
-//   - Duration calculation
+//   - Duration calculation with overflow protection
 //   - Metadata extraction
+//   - Improved bounds checking in readVariableLength
+//   - Running status validation
+//   - Bit shift overflow protection
 //
 // ============================================================================
 
@@ -25,6 +28,7 @@
 #include <sstream>
 #include <cstring>
 #include <algorithm>
+#include <limits>
 
 namespace midiMind {
 
@@ -35,6 +39,7 @@ namespace midiMind {
 MidiFileReader::MidiFileReader()
     : lastRunningStatus_(0)
     , currentAbsoluteTime_(0)
+    , bufferSize_(0)
 {
     Logger::debug("MidiFileReader", "MidiFileReader created");
 }
@@ -52,9 +57,18 @@ MidiFile MidiFileReader::readFromFile(const std::string& filepath) {
         THROW_ERROR(ErrorCode::FILE_NOT_FOUND, "Cannot open file: " + filepath);
     }
     
-    // Get file size
-    std::streamsize size = file.tellg();
+    // Get file size and verify tellg success
+    std::streampos pos = file.tellg();
+    if (pos < 0) {
+        THROW_ERROR(ErrorCode::FILE_READ_ERROR, "Failed to get file size: " + filepath);
+    }
+    std::streamsize size = pos;
     file.seekg(0, std::ios::beg);
+    
+    // Validate file size
+    if (size < 14) {
+        THROW_ERROR(ErrorCode::FILE_READ_ERROR, "File too small to be valid MIDI: " + filepath);
+    }
     
     // Read entire file
     std::vector<uint8_t> buffer(size);
@@ -90,9 +104,10 @@ MidiFile MidiFileReader::readFromBuffer(const uint8_t* data, size_t size) {
         MidiFile midiFile;
         size_t offset = 0;
         
-        // Reset state
+        // Reset state for new file
         lastRunningStatus_ = 0;
         currentAbsoluteTime_ = 0;
+        bufferSize_ = size;
         
         // ====================================================================
         // PARSE HEADER CHUNK (MThd)
@@ -214,7 +229,8 @@ bool MidiFileReader::validate(const std::string& filepath) {
         
         // Check minimum size
         file.seekg(0, std::ios::end);
-        if (file.tellg() < 14) {
+        std::streampos pos = file.tellg();
+        if (pos < 0 || pos < 14) {
             return false;
         }
         file.seekg(0, std::ios::beg);
@@ -274,15 +290,22 @@ std::vector<MidiEvent> MidiFileReader::parseTrackEvents(
     size_t trackEnd)
 {
     std::vector<MidiEvent> events;
-    events.reserve(1000); // Pre-allocate
+    // Reserve reasonable amount, not arbitrary 1000
+    size_t estimatedEvents = std::min(static_cast<size_t>(100), (trackEnd - offset) / 4);
+    events.reserve(estimatedEvents);
     
     while (offset < trackEnd) {
         MidiEvent event;
         
-        // Read delta time
-        event.deltaTime = readVariableLength(data, offset);
+        // Read delta time with bounds checking
+        event.deltaTime = readVariableLength(data, offset, trackEnd);
         currentAbsoluteTime_ += event.deltaTime;
         event.absoluteTime = currentAbsoluteTime_;
+        
+        // Check we still have data for status byte
+        if (offset >= trackEnd) {
+            THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, "Unexpected end of track");
+        }
         
         // Read status byte
         uint8_t statusByte = data[offset];
@@ -290,11 +313,13 @@ std::vector<MidiEvent> MidiFileReader::parseTrackEvents(
         // Handle running status
         if (statusByte < 0x80) {
             // Running status: reuse last status
-            if (lastRunningStatus_ == 0) {
+            // Verify that lastRunningStatus_ is valid (>= 0x80)
+            if (lastRunningStatus_ < 0x80) {
                 THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, 
-                           "Running status without previous status");
+                           "Running status without previous valid status");
             }
             statusByte = lastRunningStatus_;
+            // Don't advance offset since this is a data byte
         } else {
             // New status byte
             offset++;
@@ -339,8 +364,12 @@ void MidiFileReader::parseMetaEvent(
     }
     event.metaType = data[offset++];
     
-    // Read length
-    uint32_t length = readVariableLength(data, offset);
+    // Read length - IMPORTANT: Check bounds BEFORE reading length
+    if (offset >= trackEnd) {
+        THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, "Unexpected end reading meta length");
+    }
+    
+    uint32_t length = readVariableLength(data, offset, trackEnd);
     
     if (offset + length > trackEnd) {
         THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, 
@@ -358,45 +387,56 @@ void MidiFileReader::parseMetaEvent(
             break;
             
         case 0x01: // Text Event
-            event.metaName = "Text";
-            event.text.assign(event.data.begin(), event.data.end());
+            event.metaName = "Text Event";
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
-        case 0x02: // Copyright
-            event.metaName = "Copyright";
-            event.text.assign(event.data.begin(), event.data.end());
+        case 0x02: // Copyright Notice
+            event.metaName = "Copyright Notice";
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x03: // Track Name
             event.metaName = "Track Name";
-            event.trackName.assign(event.data.begin(), event.data.end());
+            if (length > 0) {
+                event.trackName = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x04: // Instrument Name
             event.metaName = "Instrument Name";
-            event.text.assign(event.data.begin(), event.data.end());
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x05: // Lyric
             event.metaName = "Lyric";
-            event.text.assign(event.data.begin(), event.data.end());
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x06: // Marker
             event.metaName = "Marker";
-            event.text.assign(event.data.begin(), event.data.end());
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x07: // Cue Point
             event.metaName = "Cue Point";
-            event.text.assign(event.data.begin(), event.data.end());
+            if (length > 0) {
+                event.text = std::string(event.data.begin(), event.data.end());
+            }
             break;
             
         case 0x20: // MIDI Channel Prefix
-            event.metaName = "Channel Prefix";
-            if (length == 1) {
-                event.channel = event.data[0];
-            }
+            event.metaName = "MIDI Channel Prefix";
             break;
             
         case 0x2F: // End of Track
@@ -420,7 +460,12 @@ void MidiFileReader::parseMetaEvent(
             event.metaName = "Time Signature";
             if (length == 4) {
                 event.timeSignature.numerator = event.data[0];
-                event.timeSignature.denominator = 1 << event.data[1];
+                // Protect against overflow in bit shift
+                if (event.data[1] < 8) {  // Max power of 2: 2^7 = 128
+                    event.timeSignature.denominator = 1 << event.data[1];
+                } else {
+                    event.timeSignature.denominator = 128;  // Clamp to max reasonable value
+                }
                 event.timeSignature.clocksPerClick = event.data[2];
                 event.timeSignature.notated32ndNotesPerBeat = event.data[3];
             }
@@ -454,8 +499,13 @@ void MidiFileReader::parseSysExEvent(
     event.type = MidiEventType::SYSEX;
     event.status = statusByte;
     
+    // Check bounds before reading length
+    if (offset >= trackEnd) {
+        THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, "Unexpected end reading SysEx length");
+    }
+    
     // Read length
-    uint32_t length = readVariableLength(data, offset);
+    uint32_t length = readVariableLength(data, offset, trackEnd);
     
     if (offset + length > trackEnd) {
         THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, 
@@ -559,13 +609,29 @@ void MidiFileReader::parseMidiChannelEvent(
 // PRIVATE METHODS - UTILITIES
 // ============================================================================
 
-uint32_t MidiFileReader::readVariableLength(const uint8_t* data, size_t& offset) {
+uint32_t MidiFileReader::readVariableLength(const uint8_t* data, size_t& offset, size_t maxOffset) {
     uint32_t value = 0;
     uint8_t byte;
+    int iterations = 0;
+    const int MAX_ITERATIONS = 4;  // Variable length can be max 4 bytes
     
     do {
+        // Check bounds before reading
+        if (offset >= maxOffset) {
+            THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, 
+                       "Unexpected end while reading variable length quantity");
+        }
+        
+        // Check iteration limit to prevent infinite loop
+        if (iterations >= MAX_ITERATIONS) {
+            THROW_ERROR(ErrorCode::MIDI_FILE_CORRUPTED, 
+                       "Invalid variable length quantity (too many bytes)");
+        }
+        
         byte = data[offset++];
         value = (value << 7) | (byte & 0x7F);
+        iterations++;
+        
     } while (byte & 0x80);
     
     return value;
@@ -620,13 +686,27 @@ void MidiFileReader::calculateDuration(MidiFile& file) {
         }
     }
     
-    file.durationTicks = static_cast<uint32_t>(maxTicks);
+    // Check for overflow when casting uint64_t to uint32_t
+    if (maxTicks > std::numeric_limits<uint32_t>::max()) {
+        Logger::warning("MidiFileReader", "Duration in ticks exceeds uint32_t, clamping");
+        file.durationTicks = std::numeric_limits<uint32_t>::max();
+    } else {
+        file.durationTicks = static_cast<uint32_t>(maxTicks);
+    }
     
     // Convert ticks to milliseconds
     // Formula: ms = (ticks * tempo) / (division * 1000)
     if (file.header.division > 0) {
         double ticksPerMs = (file.header.division * 1000.0) / currentTempo;
-        file.durationMs = static_cast<uint32_t>(maxTicks / ticksPerMs);
+        double durationMsDouble = maxTicks / ticksPerMs;
+        
+        // Check for overflow
+        if (durationMsDouble > std::numeric_limits<uint32_t>::max()) {
+            Logger::warning("MidiFileReader", "Duration in ms exceeds uint32_t, clamping");
+            file.durationMs = std::numeric_limits<uint32_t>::max();
+        } else {
+            file.durationMs = static_cast<uint32_t>(durationMsDouble);
+        }
     }
     
     // Calculate BPM

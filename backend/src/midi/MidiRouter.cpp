@@ -1,24 +1,21 @@
 // ============================================================================
 // File: backend/src/midi/MidiRouter.cpp
-// Version: 4.1.0
+// Version: 4.2.0 - EventBus Integration
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Implementation of MidiRouter.
-//
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Complete implementation
-//   - Latency compensation integration
-//   - Enhanced filtering and statistics
+// Changes v4.2.0:
+//   🔧 ADDED: EventBus support for routing events
+//   ✅ Publishes RouteAddedEvent and RouteRemovedEvent
+//   ✅ Added enableRoute/disableRoute convenience methods
 //
 // ============================================================================
 
 #include "MidiRouter.h"
 #include "../core/Logger.h"
+#include "../core/EventBus.h"
+#include "../core/TimeUtils.h"
+#include "../events/Events.h"
 #include "../timing/TimestampManager.h"
 #include "devices/MidiDevice.h"
 #include <algorithm>
@@ -29,11 +26,13 @@ namespace midiMind {
 // CONSTRUCTOR / DESTRUCTOR
 // ============================================================================
 
-MidiRouter::MidiRouter(LatencyCompensator* compensator)
+MidiRouter::MidiRouter(LatencyCompensator* compensator,
+                       std::shared_ptr<EventBus> eventBus)
     : compensator_(compensator)
+    , eventBus_(eventBus)
     , instrumentCompensationEnabled_(true)
 {
-    Logger::info("MidiRouter", "MidiRouter created");
+    Logger::info("MidiRouter", "MidiRouter v4.2.0 created");
     
     // Initialize global stats
     globalStats_.totalMessages = 0;
@@ -50,15 +49,20 @@ MidiRouter::~MidiRouter() {
 // ============================================================================
 
 void MidiRouter::route(const MidiMessage& message) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    
-    // Update global stats
+    // Update global stats (atomic, no lock needed)
     globalStats_.totalMessages++;
+    
+    // Copy routes for processing (avoid holding lock during routing)
+    std::vector<std::shared_ptr<MidiRoute>> routesCopy;
+    {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        routesCopy = routes_;
+    }
     
     // Find matching routes
     std::vector<std::shared_ptr<MidiRoute>> matchingRoutes;
     
-    for (const auto& route : routes_) {
+    for (const auto& route : routesCopy) {
         if (route->enabled && matchesRoute(message, *route)) {
             matchingRoutes.push_back(route);
         }
@@ -105,14 +109,18 @@ void MidiRouter::route(const MidiMessage& message) {
 }
 
 void MidiRouter::routeTo(const MidiMessage& message, const std::string& deviceId) {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    
     Logger::debug("MidiRouter", "Direct routing to device: " + deviceId);
     
     sendToDevice(deviceId, message);
     
     globalStats_.totalMessages++;
     globalStats_.routedMessages++;
+}
+
+void MidiRouter::setMessageCallback(MessageCallback callback) {
+    std::lock_guard<std::mutex> lock(callbackMutex_);
+    messageCallback_ = callback;
+    Logger::info("MidiRouter", "Message callback set");
 }
 
 // ============================================================================
@@ -145,21 +153,132 @@ void MidiRouter::addRoute(std::shared_ptr<MidiRoute> route) {
     routeStats_[route->id] = stats;
     
     Logger::info("MidiRouter", "Route added: " + route->name + " (ID: " + route->id + ")");
+    
+    // Publish event to EventBus (without holding lock)
+    std::string sourceId = route->sourceDeviceId;
+    std::string destId = route->destinationDeviceId;
+    lock.unlock();
+    
+    if (eventBus_) {
+        try {
+            eventBus_->publish(events::RouteAddedEvent(
+                sourceId.empty() ? "any" : sourceId,
+                destId,
+                TimeUtils::getCurrentTimestamp()
+            ));
+            Logger::debug("MidiRouter", "Published RouteAddedEvent");
+        } catch (const std::exception& e) {
+            Logger::error("MidiRouter", 
+                "Failed to publish RouteAddedEvent: " + std::string(e.what()));
+        }
+    }
+}
+
+bool MidiRouter::addRoute(const std::string& sourceDeviceId, const std::string& destinationDeviceId) {
+    if (destinationDeviceId.empty()) {
+        Logger::error("MidiRouter", "Cannot add route: destination device ID is empty");
+        return false;
+    }
+    
+    // Create new route
+    auto route = std::make_shared<MidiRoute>();
+    
+    // Generate unique ID
+    route->id = "route_" + sourceDeviceId + "_to_" + destinationDeviceId + "_" + 
+                std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    
+    route->name = sourceDeviceId.empty() ? 
+                  "Any -> " + destinationDeviceId : 
+                  sourceDeviceId + " -> " + destinationDeviceId;
+    
+    route->sourceDeviceId = sourceDeviceId;
+    route->destinationDeviceId = destinationDeviceId;
+    route->priority = 50;
+    route->enabled = true;
+    
+    addRoute(route);
+    
+    Logger::info("MidiRouter", "Simple route added: " + route->name);
+    return true;
 }
 
 bool MidiRouter::removeRoute(const std::string& id) {
+    std::string sourceId, destId;
+    bool found = false;
+    
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
+        
+        auto it = std::find_if(routes_.begin(), routes_.end(),
+                              [&id](const auto& r) { return r->id == id; });
+        
+        if (it != routes_.end()) {
+            sourceId = (*it)->sourceDeviceId;
+            destId = (*it)->destinationDeviceId;
+            Logger::info("MidiRouter", "Route removed: " + (*it)->name);
+            routes_.erase(it);
+            routeStats_.erase(id);
+            found = true;
+        }
+    }
+    
+    // Publish event to EventBus (without holding lock)
+    if (found && eventBus_) {
+        try {
+            eventBus_->publish(events::RouteRemovedEvent(
+                sourceId.empty() ? "any" : sourceId,
+                destId,
+                TimeUtils::getCurrentTimestamp()
+            ));
+            Logger::debug("MidiRouter", "Published RouteRemovedEvent");
+        } catch (const std::exception& e) {
+            Logger::error("MidiRouter", 
+                "Failed to publish RouteRemovedEvent: " + std::string(e.what()));
+        }
+    }
+    
+    return found;
+}
+
+bool MidiRouter::removeRoute(const std::string& sourceDeviceId, const std::string& destinationDeviceId) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     
     auto it = std::find_if(routes_.begin(), routes_.end(),
-                          [&id](const auto& r) { return r->id == id; });
+                          [&sourceDeviceId, &destinationDeviceId](const auto& r) { 
+                              return r->sourceDeviceId == sourceDeviceId && 
+                                     r->destinationDeviceId == destinationDeviceId; 
+                          });
     
     if (it != routes_.end()) {
-        Logger::info("MidiRouter", "Route removed: " + (*it)->name);
+        std::string routeName = (*it)->name;
+        std::string routeId = (*it)->id;
         routes_.erase(it);
-        routeStats_.erase(id);
+        routeStats_.erase(routeId);
+        
+        Logger::info("MidiRouter", "Route removed by devices: " + routeName);
+        
+        // Publish event (unlock first)
+        lock.unlock();
+        
+        if (eventBus_) {
+            try {
+                eventBus_->publish(events::RouteRemovedEvent(
+                    sourceDeviceId.empty() ? "any" : sourceDeviceId,
+                    destinationDeviceId,
+                    TimeUtils::getCurrentTimestamp()
+                ));
+                Logger::debug("MidiRouter", "Published RouteRemovedEvent");
+            } catch (const std::exception& e) {
+                Logger::error("MidiRouter", 
+                    "Failed to publish RouteRemovedEvent: " + std::string(e.what()));
+            }
+        }
+        
         return true;
     }
     
+    Logger::warning("MidiRouter", 
+                   "No route found from " + sourceDeviceId + " to " + destinationDeviceId);
     return false;
 }
 
@@ -193,6 +312,44 @@ void MidiRouter::setRouteEnabled(const std::string& id, bool enabled) {
                     "Route " + (*it)->name + " " + 
                     (enabled ? "enabled" : "disabled"));
     }
+}
+
+bool MidiRouter::enableRoute(const std::string& sourceDeviceId, 
+                             const std::string& destinationDeviceId) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    
+    auto it = std::find_if(routes_.begin(), routes_.end(),
+                          [&sourceDeviceId, &destinationDeviceId](const auto& r) {
+                              return r->sourceDeviceId == sourceDeviceId &&
+                                     r->destinationDeviceId == destinationDeviceId;
+                          });
+    
+    if (it != routes_.end()) {
+        (*it)->enabled = true;
+        Logger::info("MidiRouter", "Route enabled: " + (*it)->name);
+        return true;
+    }
+    
+    return false;
+}
+
+bool MidiRouter::disableRoute(const std::string& sourceDeviceId,
+                              const std::string& destinationDeviceId) {
+    std::unique_lock<std::shared_mutex> lock(mutex_);
+    
+    auto it = std::find_if(routes_.begin(), routes_.end(),
+                          [&sourceDeviceId, &destinationDeviceId](const auto& r) {
+                              return r->sourceDeviceId == sourceDeviceId &&
+                                     r->destinationDeviceId == destinationDeviceId;
+                          });
+    
+    if (it != routes_.end()) {
+        (*it)->enabled = false;
+        Logger::info("MidiRouter", "Route disabled: " + (*it)->name);
+        return true;
+    }
+    
+    return false;
 }
 
 void MidiRouter::clearRoutes() {
@@ -243,6 +400,25 @@ std::shared_ptr<MidiDevice> MidiRouter::getDevice(const std::string& deviceId) c
 }
 
 // ============================================================================
+// LATENCY COMPENSATION
+// ============================================================================
+
+void MidiRouter::setLatencyCompensator(LatencyCompensator* compensator) {
+    compensator_.store(compensator);
+    Logger::info("MidiRouter", "Latency compensator set");
+}
+
+void MidiRouter::setInstrumentCompensationEnabled(bool enabled) {
+    instrumentCompensationEnabled_.store(enabled);
+    Logger::info("MidiRouter", 
+                std::string("Instrument compensation ") + (enabled ? "enabled" : "disabled"));
+}
+
+bool MidiRouter::isInstrumentCompensationEnabled() const {
+    return instrumentCompensationEnabled_.load();
+}
+
+// ============================================================================
 // STATISTICS
 // ============================================================================
 
@@ -254,24 +430,24 @@ RouteStatistics MidiRouter::getRouteStatistics(const std::string& routeId) const
         return it->second;
     }
     
-    return RouteStatistics();
+    // Return empty stats if not found
+    RouteStatistics empty;
+    empty.routeId = routeId;
+    return empty;
 }
 
 json MidiRouter::getStatistics() const {
     std::shared_lock<std::shared_mutex> lock(mutex_);
     
     json stats = {
-        {"global", {
-            {"total_messages", globalStats_.totalMessages},
-            {"routed_messages", globalStats_.routedMessages},
-            {"dropped_messages", globalStats_.droppedMessages},
-            {"route_count", routes_.size()},
-            {"device_count", devices_.size()}
-        }},
+        {"total_messages", globalStats_.totalMessages.load()},
+        {"routed_messages", globalStats_.routedMessages.load()},
+        {"dropped_messages", globalStats_.droppedMessages.load()},
+        {"total_routes", routes_.size()},
         {"routes", json::array()}
     };
     
-    for (const auto& [routeId, routeStat] : routeStats_) {
+    for (const auto& [id, routeStat] : routeStats_) {
         stats["routes"].push_back(routeStat.toJson());
     }
     
@@ -279,20 +455,26 @@ json MidiRouter::getStatistics() const {
 }
 
 void MidiRouter::resetStatistics() {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    
     Logger::info("MidiRouter", "Resetting statistics");
     
     globalStats_.totalMessages = 0;
     globalStats_.routedMessages = 0;
     globalStats_.droppedMessages = 0;
     
-    for (auto& [routeId, stats] : routeStats_) {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    for (auto& [id, stats] : routeStats_) {
         stats.messagesRouted = 0;
-        stats.messagesDropped = 0;
         stats.avgCompensation = 0;
-        stats.lastMessageTime = 0;
     }
+}
+
+// ============================================================================
+// EVENTBUS
+// ============================================================================
+
+void MidiRouter::setEventBus(std::shared_ptr<EventBus> eventBus) {
+    eventBus_ = eventBus;
+    Logger::info("MidiRouter", "EventBus configured");
 }
 
 // ============================================================================
@@ -300,10 +482,6 @@ void MidiRouter::resetStatistics() {
 // ============================================================================
 
 bool MidiRouter::matchesRoute(const MidiMessage& message, const MidiRoute& route) const {
-    // Check source device filter
-    // Note: In real implementation, message would have source device ID
-    // For now, we assume all messages can match source filter
-    
     // Check channel filter
     if (!route.channelFilter.empty()) {
         int channel = message.getChannel();
@@ -322,43 +500,17 @@ bool MidiRouter::matchesRoute(const MidiMessage& message, const MidiRoute& route
     
     // Check message type filter
     if (!route.messageTypeFilter.empty()) {
-        std::string msgType = message.getTypeName();
+        uint8_t status = message.getStatus();
         
         bool typeMatch = false;
-        for (const auto& allowedType : route.messageTypeFilter) {
-            if (msgType == allowedType) {
+        for (uint8_t allowedType : route.messageTypeFilter) {
+            if (status == allowedType) {
                 typeMatch = true;
                 break;
             }
         }
         
         if (!typeMatch) return false;
-    }
-    
-    // Check note range (for note messages)
-    if (message.isNoteOn() || message.isNoteOff()) {
-        uint8_t note = message.getData1();
-        
-        if (route.minNote.has_value() && note < route.minNote.value()) {
-            return false;
-        }
-        
-        if (route.maxNote.has_value() && note > route.maxNote.value()) {
-            return false;
-        }
-    }
-    
-    // Check velocity range (for note messages)
-    if (message.isNoteOn() || message.isNoteOff()) {
-        uint8_t velocity = message.getData2();
-        
-        if (route.minVelocity.has_value() && velocity < route.minVelocity.value()) {
-            return false;
-        }
-        
-        if (route.maxVelocity.has_value() && velocity > route.maxVelocity.value()) {
-            return false;
-        }
     }
     
     return true;
@@ -369,10 +521,10 @@ MidiMessage MidiRouter::applyTransformations(const MidiMessage& message,
     MidiMessage transformed = message;
     
     // Apply channel transform
-    if (route.channelTransform.has_value()) {
+    if (route.channelTransform != 0) {
         int channel = message.getChannel();
         if (channel >= 0) {
-            int newChannel = channel + route.channelTransform.value();
+            int newChannel = channel + route.channelTransform;
             
             // Clamp to valid range (0-15)
             if (newChannel < 0) newChannel = 0;
@@ -388,22 +540,21 @@ MidiMessage MidiRouter::applyTransformations(const MidiMessage& message,
                                                    message.getData1(), 
                                                    message.getData2());
             }
-            // Add other message types as needed
         }
     }
     
     // Apply transpose (for note messages)
-    if (route.transposeTransform.has_value() && 
+    if (route.transposeTransform != 0 && 
         (message.isNoteOn() || message.isNoteOff())) {
         
         uint8_t note = message.getData1();
-        int newNote = note + route.transposeTransform.value();
+        int newNote = note + route.transposeTransform;
         
         // Clamp to valid range (0-127)
         if (newNote < 0) newNote = 0;
         if (newNote > 127) newNote = 127;
         
-        int channel = message.getChannel();
+        int channel = transformed.getChannel();
         if (channel < 0) channel = 0;
         
         if (message.isNoteOn()) {
@@ -413,28 +564,24 @@ MidiMessage MidiRouter::applyTransformations(const MidiMessage& message,
         }
     }
     
-    // Apply velocity scaling (for note messages)
-    if (route.velocityScale.has_value() && 
+    // Apply velocity transform (for note messages)
+    if (route.velocityTransform != 0 && 
         (message.isNoteOn() || message.isNoteOff())) {
         
         uint8_t velocity = message.getData2();
-        float scaled = velocity * route.velocityScale.value();
+        int newVelocity = velocity + route.velocityTransform;
         
         // Clamp to valid range (0-127)
-        if (scaled < 0.0f) scaled = 0.0f;
-        if (scaled > 127.0f) scaled = 127.0f;
+        if (newVelocity < 0) newVelocity = 0;
+        if (newVelocity > 127) newVelocity = 127;
         
-        int channel = message.getChannel();
+        int channel = transformed.getChannel();
         if (channel < 0) channel = 0;
         
         if (message.isNoteOn()) {
-            transformed = MidiMessage::noteOn(channel, 
-                                             message.getData1(), 
-                                             static_cast<uint8_t>(scaled));
+            transformed = MidiMessage::noteOn(channel, message.getData1(), newVelocity);
         } else {
-            transformed = MidiMessage::noteOff(channel, 
-                                              message.getData1(), 
-                                              static_cast<uint8_t>(scaled));
+            transformed = MidiMessage::noteOff(channel, message.getData1(), newVelocity);
         }
     }
     
@@ -442,27 +589,17 @@ MidiMessage MidiRouter::applyTransformations(const MidiMessage& message,
 }
 
 int64_t MidiRouter::getCompensationForRoute(const MidiRoute& route) const {
-    if (!instrumentCompensationEnabled_ || !compensator_) {
+    if (!instrumentCompensationEnabled_.load()) {
         return 0;
     }
     
-    // Try instrument-level compensation first
-    if (!route.instrumentId.empty()) {
-        int64_t compensation = compensator_->getInstrumentCompensation(route.instrumentId);
+    LatencyCompensator* comp = compensator_.load();
+    if (comp) {
+        std::string instrumentId = route.destinationDeviceId;
+        int64_t compensation = comp->getInstrumentCompensation(instrumentId);
         
         Logger::debug("MidiRouter", 
-                     "Instrument compensation for " + route.instrumentId + ": " + 
-                     std::to_string(compensation) + "µs");
-        
-        return compensation;
-    }
-    
-    // Fallback to device-level compensation
-    if (!route.destinationDeviceId.empty()) {
-        int64_t compensation = compensator_->getDeviceCompensation(route.destinationDeviceId);
-        
-        Logger::debug("MidiRouter", 
-                     "Device compensation for " + route.destinationDeviceId + ": " + 
+                     "Compensation for " + instrumentId + ": " + 
                      std::to_string(compensation) + "µs");
         
         return compensation;
@@ -480,12 +617,15 @@ void MidiRouter::sendToDevice(const std::string& deviceId, const MidiMessage& me
         return;
     }
     
-    // Send message
-    // Note: In real implementation, device would have a send() method
-    // For now, just call the callback
+    // Copy callback with lock
+    MessageCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(callbackMutex_);
+        callback = messageCallback_;
+    }
     
-    if (messageCallback_) {
-        messageCallback_(message, deviceId);
+    if (callback) {
+        callback(message, deviceId);
     }
     
     Logger::debug("MidiRouter", 
@@ -493,20 +633,19 @@ void MidiRouter::sendToDevice(const std::string& deviceId, const MidiMessage& me
 }
 
 void MidiRouter::updateRouteStatistics(const std::string& routeId, int64_t compensation) {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    
     auto it = routeStats_.find(routeId);
     if (it != routeStats_.end()) {
         auto& stats = it->second;
         
-        stats.messagesRouted++;
-        stats.lastMessageTime = TimestampManager::instance().now();
+        uint64_t routed = stats.messagesRouted.fetch_add(1) + 1;
+        stats.lastMessageTime.store(TimestampManager::instance().now());
         
         // Update average compensation (simple moving average)
-        if (stats.messagesRouted == 1) {
-            stats.avgCompensation = compensation;
-        } else {
-            stats.avgCompensation = (stats.avgCompensation * (stats.messagesRouted - 1) + 
-                                    compensation) / stats.messagesRouted;
-        }
+        int64_t oldAvg = stats.avgCompensation.load();
+        int64_t newAvg = (oldAvg * (routed - 1) + compensation) / routed;
+        stats.avgCompensation.store(newAvg);
     }
 }
 

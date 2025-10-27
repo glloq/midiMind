@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/sysex/SysExParser.h
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -13,6 +13,10 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Added bounds checking to hasFeature()
+//   - Improved documentation for findMapping() lifetime
 //
 // Changes v4.1.0:
 //   - Simplified to Blocks 1-2 only
@@ -74,9 +78,12 @@ struct CustomDeviceIdentity {
     /**
      * @brief Check if feature is supported
      * @param bit Feature bit (0-31)
-     * @return True if feature enabled
+     * @return True if feature enabled, false if bit out of range or disabled
      */
     bool hasFeature(uint8_t bit) const {
+        if (bit >= 32) {
+            return false;  // Out of range
+        }
         return (featureFlags & (1u << bit)) != 0;
     }
 };
@@ -113,6 +120,7 @@ struct NoteMap {
      * @brief Find mapping for a MIDI note
      * @param note MIDI note number
      * @return Pointer to mapping or nullptr
+     * @warning Pointer is valid only while NoteMap exists and mappings vector is not modified
      */
     const NoteMappingEntry* findMapping(uint8_t note) const;
 };
@@ -220,10 +228,10 @@ private:
      * @brief Decode 7-bit encoded 32-bit value
      * @param data Source data
      * @param offset Offset to start reading
-     * @return Decoded 32-bit value
+     * @return Decoded 32-bit value, or 0 if insufficient data
      * 
      * @details MIDI SysEx uses 7-bit encoding (MSB = 0)
-     *   4 bytes of 7-bit data = 28 bits decoded
+     *   5 bytes of 7-bit data = 35 bits (we use 32 bits)
      */
     static uint32_t decode7BitTo32Bit(const std::vector<uint8_t>& data, 
                                       size_t offset);
@@ -233,7 +241,7 @@ private:
      * @param data Source data
      * @param offset Offset to start reading
      * @param maxLen Maximum string length
-     * @return Extracted string
+     * @return Extracted string (printable ASCII only)
      */
     static std::string extractString(const std::vector<uint8_t>& data,
                                     size_t offset,

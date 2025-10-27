@@ -21,7 +21,6 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
-#include "devices/MidiDevice.h"
 
 namespace midiMind {
 
@@ -36,6 +35,12 @@ MidiMessage::MidiMessage()
 
 MidiMessage::MidiMessage(const std::vector<uint8_t>& data)
     : data_(data)
+    , timestamp_(0)
+{
+}
+
+MidiMessage::MidiMessage(std::vector<uint8_t>&& data)
+    : data_(std::move(data))
     , timestamp_(0)
 {
 }
@@ -289,6 +294,13 @@ bool MidiMessage::isValid() const {
     // Must be a status byte
     if (status < 0x80) return false;
     
+    // Validate data bytes are < 0x80 (except for SysEx)
+    if (status != 0xF0 && status != 0xF7) {
+        for (size_t i = 1; i < data_.size(); ++i) {
+            if (data_[i] >= 0x80) return false;
+        }
+    }
+    
     // Check size based on type
     if (status >= 0xF8) return data_.size() == 1;  // Real-time
     if (status == 0xF6) return data_.size() == 1;  // Tune Request
@@ -375,43 +387,94 @@ json MidiMessage::toJson() const {
 }
 
 MidiMessage MidiMessage::fromJson(const json& j) {
-    // Try to reconstruct from type
-    if (j.contains("type")) {
-        std::string type = j["type"];
-        
-        if (type == "NOTE_ON") {
-            return noteOn(j["channel"].get<int>() - 1, j["note"], j["velocity"]);
-        } else if (type == "NOTE_OFF") {
-            return noteOff(j["channel"].get<int>() - 1, j["note"], 
-                          j.value("velocity", 0));
-        } else if (type == "CONTROL_CHANGE") {
-            return controlChange(j["channel"].get<int>() - 1,
-                    j["controller"].get<uint8_t>(), 
-                    j["value"].get<uint8_t>());
-        } else if (type == "PROGRAM_CHANGE") {
-            return programChange(j["channel"].get<int>() - 1, j["program"]);
-        } else if (type == "PITCH_BEND") {
-            return pitchBend(j["channel"].get<int>() - 1, j["pitch_bend"]);
-        }
-    }
-    
-    // Fallback: reconstruct from hex
-    if (j.contains("hex")) {
-        std::string hex = j["hex"];
-        std::vector<uint8_t> data;
-        
-        std::istringstream iss(hex);
-        std::string byteStr;
-        
-        while (iss >> byteStr) {
-            data.push_back(static_cast<uint8_t>(std::stoi(byteStr, nullptr, 16)));
+    try {
+        // Validation
+        if (!j.is_object()) {
+            return MidiMessage();
         }
         
-        MidiMessage msg(data);
-        if (j.contains("timestamp")) {
-            msg.setTimestamp(j["timestamp"]);
+        // Try to reconstruct from type
+        if (j.contains("type")) {
+            std::string type = j["type"];
+            
+            if (type == "NOTE_ON") {
+                if (!j.contains("channel") || !j.contains("note") || !j.contains("velocity")) {
+                    return MidiMessage();
+                }
+                int channel = j["channel"].get<int>() - 1;
+                if (channel < 0 || channel > 15) return MidiMessage();
+                
+                return noteOn(channel, j["note"], j["velocity"]);
+            } else if (type == "NOTE_OFF") {
+                if (!j.contains("channel") || !j.contains("note")) {
+                    return MidiMessage();
+                }
+                int channel = j["channel"].get<int>() - 1;
+                if (channel < 0 || channel > 15) return MidiMessage();
+                
+                return noteOff(channel, j["note"], j.value("velocity", 0));
+            } else if (type == "CONTROL_CHANGE") {
+                if (!j.contains("channel") || !j.contains("controller") || !j.contains("value")) {
+                    return MidiMessage();
+                }
+                int channel = j["channel"].get<int>() - 1;
+                if (channel < 0 || channel > 15) return MidiMessage();
+                
+                return controlChange(channel,
+                        j["controller"].get<uint8_t>(), 
+                        j["value"].get<uint8_t>());
+            } else if (type == "PROGRAM_CHANGE") {
+                if (!j.contains("channel") || !j.contains("program")) {
+                    return MidiMessage();
+                }
+                int channel = j["channel"].get<int>() - 1;
+                if (channel < 0 || channel > 15) return MidiMessage();
+                
+                return programChange(channel, j["program"]);
+            } else if (type == "PITCH_BEND") {
+                if (!j.contains("channel") || !j.contains("pitch_bend")) {
+                    return MidiMessage();
+                }
+                int channel = j["channel"].get<int>() - 1;
+                if (channel < 0 || channel > 15) return MidiMessage();
+                
+                return pitchBend(channel, j["pitch_bend"]);
+            }
         }
-        return msg;
+        
+        // Fallback: reconstruct from hex
+        if (j.contains("hex")) {
+            std::string hex = j["hex"];
+            std::vector<uint8_t> data;
+            
+            std::istringstream iss(hex);
+            std::string byteStr;
+            
+            while (iss >> byteStr) {
+                try {
+                    int value = std::stoi(byteStr, nullptr, 16);
+                    if (value < 0 || value > 255) {
+                        return MidiMessage();
+                    }
+                    data.push_back(static_cast<uint8_t>(value));
+                } catch (...) {
+                    return MidiMessage();
+                }
+            }
+            
+            if (data.empty()) {
+                return MidiMessage();
+            }
+            
+            MidiMessage msg(std::move(data));
+            if (j.contains("timestamp")) {
+                msg.setTimestamp(j["timestamp"]);
+            }
+            return msg;
+        }
+    } catch (...) {
+        // Any exception during parsing returns empty message
+        return MidiMessage();
     }
     
     return MidiMessage();
@@ -430,7 +493,7 @@ std::string MidiMessage::toHexString() const {
 }
 
 bool MidiMessage::operator==(const MidiMessage& other) const {
-    return data_ == other.data_;
+    return data_ == other.data_ && timestamp_ == other.timestamp_;
 }
 
 // ============================================================================

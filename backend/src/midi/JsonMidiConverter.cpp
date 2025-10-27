@@ -60,16 +60,40 @@ JsonMidiEvent JsonMidiEvent::fromJson(const json& j) {
     event.time = j.value("time", 0);
     event.channel = j.value("channel", 1);
     
-    if (j.contains("note")) event.note = j["note"];
-    if (j.contains("velocity")) event.velocity = j["velocity"];
-    if (j.contains("duration")) event.duration = j["duration"];
-    if (j.contains("controller")) event.controller = j["controller"];
-    if (j.contains("value")) event.value = j["value"];
-    if (j.contains("pitchBend")) event.pitchBend = j["pitchBend"];
-    if (j.contains("program")) event.program = j["program"];
-    if (j.contains("tempo")) event.tempo = j["tempo"];
-    if (j.contains("text")) event.text = j["text"];
-    if (j.contains("data")) event.data = j["data"].get<std::vector<uint8_t>>();
+    if (j.contains("note") && j["note"].is_number_unsigned()) {
+        event.note = j["note"].get<uint8_t>();
+    }
+    if (j.contains("velocity") && j["velocity"].is_number_unsigned()) {
+        event.velocity = j["velocity"].get<uint8_t>();
+    }
+    if (j.contains("duration") && j["duration"].is_number_unsigned()) {
+        event.duration = j["duration"].get<uint32_t>();
+    }
+    if (j.contains("controller") && j["controller"].is_number_unsigned()) {
+        event.controller = j["controller"].get<uint8_t>();
+    }
+    if (j.contains("value") && j["value"].is_number_unsigned()) {
+        event.value = j["value"].get<uint8_t>();
+    }
+    if (j.contains("pitchBend") && j["pitchBend"].is_number_integer()) {
+        event.pitchBend = j["pitchBend"].get<int16_t>();
+    }
+    if (j.contains("program") && j["program"].is_number_unsigned()) {
+        event.program = j["program"].get<uint8_t>();
+    }
+    if (j.contains("tempo") && j["tempo"].is_number_unsigned()) {
+        event.tempo = j["tempo"].get<uint32_t>();
+    }
+    if (j.contains("text") && j["text"].is_string()) {
+        event.text = j["text"].get<std::string>();
+    }
+    if (j.contains("data") && j["data"].is_array()) {
+        try {
+            event.data = j["data"].get<std::vector<uint8_t>>();
+        } catch (const json::exception&) {
+            // Invalid array content, skip
+        }
+    }
     
     return event;
 }
@@ -224,21 +248,24 @@ JsonMidi JsonMidi::fromJson(const json& j) {
     
     jsonMidi.format = j.value("format", "jsonmidi-v1.0");
     jsonMidi.version = j.value("version", "1.0.0");
-    jsonMidi.metadata = JsonMidiMetadata::fromJson(j["metadata"]);
     
-    if (j.contains("timeline")) {
+    if (j.contains("metadata") && j["metadata"].is_object()) {
+        jsonMidi.metadata = JsonMidiMetadata::fromJson(j["metadata"]);
+    }
+    
+    if (j.contains("timeline") && j["timeline"].is_array()) {
         for (const auto& eventJson : j["timeline"]) {
             jsonMidi.timeline.push_back(JsonMidiEvent::fromJson(eventJson));
         }
     }
     
-    if (j.contains("tracks")) {
+    if (j.contains("tracks") && j["tracks"].is_array()) {
         for (const auto& trackJson : j["tracks"]) {
             jsonMidi.tracks.push_back(JsonMidiTrack::fromJson(trackJson));
         }
     }
     
-    if (j.contains("markers")) {
+    if (j.contains("markers") && j["markers"].is_array()) {
         for (const auto& markerJson : j["markers"]) {
             jsonMidi.markers.push_back(JsonMidiMarker::fromJson(markerJson));
         }
@@ -248,8 +275,12 @@ JsonMidi JsonMidi::fromJson(const json& j) {
 }
 
 JsonMidi JsonMidi::fromString(const std::string& jsonStr) {
-    json j = json::parse(jsonStr);
-    return fromJson(j);
+    try {
+        json j = json::parse(jsonStr);
+        return fromJson(j);
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error(std::string("JSON parse error: ") + e.what());
+    }
 }
 
 std::string JsonMidi::toString(int indent) const {
@@ -289,8 +320,8 @@ JsonMidi JsonMidiConverter::fromMidiMessages(
     
     // Convert messages to events
     for (const auto& message : messages) {
-        // Use message timestamp directly (already in microseconds)
-        uint32_t timeMs = message.getTimestamp() / 1000;
+        // Convert timestamp from microseconds to milliseconds
+        uint32_t timeMs = static_cast<uint32_t>(message.getTimestamp() / 1000);
         
         JsonMidiEvent event = messageToEvent(message, timeMs);
         if (!event.id.empty()) {
@@ -352,7 +383,7 @@ std::vector<MidiMessage> JsonMidiConverter::toMidiMessages(const JsonMidi& jsonM
         MidiMessage message = eventToMessage(event);
         
         if (message.isValid()) {
-            // Set timestamp (convert ms to µs)
+            // Convert time from milliseconds to microseconds for timestamp
             message.setTimestamp(static_cast<uint64_t>(event.time) * 1000);
             messages.push_back(message);
         }
@@ -638,7 +669,8 @@ JsonMidiMetadata JsonMidiConverter::extractMetadata(const std::vector<MidiMessag
                 lastTimestamp = msg.getTimestamp();
             }
         }
-        metadata.duration = static_cast<uint32_t>(lastTimestamp / 1000);  // Convert µs to ms
+        // Convert timestamp from microseconds to milliseconds
+        metadata.duration = static_cast<uint32_t>(lastTimestamp / 1000);
     }
     
     // Get current time for timestamps

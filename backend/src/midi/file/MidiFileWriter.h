@@ -23,6 +23,8 @@
 //   - Uses MidiFileReader structures (MidiFile, MidiTrack, MidiEvent)
 //   - Enhanced error handling
 //   - Better memory management
+//   - Improved VLQ encoding with safety limits
+//   - Performance optimizations to avoid unnecessary copies
 //
 // ============================================================================
 
@@ -47,6 +49,9 @@ namespace midiMind {
  * Compatible with structures from MidiFileReader.
  * 
  * Thread Safety: NO (create one instance per thread)
+ * Note: Member variables are not thread-safe. Statistics (bytesWritten_, 
+ * eventsWritten_) are updated during write operations and should not be
+ * accessed concurrently.
  * 
  * Example:
  * ```cpp
@@ -113,6 +118,7 @@ public:
      * @brief Validate MIDI file before writing
      * @param midiFile File to validate
      * @param errorMessage Output error message if validation fails
+     *                     Note: This parameter is cleared at function start
      * @return true if valid
      */
     bool validate(const MidiFile& midiFile, std::string& errorMessage) const;
@@ -143,11 +149,13 @@ public:
     
     /**
      * @brief Get number of bytes written in last operation
+     * @note Not thread-safe - do not call during write operation
      */
     uint32_t getBytesWritten() const;
     
     /**
      * @brief Get number of events written in last operation
+     * @note Not thread-safe - do not call during write operation
      */
     uint32_t getEventsWritten() const;
 
@@ -167,7 +175,7 @@ private:
     void writeHeader(std::ostream& stream, const MidiHeader& header);
     
     /**
-     * @brief Write track chunk
+     * @brief Write track chunk (optimized to avoid unnecessary copies)
      */
     void writeTrack(std::ostream& stream, const MidiTrack& track);
     
@@ -186,7 +194,8 @@ private:
     void writeUint16BE(std::ostream& stream, uint16_t value);
     
     /**
-     * @brief Write variable-length quantity (VLQ)
+     * @brief Write variable-length quantity (VLQ) with safety limits
+     * @throws MidiMindException if value exceeds MIDI VLQ limits
      */
     void writeVLQ(std::ostream& stream, uint32_t value);
     
@@ -214,10 +223,10 @@ private:
     /// Automatically add End-of-Track if missing
     bool autoEndOfTrack_;
     
-    /// Statistics: bytes written
+    /// Statistics: bytes written (not thread-safe)
     uint32_t bytesWritten_;
     
-    /// Statistics: events written
+    /// Statistics: events written (not thread-safe)
     uint32_t eventsWritten_;
 };
 

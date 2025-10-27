@@ -13,6 +13,7 @@
 // Changes v4.1.1:
 //   - Added missing savePreset() method
 //   - Added missing deletePreset() method
+//   - Thread-safe callback handling
 //
 // ============================================================================
 
@@ -62,6 +63,13 @@ enum class ProcessorType {
 /**
  * @class ProcessorManager
  * @brief Central manager for MIDI processor chains
+ * 
+ * Thread Safety: Methods are thread-safe. Callbacks are invoked without
+ * holding internal locks to prevent deadlocks.
+ * 
+ * Note: Processor creation methods (createProcessor, createProcessorFromType)
+ * are currently stubs returning nullptr. They will be implemented when
+ * concrete processor classes are available.
  */
 class ProcessorManager {
 public:
@@ -108,6 +116,15 @@ public:
     // PROCESSOR MANAGEMENT
     // ========================================================================
     
+    /**
+     * @brief Create processor instance
+     * @param type Processor type
+     * @param config Configuration JSON
+     * @return Processor instance or nullptr if type not implemented yet
+     * 
+     * NOTE: This is currently a stub returning nullptr. Will be implemented
+     * when concrete processor classes are available.
+     */
     std::shared_ptr<MidiProcessor> createProcessor(ProcessorType type,
                                                    const json& config = json());
     
@@ -182,6 +199,14 @@ private:
     
     std::string generateChainId();
     void initializePresets();
+    
+    /**
+     * @brief Create processor from type string
+     * @param type Type string (e.g. "transpose", "velocity")
+     * @return Processor instance or nullptr if not implemented yet
+     * 
+     * NOTE: Currently a stub returning nullptr.
+     */
     std::shared_ptr<MidiProcessor> createProcessorFromType(const std::string& type);
     
     // ========================================================================
@@ -193,6 +218,9 @@ private:
     mutable std::mutex mutex_;
     std::atomic<uint32_t> chainIdCounter_;
     std::atomic<uint64_t> messagesProcessed_;
+    
+    // Callback protected by separate mutex to avoid deadlock
+    std::mutex callbackMutex_;
     MessageOutputCallback messageOutputCallback_;
 };
 

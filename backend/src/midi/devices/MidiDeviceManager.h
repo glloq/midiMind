@@ -1,17 +1,20 @@
 // ============================================================================
 // File: backend/src/midi/devices/MidiDeviceManager.h
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.2.1 - BLE MIDI SUPPORT + Pairing Management
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.0:
-//   - Fixed include path: "MidiDevice.h" (not "devices/MidiDevice.h")
+// Changes v4.2.1:
+//   - Added BLE pairing/unpairing methods
+//   - Added scanBleDevices() with filter support
+//   - Added getBleDeviceSignal() for RSSI
+//   - Added getPairedBleDevices() listing
 //
 // ============================================================================
 
 #pragma once
 
-#include "MidiDevice.h"  // ✅ CORRIGÉ (était "devices/MidiDevice.h")
+#include "MidiDevice.h"
 #include <vector>
 #include <memory>
 #include <string>
@@ -44,6 +47,12 @@ struct MidiDeviceInfo {
     std::string model;
     std::string version;
     
+    // Bluetooth-specific (for BLE devices)
+    std::string bluetoothAddress;
+    std::string objectPath;
+    bool paired = false;
+    int signalStrength = 0;  // RSSI
+    
     // Statistics
     uint64_t messagesReceived;
     uint64_t messagesSent;
@@ -56,6 +65,9 @@ struct MidiDeviceInfo {
 /**
  * @class MidiDeviceManager
  * @brief Manages MIDI devices (discovery, connection, hot-plug)
+ * 
+ * Thread Safety: Methods are thread-safe. Callbacks are invoked without
+ * holding internal locks to prevent deadlocks.
  */
 class MidiDeviceManager {
 public:
@@ -99,6 +111,76 @@ public:
      * @return int Number of devices
      */
     int getDeviceCount() const;
+    
+    // ========================================================================
+    // BLE CONFIGURATION
+    // ========================================================================
+    
+    /**
+     * @brief Enable/disable BLE MIDI scanning
+     * @param enable true to enable BLE scanning
+     */
+    void setBluetoothEnabled(bool enable);
+    
+    /**
+     * @brief Check if BLE scanning is enabled
+     * @return bool true if enabled
+     */
+    bool isBluetoothEnabled() const;
+    
+    /**
+     * @brief Set BLE scan timeout
+     * @param seconds Scan duration (1-30 seconds)
+     */
+    void setBluetoothScanTimeout(int seconds);
+    
+    // ========================================================================
+    // BLE OPERATIONS
+    // ========================================================================
+    
+    /**
+     * @brief Scan for BLE MIDI devices
+     * @param duration Scan duration in seconds (1-30)
+     * @param nameFilter Optional name filter (empty = all devices)
+     * @return std::vector<MidiDeviceInfo> Found devices
+     */
+    std::vector<MidiDeviceInfo> scanBleDevices(int duration = 5, 
+                                                const std::string& nameFilter = "");
+    
+    /**
+     * @brief Pair with BLE device
+     * @param address Bluetooth MAC address
+     * @param pin Optional PIN code (empty if no PIN required)
+     * @return bool true if pairing successful
+     */
+    bool pairBleDevice(const std::string& address, const std::string& pin = "");
+    
+    /**
+     * @brief Unpair BLE device
+     * @param address Bluetooth MAC address
+     * @return bool true if unpairing successful
+     */
+    bool unpairBleDevice(const std::string& address);
+    
+    /**
+     * @brief Get list of paired BLE devices
+     * @return std::vector<MidiDeviceInfo> Paired devices
+     */
+    std::vector<MidiDeviceInfo> getPairedBleDevices() const;
+    
+    /**
+     * @brief Forget BLE device (unpair + remove from cache)
+     * @param address Bluetooth MAC address
+     * @return bool true if successful
+     */
+    bool forgetBleDevice(const std::string& address);
+    
+    /**
+     * @brief Get signal strength for connected BLE device
+     * @param deviceId Device ID
+     * @return int RSSI value (or 0 if not available)
+     */
+    int getBleDeviceSignal(const std::string& deviceId) const;
     
     // ========================================================================
     // CONNECTION MANAGEMENT
@@ -193,6 +275,11 @@ private:
     std::vector<MidiDeviceInfo> discoverUsbDevices();
     
     /**
+     * @brief Discover Bluetooth LE MIDI devices (BlueZ)
+     */
+    std::vector<MidiDeviceInfo> discoverBluetoothDevices();
+    
+    /**
      * @brief Create device instance
      */
     std::shared_ptr<MidiDevice> createDevice(const MidiDeviceInfo& info);
@@ -207,17 +294,22 @@ private:
     /// Available devices (last scan)
     std::vector<MidiDeviceInfo> availableDevices_;
     
-    /// Thread safety
+    /// Thread safety for devices and discovery
     mutable std::mutex mutex_;
     
     /// Hot-plug monitoring
     std::thread hotPlugThread_;
     std::atomic<bool> hotPlugRunning_{false};
-    int scanIntervalMs_{2000};
+    std::atomic<int> scanIntervalMs_{2000};
     
-    /// Callbacks
+    /// Callbacks (protected by separate mutex to avoid deadlock)
+    std::mutex callbackMutex_;
     std::function<void(const std::string&)> onDeviceConnect_;
     std::function<void(const std::string&)> onDeviceDisconnect_;
+    
+    /// Bluetooth configuration
+    std::atomic<bool> bluetoothEnabled_{true};
+    std::atomic<int> bluetoothScanTimeout_{5};
 };
 
 } // namespace midiMind

@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/storage/SessionManager.h
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -17,6 +17,11 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Added condition_variable for efficient auto-save thread waiting
+//   - Added existsUnsafe() private method to avoid double-locking
+//   - Better thread synchronization
 //
 // Changes v4.1.0:
 //   - Enhanced auto-save mechanism
@@ -36,6 +41,8 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <condition_variable>
+#include <optional>
 #include <functional>
 #include <nlohmann/json.hpp>
 
@@ -103,7 +110,7 @@ struct Session {
  * auto db = std::make_shared<Database>("midimind.db");
  * db->open();
  * 
- * SessionManager manager(db);
+ * SessionManager manager(*db);
  * 
  * // Create session
  * json sessionData = {
@@ -142,10 +149,10 @@ public:
     
     /**
      * @brief Constructor
-     * @param database Shared pointer to database
+     * @param database Reference to database
      * @throws MidiMindException if database not opened
      */
-    explicit SessionManager(std::shared_ptr<Database> database);
+    explicit SessionManager(Database& database);
     
     /**
      * @brief Destructor
@@ -378,12 +385,20 @@ private:
      */
     void autoSaveThread();
     
+    /**
+     * @brief Check if session exists (unsafe - must be called with mutex locked)
+     * @param id Session ID
+     * @return true if exists
+     * @note Internal method to avoid double-locking
+     */
+    bool existsUnsafe(int id) const;
+    
     // ========================================================================
     // MEMBER VARIABLES
     // ========================================================================
     
     /// Database connection
-    std::shared_ptr<Database> database_;
+    Database& database_;
     
     /// Active session ID
     std::atomic<int> activeSessionId_;
@@ -394,7 +409,11 @@ private:
     std::thread autoSaveThread_;
     std::atomic<bool> stopAutoSave_;
     
-    /// Auto-save callback
+    /// Auto-save synchronization
+    std::mutex autoSaveMutex_;          ///< Mutex for condition_variable
+    std::condition_variable autoSaveCv_; ///< Condition variable for efficient waiting
+    
+    /// Auto-save callback (protected by mutex_)
     AutoSaveCallback autoSaveCallback_;
     
     /// Thread safety
@@ -402,3 +421,7 @@ private:
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE SessionManager.h v4.1.1
+// ============================================================================

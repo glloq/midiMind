@@ -1,24 +1,13 @@
 // ============================================================================
 // File: backend/src/core/Application.h
-// Version: 4.1.3 - CORRIGÉ SYNCHRONISATION
+// Version: 4.2.3 - CORRECTIONS CRITIQUES
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.1.3:
-//   ✅ SYNCHRONIZED: Version with Application.cpp
-//   ✅ REMOVED: apiPort_ and apiHost_ (unused, read from Config)
-//   ✅ REMOVED: pathManager_ (unused in implementation)
-//   ✅ CLARIFIED: database_ is raw pointer to singleton
-//
-// Changes v4.1.2:
-//   ✅ ADDED: apiPort_ member to store API server port
-//   ✅ ADDED: apiHost_ member to store API server host
-//   - Fixed member variable names to match .cpp
-//   - Fixed pointer types (make_shared instead of shared_ptr)
-//   - Added missing thread variable
-//   - Fixed startTime_ type
-//   - Fixed getUptime() return type
-//   - Moved misplaced method declarations inside class
+// Changes v4.2.3:
+//   🔧 FIXED: Ordre d'initialisation: EventSystem avant Timing/MIDI/API
+//   🔧 FIXED: Getters retournent const std::shared_ptr<T>& (immutable)
+//   🔧 FIXED: signalCount_ déplacé en private
 //
 // ============================================================================
 
@@ -30,6 +19,8 @@
 #include <thread>
 #include <chrono>
 #include <optional>
+#include <condition_variable>
+#include <mutex>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -41,6 +32,7 @@ class Database;
 class Settings;
 class FileManager;
 class InstrumentDatabase;
+class PresetManager;
 class LatencyCompensator;
 class MidiDeviceManager;
 class MidiRouter;
@@ -49,175 +41,97 @@ class ApiServer;
 class CommandHandler;
 class EventBus;
 
-// ============================================================================
-// CLASS: Application (Singleton)
-// ============================================================================
-
 /**
  * @class Application
  * @brief Main application singleton
  * 
  * Manages complete application lifecycle with 7-phase initialization.
+ * 
+ * Initialization order:
+ *   1. Configuration (PathManager, Config)
+ *   2. Database (SQLite + migrations)
+ *   3. Storage (Settings, FileManager, InstrumentDB, PresetManager)
+ *   4. EventSystem (EventBus) - AVANT Timing/MIDI/API
+ *   5. Timing (LatencyCompensator)
+ *   6. MIDI (DeviceManager, Router, Player)
+ *   7. API (CommandHandler + ApiServer) - utilise EventBus
  */
 class Application {
 public:
-    // ========================================================================
-    // SINGLETON
-    // ========================================================================
-    
-    /**
-     * @brief Get singleton instance
-     */
+    // Singleton
     static Application& instance();
     
-    // Disable copy
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
     
-    // ========================================================================
-    // LIFECYCLE
-    // ========================================================================
-    
-    /**
-     * @brief Initialize application
-     * @param configPath Path to config.json (optional)
-     * @return bool true if successful
-     */
+    // Lifecycle
     bool initialize(const std::string& configPath = "");
-    
-    /**
-     * @brief Start application
-     * @return bool true if successful
-     */
     bool start();
-    
-    /**
-     * @brief Run main loop
-     */
     void run();
-    
-    /**
-     * @brief Stop application
-     */
     void stop();
-    
-    /**
-     * @brief Shutdown application (alias for stop)
-     */
     void shutdown() { stop(); }
     
-    /**
-     * @brief Check if initialized
-     */
     bool isInitialized() const;
-    
-    /**
-     * @brief Check if running
-     */
     bool isRunning() const;
     
-    // ========================================================================
-    // COMPONENT ACCESS
-    // ========================================================================
-    
+    // Component access (const references - immutable)
     Database* getDatabase() { return database_; }
-    std::shared_ptr<Settings>& getSettings() { return settings_; }
-    std::shared_ptr<FileManager>& getFileManager() { return fileManager_; }
-    std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() { return instrumentDatabase_; }
-    std::shared_ptr<LatencyCompensator>& getLatencyCompensator() { return latencyCompensator_; }
-    std::shared_ptr<MidiDeviceManager>& getDeviceManager() { return deviceManager_; }
-    std::shared_ptr<MidiRouter>& getRouter() { return router_; }
-    std::shared_ptr<MidiPlayer>& getPlayer() { return player_; }
-    std::shared_ptr<ApiServer>& getApiServer() { return apiServer_; }
-    std::shared_ptr<EventBus>& getEventBus() { return eventBus_; }
+    const std::shared_ptr<Settings>& getSettings() const { return settings_; }
+    const std::shared_ptr<FileManager>& getFileManager() const { return fileManager_; }
+    const std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() const { return instrumentDatabase_; }
+    const std::shared_ptr<PresetManager>& getPresetManager() const { return presetManager_; }
+    const std::shared_ptr<LatencyCompensator>& getLatencyCompensator() const { return latencyCompensator_; }
+    const std::shared_ptr<MidiDeviceManager>& getDeviceManager() const { return deviceManager_; }
+    const std::shared_ptr<MidiRouter>& getRouter() const { return router_; }
+    const std::shared_ptr<MidiPlayer>& getPlayer() const { return player_; }
+    const std::shared_ptr<ApiServer>& getApiServer() const { return apiServer_; }
+    const std::shared_ptr<EventBus>& getEventBus() const { return eventBus_; }
     
-    // ========================================================================
-    // STATUS
-    // ========================================================================
-    
-    /**
-     * @brief Get application status
-     * @return json Status information
-     */
+    // Status
     json getStatus() const;
-    
-    /**
-     * @brief Get uptime in seconds
-     */
     int getUptime() const;
-    
-    /**
-     * @brief Get version string
-     */
     std::string getVersion() const;
-    
-    /**
-     * @brief Get protocol version
-     */
     std::string getProtocolVersion() const;
-    
-    // ========================================================================
-    // SIGNAL HANDLING (PUBLIC STATIC)
-    // ========================================================================
-    
-    static std::atomic<int> signalCount_;
 
 private:
-    // ========================================================================
-    // PRIVATE CONSTRUCTOR
-    // ========================================================================
-    
     Application();
     ~Application();
     
-    // ========================================================================
-    // INITIALIZATION PHASES
-    // ========================================================================
+    // Initialization phases (7 phases in correct order)
+    bool initializeConfiguration(const std::string& configPath);  // Phase 1
+    bool initializeDatabase();                                     // Phase 2
+    bool initializeStorage();                                      // Phase 3
+    bool initializeEventSystem();                                  // Phase 4 - AVANT Timing/MIDI/API
+    bool initializeTiming();                                       // Phase 5
+    bool initializeMidi();                                         // Phase 6
+    bool initializeApi();                                          // Phase 7 - utilise EventBus
     
-    bool initializeConfiguration(const std::string& configPath);
-    bool initializeDatabase();
-    bool initializeStorage();
-    bool initializeTiming();
-    bool initializeMidi();
-    bool initializeApi();
-    bool initializeEventSystem();
-    
-    // ========================================================================
-    // MONITORING
-    // ========================================================================
-    
+    // Monitoring
     void startMonitoringThreads();
     void stopMonitoringThreads();
     void broadcastStatus();
     
-    // ========================================================================
-    // SIGNAL HANDLING
-    // ========================================================================
-    
+    // Signal handling
     void setupSignalHandlers();
     
-    // ========================================================================
-    // MEMBER VARIABLES
-    // ========================================================================
-    
-    // State
+    // Member variables
     std::atomic<bool> initialized_{false};
     std::atomic<bool> running_{false};
     std::atomic<bool> statusBroadcastRunning_{false};
     std::optional<std::chrono::steady_clock::time_point> startTime_;
     
-    // Configuration
     std::string configPath_;
     json config_;
-    
-    // Threads
     std::thread statusBroadcastThread_;
+    std::mutex shutdownMutex_;
+    std::condition_variable shutdownCv_;
     
     // Core components
-    Database* database_;  // Raw pointer to Database singleton (global lifetime)
+    Database* database_;
     std::shared_ptr<Settings> settings_;
     std::shared_ptr<FileManager> fileManager_;
     std::shared_ptr<InstrumentDatabase> instrumentDatabase_;
+    std::shared_ptr<PresetManager> presetManager_;
     std::shared_ptr<EventBus> eventBus_;
     
     // Timing components
@@ -231,10 +145,15 @@ private:
     // API components
     std::shared_ptr<ApiServer> apiServer_;
     std::shared_ptr<CommandHandler> commandHandler_;
+    
+    // Signal handling (private)
+    static std::atomic<int> signalCount_;
+    
+    friend void signalHandler(int);
 };
 
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Application.h v4.1.3
+// END OF FILE Application.h
 // ============================================================================

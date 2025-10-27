@@ -1,23 +1,21 @@
 // ============================================================================
 // File: backend/src/midi/player/MidiPlayer.cpp
-// Version: 4.1.1
+// Version: 4.2.0
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Complete implementation of MIDI player (compilation fixes)
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.1:
-//   - Fixed MidiMessage initialization (no setters available)
-//   - Use proper MidiMessage constructor with status byte
+// Changes v4.2.0:
+//   - Added EventBus integration
+//   - Published playback events
+//   - Added publishStateChange() implementation
 //
 // ============================================================================
 
 #include "MidiPlayer.h"
 #include "../../core/Logger.h"
+#include "../../core/EventBus.h"
+#include "../../core/TimeUtils.h"
+#include "../../events/Events.h"
 #include <algorithm>
 #include <cmath>
 
@@ -64,8 +62,10 @@ static const char* GM_INSTRUMENTS[128] = {
 // CONSTRUCTOR / DESTRUCTOR
 // ============================================================================
 
-MidiPlayer::MidiPlayer(std::shared_ptr<MidiRouter> router)
+MidiPlayer::MidiPlayer(std::shared_ptr<MidiRouter> router,
+                       std::shared_ptr<EventBus> eventBus)
     : router_(router)
+    , eventBus_(eventBus)
     , state_(PlayerState::STOPPED)
     , running_(false)
     , currentTick_(0)
@@ -88,6 +88,47 @@ MidiPlayer::~MidiPlayer() {
 }
 
 // ============================================================================
+// EVENT BUS
+// ============================================================================
+
+void MidiPlayer::setEventBus(std::shared_ptr<EventBus> eventBus) {
+    eventBus_ = eventBus;
+    Logger::info("MidiPlayer", "EventBus configured");
+}
+
+void MidiPlayer::publishStateChange(PlayerState newState) {
+    if (!eventBus_) return;
+    
+    try {
+        events::PlaybackStateChangedEvent::State eventState;
+        switch (newState) {
+            case PlayerState::PLAYING:
+                eventState = events::PlaybackStateChangedEvent::State::PLAYING;
+                break;
+            case PlayerState::PAUSED:
+                eventState = events::PlaybackStateChangedEvent::State::PAUSED;
+                break;
+            case PlayerState::STOPPED:
+            default:
+                eventState = events::PlaybackStateChangedEvent::State::STOPPED;
+                break;
+        }
+        
+        eventBus_->publish(events::PlaybackStateChangedEvent(
+            eventState,
+            currentFile_,
+            getCurrentPosition(),
+            TimeUtils::getCurrentTimestamp()
+        ));
+        
+        Logger::debug("MidiPlayer", "Published PlaybackStateChangedEvent");
+    } catch (const std::exception& e) {
+        Logger::error("MidiPlayer", 
+            "Failed to publish PlaybackStateChangedEvent: " + std::string(e.what()));
+    }
+}
+
+// ============================================================================
 // FILE LOADING
 // ============================================================================
 
@@ -97,19 +138,16 @@ bool MidiPlayer::load(const std::string& filepath) {
     Logger::info("MidiPlayer", "Loading file: " + filepath);
     
     try {
-        // Stop if playing
         if (state_ != PlayerState::STOPPED) {
             stopPlayback();
         }
         
-        // Clear previous data
         currentFile_ = "";
         currentTick_ = 0;
         totalTicks_ = 0;
         tracks_.clear();
         allEvents_.clear();
         
-        // Read file
         MidiFileReader reader;
         midiFile_ = reader.readFromFile(filepath);
         
@@ -121,13 +159,8 @@ bool MidiPlayer::load(const std::string& filepath) {
         currentFile_ = filepath;
         ticksPerQuarterNote_ = midiFile_.header.division;
         
-        // Parse tracks and build event list
         parseAllTracks();
-        
-        // Extract metadata
         extractMetadata();
-        
-        // Calculate duration
         calculateDuration();
         
         Logger::info("MidiPlayer", 
@@ -174,15 +207,14 @@ bool MidiPlayer::play() {
     state_ = PlayerState::PLAYING;
     running_ = true;
     
-    // Join previous thread if exists
     if (playbackThread_.joinable()) {
         playbackThread_.join();
     }
     
-    // Start playback thread
     playbackThread_ = std::thread(&MidiPlayer::playbackLoop, this);
     
-    // Callback
+    publishStateChange(state_);
+    
     if (stateCallback_) {
         stateCallback_("playing");
     }
@@ -202,7 +234,8 @@ bool MidiPlayer::pause() {
     state_ = PlayerState::PAUSED;
     sendAllNotesOff();
     
-    // Callback
+    publishStateChange(state_);
+    
     if (stateCallback_) {
         stateCallback_("paused");
     }
@@ -225,7 +258,6 @@ void MidiPlayer::stopPlayback() {
     running_ = false;
     state_ = PlayerState::STOPPED;
     
-    // Wait for thread to finish
     if (playbackThread_.joinable()) {
         mutex_.unlock();
         playbackThread_.join();
@@ -235,12 +267,12 @@ void MidiPlayer::stopPlayback() {
     sendAllNotesOff();
     currentTick_ = 0;
     
-    // Reset processed flags
     for (auto& event : allEvents_) {
         event.processed = false;
     }
     
-    // Callback
+    publishStateChange(state_);
+    
     if (stateCallback_) {
         stateCallback_("stopped");
     }
@@ -262,7 +294,6 @@ void MidiPlayer::seek(uint64_t timeMs) {
 void MidiPlayer::seekToTick(uint64_t tick) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Clamp to valid range
     if (tick > totalTicks_) {
         tick = totalTicks_;
     }
@@ -272,7 +303,6 @@ void MidiPlayer::seekToTick(uint64_t tick) {
     sendAllNotesOff();
     currentTick_ = tick;
     
-    // Reset processed flags for events at or after seek position
     for (auto& event : allEvents_) {
         event.processed = (event.tick < tick);
     }
@@ -281,7 +311,6 @@ void MidiPlayer::seekToTick(uint64_t tick) {
 bool MidiPlayer::seekToBar(uint32_t bar, uint8_t beat, uint16_t tick) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Validate
     if (bar < 1 || beat < 1 || beat > timeSignatureNum_) {
         Logger::warning("MidiPlayer", "Invalid bar/beat position");
         return false;
@@ -296,7 +325,6 @@ bool MidiPlayer::seekToBar(uint32_t bar, uint8_t beat, uint16_t tick) {
     sendAllNotesOff();
     currentTick_ = targetTick;
     
-    // Reset processed flags
     for (auto& event : allEvents_) {
         event.processed = (event.tick < targetTick);
     }
@@ -431,37 +459,37 @@ std::vector<TrackInfo> MidiPlayer::getTracksInfo() const {
 json MidiPlayer::getMetadata() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    json metadata;
+    json meta = json::object();
     
-    metadata["file"] = currentFile_;
-    metadata["format"] = midiFile_.header.format;
-    metadata["track_count"] = tracks_.size();
-    metadata["division"] = ticksPerQuarterNote_;
-    metadata["duration_ticks"] = totalTicks_;
-    metadata["duration_ms"] = ticksToMs(totalTicks_);
-    metadata["tempo"] = tempo_.load();
-    metadata["time_signature"] = {
-        {"numerator", timeSignatureNum_},
-        {"denominator", timeSignatureDen_}
-    };
+    meta["format"] = midiFile_.header.format;
+    meta["track_count"] = midiFile_.header.trackCount;
+    meta["division"] = ticksPerQuarterNote_;
+    meta["duration_ms"] = ticksToMs(totalTicks_);
+    meta["tempo_bpm"] = tempo_.load();
+    meta["time_signature"] = std::to_string(timeSignatureNum_) + "/" + 
+                             std::to_string(timeSignatureDen_);
     
-    // Tracks
     json tracksJson = json::array();
     for (const auto& track : tracks_) {
-        tracksJson.push_back({
+        json trackJson = {
             {"index", track.index},
             {"name", track.name},
             {"channel", track.channel},
             {"program", track.programChange},
             {"instrument", track.instrumentName},
             {"note_count", track.noteCount},
-            {"muted", track.isMuted},
-            {"solo", track.isSolo}
-        });
+            {"min_note", track.minNote},
+            {"max_note", track.maxNote},
+            {"avg_velocity", track.avgVelocity},
+            {"is_muted", track.isMuted},
+            {"is_solo", track.isSolo}
+        };
+        tracksJson.push_back(trackJson);
     }
-    metadata["tracks"] = tracksJson;
     
-    return metadata;
+    meta["tracks"] = tracksJson;
+    
+    return meta;
 }
 
 void MidiPlayer::setStateCallback(StateCallback callback) {
@@ -475,123 +503,93 @@ void MidiPlayer::setStateCallback(StateCallback callback) {
 
 void MidiPlayer::parseAllTracks() {
     allEvents_.clear();
-    tracks_.clear();
+    tracks_.resize(midiFile_.tracks.size());
     
-    for (size_t i = 0; i < midiFile_.tracks.size(); ++i) {
-        const auto& track = midiFile_.tracks[i];
+    for (size_t trackIdx = 0; trackIdx < midiFile_.tracks.size(); ++trackIdx) {
+        auto& track = midiFile_.tracks[trackIdx];
+        auto& trackInfo = tracks_[trackIdx];
+        trackInfo.index = trackIdx;
         
-        // Create track info
-        TrackInfo trackInfo;
-        trackInfo.index = static_cast<uint16_t>(i);
-        trackInfo.name = track.name;
-        trackInfo.channel = track.channel;
-        trackInfo.noteCount = track.noteCount;
+        uint64_t currentTick = 0;
         
-        // Convert events
         for (const auto& event : track.events) {
-            if (event.type == MidiEventType::MIDI_CHANNEL) {
-                ScheduledEvent scheduled;
-                scheduled.tick = event.absoluteTime;
-                scheduled.trackNumber = static_cast<uint16_t>(i);
-                scheduled.processed = false;
-                
-                // Create MidiMessage with proper constructor
-                // Format: status byte includes channel
-                uint8_t statusByte = event.status | event.channel;
-                
-                if (event.data.size() >= 2) {
-                    // Three-byte message
-                    scheduled.message = MidiMessage(statusByte, event.data[0], event.data[1]);
-                } else if (event.data.size() == 1) {
-                    // Two-byte message
-                    scheduled.message = MidiMessage(statusByte, event.data[0]);
-                } else {
-                    // One-byte message (rare)
-                    scheduled.message = MidiMessage(statusByte);
-                }
-                
-                scheduled.message.setTimestamp(event.absoluteTime);
-                allEvents_.push_back(scheduled);
-            }
+            currentTick += event.deltaTime;
+            
+            ScheduledEvent sched;
+            sched.tick = currentTick;
+            sched.message = event.message;
+            sched.trackNumber = trackIdx;
+            sched.processed = false;
+            
+            allEvents_.push_back(sched);
         }
-        
-        tracks_.push_back(trackInfo);
     }
     
-    // Sort events by tick
     std::sort(allEvents_.begin(), allEvents_.end(),
-        [](const ScheduledEvent& a, const ScheduledEvent& b) {
-            return a.tick < b.tick;
-        });
-    
-    Logger::debug("MidiPlayer", 
-                 "Parsed " + std::to_string(allEvents_.size()) + " events");
+              [](const ScheduledEvent& a, const ScheduledEvent& b) {
+                  return a.tick < b.tick;
+              });
 }
 
 void MidiPlayer::extractMetadata() {
-    // Get tempo and time signature from file
-    tempo_ = static_cast<double>(midiFile_.tempo);
-    timeSignatureNum_ = midiFile_.timeSignature.numerator;
-    timeSignatureDen_ = midiFile_.timeSignature.denominator;
-    
-    // Calculate ticks per beat
-    ticksPerBeat_ = ticksPerQuarterNote_ * 4 / timeSignatureDen_;
-    
-    // Analyze each track
-    for (size_t i = 0; i < tracks_.size(); ++i) {
-        analyzeTrack(static_cast<uint16_t>(i));
+    for (auto& track : tracks_) {
+        analyzeTrack(track.index);
     }
 }
 
 void MidiPlayer::analyzeTrack(uint16_t trackIndex) {
-    if (trackIndex >= tracks_.size()) {
-        return;
-    }
+    if (trackIndex >= tracks_.size()) return;
     
-    auto& trackInfo = tracks_[trackIndex];
-    const auto& track = midiFile_.tracks[trackIndex];
+    auto& track = tracks_[trackIndex];
+    auto& midiTrack = midiFile_.tracks[trackIndex];
+    
+    track.name = "Track " + std::to_string(trackIndex + 1);
+    track.channel = 0;
+    track.programChange = 0;
+    track.noteCount = 0;
+    track.minNote = 127;
+    track.maxNote = 0;
+    track.avgVelocity = 64;
     
     uint32_t totalVelocity = 0;
-    uint16_t noteCount = 0;
     
-    for (const auto& event : track.events) {
-        if (event.type == MidiEventType::MIDI_CHANNEL) {
-            uint8_t messageType = event.status & 0xF0;
+    for (const auto& event : midiTrack.events) {
+        const auto& msg = event.message;
+        uint8_t status = msg.getStatus();
+        uint8_t type = status & 0xF0;
+        uint8_t channel = status & 0x0F;
+        
+        if (type == 0x90) {
+            track.channel = channel;
+            uint8_t note = msg.getData1();
+            uint8_t velocity = msg.getData2();
             
-            if (messageType == 0x90 && event.velocity > 0) {
-                // Note On
-                noteCount++;
-                totalVelocity += event.velocity;
-                
-                trackInfo.minNote = std::min(trackInfo.minNote, event.note);
-                trackInfo.maxNote = std::max(trackInfo.maxNote, event.note);
+            if (velocity > 0) {
+                track.noteCount++;
+                if (note < track.minNote) track.minNote = note;
+                if (note > track.maxNote) track.maxNote = note;
+                totalVelocity += velocity;
             }
-            else if (messageType == 0xC0) {
-                // Program Change
-                trackInfo.programChange = event.program;
-                if (event.program < 128) {
-                    trackInfo.instrumentName = GM_INSTRUMENTS[event.program];
-                }
-            }
+        }
+        else if (type == 0xC0) {
+            track.programChange = msg.getData1();
+            track.instrumentName = GM_INSTRUMENTS[track.programChange];
         }
     }
     
-    if (noteCount > 0) {
-        trackInfo.avgVelocity = static_cast<uint8_t>(totalVelocity / noteCount);
+    if (track.noteCount > 0) {
+        track.avgVelocity = totalVelocity / track.noteCount;
     }
 }
 
 void MidiPlayer::calculateDuration() {
-    if (allEvents_.empty()) {
-        totalTicks_ = 0;
-        return;
+    totalTicks_ = 0;
+    
+    for (const auto& event : allEvents_) {
+        if (event.tick > totalTicks_) {
+            totalTicks_ = event.tick;
+        }
     }
-    
-    totalTicks_ = allEvents_.back().tick;
-    
-    Logger::debug("MidiPlayer", 
-                 "Duration: " + std::to_string(totalTicks_) + " ticks (" + 
-                 std::to_string(ticksToMs(totalTicks_)) + " ms)");
 }
 
 // ============================================================================
@@ -599,8 +597,9 @@ void MidiPlayer::calculateDuration() {
 // ============================================================================
 
 void MidiPlayer::playbackLoop() {
-    Logger::info("MidiPlayer", "Playback loop started");
+    Logger::info("MidiPlayer", "Playback thread started");
     
+    uint64_t tickCounter = 0;
     startTime_ = std::chrono::high_resolution_clock::now();
     
     while (running_) {
@@ -609,79 +608,72 @@ void MidiPlayer::playbackLoop() {
             continue;
         }
         
-        // Calculate current position
         auto now = std::chrono::high_resolution_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
             now - startTime_).count();
         
-        double tempo = tempo_.load();
-        if (tempo <= 0.0) tempo = 120.0;
+        double currentTempo = tempo_.load();
+        double microsecondsPerTick = (60.0 / currentTempo) * 1000000.0 / ticksPerQuarterNote_;
+        uint64_t targetTick = static_cast<uint64_t>(elapsed / microsecondsPerTick);
         
-        double ticksPerSecond = (tempo / 60.0) * ticksPerQuarterNote_;
-        double secondsElapsed = elapsed / 1000000.0;
-        uint64_t newTick = static_cast<uint64_t>(secondsElapsed * ticksPerSecond);
+        currentTick_ = targetTick;
         
-        // Update position
-        currentTick_ = newTick;
-        
-        // Process events
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& event : allEvents_) {
+            if (!running_ || state_ != PlayerState::PLAYING) break;
             
-            for (auto& event : allEvents_) {
-                if (event.tick > currentTick_) {
-                    break;
-                }
-                
-                if (event.processed) {
-                    continue;
-                }
-                
+            if (event.tick <= targetTick && !event.processed) {
                 if (shouldPlayEvent(event)) {
-                    MidiMessage msg = applyModifications(event.message, 
-                                                        event.trackNumber);
-                    msg = applyMasterVolume(msg);
+                    auto modifiedMsg = applyModifications(event.message, event.trackNumber);
+                    modifiedMsg = applyMasterVolume(modifiedMsg);
                     
-                    if (masterVolume_ > 0.0f && router_) {
-                        router_->route(msg);
+                    if (router_) {
+                        router_->routeMessage(modifiedMsg);
                     }
                 }
-                
                 event.processed = true;
             }
         }
         
-        // Check for end
-        bool reachedEnd = (currentTick_ >= totalTicks_);
-        bool shouldLoop = loopEnabled_.load();
+        // Publish progress every 10 iterations
+        if (eventBus_ && (tickCounter % 10 == 0)) {
+            try {
+                double position = getCurrentPosition();
+                double duration = getDuration();
+                double percentage = (duration > 0) ? (position / duration * 100.0) : 0.0;
+                
+                eventBus_->publish(events::PlaybackProgressEvent(
+                    position,
+                    duration,
+                    percentage,
+                    TimeUtils::getCurrentTimestamp()
+                ));
+            } catch (const std::exception&) {
+                // Silent for progress events
+            }
+        }
+        tickCounter++;
         
-        if (reachedEnd) {
-            if (shouldLoop) {
-                Logger::debug("MidiPlayer", "Loop restart");
-                
-                std::lock_guard<std::mutex> lock(mutex_);
+        if (currentTick_ >= totalTicks_) {
+            if (loopEnabled_) {
                 currentTick_ = 0;
-                startTime_ = std::chrono::high_resolution_clock::now();
-                
                 for (auto& event : allEvents_) {
                     event.processed = false;
                 }
+                startTime_ = std::chrono::high_resolution_clock::now();
             } else {
-                stop();
                 break;
             }
         }
         
-        // Sleep briefly
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
     
-    Logger::info("MidiPlayer", "Playback loop ended");
+    Logger::info("MidiPlayer", "Playback thread stopped");
 }
 
 bool MidiPlayer::shouldPlayEvent(const ScheduledEvent& event) const {
     if (event.trackNumber >= tracks_.size()) {
-        return false;
+        return true;
     }
     
     const auto& track = tracks_[event.trackNumber];
@@ -690,9 +682,8 @@ bool MidiPlayer::shouldPlayEvent(const ScheduledEvent& event) const {
         return false;
     }
     
-    // Check if any track is soloed
     bool anySolo = std::any_of(tracks_.begin(), tracks_.end(),
-        [](const TrackInfo& t) { return t.isSolo; });
+                                [](const TrackInfo& t) { return t.isSolo; });
     
     if (anySolo && !track.isSolo) {
         return false;
@@ -702,90 +693,73 @@ bool MidiPlayer::shouldPlayEvent(const ScheduledEvent& event) const {
 }
 
 MidiMessage MidiPlayer::applyModifications(const MidiMessage& message, 
-                                          uint16_t trackNumber) const {
-    // Apply transposition to note messages
-    int transposeValue = transpose_.load();
-    if (transposeValue != 0 && (message.isNoteOn() || message.isNoteOff())) {
-        int newNote = static_cast<int>(message.getData1()) + transposeValue;
-        newNote = std::clamp(newNote, 0, 127);
-        
-        // Create new message with transposed note
-        uint8_t status = message.getStatus();
-        uint8_t velocity = message.getData2();
-        return MidiMessage(status, static_cast<uint8_t>(newNote), velocity);
+                                           uint16_t trackNumber) const {
+    uint8_t status = message.getStatus();
+    uint8_t type = status & 0xF0;
+    
+    if (type != 0x90 && type != 0x80) {
+        return message;
     }
     
-    return message;
+    uint8_t note = message.getData1();
+    uint8_t velocity = message.getData2();
+    
+    int trans = transpose_.load();
+    int newNote = static_cast<int>(note) + trans;
+    
+    if (newNote < 0) newNote = 0;
+    if (newNote > 127) newNote = 127;
+    
+    return MidiMessage(status, static_cast<uint8_t>(newNote), velocity);
 }
 
 MidiMessage MidiPlayer::applyMasterVolume(const MidiMessage& message) const {
+    uint8_t status = message.getStatus();
+    uint8_t type = status & 0xF0;
+    
+    if (type != 0x90) {
+        return message;
+    }
+    
+    uint8_t note = message.getData1();
+    uint8_t velocity = message.getData2();
+    
     float volume = masterVolume_.load();
+    uint8_t newVelocity = static_cast<uint8_t>(velocity * volume);
     
-    if (message.isNoteOn() || message.isNoteOff()) {
-        uint8_t velocity = message.getData2();
-        float newVelocity = velocity * volume;
-        newVelocity = std::clamp(newVelocity, 0.0f, 127.0f);
-        
-        // Create new message with adjusted velocity
-        uint8_t status = message.getStatus();
-        uint8_t note = message.getData1();
-        return MidiMessage(status, note, static_cast<uint8_t>(newVelocity));
-    }
-    else if (message.isControlChange() && message.getData1() == 7) {
-        // Volume CC
-        uint8_t value = message.getData2();
-        float newValue = value * volume;
-        newValue = std::clamp(newValue, 0.0f, 127.0f);
-        
-        // Create new message with adjusted volume
-        uint8_t status = message.getStatus();
-        return MidiMessage(status, 7, static_cast<uint8_t>(newValue));
-    }
-    
-    return message;
+    return MidiMessage(status, note, newVelocity);
 }
 
 void MidiPlayer::sendAllNotesOff() {
-    if (!router_) {
-        return;
-    }
+    if (!router_) return;
     
-    for (int channel = 0; channel < 16; ++channel) {
-        // Control Change: All Notes Off (CC 123)
-        uint8_t statusByte = 0xB0 | channel;  // Control Change + channel
-        MidiMessage msg(statusByte, 123, 0);
-        router_->route(msg);
+    for (uint8_t channel = 0; channel < 16; ++channel) {
+        uint8_t status = 0xB0 | channel;
+        router_->routeMessage(MidiMessage(status, 123, 0));
     }
 }
 
 // ============================================================================
-// PRIVATE METHODS - CONVERSION
+// PRIVATE METHODS - TIME CONVERSION
 // ============================================================================
 
 uint64_t MidiPlayer::msToTicks(uint64_t ms) const {
-    double tempo = tempo_.load();
-    if (tempo <= 0.0) tempo = 120.0;
-    
-    double secondsPerBeat = 60.0 / tempo;
-    double ticksPerMs = ticksPerQuarterNote_ / (secondsPerBeat * 1000.0);
-    
+    double currentTempo = tempo_.load();
+    double ticksPerMs = (currentTempo * ticksPerQuarterNote_) / 60000.0;
     return static_cast<uint64_t>(ms * ticksPerMs);
 }
 
 uint64_t MidiPlayer::ticksToMs(uint64_t ticks) const {
-    double tempo = tempo_.load();
-    if (tempo <= 0.0) tempo = 120.0;
-    
-    double secondsPerBeat = 60.0 / tempo;
-    double msPerTick = (secondsPerBeat * 1000.0) / ticksPerQuarterNote_;
-    
+    double currentTempo = tempo_.load();
+    double msPerTick = 60000.0 / (currentTempo * ticksPerQuarterNote_);
     return static_cast<uint64_t>(ticks * msPerTick);
 }
 
 uint64_t MidiPlayer::musicalPositionToTicks(uint32_t bar, uint8_t beat, 
-                                            uint16_t tick) const {
-    uint64_t ticksPerBar = ticksPerBeat_ * timeSignatureNum_;
-    uint64_t ticks = (bar - 1) * ticksPerBar;
+                                             uint16_t tick) const {
+    uint64_t ticks = 0;
+    
+    ticks += (bar - 1) * timeSignatureNum_ * ticksPerBeat_;
     ticks += (beat - 1) * ticksPerBeat_;
     ticks += tick;
     
@@ -795,7 +769,7 @@ uint64_t MidiPlayer::musicalPositionToTicks(uint32_t bar, uint8_t beat,
 MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
     MusicalPosition pos;
     
-    uint64_t ticksPerBar = ticksPerBeat_ * timeSignatureNum_;
+    uint64_t ticksPerBar = timeSignatureNum_ * ticksPerBeat_;
     
     pos.bar = static_cast<uint32_t>(ticks / ticksPerBar) + 1;
     uint64_t ticksInBar = ticks % ticksPerBar;
@@ -811,7 +785,3 @@ MusicalPosition MidiPlayer::ticksToMusicalPosition(uint64_t ticks) const {
 }
 
 } // namespace midiMind
-
-// ============================================================================
-// END OF FILE MidiPlayer.cpp v4.1.1
-// ============================================================================

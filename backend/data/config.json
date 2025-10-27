@@ -1,6 +1,6 @@
 {
     "application": {
-        "version": "4.1.2",
+        "version": "4.1.4",
         "name": "MidiMind",
         "data_dir": "/opt/midimind/data",
         "log_dir": "/var/log/midimind"
@@ -9,19 +9,19 @@
         "port": 8080,
         "host": "0.0.0.0",
         "max_connections": 10,
-        "timeout_ms": 30000
+        "timeout_ms": 10000
     },
     "midi": {
         "buffer_size": 256,
         "sample_rate": 44100,
         "max_devices": 32,
         "alsa_client_name": "MidiMind",
-        "hot_plug_scan_interval": 2000,
+        "hot_plug_scan_interval": 1000,
         "default_device": "auto"
     },
     "timing": {
         "latency_compensation": true,
-        "auto_calibration": true,
+        "auto_calibration": false,
         "calibration_duration_ms": 5000,
         "calibration_iterations": 100,
         "max_jitter_ms": 5.0,

@@ -1,15 +1,13 @@
 // ============================================================================
 // File: backend/src/core/Error.h
-// Version: 4.1.0 - CORRIGÉ
+// Version: 4.1.1 - CORRECTIONS COMPLÈTES
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   Error handling system with error codes and exception class.
-//   Header-only for inline performance.
-//
-// Changes v4.1.0:
-//   - Added VALIDATION_FAILED error code
+// Corrections v4.1.1:
+//   - Ajout des cas manquants dans errorCodeToString()
+//   - Indentation corrigée ligne 188
+//   - Documentation des codes explicites
 //
 // ============================================================================
 
@@ -54,10 +52,9 @@ enum class ErrorCode {
     DATABASE_CONNECTION_FAILED,
     DATABASE_QUERY_FAILED,
     DATABASE_NOT_FOUND,
-    DATABASE_NOT_CONNECTED = 1518,
-	VALIDATION_ERROR = 1100,
-	
-	
+    DATABASE_NOT_CONNECTED = 1518,  // Explicit value for API compatibility
+    VALIDATION_ERROR = 1100,         // Explicit value for API compatibility
+    
     // File System
     FILE_ERROR,
     FILE_NOT_FOUND,
@@ -66,8 +63,8 @@ enum class ErrorCode {
     FILE_PERMISSION_ERROR,
     PATH_NOT_FOUND,
     DIRECTORY_ERROR,
-	STORAGE_FILE_EXISTS = 1501,
-	STORAGE_IO_ERROR = 1504,
+    STORAGE_FILE_EXISTS = 1501,     // Explicit value for API compatibility
+    STORAGE_IO_ERROR = 1504,        // Explicit value for API compatibility
     
     // MIDI
     MIDI_ERROR,
@@ -84,7 +81,7 @@ enum class ErrorCode {
     MIDI_FILE_PARSE_ERROR,
     MIDI_FILE_INVALID_FORMAT,
     MIDI_FILE_CORRUPTED,
-	MIDI_FILE_READ_FAILED,
+    MIDI_FILE_READ_FAILED,
     
     // Network
     NETWORK_ERROR,
@@ -101,7 +98,7 @@ enum class ErrorCode {
     COMMAND_EXECUTION_FAILED,
     
     // Validation
-    VALIDATION_FAILED,          // ✅ AJOUTÉ
+    VALIDATION_FAILED,
     INVALID_JSON,
     SCHEMA_ERROR,
     
@@ -163,6 +160,8 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::DATABASE_CONNECTION_FAILED: return "DATABASE_CONNECTION_FAILED";
         case ErrorCode::DATABASE_QUERY_FAILED: return "DATABASE_QUERY_FAILED";
         case ErrorCode::DATABASE_NOT_FOUND: return "DATABASE_NOT_FOUND";
+        case ErrorCode::DATABASE_NOT_CONNECTED: return "DATABASE_NOT_CONNECTED";
+        case ErrorCode::VALIDATION_ERROR: return "VALIDATION_ERROR";
         
         case ErrorCode::FILE_ERROR: return "FILE_ERROR";
         case ErrorCode::FILE_NOT_FOUND: return "FILE_NOT_FOUND";
@@ -171,6 +170,8 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::FILE_PERMISSION_ERROR: return "FILE_PERMISSION_ERROR";
         case ErrorCode::PATH_NOT_FOUND: return "PATH_NOT_FOUND";
         case ErrorCode::DIRECTORY_ERROR: return "DIRECTORY_ERROR";
+        case ErrorCode::STORAGE_FILE_EXISTS: return "STORAGE_FILE_EXISTS";
+        case ErrorCode::STORAGE_IO_ERROR: return "STORAGE_IO_ERROR";
         
         case ErrorCode::MIDI_ERROR: return "MIDI_ERROR";
         case ErrorCode::MIDI_DEVICE_ERROR: return "MIDI_DEVICE_ERROR";
@@ -185,7 +186,7 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::MIDI_FILE_PARSE_ERROR: return "MIDI_FILE_PARSE_ERROR";
         case ErrorCode::MIDI_FILE_INVALID_FORMAT: return "MIDI_FILE_INVALID_FORMAT";
         case ErrorCode::MIDI_FILE_CORRUPTED: return "MIDI_FILE_CORRUPTED";
-		case ErrorCode::MIDI_FILE_READ_FAILED: return "MIDI_FILE_READ_FAILED"; 
+        case ErrorCode::MIDI_FILE_READ_FAILED: return "MIDI_FILE_READ_FAILED";
         
         case ErrorCode::NETWORK_ERROR: return "NETWORK_ERROR";
         case ErrorCode::NETWORK_CONNECTION_FAILED: return "NETWORK_CONNECTION_FAILED";
@@ -199,7 +200,7 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::INVALID_COMMAND: return "INVALID_COMMAND";
         case ErrorCode::COMMAND_EXECUTION_FAILED: return "COMMAND_EXECUTION_FAILED";
         
-        case ErrorCode::VALIDATION_FAILED: return "VALIDATION_FAILED";  // ✅ AJOUTÉ
+        case ErrorCode::VALIDATION_FAILED: return "VALIDATION_FAILED";
         case ErrorCode::INVALID_JSON: return "INVALID_JSON";
         case ErrorCode::SCHEMA_ERROR: return "SCHEMA_ERROR";
         
@@ -251,13 +252,13 @@ public:
      * @brief Get error code
      * @return ErrorCode Error code
      */
-    ErrorCode getCode() const { return code_; }
+    ErrorCode getCode() const noexcept { return code_; }
     
     /**
      * @brief Get error code as string
      * @return const char* Error code name
      */
-    const char* getCodeString() const {
+    const char* getCodeString() const noexcept {
         return errorCodeToString(code_);
     }
 
@@ -282,11 +283,14 @@ private:
  * @param condition Condition to check
  * @param code Error code if false
  * @param message Error message if false
+ * @note Condition evaluated only once (safe for side effects)
  */
 #define ASSERT_OR_THROW(condition, code, message) \
-    if (!(condition)) { \
-        THROW_ERROR(code, message); \
-    }
+    do { \
+        if (!(condition)) { \
+            THROW_ERROR(code, message); \
+        } \
+    } while(0)
 
 } // namespace midiMind
 

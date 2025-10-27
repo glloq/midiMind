@@ -24,6 +24,8 @@
 //   - Aligned with MidiMessage v4.1.0
 //   - Enhanced error handling
 //   - Better memory management
+//   - Improved bounds checking
+//   - Added overflow protection
 //
 // ============================================================================
 
@@ -65,6 +67,11 @@ struct TimeSignature {
     uint8_t denominator = 4;
     uint8_t clocksPerClick = 24;
     uint8_t notated32ndNotesPerBeat = 8;
+    
+    bool isValid() const {
+        return numerator > 0 && denominator > 0 && 
+               (denominator & (denominator - 1)) == 0; // Power of 2
+    }
 };
 
 /**
@@ -74,6 +81,10 @@ struct TimeSignature {
 struct KeySignature {
     int8_t sharpsFlats = 0;  ///< -7 to +7 (negative = flats, positive = sharps)
     uint8_t majorMinor = 0;   ///< 0 = major, 1 = minor
+    
+    bool isValid() const {
+        return sharpsFlats >= -7 && sharpsFlats <= 7 && majorMinor <= 1;
+    }
 };
 
 /**
@@ -127,6 +138,10 @@ struct MidiHeader {
     uint16_t format = 1;             ///< 0, 1, or 2
     uint16_t numTracks = 0;
     uint16_t division = 480;         ///< Ticks per quarter note
+    
+    bool isValid() const {
+        return format <= 2 && numTracks > 0 && division > 0;
+    }
 };
 
 /**
@@ -145,6 +160,8 @@ struct MidiFile {
     
     /**
      * @brief Convert to JSON
+     * @throws nlohmann::json::exception on serialization error
+     * @note May throw if data structures contain invalid UTF-8 or exceed size limits
      */
     nlohmann::json toJson() const;
     
@@ -157,7 +174,7 @@ struct MidiFile {
      * @brief Check if file is valid
      */
     bool isValid() const { 
-        return header.numTracks > 0 && tracks.size() > 0; 
+        return header.isValid() && tracks.size() > 0; 
     }
 };
 
@@ -233,6 +250,7 @@ public:
      * @param size Size of buffer in bytes
      * @return Parsed MIDI file structure
      * @throws MidiMindException on error
+     * @note Buffer does not need special alignment
      */
     MidiFile readFromBuffer(const uint8_t* data, size_t size);
     
@@ -304,12 +322,14 @@ private:
     // ========================================================================
     
     /**
-     * @brief Read variable-length quantity
+     * @brief Read variable-length quantity with bounds checking
      * @param data Data buffer
      * @param offset Current offset (will be advanced)
+     * @param maxOffset Maximum valid offset
      * @return Value
+     * @throws MidiMindException if corrupted or exceeds bounds
      */
-    uint32_t readVariableLength(const uint8_t* data, size_t& offset);
+    uint32_t readVariableLength(const uint8_t* data, size_t& offset, size_t maxOffset);
     
     /**
      * @brief Read 32-bit big-endian unsigned integer
@@ -328,7 +348,7 @@ private:
     int getDataBytesCount(uint8_t statusByte);
     
     /**
-     * @brief Calculate file duration
+     * @brief Calculate file duration with overflow protection
      */
     void calculateDuration(MidiFile& file);
     
@@ -346,6 +366,9 @@ private:
     
     /// Current absolute time in ticks
     uint64_t currentAbsoluteTime_;
+    
+    /// Buffer size for bounds checking
+    size_t bufferSize_;
 };
 
 } // namespace midiMind

@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/sysex/SysExHandler.h
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -15,6 +15,11 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Added noexcept to statistics getters
+//   - Made autoIdentify_ and autoIdentifyDelayMs_ atomic
+//   - Added thread-safety notes to callback setters
 //
 // Changes v4.1.0:
 //   - Simplified to focus on Blocks 1-2 only
@@ -133,6 +138,7 @@ public:
     /**
      * @brief Set callback for sending messages
      * @param callback Function to call when sending SysEx
+     * @note Must be called before concurrent use (typically during setup)
      */
     void setSendMessageCallback(SendMessageCallback callback) {
         onSendMessage_ = std::move(callback);
@@ -141,6 +147,7 @@ public:
     /**
      * @brief Set callback for standard device identified
      * @param callback Function to call when device identified
+     * @note Must be called before concurrent use (typically during setup)
      */
     void setOnDeviceIdentified(DeviceIdentifiedCallback callback) {
         onDeviceIdentified_ = std::move(callback);
@@ -149,6 +156,7 @@ public:
     /**
      * @brief Set callback for custom device identified (Block 1)
      * @param callback Function to call when custom device identified
+     * @note Must be called before concurrent use (typically during setup)
      */
     void setOnCustomDeviceIdentified(CustomDeviceIdentifiedCallback callback) {
         onCustomDeviceIdentified_ = std::move(callback);
@@ -157,6 +165,7 @@ public:
     /**
      * @brief Set callback for note map received (Block 2)
      * @param callback Function to call when note map received
+     * @note Must be called before concurrent use (typically during setup)
      */
     void setOnNoteMapReceived(NoteMapReceivedCallback callback) {
         onNoteMapReceived_ = std::move(callback);
@@ -168,8 +177,24 @@ public:
      * @param delayMs Delay in ms before requesting (default: 500ms)
      */
     void setAutoIdentify(bool enable, int delayMs = 500) {
-        autoIdentify_ = enable;
-        autoIdentifyDelayMs_ = delayMs;
+        autoIdentify_.store(enable);
+        autoIdentifyDelayMs_.store(delayMs);
+    }
+    
+    /**
+     * @brief Check if auto-identify is enabled
+     * @return True if enabled
+     */
+    bool isAutoIdentifyEnabled() const noexcept {
+        return autoIdentify_.load();
+    }
+    
+    /**
+     * @brief Get auto-identify delay
+     * @return Delay in milliseconds
+     */
+    int getAutoIdentifyDelay() const noexcept {
+        return autoIdentifyDelayMs_.load();
     }
     
     // ========================================================================
@@ -263,7 +288,7 @@ public:
      * @brief Get number of messages received
      * @return Message count
      */
-    uint32_t getMessagesReceived() const {
+    uint32_t getMessagesReceived() const noexcept {
         return messagesReceived_.load();
     }
     
@@ -271,7 +296,7 @@ public:
      * @brief Get number of messages sent
      * @return Message count
      */
-    uint32_t getMessagesSent() const {
+    uint32_t getMessagesSent() const noexcept {
         return messagesSent_.load();
     }
     
@@ -279,8 +304,16 @@ public:
      * @brief Get number of identity replies received
      * @return Reply count
      */
-    uint32_t getIdentityRepliesReceived() const {
+    uint32_t getIdentityRepliesReceived() const noexcept {
         return identityRepliesReceived_.load();
+    }
+    
+    /**
+     * @brief Get number of identity requests sent
+     * @return Request count
+     */
+    uint32_t getIdentityRequestsSent() const noexcept {
+        return identityRequestsSent_.load();
     }
     
     /**
@@ -318,15 +351,15 @@ private:
     // MEMBER VARIABLES
     // ========================================================================
     
-    // Callbacks
+    // Callbacks (set during initialization, not protected by mutex)
     SendMessageCallback onSendMessage_;
     DeviceIdentifiedCallback onDeviceIdentified_;
     CustomDeviceIdentifiedCallback onCustomDeviceIdentified_;
     NoteMapReceivedCallback onNoteMapReceived_;
     
-    // Configuration
-    bool autoIdentify_;
-    int autoIdentifyDelayMs_;
+    // Configuration (atomic for thread-safety)
+    std::atomic<bool> autoIdentify_;
+    std::atomic<int> autoIdentifyDelayMs_;
     
     // Caches (protected by mutex_)
     mutable std::mutex mutex_;
@@ -334,7 +367,7 @@ private:
     std::map<std::string, CustomDeviceIdentity> customIdentityCache_;
     std::map<std::string, NoteMap> noteMapCache_;
     
-    // Statistics
+    // Statistics (atomic)
     std::atomic<uint32_t> messagesReceived_{0};
     std::atomic<uint32_t> messagesSent_{0};
     std::atomic<uint32_t> identityRepliesReceived_{0};

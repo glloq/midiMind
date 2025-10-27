@@ -1,19 +1,18 @@
 // ============================================================================
 // File: backend/src/storage/InstrumentDatabase.cpp
-// Version: 4.1.0
+// Version: 4.3.0 - THREAD-SAFE
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
 // Description:
 //   Implementation of InstrumentDatabase class.
 //
-// Author: MidiMind Team
-// Date: 2025-10-16
-//
-// Changes v4.1.0:
-//   - Initial implementation
-//   - CRUD operations with cache
-//   - Thread-safe operations
+// Changes v4.3.0:
+//   - Fixed: loadCacheInternal() without mutex (prevents deadlock)
+//   - Fixed: All std::stoi/stoll/stod wrapped in try-catch
+//   - Fixed: row.at() protected with existence checks
+//   - Fixed: Cache mutation without iterator invalidation
+//   - Added: getAllProfiles() and updateLatencyMs() implementations
 //
 // ============================================================================
 
@@ -30,7 +29,9 @@ InstrumentDatabase::InstrumentDatabase(Database& database)
     : database_(database)
 {
     Logger::info("InstrumentDatabase", "InstrumentDatabase created");
-    loadCache();
+    
+    std::lock_guard<std::mutex> lock(mutex_);
+    loadCacheInternal();
 }
 
 InstrumentDatabase::~InstrumentDatabase() {
@@ -111,7 +112,8 @@ std::optional<InstrumentLatencyEntry> InstrumentDatabase::getInstrument(const st
         
         if (result.success && !result.rows.empty()) {
             auto entry = parseRow(result.rows[0]);
-            cache_[id] = entry; // Update cache
+            // Update cache - safe since we're not using the iterator
+            cache_[id] = entry;
             return entry;
         }
         
@@ -216,7 +218,12 @@ std::vector<InstrumentLatencyEntry> InstrumentDatabase::listAll() {
         
         if (result.success) {
             for (const auto& row : result.rows) {
-                instruments.push_back(parseRow(row));
+                try {
+                    instruments.push_back(parseRow(row));
+                } catch (const std::exception& e) {
+                    Logger::error("InstrumentDatabase", "Failed to parse row: " + std::string(e.what()));
+                    // Continue with next row
+                }
             }
         }
         
@@ -238,7 +245,11 @@ std::vector<InstrumentLatencyEntry> InstrumentDatabase::listByDevice(const std::
         
         if (result.success) {
             for (const auto& row : result.rows) {
-                instruments.push_back(parseRow(row));
+                try {
+                    instruments.push_back(parseRow(row));
+                } catch (const std::exception& e) {
+                    Logger::error("InstrumentDatabase", "Failed to parse row: " + std::string(e.what()));
+                }
             }
         }
         
@@ -260,7 +271,11 @@ std::vector<InstrumentLatencyEntry> InstrumentDatabase::listByChannel(int channe
         
         if (result.success) {
             for (const auto& row : result.rows) {
-                instruments.push_back(parseRow(row));
+                try {
+                    instruments.push_back(parseRow(row));
+                } catch (const std::exception& e) {
+                    Logger::error("InstrumentDatabase", "Failed to parse row: " + std::string(e.what()));
+                }
             }
         }
         
@@ -282,7 +297,11 @@ std::vector<InstrumentLatencyEntry> InstrumentDatabase::listEnabled() {
         
         if (result.success) {
             for (const auto& row : result.rows) {
-                instruments.push_back(parseRow(row));
+                try {
+                    instruments.push_back(parseRow(row));
+                } catch (const std::exception& e) {
+                    Logger::error("InstrumentDatabase", "Failed to parse row: " + std::string(e.what()));
+                }
             }
         }
         
@@ -313,6 +332,42 @@ std::optional<InstrumentLatencyEntry> InstrumentDatabase::getByDeviceAndChannel(
 }
 
 // ============================================================================
+// HELPER METHODS
+// ============================================================================
+
+std::vector<InstrumentLatencyEntry> InstrumentDatabase::getAllProfiles() {
+    return listAll();
+}
+
+void InstrumentDatabase::updateLatencyMs(const std::string& id, double latencyMs) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Atomic operation under single lock
+    auto it = cache_.find(id);
+    if (it != cache_.end()) {
+        // Update in memory
+        it->second.avgLatency = static_cast<int64_t>(latencyMs * 1000.0);  // ms → µs
+        
+        // Update in database
+        try {
+            std::string sql = "UPDATE instruments_latency SET avg_latency = ? WHERE id = ?";
+            auto result = database_.execute(sql, {
+                std::to_string(it->second.avgLatency),
+                id
+            });
+            
+            if (!result.success) {
+                Logger::error("InstrumentDatabase", "Failed to update latency: " + result.error);
+            }
+        } catch (const std::exception& e) {
+            Logger::error("InstrumentDatabase", "Exception updating latency: " + std::string(e.what()));
+        }
+    } else {
+        Logger::warning("InstrumentDatabase", "Instrument not found for latency update: " + id);
+    }
+}
+
+// ============================================================================
 // CACHE MANAGEMENT
 // ============================================================================
 
@@ -322,7 +377,7 @@ void InstrumentDatabase::refreshCache() {
     Logger::info("InstrumentDatabase", "Refreshing cache...");
     
     cache_.clear();
-    loadCache();
+    loadCacheInternal();
 }
 
 void InstrumentDatabase::clearCache() {
@@ -363,7 +418,8 @@ json InstrumentDatabase::getStatistics() const {
 // PRIVATE METHODS
 // ============================================================================
 
-void InstrumentDatabase::loadCache() {
+void InstrumentDatabase::loadCacheInternal() {
+    // Assumes mutex is already locked by caller
     Logger::info("InstrumentDatabase", "Loading cache from database...");
     
     try {
@@ -372,8 +428,14 @@ void InstrumentDatabase::loadCache() {
         
         if (result.success) {
             for (const auto& row : result.rows) {
-                auto entry = parseRow(row);
-                cache_[entry.id] = entry;
+                try {
+                    auto entry = parseRow(row);
+                    cache_[entry.id] = entry;
+                } catch (const std::exception& e) {
+                    Logger::error("InstrumentDatabase", "Failed to parse row during cache load: " + 
+                                std::string(e.what()));
+                    // Continue loading other entries
+                }
             }
             
             Logger::info("InstrumentDatabase", 
@@ -388,32 +450,90 @@ void InstrumentDatabase::loadCache() {
 InstrumentLatencyEntry InstrumentDatabase::parseRow(const DatabaseRow& row) {
     InstrumentLatencyEntry entry;
     
-    entry.id = row.at("id");
-    entry.deviceId = row.at("device_id");
-    entry.channel = std::stoi(row.at("channel"));
-    entry.name = row.count("name") ? row.at("name") : "";
-    entry.instrumentType = row.count("instrument_type") ? row.at("instrument_type") : "unknown";
-    
-    entry.avgLatency = std::stoll(row.at("avg_latency"));
-    entry.minLatency = std::stoll(row.at("min_latency"));
-    entry.maxLatency = std::stoll(row.at("max_latency"));
-    
-    entry.jitter = std::stod(row.at("jitter"));
-    entry.stdDeviation = std::stod(row.at("std_deviation"));
-    entry.measurementCount = std::stoi(row.at("measurement_count"));
-    
-    entry.calibrationConfidence = std::stod(row.at("calibration_confidence"));
-    entry.lastCalibration = row.count("last_calibration") ? row.at("last_calibration") : "";
-    entry.calibrationMethod = row.count("calibration_method") ? row.at("calibration_method") : "";
-    
-    entry.compensationOffset = std::stoll(row.at("compensation_offset"));
-    entry.autoCalibration = row.at("auto_calibration") == "1";
-    entry.enabled = row.at("enabled") == "1";
-    
-    entry.measurementHistory = row.count("measurement_history") ? row.at("measurement_history") : "";
-    
-    entry.createdAt = row.count("created_at") ? row.at("created_at") : "";
-    entry.updatedAt = row.count("updated_at") ? row.at("updated_at") : "";
+    try {
+        // Required fields
+        if (row.count("id") == 0 || row.count("device_id") == 0 || 
+            row.count("channel") == 0) {
+            throw std::runtime_error("Missing required fields in row");
+        }
+        
+        entry.id = row.at("id");
+        entry.deviceId = row.at("device_id");
+        
+        // Parse integers with error handling
+        try {
+            entry.channel = std::stoi(row.at("channel"));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid channel value: " + row.at("channel"));
+        }
+        
+        // Optional string fields
+        entry.name = row.count("name") ? row.at("name") : "";
+        entry.instrumentType = row.count("instrument_type") ? row.at("instrument_type") : "unknown";
+        
+        // Parse latency values
+        try {
+            entry.avgLatency = row.count("avg_latency") ? 
+                std::stoll(row.at("avg_latency")) : 0;
+            entry.minLatency = row.count("min_latency") ? 
+                std::stoll(row.at("min_latency")) : 0;
+            entry.maxLatency = row.count("max_latency") ? 
+                std::stoll(row.at("max_latency")) : 0;
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid latency value");
+        }
+        
+        // Parse floating point values
+        try {
+            entry.jitter = row.count("jitter") ? 
+                std::stod(row.at("jitter")) : 0.0;
+            entry.stdDeviation = row.count("std_deviation") ? 
+                std::stod(row.at("std_deviation")) : 0.0;
+            entry.calibrationConfidence = row.count("calibration_confidence") ? 
+                std::stod(row.at("calibration_confidence")) : 0.0;
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid floating point value");
+        }
+        
+        // Parse measurement count
+        try {
+            entry.measurementCount = row.count("measurement_count") ? 
+                std::stoi(row.at("measurement_count")) : 0;
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid measurement_count value");
+        }
+        
+        // Calibration info
+        entry.lastCalibration = row.count("last_calibration") ? 
+            row.at("last_calibration") : "";
+        entry.calibrationMethod = row.count("calibration_method") ? 
+            row.at("calibration_method") : "";
+        
+        // Parse compensation offset
+        try {
+            entry.compensationOffset = row.count("compensation_offset") ? 
+                std::stoll(row.at("compensation_offset")) : 0;
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid compensation_offset value");
+        }
+        
+        // Boolean fields
+        entry.autoCalibration = row.count("auto_calibration") && 
+            row.at("auto_calibration") == "1";
+        entry.enabled = row.count("enabled") && 
+            row.at("enabled") == "1";
+        
+        // Measurement history
+        entry.measurementHistory = row.count("measurement_history") ? 
+            row.at("measurement_history") : "";
+        
+        // Timestamps
+        entry.createdAt = row.count("created_at") ? row.at("created_at") : "";
+        entry.updatedAt = row.count("updated_at") ? row.at("updated_at") : "";
+        
+    } catch (const std::out_of_range& e) {
+        throw std::runtime_error("Missing or invalid field: " + std::string(e.what()));
+    }
     
     return entry;
 }

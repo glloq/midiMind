@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/MidiValidator.cpp
-// Version: 4.1.0
+// Version: 4.1.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -9,6 +9,10 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.1.1:
+//   - Optimized vector operations
+//   - Better memory efficiency
 //
 // Changes v4.1.0:
 //   - Complete validation implementation
@@ -177,16 +181,20 @@ ValidationResult MidiValidator::validateRawData(const std::vector<uint8_t>& data
     MidiMessage msg(data);
     auto msgResult = validateMessage(msg);
     
-    // Merge results
-    result.errors.insert(result.errors.end(), 
-                        msgResult.errors.begin(), 
-                        msgResult.errors.end());
-    result.warnings.insert(result.warnings.end(), 
-                          msgResult.warnings.begin(), 
-                          msgResult.warnings.end());
-    result.infos.insert(result.infos.end(), 
-                       msgResult.infos.begin(), 
-                       msgResult.infos.end());
+    // Merge results efficiently
+    result.errors.reserve(result.errors.size() + msgResult.errors.size());
+    result.warnings.reserve(result.warnings.size() + msgResult.warnings.size());
+    result.infos.reserve(result.infos.size() + msgResult.infos.size());
+    
+    for (auto& error : msgResult.errors) {
+        result.errors.emplace_back(std::move(error));
+    }
+    for (auto& warning : msgResult.warnings) {
+        result.warnings.emplace_back(std::move(warning));
+    }
+    for (auto& info : msgResult.infos) {
+        result.infos.emplace_back(std::move(info));
+    }
     
     if (!msgResult.isValid) {
         result.isValid = false;
