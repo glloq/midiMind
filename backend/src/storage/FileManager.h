@@ -296,8 +296,8 @@ namespace FileManagerUnsafe {
  */
 class FileManager {
 public:
-    // For backward compatibility - delegate to namespace
-    using Unsafe = FileManagerUnsafe;
+    // For backward compatibility - namespace alias
+    namespace Unsafe = FileManagerUnsafe;
     
     explicit FileManager(const std::string& rootPath);
     ~FileManager();

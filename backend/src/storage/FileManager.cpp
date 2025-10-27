@@ -54,8 +54,8 @@ bool FileManager::initializeDirectories() {
     Logger::info("FileManager", "Initializing directory structure...");
     
     // Create root directory if it doesn't exist
-    if (!Unsafe::exists(rootPath_)) {
-        if (!Unsafe::createDirectory(rootPath_, true)) {
+    if (!FileManagerUnsafe::exists(rootPath_)) {
+        if (!FileManagerUnsafe::createDirectory(rootPath_, true)) {
             Logger::error("FileManager", "Failed to create root directory: " + rootPath_);
             return false;
         }
@@ -76,8 +76,8 @@ bool FileManager::initializeDirectories() {
     for (auto dirType : dirs) {
         std::string dirPath = getDirectoryPath(dirType);
         
-        if (!Unsafe::exists(dirPath)) {
-            if (Unsafe::createDirectory(dirPath, true)) {
+        if (!FileManagerUnsafe::exists(dirPath)) {
+            if (FileManagerUnsafe::createDirectory(dirPath, true)) {
                 Logger::info("FileManager", "  ✓ Created: " + dirPath);
             } else {
                 Logger::error("FileManager", "  ✗ Failed: " + dirPath);
@@ -138,13 +138,13 @@ std::string FileManager::uploadFile(const std::vector<uint8_t>& data,
     Logger::debug("FileManager", "  Destination: " + destPath);
     
     // 4. Check if file exists
-    if (!overwrite && Unsafe::exists(destPath)) {
+    if (!overwrite && FileManagerUnsafe::exists(destPath)) {
         THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS,
                    "File already exists: " + safeName);
     }
     
     // 5. Write file
-    if (!Unsafe::writeBinaryFile(destPath, data)) {
+    if (!FileManagerUnsafe::writeBinaryFile(destPath, data)) {
         THROW_ERROR(ErrorCode::STORAGE_IO_ERROR,
                    "Failed to write file: " + destPath);
     }
@@ -170,16 +170,16 @@ std::vector<uint8_t> FileManager::downloadFile(const std::string& filepath) {
     }
     
     // Check if file exists
-    if (!Unsafe::exists(fullPath)) {
+    if (!FileManagerUnsafe::exists(fullPath)) {
         THROW_ERROR(ErrorCode::FILE_NOT_FOUND,
                    "File not found: " + filepath);
     }
     
     // Get file size to distinguish empty file from read error
-    size_t expectedSize = Unsafe::fileSize(fullPath);
+    size_t expectedSize = FileManagerUnsafe::fileSize(fullPath);
     
     // Read file
-    auto data = Unsafe::readBinaryFile(fullPath);
+    auto data = FileManagerUnsafe::readBinaryFile(fullPath);
     
     // Verify read was successful
     if (data.size() != expectedSize) {
@@ -218,13 +218,13 @@ bool FileManager::deleteFile(const std::string& filepath) {
     }
     
     // Check if file exists
-    if (!Unsafe::exists(fullPath)) {
+    if (!FileManagerUnsafe::exists(fullPath)) {
         Logger::warning("FileManager", "File not found: " + filepath);
         return false;
     }
     
     // Delete file
-    if (Unsafe::deleteFile(fullPath)) {
+    if (FileManagerUnsafe::deleteFile(fullPath)) {
         Logger::info("FileManager", "✓ File deleted: " + filepath);
         return true;
     } else {
@@ -249,13 +249,13 @@ bool FileManager::copyFile(const std::string& source, const std::string& dest) {
     }
     
     // Check source exists
-    if (!Unsafe::exists(sourcePath)) {
+    if (!FileManagerUnsafe::exists(sourcePath)) {
         Logger::error("FileManager", "Source file not found: " + source);
         return false;
     }
     
     // Copy file
-    if (Unsafe::copyFile(sourcePath, destPath)) {
+    if (FileManagerUnsafe::copyFile(sourcePath, destPath)) {
         Logger::info("FileManager", "✓ File copied");
         return true;
     } else {
@@ -280,13 +280,13 @@ bool FileManager::moveFile(const std::string& source, const std::string& dest) {
     }
     
     // Check source exists
-    if (!Unsafe::exists(sourcePath)) {
+    if (!FileManagerUnsafe::exists(sourcePath)) {
         Logger::error("FileManager", "Source file not found: " + source);
         return false;
     }
     
     // Move file
-    if (Unsafe::moveFile(sourcePath, destPath)) {
+    if (FileManagerUnsafe::moveFile(sourcePath, destPath)) {
         Logger::info("FileManager", "✓ File moved");
         return true;
     } else {
@@ -303,27 +303,25 @@ std::vector<FileInfo> FileManager::listFiles(DirectoryType dirType) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::string dirPath = getDirectoryPath(dirType);
-    std::vector<FileInfo> files;
     
-    Logger::debug("FileManager", "Listing files in: " + dirPath);
-    
-    if (!Unsafe::exists(dirPath)) {
+    if (!FileManagerUnsafe::exists(dirPath)) {
         Logger::warning("FileManager", "Directory not found: " + dirPath);
-        return files;
+        return {};
     }
     
-    auto filenames = Unsafe::listFiles(dirPath);
+    auto filenames = FileManagerUnsafe::listFiles(dirPath);
     
-    for (const auto& filename : filenames) {
-        std::string filepath = dirPath + "/" + filename;
+    std::vector<FileInfo> files;
+    files.reserve(filenames.size());
+    
+    for (const auto& name : filenames) {
+        std::string filepath = dirPath + "/" + name;
         auto fileInfo = parseFileInfo(filepath, dirType);
         
         if (fileInfo.has_value()) {
             files.push_back(fileInfo.value());
         }
     }
-    
-    Logger::debug("FileManager", "Found " + std::to_string(files.size()) + " files");
     
     return files;
 }
@@ -336,27 +334,20 @@ std::optional<FileInfo> FileManager::getFileInfo(const std::string& filepath) {
     try {
         fullPath = buildFullPath(filepath);
     } catch (const std::exception& e) {
-        Logger::error("FileManager", "Invalid or unsafe path: " + filepath);
+        Logger::warning("FileManager", "Invalid path: " + filepath);
         return std::nullopt;
     }
     
-    if (!Unsafe::exists(fullPath)) {
-        Logger::warning("FileManager", "File not found: " + filepath);
+    if (!FileManagerUnsafe::exists(fullPath)) {
         return std::nullopt;
     }
     
     // Determine directory type from path
-    DirectoryType dirType = DirectoryType::TEMP;
-    
-    if (filepath.find(DIR_LOGS) != std::string::npos) {
-        dirType = DirectoryType::LOGS;
-    } else if (filepath.find(DIR_BACKUPS) != std::string::npos) {
-        dirType = DirectoryType::BACKUPS;
-    } else if (filepath.find(DIR_EXPORTS) != std::string::npos) {
-        dirType = DirectoryType::EXPORTS;
-    } else if (filepath.find(DIR_UPLOADS) != std::string::npos) {
-        dirType = DirectoryType::UPLOADS;
-    }
+    DirectoryType dirType = DirectoryType::UPLOADS;
+    if (filepath.find("logs/") == 0) dirType = DirectoryType::LOGS;
+    else if (filepath.find("backups/") == 0) dirType = DirectoryType::BACKUPS;
+    else if (filepath.find("exports/") == 0) dirType = DirectoryType::EXPORTS;
+    else if (filepath.find("temp/") == 0) dirType = DirectoryType::TEMP;
     
     return parseFileInfo(fullPath, dirType);
 }
@@ -367,6 +358,14 @@ std::string FileManager::getDirectoryPath(DirectoryType dirType) const {
 
 // ============================================================================
 // VALIDATION
+// ============================================================================
+
+bool FileManager::isPathSafe(const std::string& path) const {
+    return validatePath(path);
+}
+
+// ============================================================================
+// PRIVATE HELPER METHODS
 // ============================================================================
 
 std::string FileManager::buildFullPath(const std::string& relativePath) const {
@@ -457,7 +456,7 @@ std::string FileManager::sanitizeFilename(const std::string& filename) const {
     // 6. Limit length
     if (safe.length() > MAX_FILENAME_LENGTH) {
         // Keep extension if present
-        std::string ext = Unsafe::getExtension(safe);
+        std::string ext = FileManagerUnsafe::getExtension(safe);
         size_t maxBase = MAX_FILENAME_LENGTH - ext.length();
         safe = safe.substr(0, maxBase) + ext;
     }
@@ -480,25 +479,6 @@ bool FileManager::validatePath(const std::string& path) const {
     }
 }
 
-bool FileManager::isPathSafe(const std::string& path) const {
-    // Convert to relative path if absolute
-    std::string relativePath = path;
-    
-    if (path.find(rootPath_) == 0) {
-        // Path starts with rootPath_, make it relative
-        relativePath = path.substr(rootPath_.length());
-        if (!relativePath.empty() && (relativePath[0] == '/' || relativePath[0] == '\\')) {
-            relativePath = relativePath.substr(1);
-        }
-    }
-    
-    return validatePath(relativePath);
-}
-
-// ============================================================================
-// STATISTICS
-// ============================================================================
-
 json FileManager::getStatistics() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -520,27 +500,29 @@ json FileManager::getStatistics() const {
         std::string dirPath = getDirectoryPath(dirType);
         std::string dirName = directoryTypeToString(dirType);
         
-        if (Unsafe::exists(dirPath)) {
-            auto files = Unsafe::listFiles(dirPath);
+        if (FileManagerUnsafe::exists(dirPath)) {
+            auto files = FileManagerUnsafe::listFiles(dirPath);
             size_t totalSize = 0;
             
             for (const auto& file : files) {
                 std::string filepath = dirPath + "/" + file;
-                totalSize += Unsafe::fileSize(filepath);
+                totalSize += FileManagerUnsafe::fileSize(filepath);
             }
             
-            stats["directories"][dirName] = {
+            json dirInfo = {
                 {"file_count", files.size()},
                 {"total_size_bytes", totalSize},
                 {"path", dirPath}
             };
+            stats["directories"][dirName] = dirInfo;
         } else {
-            stats["directories"][dirName] = {
+            json dirInfo = {
                 {"file_count", 0},
                 {"total_size_bytes", 0},
                 {"path", dirPath},
                 {"exists", false}
             };
+            stats["directories"][dirName] = dirInfo;
         }
     }
     
@@ -553,7 +535,7 @@ json FileManager::getStatistics() const {
 
 std::optional<FileInfo> FileManager::parseFileInfo(const std::string& filepath,
                                                    DirectoryType dirType) {
-    if (!Unsafe::exists(filepath)) {
+    if (!FileManagerUnsafe::exists(filepath)) {
         return std::nullopt;
     }
     
@@ -565,10 +547,10 @@ std::optional<FileInfo> FileManager::parseFileInfo(const std::string& filepath,
         info.name = p.filename().string();
         info.id = p.filename().string();  // Set ID to filename
         info.path = filepath;
-        info.extension = Unsafe::getExtension(filepath);
-        info.size = Unsafe::fileSize(filepath);
+        info.extension = FileManagerUnsafe::getExtension(filepath);
+        info.size = FileManagerUnsafe::fileSize(filepath);
         info.directory = dirType;
-        info.isDirectory = Unsafe::isDirectory(filepath);
+        info.isDirectory = FileManagerUnsafe::isDirectory(filepath);
         
         // Get timestamps
         auto ftime = fs::last_write_time(p);
@@ -707,17 +689,17 @@ bool FileManager::renameFile(const std::string& fileId, const std::string& newNa
         return false;
     }
     
-    if (!Unsafe::exists(sourcePath)) {
+    if (!FileManagerUnsafe::exists(sourcePath)) {
         Logger::error("FileManager", "Source not found: " + fileId);
         return false;
     }
     
-    if (Unsafe::exists(destPath)) {
+    if (FileManagerUnsafe::exists(destPath)) {
         Logger::error("FileManager", "Destination already exists: " + sanitizedNew);
         return false;
     }
     
-    bool success = Unsafe::moveFile(sourcePath, destPath);
+    bool success = FileManagerUnsafe::moveFile(sourcePath, destPath);
     
     if (success) {
         Logger::info("FileManager", "✓ File renamed");
@@ -746,16 +728,16 @@ FileInfo FileManager::copyFileByName(const std::string& fileId,
                    "Invalid path: " + std::string(e.what()));
     }
     
-    if (!Unsafe::exists(sourcePath)) {
+    if (!FileManagerUnsafe::exists(sourcePath)) {
         THROW_ERROR(ErrorCode::FILE_NOT_FOUND, "Source not found: " + fileId);
     }
     
-    if (Unsafe::exists(destPath)) {
+    if (FileManagerUnsafe::exists(destPath)) {
         THROW_ERROR(ErrorCode::STORAGE_FILE_EXISTS, 
                    "Destination already exists: " + sanitizedNew);
     }
     
-    if (!Unsafe::copyFile(sourcePath, destPath)) {
+    if (!FileManagerUnsafe::copyFile(sourcePath, destPath)) {
         THROW_ERROR(ErrorCode::STORAGE_IO_ERROR, "Failed to copy file");
     }
     
