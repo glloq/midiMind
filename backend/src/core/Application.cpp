@@ -276,7 +276,7 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  ✓ InstrumentDatabase initialized");
         
         Logger::info("Application", "  Initializing PresetManager...");
-        presetManager_ = std::make_shared<PresetManager>();
+        presetManager_ = std::make_shared<PresetManager>(*database_);
         Logger::info("Application", "  ✓ PresetManager initialized");
         
         Logger::info("Application", "");
@@ -312,7 +312,7 @@ bool Application::initializeTiming() {
     
     try {
         Logger::info("Application", "  Initializing LatencyCompensator...");
-        latencyCompensator_ = std::make_shared<LatencyCompensator>();
+        latencyCompensator_ = std::make_shared<LatencyCompensator>(*instrumentDatabase_);
         Logger::info("Application", "  ✓ LatencyCompensator initialized");
         
         Logger::info("Application", "");

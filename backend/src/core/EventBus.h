@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.2.2 - FIX string concatenation
+// Version: 4.2.3 - FIX string concatenation with parentheses
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -24,13 +24,6 @@ class EventBus;
 // CLASS: Subscription (RAII)
 // ============================================================================
 
-/**
- * @class Subscription
- * @brief RAII subscription handle
- * 
- * Automatically unsubscribes when destroyed.
- * Move-only (cannot be copied).
- */
 class Subscription {
 public:
     Subscription() = default;
@@ -71,19 +64,8 @@ private:
 // CLASS: EventBus
 // ============================================================================
 
-/**
- * @class EventBus
- * @brief Thread-safe publish/subscribe event bus
- * 
- * Provides decoupled communication between components using type-safe events.
- * Handlers are called in priority order (higher priority first).
- */
 class EventBus {
 private:
-    /**
-     * @struct HandlerInfo
-     * @brief Internal handler information with shared_ptr to avoid copy overhead
-     */
     struct HandlerInfo {
         uint64_t id;
         std::shared_ptr<std::function<void(const void*)>> handler;
@@ -103,13 +85,6 @@ public:
     EventBus(const EventBus&) = delete;
     EventBus& operator=(const EventBus&) = delete;
     
-    /**
-     * @brief Subscribe to events
-     * @tparam EventType Type of event
-     * @param handler Event handler function
-     * @param priority Priority (higher = called first, default 0)
-     * @return Subscription RAII handle
-     */
     template<typename EventType>
     Subscription subscribe(std::function<void(const EventType&)> handler, 
                           int priority = 0) {
@@ -142,14 +117,6 @@ public:
         });
     }
     
-    /**
-     * @brief Subscribe with filter
-     * @tparam EventType Type of event
-     * @param handler Event handler function
-     * @param filter Filter function (return true to handle)
-     * @param priority Priority (default 0)
-     * @return Subscription RAII handle
-     */
     template<typename EventType>
     Subscription subscribe(std::function<void(const EventType&)> handler,
                           std::function<bool(const EventType&)> filter,
@@ -189,23 +156,16 @@ public:
         });
     }
     
-    /**
-     * @brief Publish event to all subscribers
-     * @tparam EventType Type of event
-     * @param event Event to publish
-     * @return size_t Number of handlers called
-     */
     template<typename EventType>
     size_t publish(const EventType& event) {
         std::type_index typeIdx(typeid(EventType));
         
-        // Copy only shared_ptr (lightweight) instead of entire functions
         std::vector<HandlerInfo> handlersCopy;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = handlers_.find(typeIdx);
             if (it != handlers_.end()) {
-                handlersCopy = it->second; // Copies shared_ptr only
+                handlersCopy = it->second;
             }
         }
         
@@ -219,10 +179,9 @@ public:
                 (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
-                // Log error but continue with other handlers
-                logError("EventBus", std::string("Handler exception: ") + std::string(e.what()));
+                logError("EventBus", ("Handler exception: " + std::string(e.what())));
             } catch (...) {
-                logError("EventBus", std::string("Handler exception: unknown error"));
+                logError("EventBus", "Handler exception: unknown error");
             }
         }
         
@@ -230,9 +189,6 @@ public:
         return count;
     }
     
-    /**
-     * @brief Get subscriber count for specific event type
-     */
     template<typename EventType>
     size_t getSubscriberCount() const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -241,33 +197,21 @@ public:
         return (it != handlers_.end()) ? it->second.size() : 0;
     }
     
-    /**
-     * @brief Get total number of registered event types
-     */
     size_t getEventTypeCount() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return handlers_.size();
     }
     
-    /**
-     * @brief Get total events published since creation
-     */
     uint64_t getTotalEventsPublished() const {
         return totalEventsPublished_.load();
     }
     
-    /**
-     * @brief Clear all subscriptions
-     */
     void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
         handlers_.clear();
     }
 
 private:
-    /**
-     * @brief Unsubscribe handler by ID
-     */
     void unsubscribe(std::type_index typeIdx, uint64_t id) {
         std::lock_guard<std::mutex> lock(mutex_);
         
@@ -286,9 +230,6 @@ private:
         );
     }
     
-    /**
-     * @brief Log error (static to avoid Logger dependency in header)
-     */
     static void logError(const char* component, const std::string& message);
     
     mutable std::mutex mutex_;
@@ -299,7 +240,3 @@ private:
 };
 
 } // namespace midiMind
-
-// ============================================================================
-// END OF FILE EventBus.h
-// ============================================================================
