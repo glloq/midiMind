@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/EventBus.h
-// Version: 4.2.3 - FIX string concatenation with parentheses
+// Version: 4.2.4 - FIX string concatenation
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -14,20 +14,15 @@
 #include <typeindex>
 #include <atomic>
 #include <algorithm>
+#include <string>
 
 namespace midiMind {
 
-// Forward declaration
 class EventBus;
-
-// ============================================================================
-// CLASS: Subscription (RAII)
-// ============================================================================
 
 class Subscription {
 public:
     Subscription() = default;
-    
     explicit Subscription(std::function<void()> unsubscribe)
         : unsubscribe_(std::move(unsubscribe)) {}
     
@@ -59,10 +54,6 @@ public:
 private:
     std::function<void()> unsubscribe_;
 };
-
-// ============================================================================
-// CLASS: EventBus
-// ============================================================================
 
 class EventBus {
 private:
@@ -179,9 +170,11 @@ public:
                 (*info.handler)(&event);
                 count++;
             } catch (const std::exception& e) {
-                logError("EventBus", std::string("Handler exception: ") + e.what());
+                std::string msg = "Handler exception: ";
+                msg += e.what();
+                logError("EventBus", msg);
             } catch (...) {
-                logError("EventBus", std::string("Handler exception: unknown error"));
+                logError("EventBus", "Handler exception: unknown error");
             }
         }
         

@@ -184,7 +184,7 @@ bool Application::initializeConfiguration(const std::string& configPath) {
     
     try {
         Logger::info("Application", "  Initializing PathManager...");
-        PathManager::initialize();
+        PathManager::instance().initialize();
         Logger::info("Application", "  ✓ PathManager ready");
         
         Logger::info("Application", "  Loading configuration...");
@@ -224,7 +224,7 @@ bool Application::initializeDatabase() {
     
     try {
         Logger::info("Application", "  Connecting to database...");
-        database_ = Database::instance();
+        database_ = &Database::instance();
         
         std::string dbPath = Config::instance().getString("database.path", 
                                                           "/var/lib/midimind/midimind.db");
@@ -268,7 +268,8 @@ bool Application::initializeStorage() {
         }
         
         Logger::info("Application", "  Initializing FileManager...");
-        fileManager_ = std::make_shared<FileManager>();
+        std::string filesRoot = PathManager::instance().getBasePath() + "/files";
+        fileManager_ = std::make_shared<FileManager>(filesRoot);
         Logger::info("Application", "  ✓ FileManager initialized");
         
         Logger::info("Application", "  Initializing InstrumentDatabase...");
