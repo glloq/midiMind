@@ -517,7 +517,16 @@ void MidiPlayer::parseAllTracks() {
             
             ScheduledEvent sched;
             sched.tick = currentTick;
-            sched.message = event.message;
+			// Construire le message MIDI à partir des données de l'événement
+			if (event.type == MidiEventType::MIDI_CHANNEL) {
+				std::vector<uint8_t> midiData;
+				midiData.push_back(event.status | event.channel);
+				midiData.insert(midiData.end(), event.data.begin(), event.data.end());
+				sched.message = MidiMessage(midiData);
+			} else {
+				// Pour les meta-events et sysex, créer un message vide ou approprié
+				sched.message = MidiMessage();
+			}
             sched.trackNumber = trackIdx;
             sched.processed = false;
             
