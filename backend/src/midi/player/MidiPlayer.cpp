@@ -118,7 +118,7 @@ void MidiPlayer::publishStateChange(PlayerState newState) {
             eventState,
             currentFile_,
             getCurrentPosition(),
-            TimeUtils::getCurrentTimestamp()
+            TimeUtils::systemNow()
         ));
         
         Logger::debug("MidiPlayer", "Published PlaybackStateChangedEvent");
@@ -462,7 +462,7 @@ json MidiPlayer::getMetadata() const {
     json meta = json::object();
     
     meta["format"] = midiFile_.header.format;
-    meta["track_count"] = midiFile_.header.trackCount;
+    meta["track_count"] = midiFile_.header.numTracks;
     meta["division"] = ticksPerQuarterNote_;
     meta["duration_ms"] = ticksToMs(totalTicks_);
     meta["tempo_bpm"] = tempo_.load();
@@ -554,7 +554,7 @@ void MidiPlayer::analyzeTrack(uint16_t trackIndex) {
     uint32_t totalVelocity = 0;
     
     for (const auto& event : midiTrack.events) {
-        const auto& msg = event.message;
+        MidiMessage msg(event.data);
         uint8_t status = msg.getStatus();
         uint8_t type = status & 0xF0;
         uint8_t channel = status & 0x0F;
@@ -627,7 +627,7 @@ void MidiPlayer::playbackLoop() {
                     modifiedMsg = applyMasterVolume(modifiedMsg);
                     
                     if (router_) {
-                        router_->routeMessage(modifiedMsg);
+                        router_->route(modifiedMsg);
                     }
                 }
                 event.processed = true;
@@ -645,7 +645,7 @@ void MidiPlayer::playbackLoop() {
                     position,
                     duration,
                     percentage,
-                    TimeUtils::getCurrentTimestamp()
+                    TimeUtils::systemNow()
                 ));
             } catch (const std::exception&) {
                 // Silent for progress events
@@ -735,7 +735,7 @@ void MidiPlayer::sendAllNotesOff() {
     
     for (uint8_t channel = 0; channel < 16; ++channel) {
         uint8_t status = 0xB0 | channel;
-        router_->routeMessage(MidiMessage(status, 123, 0));
+        router_->route(MidiMessage(status, 123, 0));
     }
 }
 

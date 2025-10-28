@@ -335,7 +335,7 @@ void MidiFileWriter::writeVLQ(std::ostream& stream, uint32_t value) {
     
     // This should never happen with proper input validation, but catch it
     if (bytesWritten >= MAX_VLQ_BYTES && (buffer & 0x80)) {
-        THROW_ERROR(ErrorCode::INTERNAL_ERROR, 
+        THROW_ERROR(ErrorCode::UNKNOWN_ERROR, 
                    "VLQ encoding exceeded maximum bytes");
     }
 }
