@@ -1,16 +1,15 @@
 #!/bin/bash
 # ============================================================================
 # Script: update_and_build.sh
-# Version: v1.1 - AUTO BRANCH DETECTION
-# Description: Met à jour le backend depuis GitHub et recompile
+# Version: v2.0 - MISE À JOUR COMPLÈTE
+# Description: Met à jour TOUT le projet depuis GitHub et redéploie
 # Repo: https://github.com/glloq/midiMind
-# Date: 2025-10-23
 # ============================================================================
-# CORRECTIONS v1.1:
-# ✅ Détection automatique de la branche courante
-# ✅ Meilleure gestion des erreurs git
-# ✅ Support des permissions git
-# ✅ Retry automatique sur échec
+# CORRECTIONS v2.0:
+# ✅ Backend + Frontend + Migrations SQL + Service systemd
+# ✅ Correction automatique des permissions
+# ✅ Vérification post-installation
+# ✅ Utilise make install pour tout installer
 # ============================================================================
 
 set -e
@@ -26,8 +25,11 @@ NC='\033[0m'
 # Variables
 REPO_DIR="$(pwd)"
 BACKEND_DIR="$REPO_DIR/backend"
+FRONTEND_DIR="$REPO_DIR/frontend"
 BUILD_DIR="$BACKEND_DIR/build"
 INSTALL_DIR="/opt/midimind"
+WEB_DIR="/var/www/midimind"
+REAL_USER="${SUDO_USER:-$USER}"
 
 # Fonctions
 log() { echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1"; }
@@ -39,156 +41,104 @@ info() { echo -e "${MAGENTA}ℹ${NC} $1"; }
 print_header() {
     echo ""
     echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║       MidiMind Backend Update & Build v1.1            ║${NC}"
+    echo -e "${BLUE}║   MidiMind Complete Update & Build v2.0               ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
 
-# Vérifier qu'on est dans le repo midiMind
+# Vérifier environnement
 check_environment() {
-    log "Vérification de l'environnement..."
+    log "🔍 Vérification de l'environnement..."
     
     [ -d ".git" ] || error "Pas un repo git. Exécutez depuis la racine du projet."
-    [ -d "backend" ] || error "Dossier backend/ introuvable. Exécutez depuis la racine du repo."
+    [ -d "backend" ] || error "Dossier backend/ introuvable"
+    [ -d "frontend" ] || error "Dossier frontend/ introuvable"
+    [ -d "scripts" ] || warning "Dossier scripts/ introuvable"
     
-    # Vérifier les outils nécessaires
-    command -v git >/dev/null 2>&1 || error "git n'est pas installé"
-    command -v cmake >/dev/null 2>&1 || error "cmake n'est pas installé"
-    command -v make >/dev/null 2>&1 || error "make n'est pas installé"
+    command -v git >/dev/null 2>&1 || error "git non installé"
+    command -v cmake >/dev/null 2>&1 || error "cmake non installé"
+    command -v make >/dev/null 2>&1 || error "make non installé"
     
     success "Environnement OK"
 }
 
-# Réparer les permissions Git si nécessaire
+# Réparer permissions Git
 fix_git_permissions() {
-    log "Vérification des permissions Git..."
+    log "🔧 Vérification permissions Git..."
     
-    CURRENT_USER=$(whoami)
-    
-    # Vérifier si on peut écrire dans .git
     if [ ! -w ".git/FETCH_HEAD" ] 2>/dev/null; then
-        warning "Problème de permissions Git détecté"
-        info "Réparation des permissions..."
-        
-        sudo chown -R $CURRENT_USER:$CURRENT_USER .git/
+        warning "Problème de permissions Git"
+        sudo chown -R $REAL_USER:$REAL_USER .git/
         sudo chmod -R u+rwX .git/
-        
         success "Permissions réparées"
     fi
 }
 
-# Pull les modifications avec détection automatique de branche
+# Pull depuis GitHub
 git_pull_smart() {
     log "📥 Récupération des modifications depuis GitHub..."
     
-    # Détection automatique de la branche courante
     CURRENT_BRANCH=$(git branch --show-current)
+    [ -z "$CURRENT_BRANCH" ] && error "Impossible de détecter la branche"
     
-    if [ -z "$CURRENT_BRANCH" ]; then
-        error "Impossible de détecter la branche courante"
-    fi
+    info "Branche: $CURRENT_BRANCH"
     
-    info "Branche courante: $CURRENT_BRANCH"
-    
-    # Vérifier s'il y a des changements locaux
+    # Sauvegarder changements locaux
     if ! git diff-index --quiet HEAD -- 2>/dev/null; then
         warning "Changements locaux détectés"
-        
-        echo -e "${BLUE}Fichiers modifiés:${NC}"
         git status --short
-        
-        log "Sauvegarde des changements locaux..."
-        if git stash push -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)"; then
-            success "Changements sauvegardés (git stash)"
-        else
-            error "Impossible de sauvegarder les changements locaux"
-        fi
+        git stash push -m "Auto-stash $(date +%Y%m%d_%H%M%S)" || error "Échec stash"
+        success "Changements sauvegardés"
     fi
     
     # Pull avec retry
     PULL_SUCCESS=0
     for i in {1..3}; do
-        info "Tentative de pull $i/3..."
-        
+        info "Tentative $i/3..."
         if git pull origin "$CURRENT_BRANCH" 2>&1; then
             PULL_SUCCESS=1
             break
         else
-            warning "Échec de la tentative $i"
-            
-            if [ $i -lt 3 ]; then
-                # Vérifier les permissions
-                if [ ! -w ".git/FETCH_HEAD" ] 2>/dev/null; then
-                    warning "Problème de permissions FETCH_HEAD"
-                    log "Réparation d'urgence..."
-                    sudo chown $USER:$USER .git/FETCH_HEAD 2>/dev/null
-                    sudo chmod 644 .git/FETCH_HEAD 2>/dev/null
-                fi
-                
-                log "Nouvelle tentative dans 2 secondes..."
-                sleep 2
-            fi
+            [ $i -lt 3 ] && sleep 2
         fi
     done
     
-    if [ $PULL_SUCCESS -eq 0 ]; then
-        error "Échec du git pull après 3 tentatives"
-    fi
+    [ $PULL_SUCCESS -eq 0 ] && error "Échec git pull après 3 tentatives"
     
     success "Modifications récupérées"
-    
-    # Afficher les derniers commits
     echo -e "${BLUE}Derniers commits:${NC}"
     git log --oneline -3 --color=always
 }
 
-# Nettoyer le build
-clean_build() {
-    log "🧹 Nettoyage du dossier build..."
-    
-    if [ -d "$BUILD_DIR" ]; then
-        rm -rf "$BUILD_DIR"
-    fi
-    
-    mkdir -p "$BUILD_DIR"
-    success "Build nettoyé"
-}
-
-# Compiler avec CMake
+# Compiler backend
 compile_backend() {
     log "🔨 Compilation du backend..."
     
+    # Nettoyer
+    [ -d "$BUILD_DIR" ] && rm -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
     
-    # Configuration CMake
+    # CMake
     info "Configuration CMake..."
-    if ! cmake "$BACKEND_DIR"; then
-        error "Échec de la configuration CMake"
-    fi
+    cmake .. -DCMAKE_BUILD_TYPE=Release || error "Échec CMake"
     
-    # Compilation
+    # Make
     info "Compilation ($(nproc) cœurs)..."
-    if ! make -j$(nproc); then
-        error "Échec de la compilation"
-    fi
+    make -j$(nproc) || error "Échec compilation"
     
-    success "Compilation terminée"
+    # Vérifier binaire
+    [ -f "bin/midimind" ] || error "Binaire bin/midimind non créé"
     
-    # Vérifier que le binaire existe
-    if [ ! -f "bin/midimind" ]; then
-        error "Le binaire bin/midimind n'a pas été créé"
-    fi
-    
-    # Afficher la taille
     BINARY_SIZE=$(du -h bin/midimind | cut -f1)
-    info "Taille du binaire: $BINARY_SIZE"
+    success "Compilation terminée ($BINARY_SIZE)"
 }
 
-# Arrêter le service
+# Arrêter service
 stop_service() {
     log "⏸️  Arrêt du service midimind..."
     
-    if sudo systemctl is-active --quiet midimind.service; then
+    if sudo systemctl is-active --quiet midimind.service 2>/dev/null; then
         sudo systemctl stop midimind.service
         sleep 1
         success "Service arrêté"
@@ -197,67 +147,188 @@ stop_service() {
     fi
 }
 
-# Installer le nouveau binaire
-install_binary() {
-    log "📦 Installation du nouveau binaire..."
+# Installer backend via make install
+install_backend() {
+    log "📦 Installation backend (binaire + migrations + service)..."
     
-    # Vérifier que le dossier de destination existe
-    if [ ! -d "$INSTALL_DIR/bin" ]; then
-        sudo mkdir -p "$INSTALL_DIR/bin"
-    fi
+    cd "$BUILD_DIR"
     
-    # Sauvegarder l'ancien binaire
+    # Sauvegarder ancien binaire
     if [ -f "$INSTALL_DIR/bin/midimind" ]; then
         sudo cp "$INSTALL_DIR/bin/midimind" \
                 "$INSTALL_DIR/bin/midimind.backup.$(date +%Y%m%d_%H%M%S)"
         info "Ancien binaire sauvegardé"
     fi
     
-    # Copier le nouveau binaire
-    sudo cp "$BUILD_DIR/bin/midimind" "$INSTALL_DIR/bin/midimind" || \
-        error "Échec de la copie du binaire"
+    # make install (installe binaire + migrations + service systemd)
+    sudo make install 2>&1 | grep -v "^--" || warning "make install a échoué partiellement"
     
-    # Définir les permissions
-    sudo chown root:root "$INSTALL_DIR/bin/midimind"
-    sudo chmod 755 "$INSTALL_DIR/bin/midimind"
+    # Corriger permissions (make install crée les fichiers en root)
+    sudo chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
+    sudo chmod -R 755 "$INSTALL_DIR"
     
-    success "Binaire installé"
+    success "Backend installé"
 }
 
-# Redémarrer le service
-start_service() {
-    log "🚀 Redémarrage du service..."
+# Copier migrations SQL (sécurité supplémentaire)
+update_migrations() {
+    log "🗄️  Mise à jour des migrations SQL..."
     
-    sudo systemctl start midimind.service || error "Échec du démarrage du service"
-    
-    # Attendre que le service démarre
-    sleep 2
-    
-    # Vérifier le statut
-    if sudo systemctl is-active --quiet midimind.service; then
-        success "Service midimind actif"
-    else
-        error "Service midimind non actif - vérifiez les logs"
+    if [ -d "$BACKEND_DIR/data/migrations" ]; then
+        sudo mkdir -p "$INSTALL_DIR/data/migrations"
+        sudo cp -f "$BACKEND_DIR/data/migrations/"*.sql "$INSTALL_DIR/data/migrations/" 2>/dev/null || true
+        
+        SQL_COUNT=$(ls -1 "$INSTALL_DIR/data/migrations/"*.sql 2>/dev/null | wc -l)
+        if [ $SQL_COUNT -gt 0 ]; then
+            sudo chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data"
+            success "Migrations SQL mises à jour ($SQL_COUNT fichiers)"
+        else
+            warning "Aucune migration SQL trouvée"
+        fi
     fi
 }
 
-# Afficher le résumé final
+# Mettre à jour frontend
+update_frontend() {
+    log "🌐 Mise à jour du frontend..."
+    
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        warning "Frontend introuvable, ignoré"
+        return
+    fi
+    
+    # Sauvegarder ancien frontend (optionnel)
+    if [ -d "$WEB_DIR" ]; then
+        BACKUP_DIR="/tmp/midimind_frontend_backup_$(date +%Y%m%d_%H%M%S)"
+        sudo cp -r "$WEB_DIR" "$BACKUP_DIR" 2>/dev/null || true
+    fi
+    
+    # Copier nouveau frontend
+    sudo mkdir -p "$WEB_DIR"
+    sudo rm -rf "$WEB_DIR"/*
+    sudo cp -r "$FRONTEND_DIR"/* "$WEB_DIR/" || error "Échec copie frontend"
+    
+    # Permissions
+    sudo chown -R www-data:www-data "$WEB_DIR"
+    sudo find "$WEB_DIR" -type f -exec chmod 644 {} \;
+    sudo find "$WEB_DIR" -type d -exec chmod 755 {} \;
+    
+    FILE_COUNT=$(find "$WEB_DIR" -type f 2>/dev/null | wc -l)
+    success "Frontend mis à jour ($FILE_COUNT fichiers)"
+}
+
+# Supprimer ancienne base de données si migrations modifiées
+check_and_reset_database() {
+    log "🔍 Vérification de la base de données..."
+    
+    # Si les migrations SQL ont été modifiées dans ce commit
+    if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "migrations/.*\.sql"; then
+        warning "Migrations SQL modifiées détectées"
+        
+        if [ -f "$INSTALL_DIR/data/midimind.db" ]; then
+            # Sauvegarder l'ancienne DB
+            BACKUP_DB="$INSTALL_DIR/data/midimind.db.backup.$(date +%Y%m%d_%H%M%S)"
+            sudo cp "$INSTALL_DIR/data/midimind.db" "$BACKUP_DB"
+            info "DB sauvegardée: $BACKUP_DB"
+            
+            # Supprimer pour forcer réinitialisation
+            sudo rm "$INSTALL_DIR/data/midimind.db"
+            success "Ancienne DB supprimée (sera recréée au démarrage)"
+        fi
+    else
+        info "Migrations SQL inchangées, DB conservée"
+    fi
+}
+
+# Recharger et démarrer services
+start_services() {
+    log "🚀 Redémarrage des services..."
+    
+    # Reload systemd
+    sudo systemctl daemon-reload
+    
+    # Redémarrer midimind
+    sudo systemctl start midimind.service || error "Échec démarrage midimind"
+    sleep 3
+    
+    if sudo systemctl is-active --quiet midimind.service; then
+        success "Service midimind actif"
+        
+        # Vérifier port 8080
+        if sudo netstat -tuln 2>/dev/null | grep -q ":8080"; then
+            success "Port 8080 ouvert"
+        else
+            warning "Port 8080 non ouvert - vérifier logs"
+        fi
+    else
+        error "Service midimind non actif - voir: sudo journalctl -u midimind -n 50"
+    fi
+    
+    # Vérifier/recharger Nginx
+    if sudo systemctl is-active --quiet nginx 2>/dev/null; then
+        sudo nginx -t 2>&1 | grep -q "successful" && sudo systemctl reload nginx
+        success "Nginx rechargé"
+    fi
+}
+
+# Vérification post-installation
+verify_installation() {
+    log "✅ Vérification post-installation..."
+    
+    ERRORS=0
+    
+    # Binaire
+    [ -f "$INSTALL_DIR/bin/midimind" ] && success "Binaire OK" || { warning "Binaire manquant"; ((ERRORS++)); }
+    
+    # Migrations
+    SQL_COUNT=$(ls -1 "$INSTALL_DIR/data/migrations/"*.sql 2>/dev/null | wc -l)
+    [ $SQL_COUNT -ge 2 ] && success "Migrations OK ($SQL_COUNT)" || { warning "Migrations manquantes"; ((ERRORS++)); }
+    
+    # Base de données
+    if [ -f "$INSTALL_DIR/data/midimind.db" ]; then
+        TABLE_COUNT=$(sqlite3 "$INSTALL_DIR/data/midimind.db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" 2>/dev/null || echo "0")
+        [ "$TABLE_COUNT" -ge 5 ] && success "Base de données OK ($TABLE_COUNT tables)" || { warning "DB incomplète ($TABLE_COUNT tables)"; ((ERRORS++)); }
+    else
+        warning "Base de données pas encore créée"
+    fi
+    
+    # Service
+    sudo systemctl is-active --quiet midimind.service && success "Service actif" || { warning "Service non actif"; ((ERRORS++)); }
+    
+    # Frontend
+    [ -f "$WEB_DIR/index.html" ] && success "Frontend OK" || { warning "Frontend manquant"; ((ERRORS++)); }
+    
+    # Permissions
+    OWNER=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null)
+    [ "$OWNER" = "$REAL_USER" ] && success "Permissions OK" || { warning "Permissions incorrectes (owner: $OWNER)"; ((ERRORS++)); }
+    
+    if [ $ERRORS -gt 0 ]; then
+        warning "Vérification terminée avec $ERRORS avertissement(s)"
+        info "Logs: sudo journalctl -u midimind -n 50"
+    fi
+}
+
+# Résumé final
 show_summary() {
+    local IP=$(hostname -I | awk '{print $1}')
+    
     echo ""
-    echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}✅ Mise à jour et compilation terminées${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║         ✅ MISE À JOUR COMPLÈTE TERMINÉE ✅            ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${BLUE}Informations:${NC}"
-    echo -e "  • Branche:  ${GREEN}$(git branch --show-current)${NC}"
-    echo -e "  • Commit:   ${GREEN}$(git log --oneline -1 | cut -d' ' -f1)${NC}"
-    echo -e "  • Binaire:  ${GREEN}$INSTALL_DIR/bin/midimind${NC}"
+    echo -e "  • Branche:    ${GREEN}$(git branch --show-current)${NC}"
+    echo -e "  • Commit:     ${GREEN}$(git log --oneline -1 | cut -d' ' -f1)${NC}"
+    echo -e "  • Backend:    ${GREEN}$INSTALL_DIR/bin/midimind${NC}"
+    echo -e "  • Frontend:   ${GREEN}$WEB_DIR${NC}"
+    echo -e "  • Interface:  ${GREEN}http://$IP:8000${NC}"
     echo ""
     echo -e "${BLUE}Commandes utiles:${NC}"
-    echo -e "  • Status:   ${GREEN}sudo systemctl status midimind${NC}"
-    echo -e "  • Logs:     ${GREEN}sudo journalctl -u midimind -f${NC}"
-    echo -e "  • Stop:     ${GREEN}sudo systemctl stop midimind${NC}"
-    echo -e "  • Restart:  ${GREEN}sudo systemctl restart midimind${NC}"
+    echo -e "  • Status:     ${GREEN}sudo systemctl status midimind${NC}"
+    echo -e "  • Logs:       ${GREEN}sudo journalctl -u midimind -f${NC}"
+    echo -e "  • Restart:    ${GREEN}sudo systemctl restart midimind${NC}"
+    echo -e "  • DB tables:  ${GREEN}sqlite3 $INSTALL_DIR/data/midimind.db '.tables'${NC}"
     echo ""
 }
 
@@ -268,17 +339,18 @@ show_summary() {
 main() {
     print_header
     
-    # Étapes d'exécution
     check_environment
     fix_git_permissions
     git_pull_smart
-    clean_build
     compile_backend
     stop_service
-    install_binary
-    start_service
+    install_backend
+    update_migrations
+    update_frontend
+    check_and_reset_database
+    start_services
+    verify_installation
     show_summary
 }
 
-# Exécuter
 main
