@@ -1,8 +1,12 @@
 // ============================================================================
 // File: backend/src/storage/Database.cpp
-// Version: 4.2.1 - DEADLOCK FIX + SQL INJECTION FIX
+// Version: 4.2.2 - SCHEMA_VERSION FIX
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Corrections v4.2.2:
+//   - Fixed: Added 'description' column to schema_version table
+//   - Fixed: Updated executeMigration() to use description column
 //
 // Corrections v4.2.1:
 //   - Fixed: Deadlock in executeMigration() - removed nested lock
@@ -370,7 +374,8 @@ bool Database::runMigrations(const std::string& migrationDir) {
 void Database::initSchemaVersionTable() {
     execute(
         "CREATE TABLE IF NOT EXISTS schema_version ("
-        "    version INTEGER PRIMARY KEY"
+        "    version INTEGER PRIMARY KEY,"
+        "    description TEXT"
         ")"
     );
 }
@@ -467,6 +472,18 @@ bool Database::executeMigration(const std::string& filepath, int version) {
                     std::istreambuf_iterator<char>());
     file.close();
     
+    // Extract description from filename
+    std::string filename = fs::path(filepath).filename().string();
+    std::string description = "Migration " + std::to_string(version);
+    
+    // Try to extract description from filename (e.g., 001_initial.sql -> "initial")
+    size_t underscorePos = filename.find('_');
+    size_t dotPos = filename.find_last_of('.');
+    if (underscorePos != std::string::npos && dotPos != std::string::npos && 
+        underscorePos < dotPos) {
+        description = filename.substr(underscorePos + 1, dotPos - underscorePos - 1);
+    }
+    
     // Execute in transaction - PAS de lock ici, transaction() le fait déjà
     bool success = transaction([&]() {
         // NE PAS prendre mutex_ ici - déjà pris par executeStatement dans transaction()
@@ -493,9 +510,11 @@ bool Database::executeMigration(const std::string& filepath, int version) {
         }
         
         rc = sqlite3_prepare_v2(db_, 
-            "INSERT INTO schema_version (version) VALUES (?)", -1, &stmt, nullptr);
+            "INSERT INTO schema_version (version, description) VALUES (?, ?)", 
+            -1, &stmt, nullptr);
         if (rc == SQLITE_OK) {
             sqlite3_bind_int(stmt, 1, version);
+            sqlite3_bind_text(stmt, 2, description.c_str(), -1, SQLITE_TRANSIENT);
             rc = sqlite3_step(stmt);
             sqlite3_finalize(stmt);
             if (rc != SQLITE_DONE) {
@@ -663,5 +682,5 @@ json Database::getStatistics() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Database.cpp v4.2.1
+// END OF FILE Database.cpp v4.2.2
 // ============================================================================
