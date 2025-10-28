@@ -1,63 +1,26 @@
-# ============================================================================
-# MidiMind v3.0 - Systemd Service File
-# ============================================================================
-# Installation:
-#   sudo cp midimind.service /etc/systemd/system/
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable midimind
-#   sudo systemctl start midimind
-#
-# Usage:
-#   sudo systemctl status midimind
-#   sudo systemctl stop midimind
-#   sudo systemctl restart midimind
-#   sudo journalctl -u midimind -f
-# ============================================================================
-
 [Unit]
-Description=MidiMind v3.0 - MIDI Orchestration System
-Documentation=https://github.com/midimind/midimind
+Description=MidiMind - Professional MIDI Orchestration System
 After=network.target sound.target
 
 [Service]
 Type=simple
 User=pi
-Group=pi
-WorkingDirectory=/home/pi/MidiMind
+WorkingDirectory=/opt/midimind
+ExecStart=/opt/midimind/bin/midimind --config /etc/midimind/config.json
+Restart=always
+RestartSec=3
 
-# Executable
-ExecStart=/usr/local/bin/midimind --config /home/pi/MidiMind/config/config.json
+# Permissions
+SupplementaryGroups=audio dialout plugdev
 
-# Restart policy
-Restart=on-failure
-RestartSec=5
-StartLimitInterval=60
-StartLimitBurst=3
-
-# Environment
-Environment="MIDIMIND_BASE_PATH=/home/pi/MidiMind"
-EnvironmentFile=-/home/pi/MidiMind/.env
+# Sécurité
+NoNewPrivileges=true
+PrivateTmp=true
 
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=midimind
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-
-# Resource limits
-LimitNOFILE=65536
-LimitNPROC=4096
-
-# Nice level (lower = higher priority)
-Nice=-5
-
-# Real-time priority (for low latency MIDI)
-# Uncomment if needed (requires CAP_SYS_NICE)
-#CPUSchedulingPolicy=fifo
-#CPUSchedulingPriority=80
 
 [Install]
 WantedBy=multi-user.target

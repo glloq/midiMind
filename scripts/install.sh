@@ -507,8 +507,9 @@ create_directories() {
     success "Structure de répertoires créée"
     
     # Permissions
+    chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
     chown -R "$REAL_USER:$REAL_USER" "$USER_DIR"
-    chmod 755 "$INSTALL_DIR"
+    chmod -R 755 "$INSTALL_DIR"
     chmod 755 /etc/midimind
     
     success "Permissions configurées"
@@ -549,6 +550,7 @@ compile_backend() {
     info "Installation du binaire..."
     cp "$BUILD_DIR/bin/midimind" "$INSTALL_DIR/bin/" || error "Échec copie binaire"
     chmod +x "$INSTALL_DIR/bin/midimind"
+    chown "$REAL_USER:$REAL_USER" "$INSTALL_DIR/bin/midimind"
     success "Binaire installé: $INSTALL_DIR/bin/midimind"
     
     # Copie des migrations SQL
@@ -562,6 +564,7 @@ compile_backend() {
             info "Aucune migration SQL à copier"
         fi
     fi
+        chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data"
     
     # Création config.json avec structure COMPLÈTE v4.1.0
     info "Création de /etc/midimind/config.json..."
