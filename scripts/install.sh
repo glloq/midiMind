@@ -539,7 +539,7 @@ compile_backend() {
     make -j$NPROC 2>&1 | tee -a "$LOG_FILE" || error "Échec compilation"
     
     # Vérification binaire
-    if [ ! -f "$BUILD_DIR/midimind" ]; then
+    if [ ! -f "$BUILD_DIR/bin/midimind" ]; then
         error "Binaire midimind non généré"
     fi
     
@@ -547,7 +547,7 @@ compile_backend() {
     
     # Installation binaire
     info "Installation du binaire..."
-    cp "$BUILD_DIR/midimind" "$INSTALL_DIR/bin/" || error "Échec copie binaire"
+    cp "$BUILD_DIR/bin/midimind" "$INSTALL_DIR/bin/" || error "Échec copie binaire"
     chmod +x "$INSTALL_DIR/bin/midimind"
     success "Binaire installé: $INSTALL_DIR/bin/midimind"
     
