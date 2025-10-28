@@ -72,7 +72,7 @@ void MidiFileWriter::writeToFile(const std::string& filepath,
         file.close();
         
         Logger::info("MidiFileWriter",
-            "âœ" File written successfully (" +
+            "File written successfully (" +
             std::to_string(bytesWritten_) + " bytes, " +
             std::to_string(eventsWritten_) + " events)");
             
@@ -98,7 +98,7 @@ std::vector<uint8_t> MidiFileWriter::writeToBuffer(const MidiFile& midiFile) {
     std::vector<uint8_t> result(str.begin(), str.end());
     
     Logger::debug("MidiFileWriter",
-        "âœ" Buffer written: " + std::to_string(result.size()) + " bytes");
+        "Buffer written: " + std::to_string(result.size()) + " bytes");
     
     return result;
 }
@@ -335,7 +335,7 @@ void MidiFileWriter::writeVLQ(std::ostream& stream, uint32_t value) {
     
     // This should never happen with proper input validation, but catch it
     if (bytesWritten >= MAX_VLQ_BYTES && (buffer & 0x80)) {
-        THROW_ERROR(ErrorCode::INTERNAL_ERROR, 
+        THROW_ERROR(ErrorCode::MIDI_FILE_ERROR, 
                    "VLQ encoding exceeded maximum bytes");
     }
 }
