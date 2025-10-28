@@ -97,6 +97,7 @@ target_link_libraries(midimind PRIVATE
     ${GIO_LIBRARIES}
 )
 
+# Binaire dans backend/build/ directement (install.sh cherche $BUILD_DIR/midimind)
 set_target_properties(midimind PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
