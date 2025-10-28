@@ -666,14 +666,14 @@ void CommandHandler::registerPlaybackCommands() {
     
     // playback.getStatus
     registerCommand("playback.getStatus", [this](const json& params) {
-        auto status = player_->getStatus();
+        auto state = player_->getState();
         
         return json{
-            {"state", static_cast<int>(status.state)},
-            {"current_time", status.currentTime},
-            {"duration", status.duration},
-            {"tempo", status.tempo},
-            {"filename", status.filename}
+            {"state", static_cast<int>(state)},
+            {"current_time", player_->getCurrentPosition()},
+            {"duration", player_->getDuration()},
+            {"tempo", player_->getTempo()},
+            {"filename", player_->getCurrentFile()}
         };
     });
     
@@ -1044,39 +1044,36 @@ void CommandHandler::registerLoggerCommands() {
         };
     });
     
-    // logger.getLogs
-    registerCommand("logger.getLogs", [this](const json& params) {
-        int count = params.value("count", 100);
-        auto logs = Logger::getRecentLogs(count);
-        
-        return json{
-            {"logs", logs},
-            {"count", logs.size()}
-        };
-    });
+    // logger.getLogs - DISABLED (Logger::getRecentLogs() not available)
+    // registerCommand("logger.getLogs", [this](const json& params) {
+    //     int count = params.value("count", 100);
+    //     auto logs = Logger::getRecentLogs(count);
+    //     return json{
+    //         {"logs", logs},
+    //         {"count", logs.size()}
+    //     };
+    // });
     
-    // logger.clear
-    registerCommand("logger.clear", [this](const json& params) {
-        Logger::clearLogs();
-        return json{{"cleared", true}};
-    });
+    // logger.clear - DISABLED (Logger::clearLogs() not available)
+    // registerCommand("logger.clear", [this](const json& params) {
+    //     Logger::clearLogs();
+    //     return json{{"cleared", true}};
+    // });
     
-    // logger.export
-    registerCommand("logger.export", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
-        }
-        
-        std::string filename = params["filename"];
-        bool success = Logger::exportLogs(filename);
-        
-        return json{
-            {"exported", success},
-            {"filename", filename}
-        };
-    });
+    // logger.export - DISABLED (Logger::exportLogs() not available)
+    // registerCommand("logger.export", [this](const json& params) {
+    //     if (!params.contains("filename")) {
+    //         throw std::runtime_error("Missing filename parameter");
+    //     }
+    //     std::string filename = params["filename"];
+    //     bool success = Logger::exportLogs(filename);
+    //     return json{
+    //         {"exported", success},
+    //         {"filename", filename}
+    //     };
+    // });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Logger commands registered (5 commands)");
+    Logger::debug("CommandHandler", "✓ Logger commands registered (2 commands)");
 }
 
 // ============================================================================
@@ -1171,8 +1168,8 @@ void CommandHandler::registerLatencyCommands() {
         for (const auto& profile : profiles) {
             json instrumentObj = {
                 {"instrument_id", profile.instrumentId},
-                {"avg_latency_us", profile.averageLatency},
-                {"compensation_offset_us", profile.compensationOffset},
+                {"avg_latency_us", profile.avgLatency},
+                {"compensation_offset_us", profile.totalCompensation},
                 {"measurement_count", profile.measurementCount},
                 {"auto_calibration", profile.autoCalibration}
             };
