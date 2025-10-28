@@ -384,7 +384,7 @@ bool BleMidiDevice::pairDevice(const std::string& pin) {
     Logger::info("BleMidiDevice", "Pairing device: " + name_);
     
     if (paired_.load()) {
-        Logger::warn("BleMidiDevice", "Device already paired: " + name_);
+        Logger::warning("BleMidiDevice", "Device already paired: " + name_);
         return true;
     }
     
@@ -450,7 +450,7 @@ bool BleMidiDevice::unpairDevice() {
     Logger::info("BleMidiDevice", "Unpairing device: " + name_);
     
     if (!paired_.load()) {
-        Logger::warn("BleMidiDevice", "Device not paired: " + name_);
+        Logger::warning("BleMidiDevice", "Device not paired: " + name_);
         return true;
     }
     
@@ -564,7 +564,7 @@ json BleMidiDevice::getSignalStrength() const {
 
 bool BleMidiDevice::connect() {
     if (connected_.load()) {
-        Logger::warn("BleMidiDevice", "Already connected: " + name_);
+        LLogger::warning("BleMidiDevice", "Already connected: " + name_);
         return true;
     }
     
@@ -788,10 +788,8 @@ bool BleMidiDevice::hasMessages() const {
 }
 
 bool BleMidiDevice::requestIdentity() {
-    MidiMessage identityRequest;
-    identityRequest.setType(MidiMessage::Type::SYSTEM_EXCLUSIVE);
     std::vector<uint8_t> sysex = {0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7};
-    identityRequest.setSysExData(sysex);
+    MidiMessage identityRequest(sysex);
     
     return sendMessage(identityRequest);
 }
@@ -1039,7 +1037,7 @@ void BleMidiDevice::readThread() {
                     
                     if (len > 0) {
                         MidiMessage msg = self->parseBlePacket(data, len);
-                        if (msg.getType() != MidiMessage::Type::INVALID) {
+                        if (!msg.getRawData().empty() && msg.getRawData()[0] != 0x00) {
                             std::lock_guard<std::mutex> lock(self->queueMutex_);
                             self->messageQueue_.push(std::move(msg));
                             self->messagesReceived_++;
@@ -1070,118 +1068,104 @@ void BleMidiDevice::readThread() {
 }
 
 MidiMessage BleMidiDevice::parseBlePacket(const uint8_t* data, size_t len) {
-    if (len < 3) {
-        return MidiMessage();
+    if (len < 2) {
+        return MidiMessage();  // Empty message
     }
     
-    MidiMessage msg;
+    // Skip BLE header
     size_t offset = 1;
-    
-    if (offset >= len) {
-        return msg;
-    }
     
     uint8_t status = data[offset];
     
     if ((status & 0x80) == 0) {
-        return msg;
+        return MidiMessage();  // Invalid status byte
     }
     
     uint8_t statusType = status & 0xF0;
     uint8_t channel = status & 0x0F;
     
-    msg.setChannel(channel);
-    
     switch (statusType) {
-        case 0x80:
-            msg.setType(MidiMessage::Type::NOTE_OFF);
+        case 0x80:  // Note Off
             if (offset + 2 < len) {
-                msg.setData1(data[offset + 1]);
-                msg.setData2(data[offset + 2]);
+                return MidiMessage::noteOff(channel, data[offset + 1], data[offset + 2]);
             }
             break;
             
-        case 0x90:
-            msg.setType(MidiMessage::Type::NOTE_ON);
+        case 0x90:  // Note On
             if (offset + 2 < len) {
-                msg.setData1(data[offset + 1]);
-                msg.setData2(data[offset + 2]);
+                return MidiMessage::noteOn(channel, data[offset + 1], data[offset + 2]);
             }
             break;
             
-        case 0xB0:
-            msg.setType(MidiMessage::Type::CONTROL_CHANGE);
+        case 0xB0:  // Control Change
             if (offset + 2 < len) {
-                msg.setData1(data[offset + 1]);
-                msg.setData2(data[offset + 2]);
+                return MidiMessage::controlChange(channel, data[offset + 1], data[offset + 2]);
             }
             break;
             
-        case 0xC0:
-            msg.setType(MidiMessage::Type::PROGRAM_CHANGE);
+        case 0xC0:  // Program Change
             if (offset + 1 < len) {
-                msg.setData1(data[offset + 1]);
+                return MidiMessage::programChange(channel, data[offset + 1]);
             }
             break;
             
-        case 0xF0:
+        case 0xF0:  // System
             if (status == 0xF0) {
-                msg.setType(MidiMessage::Type::SYSTEM_EXCLUSIVE);
+                // System Exclusive
                 std::vector<uint8_t> sysex(data + offset, data + len);
-                msg.setSysExData(sysex);
+                return MidiMessage(sysex);
             }
             break;
             
         default:
-            msg.setType(MidiMessage::Type::INVALID);
             break;
     }
     
-    return msg;
+    return MidiMessage();  // Empty message for unrecognized types
 }
 
 std::vector<uint8_t> BleMidiDevice::encodeBlePacket(const MidiMessage& msg) {
     std::vector<uint8_t> packet;
-    packet.push_back(0x80);
+    packet.push_back(0x80);  // BLE MIDI header with timestamp
+    packet.push_back(0x80);  // Additional timestamp byte
     
-    uint8_t status = 0;
+    const auto& rawData = msg.getRawData();
     
-    switch (msg.getType()) {
-        case MidiMessage::Type::NOTE_OFF:
-            status = 0x80 | msg.getChannel();
-            packet.push_back(status);
-            packet.push_back(msg.getData1());
-            packet.push_back(msg.getData2());
-            break;
-            
-        case MidiMessage::Type::NOTE_ON:
-            status = 0x90 | msg.getChannel();
-            packet.push_back(status);
-            packet.push_back(msg.getData1());
-            packet.push_back(msg.getData2());
-            break;
-            
-        case MidiMessage::Type::CONTROL_CHANGE:
-            status = 0xB0 | msg.getChannel();
-            packet.push_back(status);
-            packet.push_back(msg.getData1());
-            packet.push_back(msg.getData2());
-            break;
-            
-        case MidiMessage::Type::PROGRAM_CHANGE:
-            status = 0xC0 | msg.getChannel();
-            packet.push_back(status);
-            packet.push_back(msg.getData1());
-            break;
-            
-        case MidiMessage::Type::SYSTEM_EXCLUSIVE:
-            for (uint8_t byte : msg.getSysExData()) {
-                packet.push_back(byte);
+    if (rawData.empty()) {
+        return packet;
+    }
+    
+    uint8_t status = rawData[0];
+    uint8_t statusType = status & 0xF0;
+    
+    switch (statusType) {
+        case 0x80:  // Note Off
+        case 0x90:  // Note On
+        case 0xB0:  // Control Change
+            if (rawData.size() >= 3) {
+                packet.push_back(rawData[0]);  // Status
+                packet.push_back(rawData[1]);  // Data1
+                packet.push_back(rawData[2]);  // Data2
             }
             break;
             
+        case 0xC0:  // Program Change
+        case 0xD0:  // Channel Pressure
+            if (rawData.size() >= 2) {
+                packet.push_back(rawData[0]);  // Status
+                packet.push_back(rawData[1]);  // Data1
+            }
+            break;
+            
+        case 0xF0:  // System Exclusive
+            // Copy entire SysEx message
+            packet.insert(packet.end(), rawData.begin(), rawData.end());
+            break;
+            
         default:
-            return {};
+            // Copy all bytes for other message types
+            packet.insert(packet.end(), rawData.begin(), rawData.end());
+            break;
     }
     
     return packet;
