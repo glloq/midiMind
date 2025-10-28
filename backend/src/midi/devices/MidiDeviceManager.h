@@ -25,6 +25,9 @@
 
 namespace midiMind {
 
+// Forward declarations
+class EventBus;
+
 // ============================================================================
 // STRUCTURES
 // ============================================================================
@@ -77,8 +80,9 @@ public:
     
     /**
      * @brief Constructor
+     * @param eventBus Optional EventBus for publishing events
      */
-    MidiDeviceManager();
+    explicit MidiDeviceManager(std::shared_ptr<EventBus> eventBus = nullptr);
     
     /**
      * @brief Destructor
@@ -258,6 +262,16 @@ public:
         std::function<void(const std::string&)> onConnect,
         std::function<void(const std::string&)> onDisconnect
     );
+    
+    // ========================================================================
+    // EVENTBUS
+    // ========================================================================
+    
+    /**
+     * @brief Set EventBus for publishing events
+     * @param eventBus EventBus instance
+     */
+    void setEventBus(std::shared_ptr<EventBus> eventBus);
 
 private:
     // ========================================================================
@@ -310,6 +324,9 @@ private:
     /// Bluetooth configuration
     std::atomic<bool> bluetoothEnabled_{true};
     std::atomic<int> bluetoothScanTimeout_{5};
+    
+    /// EventBus for publishing events
+    std::shared_ptr<EventBus> eventBus_;
 };
 
 } // namespace midiMind

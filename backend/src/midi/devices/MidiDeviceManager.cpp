@@ -148,7 +148,7 @@ bool MidiDeviceManager::connect(const std::string& deviceId) {
                 deviceId,
                 deviceName,
                 MidiDevice::deviceTypeToString(deviceType),
-                TimeUtils::getCurrentTimestamp()
+                TimeUtils::systemNow()
             ));
             Logger::debug("MidiDeviceManager", "Published DeviceConnectedEvent: " + deviceName);
         } catch (const std::exception& e) {
@@ -201,7 +201,7 @@ void MidiDeviceManager::disconnect(const std::string& deviceId) {
                     deviceId,
                     deviceName,
                     "User disconnected",
-                    TimeUtils::getCurrentTimestamp()
+                    TimeUtils::systemNow()
                 ));
                 Logger::debug("MidiDeviceManager", "Published DeviceDisconnectedEvent: " + deviceName);
             } catch (const std::exception& e) {
