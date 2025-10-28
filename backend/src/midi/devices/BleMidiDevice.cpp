@@ -5,7 +5,7 @@
 // ============================================================================
 
 #include "BleMidiDevice.h"
-#include "../core/Logger.h"
+#include "../../core/Logger.h"
 #include <gio/gio.h>
 #include <algorithm>
 #include <cstring>
