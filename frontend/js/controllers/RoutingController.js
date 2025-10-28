@@ -1,21 +1,24 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/RoutingController.js
-// Version: v3.0.3 - CORRIGÉ COMPLET
-// Date: 2025-10-09
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 4.2.1 - API BACKEND FULL COMPATIBILITY + FEATURES COMPLÈTES
+// Date: 2025-10-28
 // ============================================================================
 // Description:
 //   Contrôleur gérant le routage MIDI avec transformations avancées.
-//   Intégration complète avec RoutingModel v3.0.2.
+//   Support complet API v4.2.1 + toutes fonctionnalités existantes.
 //
-// CORRECTIONS v3.0.3:
-//   ✅ Validation avant assignation (validateRouting)
-//   ✅ Support transformations MIDI (velocity, transpose, note mapping)
-//   ✅ Configuration avancée (velocity curves, filters)
-//   ✅ Intégration applyTransformations() dans le flux playback
-//   ✅ Méthodes de configuration des transformations
+// MODIFICATIONS v4.2.1:
+//   ✅ Support routing.enableRoute, routing.disableRoute
+//   ✅ Gestion format API (request/response standardisé)
+//   ✅ Statistiques routing via routing.getStats
+//   ✅ Conservation TOUTES fonctionnalités existantes
+//   ✅ Transformations MIDI (velocity, transpose, filters)
+//   ✅ Presets complets
+//   ✅ LocalStorage
+//   ✅ Auto-routing
+//   ✅ Test routes
 //
-// Auteur: midiMind Team
+// Auteur: MidiMind Team
 // ============================================================================
 
 class RoutingController extends BaseController {
@@ -43,12 +46,27 @@ class RoutingController extends BaseController {
             confirmReset: true,
             enablePresets: true,
             maxPresets: 10,
-            validateBeforeAssign: true,  // ✅ NOUVEAU
-            applyTransformations: true    // ✅ NOUVEAU
+            validateBeforeAssign: true,  // ✅ Validation avant assignation
+            applyTransformations: true    // ✅ Application transformations
         };
+        
+        // ✅ NOUVEAU v4.2.1: État des routes avec enable/disable
+        this.routes = new Map(); // key: "source_id:destination_id" -> route object
+        this.routeStats = {
+            total: 0,
+            enabled: 0,
+            disabled: 0,
+            messagesProcessed: 0,
+            lastUpdate: null
+        };
+        
+        // ✅ NOUVEAU v4.2.1: Synchronisation auto
+        this.autoSyncEnabled = true;
+        this.autoSyncTimer = null;
         
         // Composants UI
         this.routingMatrix = null;
+        this.selectedRoute = null;
         
         // Mark as fully initialized
         this._fullyInitialized = true;
@@ -57,7 +75,10 @@ class RoutingController extends BaseController {
         this.initialize();
     }
     
-    // Safe logging helper
+    // ========================================================================
+    // LOGGING HELPER
+    // ========================================================================
+    
     logDebug(category, message, data = null) {
         if (!this.logger) {
             console.log(`[${category}] ${message}`, data || '');
@@ -83,21 +104,21 @@ class RoutingController extends BaseController {
             return;
         }
         
-        this.logDebug('routing', '🔀 Initializing RoutingController v3.0.3');
+        this.logDebug('routing', '🔀 Initializing RoutingController v4.2.1');
         
         // Créer le modèle s'il n'existe pas
-		if (!this.getModel('routing')) {
-			if (typeof RoutingModel !== 'undefined') {
-				// ✅ Ajouter backend et logger
-				const backend = this.models?.backend || window.backendService;
-				this.models.routing = new RoutingModel(
-					this.eventBus,
-					backend,
-					this.logger
-				);
-				this.logDebug('routing', 'RoutingModel created with backend & logger');
-			}
-		}
+        if (!this.getModel('routing')) {
+            if (typeof RoutingModel !== 'undefined') {
+                // ✅ Ajouter backend et logger
+                const backend = this.models?.backend || window.backendService;
+                this.models.routing = new RoutingModel(
+                    this.eventBus,
+                    backend,
+                    this.logger
+                );
+                this.logDebug('routing', 'RoutingModel created with backend & logger');
+            }
+        }
         
         // Créer la vue si elle n'existe pas
         if (!this.getView('routing')) {
@@ -122,7 +143,7 @@ class RoutingController extends BaseController {
         this.eventBus.on('routing:preset-loaded', (data) => this.onPresetLoaded(data));
         this.eventBus.on('routing:reset', () => this.onReset());
         
-        // ✅ NOUVEAU: Événements de transformations
+        // Événements de transformations
         this.eventBus.on('routing:velocity-mapping', (data) => this.onVelocityMappingChanged(data));
         this.eventBus.on('routing:note-filter', (data) => this.onNoteFilterChanged(data));
         this.eventBus.on('routing:note-remap', (data) => this.onNoteRemapChanged(data));
@@ -136,20 +157,46 @@ class RoutingController extends BaseController {
         this.eventBus.on('backend:event:devices_changed', (data) => this.onBackendDevicesChanged(data));
         this.eventBus.on('backend:event:channel_activity', (data) => this.onChannelActivity(data));
         
+        // ✅ NOUVEAU v4.2.1: Événements routes
+        this.eventBus.on('backend:route:added', (data) => this.onBackendRoutingChanged(data));
+        this.eventBus.on('backend:route:removed', (data) => this.onBackendRoutingChanged(data));
+        this.eventBus.on('backend:route:updated', (data) => this.onBackendRoutingChanged(data));
+        
         // Événements UI
         this.eventBus.on('ui:routing-matrix-click', (data) => this.onMatrixClick(data));
+        
+        // Navigation
+        this.eventBus.on('navigation:page_changed', (data) => {
+            if (data.page === 'routing') {
+                this.onRoutingPageActive();
+            } else {
+                this.onRoutingPageInactive();
+            }
+        });
+        
+        // Demandes de refresh
+        this.eventBus.on('routing:request_refresh', () => this.syncWithBackend());
     }
     
     /**
      * Configurer la synchronisation automatique
      */
     setupAutoSync() {
-        if (this.config.syncInterval > 0) {
-            setInterval(() => {
-                if (!this.localState.isSyncing) {
+        if (this.config.syncInterval > 0 && this.autoSyncEnabled) {
+            this.autoSyncTimer = setInterval(() => {
+                if (!this.localState.isSyncing && this.backend?.isConnected()) {
                     this.syncWithBackend();
                 }
             }, this.config.syncInterval);
+            
+            this.logDebug('routing', '✓ Auto-sync started');
+        }
+    }
+    
+    stopAutoSync() {
+        if (this.autoSyncTimer) {
+            clearInterval(this.autoSyncTimer);
+            this.autoSyncTimer = null;
         }
     }
     
@@ -159,11 +206,21 @@ class RoutingController extends BaseController {
     
     onBackendConnected() {
         this.logDebug('routing', '✓ Backend connected, loading routing configuration');
+        
+        // Charger configuration
         this.loadFromBackend();
+        
+        // Démarrer auto-sync
+        if (this.autoSyncEnabled) {
+            this.setupAutoSync();
+        }
     }
     
     onBackendDisconnected() {
         this.logDebug('routing', '✗ Backend disconnected');
+        
+        // Arrêter auto-sync
+        this.stopAutoSync();
         
         if (this.config.autoSave) {
             this.saveToLocalStorage();
@@ -178,16 +235,22 @@ class RoutingController extends BaseController {
         if (data.devices) {
             this.updateDevicesFromBackend(data.devices);
         }
+        
+        if (data.connected && !this.autoSyncTimer && this.autoSyncEnabled) {
+            this.setupAutoSync();
+        }
     }
     
     onBackendRoutingChanged(data) {
         this.logDebug('routing', 'Routing changed on backend', data);
         this.updateRoutingFromBackend(data);
+        this.syncWithBackend();
     }
     
     onBackendDevicesChanged(data) {
         this.logDebug('routing', 'Devices changed on backend', data);
         this.updateDevicesFromBackend(data.devices);
+        this.syncWithBackend();
     }
     
     onChannelActivity(data) {
@@ -199,6 +262,8 @@ class RoutingController extends BaseController {
         if (this.routingMatrix) {
             this.routingMatrix.updateChannelActivity(data.channel, true);
         }
+        
+        this.eventBus.emit('routing:channel_activity', data);
     }
     
     // ========================================================================
@@ -214,11 +279,24 @@ class RoutingController extends BaseController {
         this.localState.isSyncing = true;
         
         try {
+            // Charger routing traditionnel
             const routing = await this.backend.getRouting();
             this.updateRoutingFromBackend(routing);
             
+            // Charger devices
             const devices = await this.backend.listDevices();
             this.updateDevicesFromBackend(devices);
+            
+            // ✅ NOUVEAU v4.2.1: Charger toutes les routes
+            await this.listRoutesAPI();
+            
+            // ✅ NOUVEAU v4.2.1: Charger stats
+            try {
+                await this.getRoutingStatsAPI();
+            } catch (error) {
+                // Stats non critique
+                this.logDebug('routing', 'Stats not available');
+            }
             
             this.localState.lastSync = Date.now();
             this.logDebug('routing', '✓ Routing configuration loaded from backend');
@@ -266,7 +344,10 @@ class RoutingController extends BaseController {
                     case 'transpose':
                         await this.backend.setChannelTranspose(change.channel, change.transpose);
                         break;
-                    // ✅ NOUVEAU: Transformations
+                    case 'pan':
+                        await this.backend.setChannelPan(change.channel, change.pan);
+                        break;
+                    // Transformations
                     case 'velocity_mapping':
                         await this.backend.sendCommand('routing.set_velocity_mapping', {
                             channel: change.channel,
@@ -314,6 +395,414 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
+    // ✅ NOUVEAU v4.2.1: API ROUTES (ENABLE/DISABLE)
+    // ========================================================================
+    
+    /**
+     * Ajoute une route MIDI
+     * @param {string} sourceId - ID périphérique source
+     * @param {string} destinationId - ID périphérique destination
+     * @returns {Promise<boolean>}
+     */
+    async addRouteAPI(sourceId, destinationId) {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.addRoute', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
+            
+            if (response.success) {
+                // Ajouter au cache local
+                const routeKey = this.getRouteKey(sourceId, destinationId);
+                this.routes.set(routeKey, {
+                    source_id: sourceId,
+                    destination_id: destinationId,
+                    enabled: true,
+                    created_at: Date.now()
+                });
+                
+                this.updateRouteStats();
+                
+                this.logDebug('routing', `✓ Route added: ${sourceId} → ${destinationId}`);
+                
+                this.eventBus.emit('routing:route_added', { sourceId, destinationId });
+                this.showNotification(`Route created: ${sourceId} → ${destinationId}`, 'success');
+                
+                this.updateView();
+                
+                return true;
+            } else {
+                throw new Error(response.error_message || 'Add route failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'addRouteAPI failed:', error);
+            this.showNotification(`Failed to add route: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * Retire une route MIDI
+     */
+    async removeRouteAPI(sourceId, destinationId) {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.removeRoute', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
+            
+            if (response.success) {
+                const routeKey = this.getRouteKey(sourceId, destinationId);
+                this.routes.delete(routeKey);
+                
+                this.updateRouteStats();
+                
+                this.logDebug('routing', `✓ Route removed: ${sourceId} → ${destinationId}`);
+                
+                this.eventBus.emit('routing:route_removed', { sourceId, destinationId });
+                this.showNotification(`Route deleted: ${sourceId} → ${destinationId}`, 'info');
+                
+                this.updateView();
+                
+                return true;
+            } else {
+                throw new Error(response.error_message || 'Remove route failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'removeRouteAPI failed:', error);
+            this.showNotification(`Failed to remove route: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * Active une route (sans la supprimer)
+     */
+    async enableRoute(sourceId, destinationId) {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.enableRoute', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
+            
+            if (response.success) {
+                const routeKey = this.getRouteKey(sourceId, destinationId);
+                const route = this.routes.get(routeKey);
+                
+                if (route) {
+                    route.enabled = true;
+                    this.routes.set(routeKey, route);
+                }
+                
+                this.updateRouteStats();
+                
+                this.logDebug('routing', `✓ Route enabled: ${sourceId} → ${destinationId}`);
+                
+                this.eventBus.emit('routing:route_enabled', { sourceId, destinationId });
+                this.showNotification(`Route enabled: ${sourceId} → ${destinationId}`, 'success');
+                
+                this.updateView();
+                
+                return true;
+            } else {
+                throw new Error(response.error_message || 'Enable route failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'enableRoute failed:', error);
+            this.showNotification(`Failed to enable route: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * Désactive une route (sans la supprimer)
+     */
+    async disableRoute(sourceId, destinationId) {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.disableRoute', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
+            
+            if (response.success) {
+                const routeKey = this.getRouteKey(sourceId, destinationId);
+                const route = this.routes.get(routeKey);
+                
+                if (route) {
+                    route.enabled = false;
+                    this.routes.set(routeKey, route);
+                }
+                
+                this.updateRouteStats();
+                
+                this.logDebug('routing', `✓ Route disabled: ${sourceId} → ${destinationId}`);
+                
+                this.eventBus.emit('routing:route_disabled', { sourceId, destinationId });
+                this.showNotification(`Route disabled: ${sourceId} → ${destinationId}`, 'info');
+                
+                this.updateView();
+                
+                return true;
+            } else {
+                throw new Error(response.error_message || 'Disable route failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'disableRoute failed:', error);
+            this.showNotification(`Failed to disable route: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * Toggle l'état enabled/disabled d'une route
+     */
+    async toggleRoute(sourceId, destinationId) {
+        const routeKey = this.getRouteKey(sourceId, destinationId);
+        const route = this.routes.get(routeKey);
+        
+        if (!route) {
+            throw new Error('Route not found');
+        }
+        
+        if (route.enabled) {
+            return await this.disableRoute(sourceId, destinationId);
+        } else {
+            return await this.enableRoute(sourceId, destinationId);
+        }
+    }
+
+    /**
+     * Efface toutes les routes
+     */
+    async clearRoutesAPI() {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.clearRoutes', {});
+            
+            if (response.success) {
+                this.routes.clear();
+                this.updateRouteStats();
+                
+                this.logDebug('routing', '✓ All routes cleared');
+                
+                this.eventBus.emit('routing:routes_cleared');
+                this.showNotification('All routes cleared', 'success');
+                
+                this.updateView();
+                
+                return true;
+            } else {
+                throw new Error(response.error_message || 'Clear routes failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'clearRoutesAPI failed:', error);
+            this.showNotification(`Failed to clear routes: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * Liste toutes les routes
+     */
+    async listRoutesAPI() {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.listRoutes', {});
+            
+            if (response.success) {
+                const routes = response.data?.routes || [];
+                
+                this.routes.clear();
+                routes.forEach(route => {
+                    const routeKey = this.getRouteKey(route.source_id, route.destination_id);
+                    this.routes.set(routeKey, {
+                        ...route,
+                        enabled: route.enabled !== false
+                    });
+                });
+                
+                this.updateRouteStats();
+                
+                this.logDebug('routing', `✓ Listed ${routes.length} routes`);
+                
+                return routes;
+            } else {
+                throw new Error(response.error_message || 'List routes failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'listRoutesAPI failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtient les statistiques de routing
+     */
+    async getRoutingStatsAPI() {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+
+        try {
+            const response = await this.backend.sendCommand('routing.getStats', {});
+            
+            if (response.success) {
+                const stats = response.data;
+                
+                this.routeStats = {
+                    ...this.routeStats,
+                    ...stats,
+                    lastUpdate: Date.now()
+                };
+                
+                return stats;
+            } else {
+                throw new Error(response.error_message || 'Get routing stats failed');
+            }
+        } catch (error) {
+            this.logDebug('routing', 'getRoutingStatsAPI failed:', error);
+            throw error;
+        }
+    }
+
+    // ========================================================================
+    // ROUTE HELPERS
+    // ========================================================================
+
+    getRouteKey(sourceId, destinationId) {
+        return `${sourceId}:${destinationId}`;
+    }
+
+    parseRouteKey(routeKey) {
+        const [sourceId, destinationId] = routeKey.split(':');
+        return { sourceId, destinationId };
+    }
+
+    hasRoute(sourceId, destinationId) {
+        const routeKey = this.getRouteKey(sourceId, destinationId);
+        return this.routes.has(routeKey);
+    }
+
+    getRoute(sourceId, destinationId) {
+        const routeKey = this.getRouteKey(sourceId, destinationId);
+        return this.routes.get(routeKey) || null;
+    }
+
+    isRouteEnabled(sourceId, destinationId) {
+        const route = this.getRoute(sourceId, destinationId);
+        return route ? route.enabled !== false : false;
+    }
+
+    getAllRoutes() {
+        return Array.from(this.routes.values());
+    }
+
+    getEnabledRoutes() {
+        return Array.from(this.routes.values()).filter(route => route.enabled !== false);
+    }
+
+    getDisabledRoutes() {
+        return Array.from(this.routes.values()).filter(route => route.enabled === false);
+    }
+
+    getRoutesFromSource(sourceId) {
+        return Array.from(this.routes.values()).filter(route => 
+            route.source_id === sourceId
+        );
+    }
+
+    getRoutesToDestination(destinationId) {
+        return Array.from(this.routes.values()).filter(route => 
+            route.destination_id === destinationId
+        );
+    }
+
+    updateRouteStats() {
+        this.routeStats.total = this.routes.size;
+        this.routeStats.enabled = this.getEnabledRoutes().length;
+        this.routeStats.disabled = this.getDisabledRoutes().length;
+        this.routeStats.lastUpdate = Date.now();
+    }
+
+    selectRoute(sourceId, destinationId) {
+        this.selectedRoute = { sourceId, destinationId };
+        this.updateView();
+    }
+
+    deselectRoute() {
+        this.selectedRoute = null;
+        this.updateView();
+    }
+
+    // ========================================================================
+    // ACTIONS EN MASSE
+    // ========================================================================
+
+    async enableAllRoutes() {
+        const disabledRoutes = this.getDisabledRoutes();
+        let count = 0;
+
+        for (const route of disabledRoutes) {
+            try {
+                await this.enableRoute(route.source_id, route.destination_id);
+                count++;
+            } catch (error) {
+                this.logDebug('routing', 
+                    `Failed to enable route ${route.source_id} → ${route.destination_id}`);
+            }
+        }
+
+        if (count > 0) {
+            this.showNotification(`Enabled ${count} routes`, 'success');
+        }
+
+        return count;
+    }
+
+    async disableAllRoutes() {
+        const enabledRoutes = this.getEnabledRoutes();
+        let count = 0;
+
+        for (const route of enabledRoutes) {
+            try {
+                await this.disableRoute(route.source_id, route.destination_id);
+                count++;
+            } catch (error) {
+                this.logDebug('routing', 
+                    `Failed to disable route ${route.source_id} → ${route.destination_id}`);
+            }
+        }
+
+        if (count > 0) {
+            this.showNotification(`Disabled ${count} routes`, 'info');
+        }
+
+        return count;
+    }
+    
+    // ========================================================================
     // ACTIONS CANAUX - ✅ AVEC VALIDATION
     // ========================================================================
     
@@ -325,14 +814,14 @@ class RoutingController extends BaseController {
         const model = this.getModel('routing');
         if (!model) return false;
         
-        // ✅ Construire la configuration complète
+        // Construire la configuration complète
         const routing = {
             channel: channelNumber,
             device: deviceId,
             ...config
         };
         
-        // ✅ NOUVEAU: Valider AVANT d'assigner
+        // Valider AVANT d'assigner
         if (this.config.validateBeforeAssign) {
             const validation = model.validateRouting(routing);
             
@@ -367,7 +856,7 @@ class RoutingController extends BaseController {
             device: deviceId
         });
         
-        // ✅ NOUVEAU: Activer les transformations dans le flux
+        // Activer les transformations dans le flux
         this.eventBus.emit('routing:assigned', {
             channel: channelNumber,
             device: deviceId,
@@ -497,19 +986,16 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // TRANSFORMATIONS AVANCÉES - ✅ NOUVEAU
+    // TRANSFORMATIONS AVANCÉES
     // ========================================================================
     
     /**
      * Configure le velocity mapping d'un canal
-     * @param {number} channelNumber - Numéro de canal (0-15)
-     * @param {Object} config - Configuration velocity
      */
     setVelocityMapping(channelNumber, config) {
         const model = this.getModel('routing');
         if (!model) return false;
         
-        // Valider la configuration
         if (!model.validateVelocityConfig(config)) {
             this.showError('Invalid velocity configuration');
             return false;
@@ -526,7 +1012,6 @@ class RoutingController extends BaseController {
             
             this.showSuccess(`Velocity curve set to "${config.curve}"`);
             
-            // Sync avec backend
             if (this.backend && this.backend.isConnected()) {
                 this.backend.sendCommand('routing.set_velocity_mapping', {
                     channel: channelNumber,
@@ -542,14 +1027,11 @@ class RoutingController extends BaseController {
     
     /**
      * Configure le filtre de notes
-     * @param {number} channelNumber - Numéro de canal (0-15)
-     * @param {Object} config - Configuration filtre
      */
     setNoteFilter(channelNumber, config) {
         const model = this.getModel('routing');
         if (!model) return false;
         
-        // Valider la configuration
         if (!model.validateNoteFilterConfig(config)) {
             this.showError('Invalid note filter configuration');
             return false;
@@ -566,7 +1048,6 @@ class RoutingController extends BaseController {
             
             this.showSuccess('Note filter updated');
             
-            // Sync avec backend
             if (this.backend && this.backend.isConnected()) {
                 this.backend.sendCommand('routing.set_note_filter', {
                     channel: channelNumber,
@@ -582,8 +1063,6 @@ class RoutingController extends BaseController {
     
     /**
      * Configure le remapping de notes
-     * @param {number} channelNumber - Numéro de canal (0-15)
-     * @param {Array} mappings - Liste de mappings {from, to}
      */
     setNoteRemap(channelNumber, mappings) {
         const model = this.getModel('routing');
@@ -594,7 +1073,6 @@ class RoutingController extends BaseController {
         if (success) {
             this.showSuccess(`${mappings.length} note mapping${mappings.length > 1 ? 's' : ''} applied`);
             
-            // Sync avec backend
             if (this.backend && this.backend.isConnected()) {
                 this.backend.sendCommand('routing.set_note_remap', {
                     channel: channelNumber,
@@ -610,8 +1088,6 @@ class RoutingController extends BaseController {
     
     /**
      * Configure le remapping de CC
-     * @param {number} channelNumber - Numéro de canal (0-15)
-     * @param {Array} mappings - Liste de mappings {from, to, invert}
      */
     setCCRemap(channelNumber, mappings) {
         const model = this.getModel('routing');
@@ -622,7 +1098,6 @@ class RoutingController extends BaseController {
         if (success) {
             this.showSuccess(`${mappings.length} CC mapping${mappings.length > 1 ? 's' : ''} applied`);
             
-            // Sync avec backend
             if (this.backend && this.backend.isConnected()) {
                 this.backend.sendCommand('routing.set_cc_remap', {
                     channel: channelNumber,
@@ -676,7 +1151,6 @@ class RoutingController extends BaseController {
         const channel = model.getChannel(channelNumber);
         if (!channel) return false;
         
-        // Désactiver toutes les transformations
         channel.transformations.velocity.enabled = false;
         channel.transformations.noteFilter.enabled = false;
         channel.transformations.noteRemap.enabled = false;
@@ -916,6 +1390,15 @@ class RoutingController extends BaseController {
         
         if (view && model) {
             const data = model.getRoutingConfiguration();
+            
+            // ✅ Ajouter les nouvelles données v4.2.1
+            data.routes = Array.from(this.routes.values());
+            data.routeStats = this.routeStats;
+            data.selectedRoute = this.selectedRoute;
+            data.backendConnected = this.backend?.isConnected() || false;
+            data.autoSyncEnabled = this.autoSyncEnabled;
+            data.pendingChanges = this.localState.pendingChanges.length;
+            
             view.render(data);
             
             if (this.routingMatrix) {
@@ -967,7 +1450,6 @@ class RoutingController extends BaseController {
         this.updateView();
     }
     
-    // ✅ NOUVEAU: Callbacks transformations
     onVelocityMappingChanged(data) {
         this.logDebug('routing', `Velocity mapping changed for channel ${data.channel}: ${data.config.curve}`);
         this.updateView();
@@ -1003,6 +1485,29 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
+    // ÉVÉNEMENTS PAGE
+    // ========================================================================
+    
+    onRoutingPageActive() {
+        this.logDebug('routing', 'Routing page active');
+        
+        // Synchroniser immédiatement
+        this.syncWithBackend();
+        
+        // Démarrer auto-sync
+        if (this.autoSyncEnabled) {
+            this.setupAutoSync();
+        }
+    }
+    
+    onRoutingPageInactive() {
+        this.logDebug('routing', 'Routing page inactive');
+        
+        // Arrêter auto-sync pour économiser ressources
+        this.stopAutoSync();
+    }
+    
+    // ========================================================================
     // MÉTHODES D'AIDE UI
     // ========================================================================
     
@@ -1031,14 +1536,32 @@ class RoutingController extends BaseController {
         });
     }
     
+    showNotification(message, type = 'info') {
+        if (this.notifications && typeof this.notifications.show === 'function') {
+            this.notifications.show(message, type);
+        } else {
+            this.eventBus.emit('notification:show', { message, type });
+        }
+    }
+    
+    showSuccess(message) {
+        this.showNotification(message, 'success');
+    }
+    
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+    
+    showWarning(message) {
+        this.showNotification(message, 'warning');
+    }
     
     // ========================================================================
-    // API PUBLIQUE - Méthodes de la référence
+    // API PUBLIQUE - CONFORMITÉ RÉFÉRENCE
     // ========================================================================
     
     /**
      * Charge la configuration de routage
-     * @returns {Promise<boolean>}
      */
     async loadRouting() {
         try {
@@ -1052,7 +1575,6 @@ class RoutingController extends BaseController {
     
     /**
      * Sauvegarde la configuration de routage
-     * @returns {Promise<boolean>}
      */
     async saveRouting() {
         try {
@@ -1067,10 +1589,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Assigne un canal à un périphérique (alias pour assignChannelToDevice)
-     * @param {number} channelId - Numéro du canal
-     * @param {string} deviceId - ID du périphérique
-     * @returns {Promise<boolean>}
+     * Assigne un canal à un périphérique (alias)
      */
     async assignChannel(channelId, deviceId) {
         return await this.assignChannelToDevice(channelId, deviceId);
@@ -1078,8 +1597,6 @@ class RoutingController extends BaseController {
     
     /**
      * Teste une route en envoyant une note test
-     * @param {string} routeId - ID de la route (format: "channel-device")
-     * @returns {Promise<boolean>}
      */
     async testRoute(routeId) {
         try {
@@ -1090,7 +1607,6 @@ class RoutingController extends BaseController {
                 return false;
             }
             
-            // Envoyer une note de test via le backend
             if (this.backend && this.backend.isConnected()) {
                 await this.backend.sendCommand('midi.test_note', {
                     channel: parseInt(channel),
@@ -1114,17 +1630,8 @@ class RoutingController extends BaseController {
         }
     }
     
-    
-    // ========================================================================
-    // FONCTIONS PUBLIQUES (CONFORMITÉ RÉFÉRENCE)
-    // ========================================================================
-    
     /**
-     * Crée une nouvelle route entre un canal et un périphérique
-     * @param {number} channel - Canal MIDI (1-16)
-     * @param {string} deviceId - ID du périphérique
-     * @param {Object} options - Options de routage
-     * @returns {Promise<boolean>}
+     * Crée une nouvelle route
      */
     async createRoute(channel, deviceId, options = {}) {
         return await this.assignChannel(channel, deviceId, options);
@@ -1132,8 +1639,6 @@ class RoutingController extends BaseController {
     
     /**
      * Supprime une route
-     * @param {number} channel - Canal MIDI (1-16)
-     * @returns {Promise<boolean>}
      */
     async removeRoute(channel) {
         const model = this.getModel('routing');
@@ -1147,9 +1652,6 @@ class RoutingController extends BaseController {
     
     /**
      * Met à jour une route existante
-     * @param {number} channel - Canal MIDI (1-16)
-     * @param {Object} options - Nouvelles options
-     * @returns {Promise<boolean>}
      */
     async updateRoute(channel, options) {
         const model = this.getModel('routing');
@@ -1169,7 +1671,6 @@ class RoutingController extends BaseController {
     
     /**
      * Obtient toutes les routes configurées
-     * @returns {Array}
      */
     getRoutes() {
         const model = this.getModel('routing');
@@ -1180,7 +1681,6 @@ class RoutingController extends BaseController {
     
     /**
      * Auto-routage automatique des canaux aux périphériques
-     * @returns {Promise<boolean>}
      */
     async autoRoute() {
         const model = this.getModel('routing');
@@ -1221,7 +1721,6 @@ class RoutingController extends BaseController {
     
     /**
      * Efface tout le routage
-     * @returns {Promise<boolean>}
      */
     async clearRouting() {
         if (this.config.confirmReset) {
@@ -1252,9 +1751,35 @@ class RoutingController extends BaseController {
             return false;
         }
     }
-
-
+    
+    // ========================================================================
+    // STATISTIQUES
+    // ========================================================================
+    
+    getStats() {
+        return {
+            ...this.routeStats,
+            autoSyncEnabled: this.autoSyncEnabled,
+            syncInterval: this.config.syncInterval,
+            pendingChanges: this.localState.pendingChanges.length,
+            backendConnected: this.backend?.isConnected() || false,
+            lastSync: this.localState.lastSync
+        };
+    }
+    
+    // ========================================================================
+    // DESTRUCTION
+    // ========================================================================
+    
+    destroy() {
+        this.stopAutoSync();
+        this.routes.clear();
+        this.localState.pendingChanges = [];
+        
+        this.logDebug('routing', 'RoutingController destroyed');
+    }
 }
+
 // ============================================================================
 // EXPORT
 // ============================================================================

@@ -1,14 +1,24 @@
 // ============================================================================
 // Fichier: frontend/js/core/Router.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - Enrichi pour nouvelles fonctionnalités API
+// Date: 2025-10-28
 // ============================================================================
 // Description:
 //   Routeur pour navigation SPA (Single Page Application).
 //   Gère les routes, l'historique et la navigation sans rechargement.
 //
+// NOUVELLES ROUTES v3.1.0:
+//   - /bluetooth → BluetoothView (gestion périphériques Bluetooth)
+//   - /latency → LatencyView (calibration et compensation latence)
+//   - /presets → PresetView (gestion presets de configuration)
+//   - /network → NetworkMonitor (monitoring réseau)
+//   - /logger → LoggerView (configuration niveau de logs)
+//
+// Configuration:
+//   Les routes sont configurées dans Application.js lors de l'initialisation
+//
 // Auteur: midiMind Team
-// Date: 2025-10-04
-// Version: 3.0.0
 // ============================================================================
 
 class Router {
@@ -132,6 +142,56 @@ class Router {
             ...config,
             is404: true
         });
+        
+        return this;
+    }
+    
+    /**
+     * NOUVELLE MÉTHODE v3.1.0: Configuration rapide des routes API
+     * Configure les routes pour les nouvelles fonctionnalités
+     * @param {Object} controllers - Objet contenant les contrôleurs
+     * @param {Object} views - Objet contenant les vues
+     */
+    configureApiRoutes(controllers = {}, views = {}) {
+        const apiRoutes = [
+            {
+                path: '/bluetooth',
+                controller: controllers.bluetooth,
+                view: views.bluetooth,
+                title: 'Bluetooth - MidiMind',
+                meta: { requiresFeature: 'bluetooth' }
+            },
+            {
+                path: '/latency',
+                controller: controllers.latency,
+                view: views.latency,
+                title: 'Latence - MidiMind',
+                meta: { requiresFeature: 'latency' }
+            },
+            {
+                path: '/presets',
+                controller: controllers.preset,
+                view: views.preset,
+                title: 'Presets - MidiMind',
+                meta: { requiresFeature: 'presets' }
+            },
+            {
+                path: '/network',
+                controller: controllers.network,
+                view: views.network,
+                title: 'Réseau - MidiMind',
+                meta: { requiresFeature: 'network' }
+            },
+            {
+                path: '/logger',
+                controller: controllers.logger,
+                view: views.logger,
+                title: 'Logs - MidiMind',
+                meta: { requiresFeature: 'logger' }
+            }
+        ];
+        
+        this.addRoutes(apiRoutes);
         
         return this;
     }
@@ -745,4 +805,9 @@ class Router {
         return [...this.state.history];
     }
 }
+
 window.Router = Router;
+
+// ============================================================================
+// FIN DU FICHIER Router.js v3.1.0
+// ============================================================================

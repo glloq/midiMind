@@ -1,15 +1,13 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.6.0 - STRUCTURE RÉELLE CORRECTE
-Date: 2025-10-23
+Version: v3.7.0 - AJOUT 5 NOUVELLES PAGES API
+Date: 2025-10-28
 ============================================================================ 
-CORRECTIONS v3.6.0:
-✅ Structure CORRECTE : js/ et styles/ UNIQUEMENT
-✅ PLUS de dossiers scripts/ ou src/ ou css/
-✅ Router.js dans js/core/ (pas scripts/core/)
-✅ MidiService.js et StorageService.js dans js/services/ (pas scripts/services/)
-✅ DeviceCard, Modal, etc. dans js/views/components/ (pas scripts/views/components/)
-✅ Tous les chemins corrigés selon la structure RÉELLE
+CORRECTIONS v3.7.0:
+✅ Ajout pages Bluetooth, Latency, Presets, Network, Logger
+✅ Ajout navigation pour nouvelles pages
+✅ Structure identique aux pages existantes
+✅ Conteneurs prêts pour les vues
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -41,6 +39,8 @@ CORRECTIONS v3.6.0:
     <link rel="stylesheet" href="styles/loop-recorder.css">
     <link rel="stylesheet" href="styles/fileview-extended.css">
     <link rel="stylesheet" href="styles/themes.css">
+    <!-- ✅ NOUVEAU: CSS pour nouvelles pages API -->
+    <link rel="stylesheet" href="styles/api-pages.css">
 </head>
 <body>
     <!-- ========================================================================
@@ -86,6 +86,29 @@ CORRECTIONS v3.6.0:
                         <span class="nav-icon">⚙️</span>
                         <span class="nav-label">Système</span>
                     </a>
+                    
+                    <!-- ✅ NOUVEAU: Navigation API Features -->
+                    <div class="nav-separator"></div>
+                    <a href="#bluetooth" class="nav-item" data-page="bluetooth">
+                        <span class="nav-icon">📡</span>
+                        <span class="nav-label">Bluetooth</span>
+                    </a>
+                    <a href="#latency" class="nav-item" data-page="latency">
+                        <span class="nav-icon">⏱️</span>
+                        <span class="nav-label">Latence</span>
+                    </a>
+                    <a href="#presets" class="nav-item" data-page="presets">
+                        <span class="nav-icon">💾</span>
+                        <span class="nav-label">Presets</span>
+                    </a>
+                    <a href="#network" class="nav-item" data-page="network">
+                        <span class="nav-icon">🌐</span>
+                        <span class="nav-label">Réseau</span>
+                    </a>
+                    <a href="#logger" class="nav-item" data-page="logger">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-label">Logs</span>
+                    </a>
                 </nav>
                 
                 <div class="header-right">
@@ -101,12 +124,70 @@ CORRECTIONS v3.6.0:
              MAIN CONTENT
              ======================================================================== -->
         <main class="app-main">
+            <!-- Pages existantes -->
             <div id="home" class="page active"></div>
             <div id="editor" class="page"></div>
             <div id="routing" class="page"></div>
             <div id="keyboard" class="page"></div>
             <div id="instruments" class="page"></div>
             <div id="system" class="page"></div>
+            
+            <!-- ✅ NOUVELLES PAGES API -->
+            
+            <!-- Page Bluetooth -->
+            <div id="bluetooth" class="page">
+                <div class="page-header">
+                    <h1>📡 Gestion Bluetooth</h1>
+                    <p>Scan et appairage des périphériques Bluetooth MIDI</p>
+                </div>
+                <div class="bluetooth-content api-page-content">
+                    <!-- Contenu géré par BluetoothView -->
+                </div>
+            </div>
+            
+            <!-- Page Latence -->
+            <div id="latency" class="page">
+                <div class="page-header">
+                    <h1>⏱️ Compensation de Latence</h1>
+                    <p>Calibration et compensation de latence MIDI</p>
+                </div>
+                <div class="latency-content api-page-content">
+                    <!-- Contenu géré par LatencyView -->
+                </div>
+            </div>
+            
+            <!-- Page Presets -->
+            <div id="presets" class="page">
+                <div class="page-header">
+                    <h1>💾 Gestion des Presets</h1>
+                    <p>Sauvegarde et chargement des configurations</p>
+                </div>
+                <div class="presets-content api-page-content">
+                    <!-- Contenu géré par PresetView -->
+                </div>
+            </div>
+            
+            <!-- Page Network -->
+            <div id="network" class="page">
+                <div class="page-header">
+                    <h1>🌐 Monitoring Réseau</h1>
+                    <p>État des interfaces et statistiques réseau</p>
+                </div>
+                <div class="network-content api-page-content">
+                    <!-- Contenu géré par NetworkMonitor -->
+                </div>
+            </div>
+            
+            <!-- Page Logger -->
+            <div id="logger" class="page">
+                <div class="page-header">
+                    <h1>📝 Configuration des Logs</h1>
+                    <p>Niveau de détail des logs système</p>
+                </div>
+                <div class="logger-content api-page-content">
+                    <!-- Contenu géré par LoggerView -->
+                </div>
+            </div>
         </main>
 
         <!-- ========================================================================
@@ -249,6 +330,13 @@ CORRECTIONS v3.6.0:
     <script src="js/views/PianoRollView.js"></script>
     <script src="js/views/LoopRecorderView.js"></script>
     <script src="js/views/VisualizerView.js"></script>
+    
+    <!-- ✅ NOUVEAU: VUES API (quand créées) -->
+    <script src="js/views/BluetoothView.js"></script> 
+    <script src="js/views/LatencyView.js"></script> 
+    <script src="js/views/PresetView.js"></script> 
+    <script src="js/views/NetworkMonitor.js"></script> 
+    <script src="js/views/LoggerView.js"></script> 
 
     <!-- ÉTAPE 17: ROUTER - Dans js/core/ -->
     <script src="js/core/Router.js"></script>
@@ -279,6 +367,12 @@ CORRECTIONS v3.6.0:
     <script src="js/controllers/PerformanceController.js"></script>
     <script src="js/controllers/VisualizerController.js"></script>
     <script src="js/controllers/PianoRollController.js"></script>
+    
+    <!-- ✅ NOUVEAU: CONTRÔLEURS API  -->
+    <script src="js/controllers/BluetoothController.js"></script> 
+    <script src="js/controllers/LatencyController.js"></script> 
+    <script src="js/controllers/PresetController.js"></script> 
+    <script src="js/controllers/LoggerController.js"></script> 
 
     <!-- ÉTAPE 20: APPLICATION -->
     <script src="js/core/Application.js"></script>

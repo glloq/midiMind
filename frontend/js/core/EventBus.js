@@ -1,7 +1,7 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
-// Version: 3.0.5 - Phase 2 - Avec Priorités
-// Date: 2025-10-09
+// Version: 3.1.0 - Enrichi avec nouveaux événements API
+// Date: 2025-10-28
 // ============================================================================
 // Auteur: midiMind Team
 // ============================================================================
@@ -19,6 +19,14 @@ const EventPriority = {
 /**
  * @class EventBus
  * @description Bus d'événements centralisé avec gestion de priorités
+ * 
+ * NOUVEAUX ÉVÉNEMENTS v3.1.0:
+ * - bluetooth:* (scan, paired, unpaired, signal)
+ * - hotplug:* (device-added, device-removed, monitoring-started, monitoring-stopped)
+ * - latency:* (updated, calibration-started, calibration-complete, enabled, disabled)
+ * - preset:* (loaded, saved, deleted, exported)
+ * - logger:* (level-changed)
+ * - network:* (status-changed, interface-up, interface-down)
  * 
  * Architecture Phase 2:
  * ```
@@ -84,8 +92,10 @@ class EventBus {
         
         // Traitement asynchrone
         this.processingTimer = null;
-		//
-		this._lastCacheClean = null;
+        this._lastCacheClean = null;
+        
+        // Documentation des événements disponibles
+        this.eventDocumentation = this.initEventDocumentation();
         
         this.init();
     }
@@ -95,10 +105,96 @@ class EventBus {
     // ========================================================================
     
     init() {
-        console.log('🔄 EventBus v3.0.5 initialized with priorities');
+        console.log('🔄 EventBus v3.1.0 initialized with priorities and new API events');
         
         // Démarrer le traitement des queues
         this.startProcessing();
+    }
+    
+    /**
+     * Initialise la documentation des événements disponibles
+     */
+    initEventDocumentation() {
+        return {
+            // Événements existants
+            'app:ready': 'Application prête',
+            'app:error': 'Erreur application',
+            'backend:connected': 'Backend connecté',
+            'backend:disconnected': 'Backend déconnecté',
+            'websocket:disconnected': 'WebSocket déconnecté',
+            'navigation:changed': 'Navigation changée',
+            
+            // Événements périphériques
+            'device:connected': 'Périphérique connecté',
+            'device:disconnected': 'Périphérique déconnecté',
+            'device:scan': 'Scan de périphériques',
+            
+            // Événements MIDI
+            'midi:message': 'Message MIDI reçu',
+            'midi:note-on': 'Note MIDI activée',
+            'midi:note-off': 'Note MIDI désactivée',
+            
+            // Événements de routing
+            'routing:route-added': 'Route ajoutée',
+            'routing:route-removed': 'Route retirée',
+            'routing:routes-cleared': 'Routes effacées',
+            
+            // Événements de playback
+            'playback:playing': 'Lecture en cours',
+            'playback:paused': 'Lecture en pause',
+            'playback:stopped': 'Lecture arrêtée',
+            'playback:position': 'Position de lecture',
+            
+            // NOUVEAUX ÉVÉNEMENTS BLUETOOTH
+            'bluetooth:scan-started': 'Scan Bluetooth démarré',
+            'bluetooth:scan-complete': 'Scan Bluetooth terminé',
+            'bluetooth:device-found': 'Périphérique Bluetooth trouvé',
+            'bluetooth:paired': 'Périphérique Bluetooth apparié',
+            'bluetooth:unpaired': 'Périphérique Bluetooth désapparié',
+            'bluetooth:signal-update': 'Mise à jour du signal Bluetooth',
+            'bluetooth:signal-weak': 'Signal Bluetooth faible',
+            'bluetooth:error': 'Erreur Bluetooth',
+            
+            // NOUVEAUX ÉVÉNEMENTS HOT-PLUG
+            'hotplug:device-added': 'Périphérique ajouté (hot-plug)',
+            'hotplug:device-removed': 'Périphérique retiré (hot-plug)',
+            'hotplug:monitoring-started': 'Surveillance hot-plug démarrée',
+            'hotplug:monitoring-stopped': 'Surveillance hot-plug arrêtée',
+            'hotplug:status-update': 'Mise à jour statut hot-plug',
+            
+            // NOUVEAUX ÉVÉNEMENTS LATENCE
+            'latency:updated': 'Latence mise à jour',
+            'latency:calibration-started': 'Calibration de latence démarrée',
+            'latency:calibration-progress': 'Progression calibration latence',
+            'latency:calibration-complete': 'Calibration de latence terminée',
+            'latency:calibration-failed': 'Échec calibration latence',
+            'latency:compensation-enabled': 'Compensation de latence activée',
+            'latency:compensation-disabled': 'Compensation de latence désactivée',
+            'latency:offset-changed': 'Offset de latence changé',
+            
+            // NOUVEAUX ÉVÉNEMENTS PRESET
+            'preset:loaded': 'Preset chargé',
+            'preset:saved': 'Preset sauvegardé',
+            'preset:deleted': 'Preset supprimé',
+            'preset:exported': 'Preset exporté',
+            'preset:imported': 'Preset importé',
+            'preset:list-updated': 'Liste des presets mise à jour',
+            'preset:error': 'Erreur preset',
+            
+            // NOUVEAUX ÉVÉNEMENTS LOGGER
+            'logger:level-changed': 'Niveau de log changé',
+            'logger:message': 'Message de log',
+            'logger:error': 'Erreur de log',
+            
+            // NOUVEAUX ÉVÉNEMENTS NETWORK
+            'network:status-changed': 'Statut réseau changé',
+            'network:online': 'Réseau en ligne',
+            'network:offline': 'Réseau hors ligne',
+            'network:interface-up': 'Interface réseau activée',
+            'network:interface-down': 'Interface réseau désactivée',
+            'network:stats-updated': 'Statistiques réseau mises à jour',
+            'network:error': 'Erreur réseau'
+        };
     }
     
     startProcessing() {
@@ -294,18 +390,18 @@ class EventBus {
         // HIGH (déjà traités en direct)
         
         // NORMAL
-		this.processQueue(EventPriority.NORMAL, 10);
-		
-		// LOW
-		this.processQueue(EventPriority.LOW, 5);
-		
-		// ✅ NOUVEAU: Nettoyage périodique du cache (toutes les 60s)
-		const now = Date.now();
-		if (!this._lastCacheClean || now - this._lastCacheClean > 60000) {
-			this.cleanThrottleCache();
-			this._lastCacheClean = now;
-		}
-	}
+        this.processQueue(EventPriority.NORMAL, 10);
+        
+        // LOW
+        this.processQueue(EventPriority.LOW, 5);
+        
+        // ✅ NOUVEAU: Nettoyage périodique du cache (toutes les 60s)
+        const now = Date.now();
+        if (!this._lastCacheClean || now - this._lastCacheClean > 60000) {
+            this.cleanThrottleCache();
+            this._lastCacheClean = now;
+        }
+    }
     
     /**
      * Traite une queue
@@ -429,16 +525,17 @@ class EventBus {
     // UTILITAIRES
     // ========================================================================
     
-cleanThrottleCache() {
-    const now = performance.now();
-    const maxAge = 60000; // 1 minute
-    
-    for (const [key, timestamp] of this.throttleCache.entries()) {
-        if (now - timestamp > maxAge) {
-            this.throttleCache.delete(key);
+    cleanThrottleCache() {
+        const now = performance.now();
+        const maxAge = 60000; // 1 minute
+        
+        for (const [key, timestamp] of this.throttleCache.entries()) {
+            if (now - timestamp > maxAge) {
+                this.throttleCache.delete(key);
+            }
         }
     }
-}
+    
     /**
      * Trouve l'index d'insertion pour respecter la priorité
      */
@@ -480,6 +577,13 @@ cleanThrottleCache() {
     }
     
     /**
+     * Liste tous les événements disponibles avec documentation
+     */
+    listAvailableEvents() {
+        return this.eventDocumentation;
+    }
+    
+    /**
      * Compte les listeners pour un événement
      */
     listenerCount(eventName) {
@@ -505,3 +609,8 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 window.EventBus = EventBus;
+window.EventPriority = EventPriority;
+
+// ============================================================================
+// FIN DU FICHIER EventBus.js v3.1.0
+// ============================================================================

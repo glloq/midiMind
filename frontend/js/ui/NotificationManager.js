@@ -1,8 +1,8 @@
 // ============================================================================
 // Fichier: frontend/js/ui/NotificationManager.js
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: 3.1.0 - Enrichi avec nouvelles notifications API
+// Date: 2025-10-28
 // ============================================================================
 // Description:
 //   Gestionnaire centralisé de toutes les notifications de l'application.
@@ -17,6 +17,8 @@
 //   - Grouping similaires (anti-spam)
 //   - Historique notifications
 //   - Préférences utilisateur (son, vibration)
+//   - Mapping codes erreur backend → messages utilisateur
+//   - Notifications Bluetooth, Hot-plug, Latence, Presets
 //
 // Architecture:
 //   NotificationManager (classe singleton)
@@ -28,7 +30,7 @@
 // ============================================================================
 /**
  * @class NotificationManager
- * @description Gestionnaire de notifications toast
+ * @description Gestionnaire de notifications toast enrichi pour API Backend
  */
 class NotificationManager {
     constructor() {
@@ -36,6 +38,9 @@ class NotificationManager {
         this.notifications = [];
         this.maxNotifications = 5;
         this.defaultDuration = 3000; // ms
+        
+        // Mapping des codes d'erreur backend → messages utilisateur
+        this.errorMessages = this.initErrorMessages();
         
         this.init();
     }
@@ -48,6 +53,68 @@ class NotificationManager {
         this.container = document.createElement('div');
         this.container.className = 'notification-container';
         document.body.appendChild(this.container);
+    }
+
+    /**
+     * Initialise le mapping des codes d'erreur
+     */
+    initErrorMessages() {
+        return {
+            // Erreurs générales
+            'INVALID_REQUEST': 'Requête invalide',
+            'UNAUTHORIZED': 'Non autorisé',
+            'FORBIDDEN': 'Accès refusé',
+            'NOT_FOUND': 'Ressource non trouvée',
+            'TIMEOUT': 'Délai d\'attente dépassé',
+            'INTERNAL_ERROR': 'Erreur interne du serveur',
+            'SERVICE_UNAVAILABLE': 'Service temporairement indisponible',
+            'PARSE_ERROR': 'Erreur de format de données',
+            'INVALID_COMMAND': 'Commande invalide',
+            'INVALID_PARAMS': 'Paramètres invalides',
+            'INVALID_MESSAGE': 'Message invalide',
+            'COMMAND_FAILED': 'Échec de l\'exécution de la commande',
+            'UNKNOWN_COMMAND': 'Commande inconnue',
+            
+            // Erreurs périphériques
+            'DEVICE_NOT_FOUND': 'Périphérique non trouvé',
+            'DEVICE_BUSY': 'Périphérique occupé',
+            'DEVICE_DISCONNECTED': 'Périphérique déconnecté',
+            'DEVICE_CONNECTION_FAILED': 'Échec de connexion au périphérique',
+            
+            // Erreurs MIDI
+            'MIDI_ERROR': 'Erreur MIDI',
+            'MIDI_PORT_ERROR': 'Erreur de port MIDI',
+            'MIDI_ROUTING_ERROR': 'Erreur de routage MIDI',
+            
+            // Erreurs fichiers
+            'FILE_ERROR': 'Erreur de fichier',
+            'FILE_NOT_FOUND': 'Fichier non trouvé',
+            'FILE_READ_ERROR': 'Erreur de lecture du fichier',
+            'FILE_WRITE_ERROR': 'Erreur d\'écriture du fichier',
+            'FILE_DELETE_ERROR': 'Erreur de suppression du fichier',
+            
+            // Erreurs système
+            'SYSTEM_ERROR': 'Erreur système',
+            'MEMORY_ERROR': 'Erreur de mémoire',
+            'DISK_ERROR': 'Erreur disque',
+            
+            // Erreurs Bluetooth
+            'BLUETOOTH_ERROR': 'Erreur Bluetooth',
+            'BLUETOOTH_NOT_AVAILABLE': 'Bluetooth non disponible',
+            'BLUETOOTH_SCAN_FAILED': 'Échec du scan Bluetooth',
+            'BLUETOOTH_PAIR_FAILED': 'Échec d\'appairage Bluetooth',
+            'BLUETOOTH_UNPAIR_FAILED': 'Échec du désappairage Bluetooth',
+            
+            // Erreurs Latence
+            'LATENCY_ERROR': 'Erreur de latence',
+            'LATENCY_CALIBRATION_FAILED': 'Échec de calibration de latence',
+            
+            // Erreurs Preset
+            'PRESET_ERROR': 'Erreur de preset',
+            'PRESET_NOT_FOUND': 'Preset non trouvé',
+            'PRESET_LOAD_FAILED': 'Échec du chargement du preset',
+            'PRESET_SAVE_FAILED': 'Échec de la sauvegarde du preset'
+        };
     }
 
     /**
@@ -130,7 +197,7 @@ class NotificationManager {
      */
     getIcon(type) {
         const icons = {
-            success: '✓',
+            success: '✔',
             error: '✕',
             warning: '⚠',
             info: 'ℹ'
@@ -205,6 +272,207 @@ class NotificationManager {
         return this.show(message, 'info', duration, options);
     }
 
+    // ========================================================================
+    // NOTIFICATIONS SPÉCIFIQUES API BACKEND
+    // ========================================================================
+
+    /**
+     * Affiche une notification d'erreur backend avec mapping
+     * @param {string} errorCode - Code d'erreur du backend
+     * @param {string} errorMessage - Message d'erreur optionnel
+     */
+    showBackendError(errorCode, errorMessage = null) {
+        const mappedMessage = this.errorMessages[errorCode] || errorMessage || 'Erreur inconnue';
+        return this.error(mappedMessage, 5000, {
+            details: errorCode
+        });
+    }
+
+    /**
+     * Notification Bluetooth - Scan démarré
+     */
+    bluetoothScanStarted() {
+        return this.info('Scan Bluetooth démarré...', 2000);
+    }
+
+    /**
+     * Notification Bluetooth - Périphérique trouvé
+     * @param {string} deviceName - Nom du périphérique
+     */
+    bluetoothDeviceFound(deviceName) {
+        return this.info(`Périphérique trouvé: ${deviceName}`, 3000);
+    }
+
+    /**
+     * Notification Bluetooth - Périphérique apparié
+     * @param {string} deviceName - Nom du périphérique
+     */
+    bluetoothDevicePaired(deviceName) {
+        return this.success(`Périphérique apparié: ${deviceName}`, 4000);
+    }
+
+    /**
+     * Notification Bluetooth - Périphérique désapparié
+     * @param {string} deviceName - Nom du périphérique
+     */
+    bluetoothDeviceUnpaired(deviceName) {
+        return this.info(`Périphérique désapparié: ${deviceName}`, 3000);
+    }
+
+    /**
+     * Notification Bluetooth - Signal faible
+     * @param {string} deviceName - Nom du périphérique
+     * @param {number} signal - Force du signal (0-100)
+     */
+    bluetoothWeakSignal(deviceName, signal) {
+        return this.warning(`Signal faible pour ${deviceName}: ${signal}%`, 4000);
+    }
+
+    /**
+     * Notification Hot-plug - Périphérique ajouté
+     * @param {string} deviceName - Nom du périphérique
+     */
+    hotplugDeviceAdded(deviceName) {
+        return this.success(`Périphérique connecté: ${deviceName}`, 4000);
+    }
+
+    /**
+     * Notification Hot-plug - Périphérique retiré
+     * @param {string} deviceName - Nom du périphérique
+     */
+    hotplugDeviceRemoved(deviceName) {
+        return this.warning(`Périphérique déconnecté: ${deviceName}`, 4000);
+    }
+
+    /**
+     * Notification Hot-plug - Surveillance démarrée
+     */
+    hotplugMonitoringStarted() {
+        return this.info('Surveillance des périphériques activée', 2000);
+    }
+
+    /**
+     * Notification Hot-plug - Surveillance arrêtée
+     */
+    hotplugMonitoringStopped() {
+        return this.info('Surveillance des périphériques désactivée', 2000);
+    }
+
+    /**
+     * Notification Latence - Calibration démarrée
+     * @param {string} instrumentName - Nom de l'instrument
+     */
+    latencyCalibrationStarted(instrumentName) {
+        return this.info(`Calibration de latence démarrée pour ${instrumentName}...`, 3000);
+    }
+
+    /**
+     * Notification Latence - Calibration terminée
+     * @param {string} instrumentName - Nom de l'instrument
+     * @param {number} latencyMs - Latence mesurée en ms
+     */
+    latencyCalibrationComplete(instrumentName, latencyMs) {
+        return this.success(`Calibration terminée pour ${instrumentName}: ${latencyMs.toFixed(1)}ms`, 5000);
+    }
+
+    /**
+     * Notification Latence - Compensation mise à jour
+     * @param {string} instrumentName - Nom de l'instrument
+     * @param {number} offsetMs - Offset de compensation en ms
+     */
+    latencyCompensationUpdated(instrumentName, offsetMs) {
+        return this.info(`Compensation de latence mise à jour pour ${instrumentName}: ${offsetMs.toFixed(1)}ms`, 3000);
+    }
+
+    /**
+     * Notification Latence - Compensation activée
+     */
+    latencyCompensationEnabled() {
+        return this.success('Compensation de latence activée', 3000);
+    }
+
+    /**
+     * Notification Latence - Compensation désactivée
+     */
+    latencyCompensationDisabled() {
+        return this.info('Compensation de latence désactivée', 3000);
+    }
+
+    /**
+     * Notification Preset - Chargé
+     * @param {string} presetName - Nom du preset
+     */
+    presetLoaded(presetName) {
+        return this.success(`Preset chargé: ${presetName}`, 3000);
+    }
+
+    /**
+     * Notification Preset - Sauvegardé
+     * @param {string} presetName - Nom du preset
+     */
+    presetSaved(presetName) {
+        return this.success(`Preset sauvegardé: ${presetName}`, 3000);
+    }
+
+    /**
+     * Notification Preset - Supprimé
+     * @param {string} presetName - Nom du preset
+     */
+    presetDeleted(presetName) {
+        return this.info(`Preset supprimé: ${presetName}`, 3000);
+    }
+
+    /**
+     * Notification Preset - Exporté
+     * @param {string} presetName - Nom du preset
+     * @param {string} filepath - Chemin du fichier
+     */
+    presetExported(presetName, filepath) {
+        return this.success(`Preset exporté: ${presetName}`, 3000, {
+            details: filepath
+        });
+    }
+
+    /**
+     * Notification Logger - Niveau de log changé
+     * @param {string} level - Nouveau niveau (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+     */
+    loggerLevelChanged(level) {
+        return this.info(`Niveau de log changé: ${level}`, 2000);
+    }
+
+    /**
+     * Notification Network - Statut changé
+     * @param {boolean} isOnline - true si en ligne, false si hors ligne
+     */
+    networkStatusChanged(isOnline) {
+        if (isOnline) {
+            return this.success('Connexion réseau rétablie', 3000);
+        } else {
+            return this.warning('Connexion réseau perdue', 4000);
+        }
+    }
+
+    /**
+     * Notification Network - Interface activée
+     * @param {string} interfaceName - Nom de l'interface
+     */
+    networkInterfaceUp(interfaceName) {
+        return this.info(`Interface réseau activée: ${interfaceName}`, 3000);
+    }
+
+    /**
+     * Notification Network - Interface désactivée
+     * @param {string} interfaceName - Nom de l'interface
+     */
+    networkInterfaceDown(interfaceName) {
+        return this.warning(`Interface réseau désactivée: ${interfaceName}`, 3000);
+    }
+
+    // ========================================================================
+    // UTILITAIRES
+    // ========================================================================
+
     /**
      * Échappe le HTML pour éviter XSS
      */
@@ -240,5 +508,5 @@ if (typeof window !== 'undefined') {
 }
 window.NotificationManager = NotificationManager;
 // ============================================================================
-// FIN DU FICHIER NotificationManager.js
+// FIN DU FICHIER NotificationManager.js v3.1.0
 // ============================================================================
