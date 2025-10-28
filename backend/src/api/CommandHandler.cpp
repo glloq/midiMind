@@ -722,15 +722,13 @@ void CommandHandler::registerPlaybackCommands() {
     
     // playback.getInfo
     registerCommand("playback.getInfo", [this](const json& params) {
-        auto info = player_->getFileInfo();
+        json metadata = player_->getMetadata();
         
         return json{
-            {"filename", info.filename},
-            {"duration", info.duration},
-            {"track_count", info.trackCount},
-            {"tempo", info.tempo},
-            {"time_signature", info.timeSignature},
-            {"format", info.format}
+            {"filename", player_->getCurrentFile()},
+            {"duration", player_->getDuration()},
+            {"tempo", player_->getTempo()},
+            {"metadata", metadata}
         };
     });
     
@@ -1039,8 +1037,9 @@ void CommandHandler::registerLoggerCommands() {
     
     // logger.getLevel
     registerCommand("logger.getLevel", [this](const json& params) {
+        auto level = Logger::getLevel();
         return json{
-            {"level", Logger::getGlobalLogLevelString()}
+            {"level", Logger::levelToString(level)}
         };
     });
     
