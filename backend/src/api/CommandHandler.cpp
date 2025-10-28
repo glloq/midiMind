@@ -45,7 +45,7 @@ CommandHandler::CommandHandler(
     Logger::info("CommandHandler", "Initializing CommandHandler v4.2.1...");
     registerAllCommands();
     Logger::info("CommandHandler", 
-                "✅ CommandHandler initialized (" + 
+                "âœ… CommandHandler initialized (" + 
                 std::to_string(commands_.size()) + " commands)");
 }
 
@@ -64,7 +64,7 @@ json CommandHandler::processCommand(const json& command) {
             return createErrorResponse(error, "INVALID_COMMAND");
         }
         
-        // CORRECTION CRITIQUE 1: Validation sécurisée avant accès
+        // CORRECTION CRITIQUE 1: Validation sÃ©curisÃ©e avant accÃ¨s
         if (!command.contains("command") || !command["command"].is_string()) {
             return createErrorResponse("Missing or invalid 'command' field", "INVALID_COMMAND");
         }
@@ -313,7 +313,7 @@ void CommandHandler::registerDeviceCommands() {
             {"name", device->getName()},
             {"type", static_cast<int>(device->getType())},
             {"status", static_cast<int>(device->getStatus())},
-            {"available", device->isAvailable()}
+            {"available", device->isConnected()}
         };
     });
     
@@ -496,7 +496,7 @@ void CommandHandler::registerDeviceCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Device commands registered (18 commands)");  
+    Logger::debug("CommandHandler", "âœ… Device commands registered (18 commands)");  
 }
 
 // ============================================================================
@@ -607,7 +607,7 @@ void CommandHandler::registerRoutingCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Routing commands registered (6 commands)");
+    Logger::debug("CommandHandler", "âœ… Routing commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -743,7 +743,7 @@ void CommandHandler::registerPlaybackCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Playback commands registered (10 commands)");
+    Logger::debug("CommandHandler", "âœ… Playback commands registered (10 commands)");
 }
 
 // ============================================================================
@@ -849,7 +849,7 @@ void CommandHandler::registerFileCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ File commands registered (6 commands)");
+    Logger::debug("CommandHandler", "âœ… File commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -961,7 +961,7 @@ void CommandHandler::registerSystemCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ System commands registered (7 commands)");
+    Logger::debug("CommandHandler", "âœ… System commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1014,7 +1014,7 @@ void CommandHandler::registerNetworkCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Network commands registered (3 commands)");
+    Logger::debug("CommandHandler", "âœ… Network commands registered (3 commands)");
 }
 
 // ============================================================================
@@ -1075,7 +1075,7 @@ void CommandHandler::registerLoggerCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Logger commands registered (5 commands)");
+    Logger::debug("CommandHandler", "âœ… Logger commands registered (5 commands)");
 }
 
 // ============================================================================
@@ -1183,7 +1183,7 @@ void CommandHandler::registerLatencyCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Latency commands registered (7 commands)");
+    Logger::debug("CommandHandler", "âœ… Latency commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1282,7 +1282,7 @@ void CommandHandler::registerPresetCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✅ Preset commands registered (5 commands)");
+    Logger::debug("CommandHandler", "âœ… Preset commands registered (5 commands)");
 }
 
 // ============================================================================

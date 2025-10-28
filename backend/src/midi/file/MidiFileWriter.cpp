@@ -72,7 +72,7 @@ void MidiFileWriter::writeToFile(const std::string& filepath,
         file.close();
         
         Logger::info("MidiFileWriter",
-            "✓ File written successfully (" +
+            "âœ" File written successfully (" +
             std::to_string(bytesWritten_) + " bytes, " +
             std::to_string(eventsWritten_) + " events)");
             
@@ -93,12 +93,12 @@ std::vector<uint8_t> MidiFileWriter::writeToBuffer(const MidiFile& midiFile) {
     
     writeToStream(buffer, midiFile);
     
-    // Use move semantics to avoid copy
-    std::string str = std::move(buffer.str());
+    // Copy elision handles optimization automatically
+    std::string str = buffer.str();
     std::vector<uint8_t> result(str.begin(), str.end());
     
     Logger::debug("MidiFileWriter",
-        "✓ Buffer written: " + std::to_string(result.size()) + " bytes");
+        "âœ" Buffer written: " + std::to_string(result.size()) + " bytes");
     
     return result;
 }
@@ -265,8 +265,8 @@ void MidiFileWriter::writeTrack(std::ostream& stream, const MidiTrack& track) {
         eventsWritten_++;
     }
     
-    // Get track data as string (use move to avoid copy)
-    std::string trackDataStr = std::move(trackData.str());
+    // Copy elision handles optimization automatically
+    std::string trackDataStr = trackData.str();
     
     // Write track length
     writeUint32BE(stream, static_cast<uint32_t>(trackDataStr.size()));
@@ -335,7 +335,7 @@ void MidiFileWriter::writeVLQ(std::ostream& stream, uint32_t value) {
     
     // This should never happen with proper input validation, but catch it
     if (bytesWritten >= MAX_VLQ_BYTES && (buffer & 0x80)) {
-        THROW_ERROR(ErrorCode::UNKNOWN_ERROR, 
+        THROW_ERROR(ErrorCode::INTERNAL_ERROR, 
                    "VLQ encoding exceeded maximum bytes");
     }
 }

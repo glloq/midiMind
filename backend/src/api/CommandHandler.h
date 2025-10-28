@@ -78,13 +78,14 @@ private:
     std::unordered_map<std::string, CommandFunction> commands_;
     mutable std::mutex commandsMutex_;  // mutable allows locking in const methods
     
-    std::shared_ptr<LatencyCompensator> compensator_;
-    std::shared_ptr<InstrumentDatabase> instrumentDb_;
-    std::shared_ptr<PresetManager> presetManager_;
+    // Member order matches constructor initialization list
     std::shared_ptr<MidiDeviceManager> deviceManager_;
     std::shared_ptr<MidiRouter> router_;
     std::shared_ptr<MidiPlayer> player_;
     std::shared_ptr<FileManager> fileManager_;
+    std::shared_ptr<LatencyCompensator> compensator_;
+    std::shared_ptr<InstrumentDatabase> instrumentDb_;
+    std::shared_ptr<PresetManager> presetManager_;
     std::shared_ptr<EventBus> eventBus_;
 };
 

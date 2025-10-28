@@ -64,7 +64,7 @@ ApiServer::ApiServer(std::shared_ptr<EventBus> eventBus)
         setupEventSubscriptions();
     }
     
-    Logger::info("ApiServer", "✓ WebSocket server created");
+    Logger::info("ApiServer", "âœ" WebSocket server created");
 }
 
 ApiServer::~ApiServer() {
@@ -219,7 +219,7 @@ void ApiServer::setupEventSubscriptions() {
         )
     );
     
-    Logger::info("ApiServer", "✓ Event subscriptions configured (" + 
+    Logger::info("ApiServer", "âœ" Event subscriptions configured (" + 
                 std::to_string(eventSubscriptions_.size()) + " events)");
 }
 
@@ -242,15 +242,11 @@ void ApiServer::start(int port) {
         
         serverThread_ = std::thread(&ApiServer::serverThread, this);
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Logger::info("ApiServer", "✓ WebSocket server started successfully");
+        Logger::info("ApiServer", "âœ" WebSocket server started");
         
     } catch (const std::exception& e) {
         running_ = false;
         Logger::error("ApiServer", 
-                     "Failed to start server: " + std::string(e.what()));
-        throw std::runtime_error(
             "Failed to start ApiServer: " + std::string(e.what()));
     }
 }
@@ -287,7 +283,7 @@ void ApiServer::stop() {
             serverThread_.join();
         }
         
-        Logger::info("ApiServer", "✓ WebSocket server stopped");
+        Logger::info("ApiServer", "âœ" WebSocket server stopped");
         
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
@@ -313,7 +309,7 @@ ApiServer::Stats ApiServer::getStats() const {
 
 bool ApiServer::sendTo(connection_hdl hdl, const MessageEnvelope& message) {
     try {
-        std::string payload = message.serialize();
+        std::string payload = message.toString();
         server_.send(hdl, payload, websocketpp::frame::opcode::text);
         
         {
@@ -341,14 +337,14 @@ bool ApiServer::sendError(connection_hdl hdl,
                           protocol::ErrorCode code,
                           const std::string& message,
                           const json& details) {
-    auto envelope = MessageEnvelope::createError(requestId, code, message, details);
+    auto envelope = MessageEnvelope::createErrorResponse(requestId, code, message, details);
     return sendTo(hdl, envelope);
 }
 
 void ApiServer::broadcast(const MessageEnvelope& message) {
     std::lock_guard<std::mutex> lock(connectionsMutex_);
     
-    std::string payload = message.serialize();
+    std::string payload = message.toString();
     
     for (auto& hdl : connections_) {
         try {
@@ -413,14 +409,17 @@ void ApiServer::onMessage(connection_hdl hdl, message_ptr msg) {
         }
         
         std::string payload = msg->get_payload();
-        auto envelope = MessageEnvelope::deserialize(payload);
+        auto envelopeOpt = MessageEnvelope::fromString(payload);
         
-        if (envelope.type == "request") {
-            processRequest(hdl, envelope);
+        if (!envelopeOpt) {
+            Logger::warning("ApiServer", "Failed to parse message");
+            return;
         }
-        else if (envelope.type == "ping") {
-            auto pong = MessageEnvelope::createPong(envelope.requestId);
-            sendTo(hdl, pong);
+        
+        const auto& envelope = *envelopeOpt;
+        
+        if (envelope.isRequest()) {
+            processRequest(hdl, envelope);
         }
         
     } catch (const std::exception& e) {
@@ -467,17 +466,18 @@ void ApiServer::serverThread() {
 
 void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& message) {
     if (!commandCallback_) {
-        sendError(hdl, message.requestId, 
+        sendError(hdl, message.getRequest().id, 
                  protocol::ErrorCode::INTERNAL_ERROR,
                  "No command handler configured");
         return;
     }
     
     try {
-        json result = commandCallback_(message.data);
+        const auto& request = message.getRequest();
+        json result = commandCallback_(request.params);
         
-        auto response = MessageEnvelope::createResponse(
-            message.requestId,
+        auto response = MessageEnvelope::createSuccessResponse(
+            request.id,
             result
         );
         
@@ -487,7 +487,7 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
         Logger::error("ApiServer", 
                      "Command processing error: " + std::string(e.what()));
         
-        sendError(hdl, message.requestId,
+        sendError(hdl, message.getRequest().id,
                  protocol::ErrorCode::COMMAND_FAILED,
                  "Command execution failed",
                  {{"error", e.what()}});
