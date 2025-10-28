@@ -64,7 +64,7 @@ ApiServer::ApiServer(std::shared_ptr<EventBus> eventBus)
         setupEventSubscriptions();
     }
     
-    Logger::info("ApiServer", "âœ" WebSocket server created");
+    Logger::info("ApiServer", "✓ WebSocket server created");
 }
 
 ApiServer::~ApiServer() {
@@ -219,7 +219,7 @@ void ApiServer::setupEventSubscriptions() {
         )
     );
     
-    Logger::info("ApiServer", "âœ" Event subscriptions configured (" + 
+    Logger::info("ApiServer", "✓ Event subscriptions configured (" + 
                 std::to_string(eventSubscriptions_.size()) + " events)");
 }
 
@@ -242,12 +242,13 @@ void ApiServer::start(int port) {
         
         serverThread_ = std::thread(&ApiServer::serverThread, this);
         
-        Logger::info("ApiServer", "âœ" WebSocket server started");
+        Logger::info("ApiServer", "✓ WebSocket server started");
         
     } catch (const std::exception& e) {
         running_ = false;
         Logger::error("ApiServer", 
-            "Failed to start ApiServer: " + std::string(e.what()));
+                     "Failed to start server: " + std::string(e.what()));
+        throw;
     }
 }
 
@@ -283,7 +284,7 @@ void ApiServer::stop() {
             serverThread_.join();
         }
         
-        Logger::info("ApiServer", "âœ" WebSocket server stopped");
+        Logger::info("ApiServer", "✓ WebSocket server stopped");
         
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 

@@ -45,7 +45,7 @@ CommandHandler::CommandHandler(
     Logger::info("CommandHandler", "Initializing CommandHandler v4.2.1...");
     registerAllCommands();
     Logger::info("CommandHandler", 
-                "âœ… CommandHandler initialized (" + 
+                "Ã¢Å“â€¦ CommandHandler initialized (" + 
                 std::to_string(commands_.size()) + " commands)");
 }
 
@@ -64,7 +64,7 @@ json CommandHandler::processCommand(const json& command) {
             return createErrorResponse(error, "INVALID_COMMAND");
         }
         
-        // CORRECTION CRITIQUE 1: Validation sÃ©curisÃ©e avant accÃ¨s
+        // CORRECTION CRITIQUE 1: Validation sÃƒÂ©curisÃƒÂ©e avant accÃƒÂ¨s
         if (!command.contains("command") || !command["command"].is_string()) {
             return createErrorResponse("Missing or invalid 'command' field", "INVALID_COMMAND");
         }
@@ -496,7 +496,7 @@ void CommandHandler::registerDeviceCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Device commands registered (18 commands)");  
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Device commands registered (18 commands)");  
 }
 
 // ============================================================================
@@ -558,11 +558,12 @@ void CommandHandler::registerRoutingCommands() {
         
         json routesJson = json::array();
         for (const auto& route : routes) {
-            routesJson.push_back({
-                {"source_id", route.sourceId},
-                {"destination_id", route.destinationId},
-                {"enabled", route.enabled}
-            });
+            json routeObj = {
+                {"source_id", route->sourceDeviceId},
+                {"destination_id", route->destinationDeviceId},
+                {"enabled", route->enabled}
+            };
+            routesJson.push_back(routeObj);
         }
         
         return json{
@@ -607,7 +608,7 @@ void CommandHandler::registerRoutingCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Routing commands registered (6 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Routing commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -743,7 +744,7 @@ void CommandHandler::registerPlaybackCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Playback commands registered (10 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Playback commands registered (10 commands)");
 }
 
 // ============================================================================
@@ -849,7 +850,7 @@ void CommandHandler::registerFileCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… File commands registered (6 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ File commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -961,7 +962,7 @@ void CommandHandler::registerSystemCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… System commands registered (7 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ System commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1014,7 +1015,7 @@ void CommandHandler::registerNetworkCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Network commands registered (3 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Network commands registered (3 commands)");
 }
 
 // ============================================================================
@@ -1075,7 +1076,7 @@ void CommandHandler::registerLoggerCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Logger commands registered (5 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Logger commands registered (5 commands)");
 }
 
 // ============================================================================
@@ -1168,13 +1169,14 @@ void CommandHandler::registerLatencyCommands() {
         
         json instrumentsJson = json::array();
         for (const auto& profile : profiles) {
-            instrumentsJson.push_back({
+            json instrumentObj = {
                 {"instrument_id", profile.instrumentId},
                 {"avg_latency_us", profile.averageLatency},
                 {"compensation_offset_us", profile.compensationOffset},
                 {"measurement_count", profile.measurementCount},
                 {"auto_calibration", profile.autoCalibration}
-            });
+            };
+            instrumentsJson.push_back(instrumentObj);
         }
         
         return json{
@@ -1183,7 +1185,7 @@ void CommandHandler::registerLatencyCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Latency commands registered (7 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Latency commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1282,7 +1284,7 @@ void CommandHandler::registerPresetCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "âœ… Preset commands registered (5 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Preset commands registered (5 commands)");
 }
 
 // ============================================================================
