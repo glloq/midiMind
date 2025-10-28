@@ -334,15 +334,16 @@ install_system_dependencies() {
         warning "Certains outils réseau manquants"
     fi
     
-    info "Installation du support Bluetooth..."
+    info "Installation du support Bluetooth + D-Bus..."
     apt-get install -y -qq \
         bluez \
         bluez-tools \
         libbluetooth-dev \
+        libglib2.0-dev \
         pi-bluetooth \
         2>&1 | tee -a "$LOG_FILE" || {
             warning "pi-bluetooth non disponible (normal sur non-Raspberry Pi)"
-            apt-get install -y -qq bluez bluez-tools libbluetooth-dev 2>&1 | tee -a "$LOG_FILE" || error "Échec installation Bluetooth"
+            apt-get install -y -qq bluez bluez-tools libbluetooth-dev libglib2.0-dev 2>&1 | tee -a "$LOG_FILE" || error "Échec installation Bluetooth"
         }
     
     # ✅ VÉRIFICATION Bluetooth

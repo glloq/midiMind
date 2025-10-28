@@ -98,13 +98,26 @@ target_link_libraries(midimind PRIVATE
 )
 
 set_target_properties(midimind PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
 # ============================================================================
 # INSTALLATION
 # ============================================================================
 
-install(TARGETS midimind RUNTIME DESTINATION bin)
-install(FILES data/migrations/001_initial.sql data/migrations/005_instruments_latency.sql 
-    DESTINATION share/midimind/migrations)
+install(TARGETS midimind RUNTIME DESTINATION /opt/midimind/bin)
+
+install(FILES 
+    data/migrations/001_initial.sql 
+    data/migrations/005_instruments_latency.sql 
+    DESTINATION /opt/midimind/data/migrations
+)
+
+# Installer le service systemd
+set(SERVICE_FILE "${CMAKE_SOURCE_DIR}/../scripts/midimind.service")
+if(EXISTS ${SERVICE_FILE})
+    install(FILES ${SERVICE_FILE} DESTINATION /etc/systemd/system/)
+    install(CODE "execute_process(COMMAND systemctl daemon-reload)")
+    install(CODE "execute_process(COMMAND systemctl enable midimind.service OUTPUT_QUIET ERROR_QUIET)")
+    message(STATUS "Service systemd sera installé: ${SERVICE_FILE}")
+endif()
