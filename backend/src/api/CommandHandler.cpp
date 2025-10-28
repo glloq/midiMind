@@ -734,11 +734,16 @@ void CommandHandler::registerPlaybackCommands() {
     
     // playback.listFiles
     registerCommand("playback.listFiles", [this](const json& params) {
-        auto files = player_->listAvailableFiles();
+        auto fileInfos = fileManager_->listFiles(DirectoryType::SONGS);
+        
+        json filesJson = json::array();
+        for (const auto& info : fileInfos) {
+            filesJson.push_back(info.toJson());
+        }
         
         return json{
-            {"files", files},
-            {"count", files.size()}
+            {"files", filesJson},
+            {"count", filesJson.size()}
         };
     });
     
@@ -838,14 +843,13 @@ void CommandHandler::registerFileCommands() {
         }
         
         std::string filename = params["filename"];
-        auto info = fileManager_->getFileInfo(filename);
+        auto infoOpt = fileManager_->getFileInfo(filename);
         
-        return json{
-            {"filename", info.filename},
-            {"size", info.size},
-            {"modified", info.modifiedTime},
-            {"type", info.type}
-        };
+        if (!infoOpt) {
+            throw std::runtime_error("File not found: " + filename);
+        }
+        
+        return infoOpt->toJson();
     });
     
     Logger::debug("CommandHandler", "Ã¢Å“â€¦ File commands registered (6 commands)");
@@ -1027,19 +1031,60 @@ void CommandHandler::registerLoggerCommands() {
             throw std::runtime_error("Missing level parameter");
         }
         
-        std::string level = params["level"];
-        Logger::setGlobalLogLevel(level);
+        std::string levelStr = params["level"];
+        
+        // Convert string to Logger::Level
+        Logger::Level level;
+        if (levelStr == "DEBUG" || levelStr == "debug" || levelStr == "0") {
+            level = Logger::Level::DEBUG;
+        } else if (levelStr == "INFO" || levelStr == "info" || levelStr == "1") {
+            level = Logger::Level::INFO;
+        } else if (levelStr == "WARNING" || levelStr == "warning" || levelStr == "2") {
+            level = Logger::Level::WARNING;
+        } else if (levelStr == "ERROR" || levelStr == "error" || levelStr == "3") {
+            level = Logger::Level::ERROR;
+        } else if (levelStr == "CRITICAL" || levelStr == "critical" || levelStr == "4") {
+            level = Logger::Level::CRITICAL;
+        } else {
+            throw std::runtime_error("Invalid log level: " + levelStr);
+        }
+        
+        Logger::setLevel(level);
         
         return json{
-            {"level", level}
+            {"level", levelStr}
         };
     });
     
     // logger.getLevel
     registerCommand("logger.getLevel", [this](const json& params) {
         auto level = Logger::getLevel();
+        
+        // Convert Logger::Level to string
+        std::string levelStr;
+        switch (level) {
+            case Logger::Level::DEBUG:
+                levelStr = "DEBUG";
+                break;
+            case Logger::Level::INFO:
+                levelStr = "INFO";
+                break;
+            case Logger::Level::WARNING:
+                levelStr = "WARNING";
+                break;
+            case Logger::Level::ERROR:
+                levelStr = "ERROR";
+                break;
+            case Logger::Level::CRITICAL:
+                levelStr = "CRITICAL";
+                break;
+            default:
+                levelStr = "UNKNOWN";
+                break;
+        }
+        
         return json{
-            {"level", Logger::levelToString(level)}
+            {"level", levelStr}
         };
     });
     
