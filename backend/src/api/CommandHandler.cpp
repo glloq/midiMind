@@ -496,7 +496,7 @@ void CommandHandler::registerDeviceCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Device commands registered (18 commands)");  
+    Logger::debug("CommandHandler", "✓ Device commands registered (18 commands)");  
 }
 
 // ============================================================================
@@ -608,7 +608,7 @@ void CommandHandler::registerRoutingCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Routing commands registered (6 commands)");
+    Logger::debug("CommandHandler", "✓ Routing commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -734,7 +734,7 @@ void CommandHandler::registerPlaybackCommands() {
     
     // playback.listFiles
     registerCommand("playback.listFiles", [this](const json& params) {
-        auto fileInfos = fileManager_->listFiles(DirectoryType::SONGS);
+        auto fileInfos = fileManager_->listFiles();  // List all files
         
         json filesJson = json::array();
         for (const auto& info : fileInfos) {
@@ -747,7 +747,7 @@ void CommandHandler::registerPlaybackCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Playback commands registered (10 commands)");
+    Logger::debug("CommandHandler", "✓ Playback commands registered (10 commands)");
 }
 
 // ============================================================================
@@ -763,12 +763,16 @@ void CommandHandler::registerFileCommands() {
     
     // files.list
     registerCommand("files.list", [this](const json& params) {
-        std::string directory = params.value("directory", "");
-        auto files = fileManager_->listFiles(directory);
+        auto fileInfos = fileManager_->listFiles();  // List all files
+        
+        json filesJson = json::array();
+        for (const auto& info : fileInfos) {
+            filesJson.push_back(info.toJson());
+        }
         
         return json{
-            {"files", files},
-            {"count", files.size()}
+            {"files", filesJson},
+            {"count", filesJson.size()}
         };
     });
     
@@ -779,12 +783,15 @@ void CommandHandler::registerFileCommands() {
         }
         
         std::string filename = params["filename"];
-        auto content = fileManager_->readFile(filename);
+        auto data = fileManager_->downloadFile(filename);
+        
+        // Convert binary data to base64 string for JSON
+        std::string content(data.begin(), data.end());
         
         return json{
             {"filename", filename},
             {"content", content},
-            {"size", content.size()}
+            {"size", data.size()}
         };
     });
     
@@ -797,12 +804,15 @@ void CommandHandler::registerFileCommands() {
         std::string filename = params["filename"];
         std::string content = params["content"];
         
-        bool success = fileManager_->writeFile(filename, content);
+        // Convert string to binary data
+        std::vector<uint8_t> data(content.begin(), content.end());
+        
+        std::string filepath = fileManager_->uploadFile(data, filename, DirectoryType::UPLOADS, true);
         
         return json{
-            {"written", success},
+            {"success", !filepath.empty()},
             {"filename", filename},
-            {"size", content.size()}
+            {"filepath", filepath}
         };
     });
     
@@ -828,7 +838,8 @@ void CommandHandler::registerFileCommands() {
         }
         
         std::string filename = params["filename"];
-        bool exists = fileManager_->fileExists(filename);
+        auto infoOpt = fileManager_->getFileInfo(filename);
+        bool exists = infoOpt.has_value();
         
         return json{
             {"exists", exists},
@@ -852,7 +863,7 @@ void CommandHandler::registerFileCommands() {
         return infoOpt->toJson();
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ File commands registered (6 commands)");
+    Logger::debug("CommandHandler", "✓ File commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -964,7 +975,7 @@ void CommandHandler::registerSystemCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ System commands registered (7 commands)");
+    Logger::debug("CommandHandler", "✓ System commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1017,7 +1028,7 @@ void CommandHandler::registerNetworkCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Network commands registered (3 commands)");
+    Logger::debug("CommandHandler", "✓ Network commands registered (3 commands)");
 }
 
 // ============================================================================
@@ -1226,7 +1237,7 @@ void CommandHandler::registerLatencyCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Latency commands registered (7 commands)");
+    Logger::debug("CommandHandler", "✓ Latency commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1325,7 +1336,7 @@ void CommandHandler::registerPresetCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "Ã¢Å“â€¦ Preset commands registered (5 commands)");
+    Logger::debug("CommandHandler", "✓ Preset commands registered (5 commands)");
 }
 
 // ============================================================================
