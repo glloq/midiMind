@@ -6,16 +6,16 @@
 --
 -- Description:
 --   Migration pour ajouter la compensation de latence par instrument.
---   VERSION SIMPLIFIÉE : Réglage manuel uniquement + SysEx
+--   VERSION SIMPLIFIÃ‰E : RÃ©glage manuel uniquement + SysEx
 --
 -- Tables Created:
 --   - instruments_latency (profils de latence des instruments)
 --
 -- Features:
 --   - Compensation manuelle par l'utilisateur
---   - Récupération info via SysEx (calibration_method = 'sysex')
+--   - RÃ©cupÃ©ration info via SysEx (calibration_method = 'sysex')
 --   - Pas de calibration automatique
---   - Historique optionnel pour futures évolutions
+--   - Historique optionnel pour futures Ã©volutions
 --
 -- Author: MidiMind Team
 -- Date: 2025-10-16
@@ -30,7 +30,7 @@
 -- Changes v4.1.0:
 --   - Retrait de auto_calibration (compensation manuelle uniquement)
 --   - Calibration methods: 'manual' ou 'sysex' uniquement
---   - Schéma simplifié pour usage immédiat
+--   - SchÃ©ma simplifiÃ© pour usage immÃ©diat
 --
 -- ============================================================================
 
@@ -38,7 +38,6 @@
 -- BEGIN TRANSACTION
 -- ============================================================================
 
-BEGIN TRANSACTION;
 
 -- Check prerequisites (after table creation to avoid RAISE in SELECT)
 CREATE TEMP TABLE IF NOT EXISTS _migration_005_check AS
@@ -57,7 +56,7 @@ DROP TABLE _migration_005_check;
 
 -- ============================================================================
 -- TABLE: instruments_latency
--- Description: Profils de latence par instrument (réglage manuel)
+-- Description: Profils de latence par instrument (rÃ©glage manuel)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS instruments_latency (
@@ -71,7 +70,7 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     channel INTEGER NOT NULL CHECK(channel BETWEEN 0 AND 15),
     
     -- ========================================================================
-    -- MÉTADONNÉES
+    -- MÃ‰TADONNÃ‰ES
     -- ========================================================================
     name TEXT NOT NULL DEFAULT 'Unnamed Instrument',
     instrument_type TEXT DEFAULT 'unknown',
@@ -79,13 +78,13 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     -- ========================================================================
     -- COMPENSATION (microsecondes)
     -- ========================================================================
-    -- Note: compensation_offset est NÉGATIF pour avancer le signal
+    -- Note: compensation_offset est NÃ‰GATIF pour avancer le signal
     -- Exemple: -15000 = avancer de 15ms
     -- INTEGER range: -2^31 to 2^31-1 (-2147s to +2147s) - sufficient for microseconds
     compensation_offset INTEGER DEFAULT 0 
         CHECK(compensation_offset BETWEEN -2147483648 AND 2147483647),
     
-    -- Latence moyenne mesurée (valeur absolue, pour stats)
+    -- Latence moyenne mesurÃ©e (valeur absolue, pour stats)
     avg_latency INTEGER DEFAULT 0 
         CHECK(avg_latency BETWEEN 0 AND 1000000),  -- Max 1000ms = 1s
     
@@ -96,7 +95,7 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
         CHECK(max_latency >= 0),
     
     -- ========================================================================
-    -- STATISTIQUES (optionnel, pour futures évolutions)
+    -- STATISTIQUES (optionnel, pour futures Ã©volutions)
     -- ========================================================================
     jitter REAL DEFAULT 0.0,
     std_deviation REAL DEFAULT 0.0,
@@ -105,16 +104,16 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     -- ========================================================================
     -- CALIBRATION
     -- ========================================================================
-    -- Confidence: 0.0 = pas calibré, 1.0 = parfaitement calibré
+    -- Confidence: 0.0 = pas calibrÃ©, 1.0 = parfaitement calibrÃ©
     calibration_confidence REAL DEFAULT 0.0 
         CHECK(calibration_confidence BETWEEN 0.0 AND 1.0),
     
-    -- Timestamp dernière calibration
+    -- Timestamp derniÃ¨re calibration
     last_calibration TEXT,
     
-    -- Méthode de calibration:
-    --   'manual' = réglé manuellement par l'utilisateur
-    --   'sysex'  = récupéré via Identity Request SysEx
+    -- MÃ©thode de calibration:
+    --   'manual' = rÃ©glÃ© manuellement par l'utilisateur
+    --   'sysex'  = rÃ©cupÃ©rÃ© via Identity Request SysEx
     calibration_method TEXT DEFAULT 'manual' 
         CHECK(calibration_method IN ('manual', 'sysex')),
     
@@ -124,7 +123,7 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
     enabled BOOLEAN DEFAULT 1,
     
     -- ========================================================================
-    -- HISTORIQUE (JSON optionnel pour futures évolutions)
+    -- HISTORIQUE (JSON optionnel pour futures Ã©volutions)
     -- ========================================================================
     -- Format: [{"timestamp": "2025-10-16T10:00:00Z", "latency": 15000, "method": "manual"}]
     measurement_history TEXT CHECK(measurement_history IS NULL OR json_valid(measurement_history)),
@@ -144,7 +143,7 @@ CREATE TABLE IF NOT EXISTS instruments_latency (
 CREATE INDEX IF NOT EXISTS idx_instruments_device 
 ON instruments_latency(device_id);
 
--- Recherche rapide par device + channel (requête courante)
+-- Recherche rapide par device + channel (requÃªte courante)
 CREATE INDEX IF NOT EXISTS idx_instruments_device_channel 
 ON instruments_latency(device_id, channel);
 
@@ -156,11 +155,11 @@ ON instruments_latency(channel);
 CREATE INDEX IF NOT EXISTS idx_instruments_enabled 
 ON instruments_latency(enabled) WHERE enabled = 1;
 
--- Tri par confidence (instruments les mieux calibrés en premier)
+-- Tri par confidence (instruments les mieux calibrÃ©s en premier)
 CREATE INDEX IF NOT EXISTS idx_instruments_confidence 
 ON instruments_latency(calibration_confidence DESC);
 
--- Tri par dernière calibration
+-- Tri par derniÃ¨re calibration
 CREATE INDEX IF NOT EXISTS idx_instruments_last_calibration 
 ON instruments_latency(last_calibration DESC);
 
@@ -178,7 +177,7 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
--- Auto-update de calibration_confidence basé sur measurement_count
+-- Auto-update de calibration_confidence basÃ© sur measurement_count
 -- Plus de mesures = plus de confiance (max 1.0)
 -- FIXED: Use CASE instead of MIN for SQLite compatibility
 CREATE TRIGGER IF NOT EXISTS trg_instruments_latency_confidence
@@ -195,7 +194,7 @@ BEGIN
 END;
 
 -- Auto-update de compensation_offset = -avg_latency
--- La compensation est l'opposé de la latence mesurée
+-- La compensation est l'opposÃ© de la latence mesurÃ©e
 -- FIXED: Added upper bound check
 CREATE TRIGGER IF NOT EXISTS trg_instruments_latency_compensation
 AFTER UPDATE OF avg_latency ON instruments_latency
@@ -229,7 +228,7 @@ FROM instruments_latency
 WHERE enabled = 1
 ORDER BY device_id, channel;
 
--- Vue: Instruments nécessitant une calibration
+-- Vue: Instruments nÃ©cessitant une calibration
 CREATE VIEW IF NOT EXISTS instruments_needing_calibration AS
 SELECT 
     id,
@@ -256,7 +255,7 @@ SELECT
 FROM instruments_latency;
 
 -- ============================================================================
--- DONNÉES D'EXEMPLE (optionnel, commenter en production)
+-- DONNÃ‰ES D'EXEMPLE (optionnel, commenter en production)
 -- FIXED: Use INSERT OR IGNORE to prevent conflicts on re-run
 -- ============================================================================
 
@@ -273,7 +272,7 @@ INSERT OR IGNORE INTO instruments_latency (
     'piano',
     15000,              -- 15ms latency
     -15000,             -- Avancer de 15ms
-    1.0,                -- Parfaitement calibré
+    1.0,                -- Parfaitement calibrÃ©
     'manual',
     1
 );
@@ -293,12 +292,12 @@ INSERT OR IGNORE INTO instruments_latency (
     18000,              -- 18ms latency
     -18000,             -- Avancer de 18ms
     0.9,                -- Bonne confiance
-    'sysex',            -- Récupéré via SysEx
+    'sysex',            -- RÃ©cupÃ©rÃ© via SysEx
     1,
     '[{"timestamp":"2025-10-16T10:00:00Z","latency":18000,"method":"sysex"}]'
 );
 
--- Exemple 3: Bass non calibré (compensation par défaut)
+-- Exemple 3: Bass non calibrÃ© (compensation par dÃ©faut)
 INSERT OR IGNORE INTO instruments_latency (
     id, device_id, channel, name, instrument_type,
     compensation_offset, calibration_confidence,
@@ -310,7 +309,7 @@ INSERT OR IGNORE INTO instruments_latency (
     'Synth Bass',
     'bass',
     0,                  -- Pas de compensation
-    0.0,                -- Non calibré
+    0.0,                -- Non calibrÃ©
     'manual',
     1
 );
@@ -326,13 +325,12 @@ VALUES (5, 'Add instruments_latency table (manual compensation only)');
 -- COMMIT TRANSACTION
 -- ============================================================================
 
-COMMIT;
 
 -- ============================================================================
--- VÉRIFICATION POST-MIGRATION
+-- VÃ‰RIFICATION POST-MIGRATION
 -- ============================================================================
 
--- Vérifier création de la table
+-- VÃ©rifier crÃ©ation de la table
 SELECT 
     CASE 
         WHEN NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='instruments_latency')
@@ -340,7 +338,7 @@ SELECT
         ELSE 'Table instruments_latency created successfully'
     END as table_check;
 
--- Vérifier indexes (devrait être 6)
+-- VÃ©rifier indexes (devrait Ãªtre 6)
 SELECT 
     CASE 
         WHEN (SELECT COUNT(*) FROM sqlite_master 
@@ -349,7 +347,7 @@ SELECT
         ELSE 'All indexes created successfully'
     END as index_check;
 
--- Vérifier triggers (devrait être 3)
+-- VÃ©rifier triggers (devrait Ãªtre 3)
 SELECT 
     CASE 
         WHEN (SELECT COUNT(*) FROM sqlite_master 
@@ -358,7 +356,7 @@ SELECT
         ELSE 'All triggers created successfully'
     END as trigger_check;
 
--- Vérifier views (devrait être 3)
+-- VÃ©rifier views (devrait Ãªtre 3)
 SELECT 
     CASE 
         WHEN (SELECT COUNT(*) FROM sqlite_master 
@@ -369,7 +367,7 @@ SELECT
         ELSE 'All views created successfully'
     END as view_check;
 
--- Afficher résumé de migration
+-- Afficher rÃ©sumÃ© de migration
 SELECT 
     'Migration 005 completed successfully' as status,
     (SELECT version FROM schema_version ORDER BY version DESC LIMIT 1) as current_version,
@@ -385,7 +383,7 @@ SELECT * FROM calibration_stats;
 -- INSTRUCTIONS DE ROLLBACK (pour documentation)
 -- ============================================================================
 
--- Pour annuler cette migration, exécuter:
+-- Pour annuler cette migration, exÃ©cuter:
 /*
 BEGIN TRANSACTION;
 
@@ -410,7 +408,7 @@ DROP INDEX IF EXISTS idx_instruments_device;
 -- Supprimer la table
 DROP TABLE IF EXISTS instruments_latency;
 
--- Supprimer l'entrée de version
+-- Supprimer l'entrÃ©e de version
 DELETE FROM schema_version WHERE version = 5;
 
 COMMIT;
@@ -420,13 +418,13 @@ COMMIT;
 -- NOTES D'UTILISATION
 -- ============================================================================
 
--- Créer un nouvel instrument (manual):
+-- CrÃ©er un nouvel instrument (manual):
 /*
 INSERT INTO instruments_latency (id, device_id, channel, name, compensation_offset, calibration_method)
 VALUES ('my_synth_dev1_0', 'device_1', 0, 'My Synth', -12000, 'manual');
 */
 
--- Mettre à jour la compensation:
+-- Mettre Ã  jour la compensation:
 /*
 UPDATE instruments_latency 
 SET compensation_offset = -15000, 
@@ -435,12 +433,12 @@ SET compensation_offset = -15000,
 WHERE id = 'my_synth_dev1_0';
 */
 
--- Récupérer tous les instruments actifs:
+-- RÃ©cupÃ©rer tous les instruments actifs:
 /*
 SELECT * FROM active_instruments;
 */
 
--- Trouver instruments nécessitant calibration:
+-- Trouver instruments nÃ©cessitant calibration:
 /*
 SELECT * FROM instruments_needing_calibration;
 */

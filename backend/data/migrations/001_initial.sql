@@ -19,6 +19,7 @@
 -- Date: 2025-10-16
 --
 -- Changes v4.1.4:
+--   - FIXED: Removed BEGIN/COMMIT (handled by C++ code)
 --   - FIXED: Migration check without RAISE(ABORT) in SELECT
 --   - FIXED: Added 'number' type to settings type CHECK
 --   - FIXED: JSON validation with CHECK constraints
@@ -26,18 +27,7 @@
 --   - FIXED: Optimized prune trigger with batch delete
 --   - FIXED: INSERT OR IGNORE for default data
 --
--- Changes v4.1.0:
---   - Initial schema for v4.1.0
---   - Simplified structure (removed network tables for v4.2.0)
---   - Optimized indexes
---
 -- ============================================================================
-
--- ============================================================================
--- BEGIN TRANSACTION
--- ============================================================================
-
-BEGIN TRANSACTION;
 
 -- ============================================================================
 -- TABLE: schema_version
@@ -204,12 +194,6 @@ INSERT OR IGNORE INTO presets (name, category, description, data) VALUES
 
 INSERT OR IGNORE INTO schema_version (version, description) 
 VALUES (1, 'Initial schema - Base tables and indexes');
-
--- ============================================================================
--- COMMIT TRANSACTION
--- ============================================================================
-
-COMMIT;
 
 -- ============================================================================
 -- POST-MIGRATION VERIFICATION
