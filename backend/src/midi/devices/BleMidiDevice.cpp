@@ -564,7 +564,7 @@ json BleMidiDevice::getSignalStrength() const {
 
 bool BleMidiDevice::connect() {
     if (connected_.load()) {
-        LLogger::warning("BleMidiDevice", "Already connected: " + name_);
+        Logger::warning("BleMidiDevice", "Already connected: " + name_);
         return true;
     }
     
