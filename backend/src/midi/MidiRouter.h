@@ -71,6 +71,51 @@ struct RouteStatistics {
     std::atomic<uint64_t> lastMessageTime{0};
     std::atomic<int64_t> avgCompensation{0};
     
+    // Default constructor
+    RouteStatistics() = default;
+    
+    // Copy constructor - needed for map operations
+    RouteStatistics(const RouteStatistics& other) 
+        : routeId(other.routeId)
+        , routeName(other.routeName)
+        , messagesRouted(other.messagesRouted.load())
+        , lastMessageTime(other.lastMessageTime.load())
+        , avgCompensation(other.avgCompensation.load())
+    {}
+    
+    // Copy assignment operator
+    RouteStatistics& operator=(const RouteStatistics& other) {
+        if (this != &other) {
+            routeId = other.routeId;
+            routeName = other.routeName;
+            messagesRouted.store(other.messagesRouted.load());
+            lastMessageTime.store(other.lastMessageTime.load());
+            avgCompensation.store(other.avgCompensation.load());
+        }
+        return *this;
+    }
+    
+    // Move constructor
+    RouteStatistics(RouteStatistics&& other) noexcept
+        : routeId(std::move(other.routeId))
+        , routeName(std::move(other.routeName))
+        , messagesRouted(other.messagesRouted.load())
+        , lastMessageTime(other.lastMessageTime.load())
+        , avgCompensation(other.avgCompensation.load())
+    {}
+    
+    // Move assignment operator
+    RouteStatistics& operator=(RouteStatistics&& other) noexcept {
+        if (this != &other) {
+            routeId = std::move(other.routeId);
+            routeName = std::move(other.routeName);
+            messagesRouted.store(other.messagesRouted.load());
+            lastMessageTime.store(other.lastMessageTime.load());
+            avgCompensation.store(other.avgCompensation.load());
+        }
+        return *this;
+    }
+    
     json toJson() const {
         return json{
             {"route_id", routeId},

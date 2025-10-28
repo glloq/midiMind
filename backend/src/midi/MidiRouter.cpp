@@ -29,8 +29,8 @@ namespace midiMind {
 MidiRouter::MidiRouter(LatencyCompensator* compensator,
                        std::shared_ptr<EventBus> eventBus)
     : compensator_(compensator)
-    , eventBus_(eventBus)
     , instrumentCompensationEnabled_(true)
+    , eventBus_(eventBus)
 {
     Logger::info("MidiRouter", "MidiRouter v4.2.0 created");
     
@@ -150,7 +150,7 @@ void MidiRouter::addRoute(std::shared_ptr<MidiRoute> route) {
     RouteStatistics stats;
     stats.routeId = route->id;
     stats.routeName = route->name;
-    routeStats_[route->id] = stats;
+    routeStats_[route->id] = std::move(stats);
     
     Logger::info("MidiRouter", "Route added: " + route->name + " (ID: " + route->id + ")");
     
@@ -164,7 +164,7 @@ void MidiRouter::addRoute(std::shared_ptr<MidiRoute> route) {
             eventBus_->publish(events::RouteAddedEvent(
                 sourceId.empty() ? "any" : sourceId,
                 destId,
-                TimeUtils::getCurrentTimestamp()
+                TimeUtils::systemNow()
             ));
             Logger::debug("MidiRouter", "Published RouteAddedEvent");
         } catch (const std::exception& e) {
@@ -228,7 +228,7 @@ bool MidiRouter::removeRoute(const std::string& id) {
             eventBus_->publish(events::RouteRemovedEvent(
                 sourceId.empty() ? "any" : sourceId,
                 destId,
-                TimeUtils::getCurrentTimestamp()
+                TimeUtils::systemNow()
             ));
             Logger::debug("MidiRouter", "Published RouteRemovedEvent");
         } catch (const std::exception& e) {
@@ -240,46 +240,46 @@ bool MidiRouter::removeRoute(const std::string& id) {
     return found;
 }
 
-bool MidiRouter::removeRoute(const std::string& sourceDeviceId, const std::string& destinationDeviceId) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+bool MidiRouter::removeRoute(const std::string& sourceDeviceId,
+                             const std::string& destinationDeviceId) {
+    std::string sourceId, destId;
+    bool found = false;
     
-    auto it = std::find_if(routes_.begin(), routes_.end(),
-                          [&sourceDeviceId, &destinationDeviceId](const auto& r) { 
-                              return r->sourceDeviceId == sourceDeviceId && 
-                                     r->destinationDeviceId == destinationDeviceId; 
-                          });
-    
-    if (it != routes_.end()) {
-        std::string routeName = (*it)->name;
-        std::string routeId = (*it)->id;
-        routes_.erase(it);
-        routeStats_.erase(routeId);
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
         
-        Logger::info("MidiRouter", "Route removed by devices: " + routeName);
+        auto it = std::find_if(routes_.begin(), routes_.end(),
+                              [&](const auto& r) {
+                                  return (sourceDeviceId.empty() || r->sourceDeviceId == sourceDeviceId) &&
+                                         r->destinationDeviceId == destinationDeviceId;
+                              });
         
-        // Publish event (unlock first)
-        lock.unlock();
-        
-        if (eventBus_) {
-            try {
-                eventBus_->publish(events::RouteRemovedEvent(
-                    sourceDeviceId.empty() ? "any" : sourceDeviceId,
-                    destinationDeviceId,
-                    TimeUtils::getCurrentTimestamp()
-                ));
-                Logger::debug("MidiRouter", "Published RouteRemovedEvent");
-            } catch (const std::exception& e) {
-                Logger::error("MidiRouter", 
-                    "Failed to publish RouteRemovedEvent: " + std::string(e.what()));
-            }
+        if (it != routes_.end()) {
+            sourceId = (*it)->sourceDeviceId;
+            destId = (*it)->destinationDeviceId;
+            Logger::info("MidiRouter", "Route removed: " + (*it)->name);
+            routes_.erase(it);
+            routeStats_.erase((*it)->id);
+            found = true;
         }
-        
-        return true;
     }
     
-    Logger::warning("MidiRouter", 
-                   "No route found from " + sourceDeviceId + " to " + destinationDeviceId);
-    return false;
+    // Publish event to EventBus (without holding lock)
+    if (found && eventBus_) {
+        try {
+            eventBus_->publish(events::RouteRemovedEvent(
+                sourceId.empty() ? "any" : sourceId,
+                destId,
+                TimeUtils::systemNow()
+            ));
+            Logger::debug("MidiRouter", "Published RouteRemovedEvent");
+        } catch (const std::exception& e) {
+            Logger::error("MidiRouter", 
+                "Failed to publish RouteRemovedEvent: " + std::string(e.what()));
+        }
+    }
+    
+    return found;
 }
 
 std::shared_ptr<MidiRoute> MidiRouter::getRoute(const std::string& id) const {
@@ -309,18 +309,17 @@ void MidiRouter::setRouteEnabled(const std::string& id, bool enabled) {
     if (it != routes_.end()) {
         (*it)->enabled = enabled;
         Logger::info("MidiRouter", 
-                    "Route " + (*it)->name + " " + 
-                    (enabled ? "enabled" : "disabled"));
+                    "Route " + id + " " + (enabled ? "enabled" : "disabled"));
     }
 }
 
-bool MidiRouter::enableRoute(const std::string& sourceDeviceId, 
+bool MidiRouter::enableRoute(const std::string& sourceDeviceId,
                              const std::string& destinationDeviceId) {
     std::unique_lock<std::shared_mutex> lock(mutex_);
     
     auto it = std::find_if(routes_.begin(), routes_.end(),
-                          [&sourceDeviceId, &destinationDeviceId](const auto& r) {
-                              return r->sourceDeviceId == sourceDeviceId &&
+                          [&](const auto& r) {
+                              return (sourceDeviceId.empty() || r->sourceDeviceId == sourceDeviceId) &&
                                      r->destinationDeviceId == destinationDeviceId;
                           });
     
@@ -338,8 +337,8 @@ bool MidiRouter::disableRoute(const std::string& sourceDeviceId,
     std::unique_lock<std::shared_mutex> lock(mutex_);
     
     auto it = std::find_if(routes_.begin(), routes_.end(),
-                          [&sourceDeviceId, &destinationDeviceId](const auto& r) {
-                              return r->sourceDeviceId == sourceDeviceId &&
+                          [&](const auto& r) {
+                              return (sourceDeviceId.empty() || r->sourceDeviceId == sourceDeviceId) &&
                                      r->destinationDeviceId == destinationDeviceId;
                           });
     
@@ -365,17 +364,15 @@ void MidiRouter::clearRoutes() {
 // ============================================================================
 
 void MidiRouter::registerDevice(std::shared_ptr<MidiDevice> device) {
-    std::unique_lock<std::shared_mutex> lock(mutex_);
-    
     if (!device) {
-        Logger::warning("MidiRouter", "Cannot register null device");
+        Logger::error("MidiRouter", "Cannot register null device");
         return;
     }
     
-    std::string deviceId = device->getId();
-    devices_[deviceId] = device;
+    std::unique_lock<std::shared_mutex> lock(mutex_);
     
-    Logger::info("MidiRouter", "Device registered: " + deviceId);
+    devices_[device->getId()] = device;
+    Logger::info("MidiRouter", "Device registered: " + device->getId());
 }
 
 void MidiRouter::unregisterDevice(const std::string& deviceId) {
@@ -411,7 +408,7 @@ void MidiRouter::setLatencyCompensator(LatencyCompensator* compensator) {
 void MidiRouter::setInstrumentCompensationEnabled(bool enabled) {
     instrumentCompensationEnabled_.store(enabled);
     Logger::info("MidiRouter", 
-                std::string("Instrument compensation ") + (enabled ? "enabled" : "disabled"));
+                "Instrument compensation " + std::string(enabled ? "enabled" : "disabled"));
 }
 
 bool MidiRouter::isInstrumentCompensationEnabled() const {
@@ -427,7 +424,7 @@ RouteStatistics MidiRouter::getRouteStatistics(const std::string& routeId) const
     
     auto it = routeStats_.find(routeId);
     if (it != routeStats_.end()) {
-        return it->second;
+        return RouteStatistics(it->second);
     }
     
     // Return empty stats if not found
