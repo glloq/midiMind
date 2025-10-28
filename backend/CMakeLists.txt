@@ -25,12 +25,17 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
 
 find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
+find_package(PkgConfig REQUIRED)
 
 find_library(ALSA_LIBRARY asound)
 find_path(ALSA_INCLUDE_DIR alsa/asoundlib.h)
 if(NOT ALSA_LIBRARY OR NOT ALSA_INCLUDE_DIR)
     message(FATAL_ERROR "ALSA required: sudo apt install libasound2-dev")
 endif()
+
+# GLib/GIO for Bluetooth D-Bus support
+pkg_check_modules(GLIB REQUIRED glib-2.0)
+pkg_check_modules(GIO REQUIRED gio-2.0)
 
 # ============================================================================
 # SOURCE FILES
@@ -80,12 +85,16 @@ target_include_directories(midimind PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${ALSA_INCLUDE_DIR}
     ${SQLite3_INCLUDE_DIRS}
+    ${GLIB_INCLUDE_DIRS}
+    ${GIO_INCLUDE_DIRS}
 )
 
 target_link_libraries(midimind PRIVATE
     Threads::Threads
     ${ALSA_LIBRARY}
     SQLite::SQLite3
+    ${GLIB_LIBRARIES}
+    ${GIO_LIBRARIES}
 )
 
 set_target_properties(midimind PROPERTIES
