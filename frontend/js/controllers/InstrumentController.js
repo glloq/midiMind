@@ -17,7 +17,7 @@ class InstrumentController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         this.model = models.instrument;
         this.view = views.instrument;
         this.backend = window.app?.services?.backend || window.backendService;

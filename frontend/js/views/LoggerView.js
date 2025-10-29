@@ -304,5 +304,5 @@ class LoggerView extends BaseView {
 
 // Rendre la classe disponible globalement
 if (typeof window !== 'undefined') {
-    window.LoggerView = LoggerView;
+    window.loggerView = LoggerView;
 }

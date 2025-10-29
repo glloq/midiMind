@@ -1,8 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/VisualizerController.js
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: 3.0.1 - CORRECTION DOCUMENTATION
+// Date: 2025-10-29
+// ============================================================================
+// CORRECTIONS v3.0.1:
+// ✅ Documentation corrigée - N'hérite PAS de BaseController
+// ✅ Architecture clarifiée - Standalone controller
 // ============================================================================
 // Description:
 //   Contrôleur du visualiseur temps réel MIDI.
@@ -20,11 +24,12 @@
 //   - Pause/Resume visualisation
 //
 // Architecture:
-//   VisualizerController extends BaseController
+//   VisualizerController - Standalone visualizer controller
 //   - Utilise VisualizerView pour rendu
 //   - Utilise PlaybackModel pour données MIDI
 //   - PerformanceMonitor pour optimisation
 //   - Object pooling pour notes actives
+//   - Ne hérite PAS de BaseController (contrôleur léger optimisé)
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -41,7 +46,7 @@ class VisualizerController {
     }
 
     /**
-     * Initialise le contrôleur
+     * Initialise le contrÃ´leur
      */
     init(visualizer, playbackController, routingModel) {
         this.visualizer = visualizer;
@@ -52,10 +57,10 @@ class VisualizerController {
     }
 
     /**
-     * Attache les événements
+     * Attache les Ã©vÃ©nements
      */
     attachEvents() {
-        // Événements de lecture
+        // Ã‰vÃ©nements de lecture
         this.eventBus.on('playback:started', () => {
             this.startUpdates();
         });
@@ -77,26 +82,26 @@ class VisualizerController {
             }
         });
 
-        // Événements MIDI
+        // Ã‰vÃ©nements MIDI
         this.eventBus.on('playback:event', (event) => {
             this.handleMidiEvent(event);
         });
 
-        // Événements de routing
+        // Ã‰vÃ©nements de routing
         this.eventBus.on('routing:changed', () => {
             if (this.visualizer) {
                 this.visualizer.invalidate();
             }
         });
 
-        // Événements de performance
+        // Ã‰vÃ©nements de performance
         this.eventBus.on('performance:quality:changed', (data) => {
             this.adjustQuality(data.quality);
         });
     }
 
     /**
-     * Démarre les mises à jour
+     * DÃ©marre les mises Ã  jour
      */
     startUpdates() {
         this.stopUpdates();
@@ -115,7 +120,7 @@ class VisualizerController {
     }
 
     /**
-     * Arrête les mises à jour
+     * ArrÃªte les mises Ã  jour
      */
     stopUpdates() {
         if (this.updateInterval) {
@@ -125,12 +130,12 @@ class VisualizerController {
     }
 
     /**
-     * Gère un événement MIDI
+     * GÃ¨re un Ã©vÃ©nement MIDI
      */
     handleMidiEvent(event) {
         if (!this.visualizer) return;
 
-        // Vérifier la validité avec le routing
+        // VÃ©rifier la validitÃ© avec le routing
         if (event.channel !== undefined) {
             const routing = this.routingModel.getRouting(event.channel);
 
@@ -146,11 +151,11 @@ class VisualizerController {
             }
         }
 
-        // L'événement sera visible dans le visualizer via la mise à jour normale
+        // L'Ã©vÃ©nement sera visible dans le visualizer via la mise Ã  jour normale
     }
 
     /**
-     * Ajuste la qualité selon les performances
+     * Ajuste la qualitÃ© selon les performances
      */
     adjustQuality(quality) {
         if (!this.visualizer) return;
@@ -175,14 +180,14 @@ class VisualizerController {
                 break;
         }
 
-        // Redémarrer avec le nouveau rate
+        // RedÃ©marrer avec le nouveau rate
         if (this.updateInterval) {
             this.startUpdates();
         }
     }
 
     /**
-     * Définit le temps d'aperçu
+     * DÃ©finit le temps d'aperÃ§u
      */
     setPreviewTime(ms) {
         if (this.visualizer) {
@@ -191,7 +196,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/désactive un canal
+     * Active/dÃ©sactive un canal
      */
     toggleChannel(channel, enabled) {
         if (this.visualizer) {
@@ -200,7 +205,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/désactive l'affichage de la vélocité
+     * Active/dÃ©sactive l'affichage de la vÃ©locitÃ©
      */
     setShowVelocity(show) {
         if (this.visualizer) {
@@ -209,7 +214,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/désactive l'affichage des CC
+     * Active/dÃ©sactive l'affichage des CC
      */
     setShowCC(show) {
         if (this.visualizer) {
@@ -218,7 +223,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/désactive l'affichage des noms de notes
+     * Active/dÃ©sactive l'affichage des noms de notes
      */
     setShowNoteNames(show) {
         if (this.visualizer) {
@@ -227,7 +232,7 @@ class VisualizerController {
     }
 
     /**
-     * Obtient un snapshot de l'état actuel
+     * Obtient un snapshot de l'Ã©tat actuel
      */
     getSnapshot() {
         if (!this.visualizer || !this.playbackController) {

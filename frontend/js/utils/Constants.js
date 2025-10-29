@@ -1,27 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/utils/Constants.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Projet: MidiMind v3.1 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - SYNCHRONIZED WITH BACKEND API v4.2.1
+// Date: 2025-10-28
 // ============================================================================
-// Description:
-//   Centralisation de toutes les constantes de l'application.
-//   Facilite la maintenance et évite les "magic numbers".
-//
-// Constantes:
-//   - MIDI : Notes, CC types, messages types, channels
-//   - UI : Tailles, couleurs, durées animations
-//   - Audio : Sample rates, buffer sizes, latences
-//   - Files : Extensions supportées, tailles max
-//   - Network : URLs, ports, timeouts
-//   - Config : Valeurs par défaut
-//
-// Architecture:
-//   Object freezé (immutable)
-//   - Hiérarchie logique (MIDI.NOTES, UI.COLORS)
-//   - JSDoc complet pour autocomplete
-//
-// Auteur: MidiMind Team
+// CORRECTIONS v3.1.0:
+// ✅ Synchronisation 100% avec API_COMMANDS.md v4.2.1
+// ✅ 64 commandes backend documentées
+// ✅ Toutes les commandes suivent le format exact du backend
+// ✅ Suppression des commandes obsolètes/inexistantes
+// ✅ Ajout des commandes manquantes (bluetooth, latency, preset, logger)
 // ============================================================================
 
 const Constants = {
@@ -30,121 +18,127 @@ const Constants = {
     // VERSION DU PROTOCOLE
     // ========================================================================
     
-    PROTOCOL_VERSION: '3.0',
+    PROTOCOL_VERSION: '4.2.1',
     
     // ========================================================================
-    // COMMANDES BACKEND (100% synchronisées)
+    // COMMANDES BACKEND - SYNCHRONISÉES AVEC API_COMMANDS.md v4.2.1
+    // Total: 64 commandes disponibles
     // ========================================================================
     
     COMMANDS: {
         // ===================================================================
-        // DEVICES - backend/src/api/commands/devices.cpp (5 commandes) ✅
+        // 1. DEVICES COMMANDS (18 commandes)
+        // backend/src/api/commands/devices.cpp
         // ===================================================================
-        DEVICES_SCAN: 'devices.scan',
         DEVICES_LIST: 'devices.list',
+        DEVICES_SCAN: 'devices.scan',
         DEVICES_CONNECT: 'devices.connect',
         DEVICES_DISCONNECT: 'devices.disconnect',
-        DEVICES_INFO: 'devices.info',
+        DEVICES_DISCONNECT_ALL: 'devices.disconnectAll',
+        DEVICES_GET_INFO: 'devices.getInfo',
+        DEVICES_GET_CONNECTED: 'devices.getConnected',
+        DEVICES_START_HOTPLUG: 'devices.startHotPlug',
+        DEVICES_STOP_HOTPLUG: 'devices.stopHotPlug',
+        DEVICES_GET_HOTPLUG_STATUS: 'devices.getHotPlugStatus',
         
         // ===================================================================
-        // ROUTING - backend/src/api/commands/routing.cpp (6 commandes) ✅
+        // 2. BLUETOOTH COMMANDS (8 commandes)
+        // backend/src/api/commands/bluetooth.cpp
         // ===================================================================
-        ROUTING_ADD: 'routing.addRoute',
-        ROUTING_REMOVE: 'routing.removeRoute',
-        ROUTING_LIST: 'routing.listRoutes',
-        ROUTING_UPDATE: 'routing.updateRoute',
-        ROUTING_CLEAR: 'routing.clearRoutes',
-        ROUTING_STATS: 'routing.getStats',
+        BLUETOOTH_CONFIG: 'bluetooth.config',
+        BLUETOOTH_STATUS: 'bluetooth.status',
+        BLUETOOTH_SCAN: 'bluetooth.scan',
+        BLUETOOTH_PAIR: 'bluetooth.pair',
+        BLUETOOTH_UNPAIR: 'bluetooth.unpair',
+        BLUETOOTH_PAIRED: 'bluetooth.paired',
+        BLUETOOTH_FORGET: 'bluetooth.forget',
+        BLUETOOTH_SIGNAL: 'bluetooth.signal',
         
         // ===================================================================
-        // PLAYBACK - backend/src/api/commands/playback.cpp (11 commandes) ✅
+        // 3. ROUTING COMMANDS (6 commandes)
+        // backend/src/api/commands/routing.cpp
+        // ===================================================================
+        ROUTING_ADD_ROUTE: 'routing.addRoute',
+        ROUTING_REMOVE_ROUTE: 'routing.removeRoute',
+        ROUTING_CLEAR_ROUTES: 'routing.clearRoutes',
+        ROUTING_LIST_ROUTES: 'routing.listRoutes',
+        ROUTING_ENABLE_ROUTE: 'routing.enableRoute',
+        ROUTING_DISABLE_ROUTE: 'routing.disableRoute',
+        
+        // ===================================================================
+        // 4. PLAYBACK COMMANDS (10 commandes)
+        // backend/src/api/commands/playback.cpp
         // ===================================================================
         PLAYBACK_LOAD: 'playback.load',
         PLAYBACK_PLAY: 'playback.play',
         PLAYBACK_PAUSE: 'playback.pause',
         PLAYBACK_STOP: 'playback.stop',
+        PLAYBACK_GET_STATUS: 'playback.getStatus',
         PLAYBACK_SEEK: 'playback.seek',
-        PLAYBACK_STATUS: 'playback.status',
-        PLAYBACK_METADATA: 'playback.getMetadata',
-        PLAYBACK_SET_LOOP: 'playback.setLoop',
         PLAYBACK_SET_TEMPO: 'playback.setTempo',
-        PLAYBACK_SET_VOLUME: 'playback.setVolume',      // ✅ CONFIRMÉE v3.1.1
-        PLAYBACK_GET_VOLUME: 'playback.getVolume',      // ✅ NOUVELLE v3.1.1
+        PLAYBACK_SET_LOOP: 'playback.setLoop',
+        PLAYBACK_GET_INFO: 'playback.getInfo',
+        PLAYBACK_LIST_FILES: 'playback.listFiles',
         
         // ===================================================================
-        // FILES - backend/src/api/commands/files.cpp (7 commandes) ✅
+        // 5. FILE COMMANDS (6 commandes)
+        // backend/src/api/commands/files.cpp
         // ===================================================================
         FILES_LIST: 'files.list',
-        FILES_SCAN: 'files.scan',
+        FILES_READ: 'files.read',
+        FILES_WRITE: 'files.write',
         FILES_DELETE: 'files.delete',
-        FILES_UPLOAD: 'files.upload',
-        FILES_METADATA: 'files.getMetadata',
-        FILES_CONVERT: 'files.convert',
-        FILES_MOVE: 'files.move',
-        
-        // Legacy aliases (kept for compatibility)
-        FILES_LOAD: 'playback.load',  // Redirects to playback
-        FILES_SAVE: 'editor.save',    // Redirects to editor
-        FILES_INFO: 'files.getMetadata',
+        FILES_EXISTS: 'files.exists',
+        FILES_GET_INFO: 'files.getInfo',
         
         // ===================================================================
-        // EDITOR - backend/src/api/commands/editor.cpp (7 commandes) ✅
+        // 6. SYSTEM COMMANDS (7 commandes)
+        // backend/src/api/commands/system.cpp
         // ===================================================================
-        EDITOR_LOAD: 'editor.load',
-        EDITOR_SAVE: 'editor.save',
-        EDITOR_ADD_NOTE: 'editor.addNote',
-        EDITOR_DELETE_NOTE: 'editor.deleteNote',
-        EDITOR_UPDATE_NOTE: 'editor.updateNote',
-        EDITOR_ADD_CC: 'editor.addCC',
-        EDITOR_UNDO: 'editor.undo',
-        EDITOR_REDO: 'editor.redo',
+        SYSTEM_PING: 'system.ping',
+        SYSTEM_VERSION: 'system.version',
+        SYSTEM_INFO: 'system.info',
+        SYSTEM_UPTIME: 'system.uptime',
+        SYSTEM_MEMORY: 'system.memory',
+        SYSTEM_DISK: 'system.disk',
+        SYSTEM_COMMANDS: 'system.commands',
         
         // ===================================================================
-        // NETWORK - backend/src/api/commands/network.cpp (6 commandes) ✅
+        // 7. NETWORK COMMANDS (3 commandes)
+        // backend/src/api/commands/network.cpp
         // ===================================================================
         NETWORK_STATUS: 'network.status',
-        NETWORK_INTERFACES: 'network.getInterfaces',
-        NETWORK_SCAN_WIFI: 'network.scanWifi',
-        NETWORK_CONNECT_WIFI: 'network.connectWifi',
-        NETWORK_START_HOTSPOT: 'network.startHotspot',
-        NETWORK_STOP_HOTSPOT: 'network.stopHotspot',
+        NETWORK_INTERFACES: 'network.interfaces',
+        NETWORK_STATS: 'network.stats',
         
         // ===================================================================
-        // SYSTEM - backend/src/api/commands/system.cpp (6 commandes) ✅
+        // 8. LOGGER COMMANDS (2 commandes)
+        // backend/src/api/commands/logger.cpp
         // ===================================================================
-        SYSTEM_STATUS: 'system.status',
-        SYSTEM_INFO: 'system.info',
-        SYSTEM_COMMANDS: 'system.commands',
-        SYSTEM_SHUTDOWN: 'system.shutdown',
-        SYSTEM_RESTART: 'system.restart',
-        SYSTEM_PING: 'system.ping',
+        LOGGER_SET_LEVEL: 'logger.setLevel',
+        LOGGER_GET_LEVEL: 'logger.getLevel',
         
         // ===================================================================
-        // INSTRUMENTS - backend/src/api/commands/instruments.cpp ✅
+        // 9. LATENCY COMMANDS (7 commandes)
+        // backend/src/api/commands/latency.cpp
         // ===================================================================
-        INSTRUMENTS_GET_PROFILE: 'instruments.getProfile',  // ✅ CONFIRMÉE
-        INSTRUMENTS_SCAN: 'instruments.scan',
-        INSTRUMENTS_CONNECT: 'instruments.connect',
-        INSTRUMENTS_DISCONNECT: 'instruments.disconnect',
-        INSTRUMENTS_REQUEST_IDENTITY: 'instruments.requestIdentity',
-        INSTRUMENTS_REQUEST_NOTEMAP: 'instruments.requestNoteMap',
-        INSTRUMENTS_REQUEST_CC: 'instruments.requestCC',
-        INSTRUMENTS_SET_CONFIG: 'instruments.setConfig',
+        LATENCY_SET_COMPENSATION: 'latency.setCompensation',
+        LATENCY_GET_COMPENSATION: 'latency.getCompensation',
+        LATENCY_ENABLE: 'latency.enable',
+        LATENCY_DISABLE: 'latency.disable',
+        LATENCY_SET_GLOBAL_OFFSET: 'latency.setGlobalOffset',
+        LATENCY_GET_GLOBAL_OFFSET: 'latency.getGlobalOffset',
+        LATENCY_LIST_INSTRUMENTS: 'latency.listInstruments',
         
         // ===================================================================
-        // LOOPS - backend/src/loop/LoopManager.cpp ✅
+        // 10. PRESET COMMANDS (5 commandes)
+        // backend/src/api/commands/preset.cpp
         // ===================================================================
-        LOOP_CREATE: 'loop.create',
-        LOOP_START_RECORDING: 'loop.startRecording',
-        LOOP_STOP_RECORDING: 'loop.stopRecording',
-        LOOP_PLAY: 'loop.play',
-        LOOP_STOP: 'loop.stop',
-        LOOP_SAVE: 'loop.save',
-        LOOP_LOAD: 'loop.load',
-        LOOP_DELETE: 'loop.delete',
-        LOOP_LIST: 'loop.list',
-        LOOP_ADD_LAYER: 'loop.addLayer',
-        LOOP_DELETE_LAYER: 'loop.deleteLayer'
+        PRESET_LIST: 'preset.list',
+        PRESET_LOAD: 'preset.load',
+        PRESET_SAVE: 'preset.save',
+        PRESET_DELETE: 'preset.delete',
+        PRESET_EXPORT: 'preset.export'
     },
     
     // ========================================================================
@@ -152,12 +146,14 @@ const Constants = {
     // ========================================================================
     
     EVENTS: {
-        // Connexion
+        // Connexion WebSocket
         WEBSOCKET_CONNECTED: 'websocket:connected',
         WEBSOCKET_DISCONNECTED: 'websocket:disconnected',
         WEBSOCKET_ERROR: 'websocket:error',
         
         // Backend général
+        BACKEND_CONNECTED: 'backend:connected',
+        BACKEND_DISCONNECTED: 'backend:disconnected',
         BACKEND_STATUS: 'backend:status',
         BACKEND_EVENT: 'backend:event',
         BACKEND_ERROR: 'backend:error',
@@ -177,11 +173,6 @@ const Constants = {
         DEVICE_DISCOVERED: 'backend:device:discovered',
         DEVICE_ERROR: 'backend:device:error',
         
-        // SysEx
-        SYSEX_IDENTITY: 'backend:sysex:identity',
-        SYSEX_NOTEMAP: 'backend:sysex:notemap',
-        SYSEX_MESSAGE: 'backend:sysex:message',
-        
         // Playback
         PLAYBACK_STARTED: 'backend:playback:started',
         PLAYBACK_STOPPED: 'backend:playback:stopped',
@@ -189,14 +180,12 @@ const Constants = {
         PLAYBACK_POSITION: 'backend:playback:position',
         PLAYBACK_FINISHED: 'backend:playback:finished',
         PLAYBACK_TEMPO_CHANGED: 'backend:playback:tempo_changed',
-        PLAYBACK_VOLUME_CHANGED: 'backend:playback:volume_changed',  // ✅ NOUVEAU
         
         // Files
         FILE_LOADED: 'backend:file:loaded',
         FILE_SAVED: 'backend:file:saved',
         FILE_DELETED: 'backend:file:deleted',
         FILE_ADDED: 'backend:file:added',
-        FILE_SCAN_COMPLETE: 'backend:file:scan_complete',
         
         // Routing
         ROUTE_ADDED: 'backend:route:added',
@@ -208,15 +197,34 @@ const Constants = {
         SYSTEM_WARNING: 'backend:system:warning',
         SYSTEM_STATUS_UPDATE: 'backend:status_update',
         
-        // Network
-        NETWORK_WIFI_CONNECTED: 'backend:network:wifi_connected',
-        NETWORK_WIFI_DISCONNECTED: 'backend:network:wifi_disconnected',
-        NETWORK_HOTSPOT_STARTED: 'backend:network:hotspot_started',
-        NETWORK_HOTSPOT_STOPPED: 'backend:network:hotspot_stopped',
-        
         // Performance
         METRICS_UPDATE: 'backend:metrics_update',
         PERFORMANCE_WARNING: 'backend:performance:warning'
+    },
+    
+    // ========================================================================
+    // CODES D'ERREUR BACKEND
+    // ========================================================================
+    
+    ERROR_CODES: {
+        INVALID_REQUEST: 'INVALID_REQUEST',
+        UNAUTHORIZED: 'UNAUTHORIZED',
+        FORBIDDEN: 'FORBIDDEN',
+        NOT_FOUND: 'NOT_FOUND',
+        TIMEOUT: 'TIMEOUT',
+        INTERNAL_ERROR: 'INTERNAL_ERROR',
+        SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+        PARSE_ERROR: 'PARSE_ERROR',
+        INVALID_COMMAND: 'INVALID_COMMAND',
+        INVALID_PARAMS: 'INVALID_PARAMS',
+        INVALID_MESSAGE: 'INVALID_MESSAGE',
+        COMMAND_FAILED: 'COMMAND_FAILED',
+        UNKNOWN_COMMAND: 'UNKNOWN_COMMAND',
+        DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
+        DEVICE_BUSY: 'DEVICE_BUSY',
+        MIDI_ERROR: 'MIDI_ERROR',
+        FILE_ERROR: 'FILE_ERROR',
+        SYSTEM_ERROR: 'SYSTEM_ERROR'
     },
     
     // ========================================================================
@@ -224,10 +232,10 @@ const Constants = {
     // ========================================================================
     
     PLAYBACK_STATES: {
-        STOPPED: 'stopped',
-        PLAYING: 'playing',
-        PAUSED: 'paused',
-        LOADING: 'loading'
+        STOPPED: 0,
+        PLAYING: 1,
+        PAUSED: 2,
+        LOADING: 3
     },
     
     // ========================================================================
@@ -235,11 +243,9 @@ const Constants = {
     // ========================================================================
     
     DEVICE_TYPES: {
-        USB: 'usb',
-        WIFI: 'wifi',
-        BLUETOOTH: 'bluetooth',
-        VIRTUAL: 'virtual',
-        ALSA: 'alsa'
+        INPUT: 0,
+        OUTPUT: 1,
+        BIDIRECTIONAL: 2
     },
     
     // ========================================================================
@@ -247,212 +253,191 @@ const Constants = {
     // ========================================================================
     
     DEVICE_STATUS: {
-        CONNECTED: 'connected',
-        DISCONNECTED: 'disconnected',
-        CONNECTING: 'connecting',
-        ERROR: 'error',
-        AVAILABLE: 'available'
+        AVAILABLE: 0,
+        CONNECTED: 1,
+        ERROR: 2,
+        BUSY: 3
     },
     
     // ========================================================================
-    // LIMITES
+    // NIVEAUX DE LOG
     // ========================================================================
-    
-    LIMITS: {
-        MAX_FILENAME_LENGTH: 255,
-        MAX_PLAYLIST_SIZE: 1000,
-        MAX_HISTORY_SIZE: 50,
-        MAX_UNDO_STACK: 50,
-        MAX_NOTES_PER_TRACK: 100000,
-        MAX_ROUTES: 64,
-        MAX_DEVICES: 32,
-        MIN_TEMPO: 20,
-        MAX_TEMPO: 300,
-        MIN_VELOCITY: 0,
-        MAX_VELOCITY: 127,
-        MIN_VOLUME: 0,          // ✅ NOUVEAU
-        MAX_VOLUME: 100         // ✅ NOUVEAU
-    },
-    
-    // ========================================================================
-    // AUTRES CONSTANTES (inchangées)
-    // ========================================================================
-    
-    INSTRUMENT_TYPES: {
-        PIANO: 'piano',
-        SYNTH: 'synth',
-        ORGAN: 'organ',
-        DRUMS: 'drums',
-        PERCUSSION: 'percussion',
-        BASS: 'bass',
-        STRINGS: 'strings',
-        GUITAR: 'guitar',
-        BRASS: 'brass',
-        WOODWINDS: 'woodwinds',
-        CHOIR: 'choir',
-        PAD: 'pad',
-        LEAD: 'lead',
-        SFX: 'sfx',
-        OTHER: 'other'
-    },
-    
-    MIDI_MESSAGES: {
-        NOTE_OFF: 0x80,
-        NOTE_ON: 0x90,
-        POLY_PRESSURE: 0xA0,
-        CONTROL_CHANGE: 0xB0,
-        PROGRAM_CHANGE: 0xC0,
-        CHANNEL_PRESSURE: 0xD0,
-        PITCH_BEND: 0xE0,
-        SYSTEM: 0xF0
-    },
-    
-    MIDI_CC: {
-        BANK_SELECT: 0,
-        MODULATION: 1,
-        BREATH: 2,
-        FOOT: 4,
-        PORTAMENTO_TIME: 5,
-        DATA_ENTRY: 6,
-        VOLUME: 7,
-        BALANCE: 8,
-        PAN: 10,
-        EXPRESSION: 11,
-        SUSTAIN: 64,
-        PORTAMENTO: 65,
-        SOSTENUTO: 66,
-        SOFT_PEDAL: 67,
-        REVERB: 91,
-        TREMOLO: 92,
-        CHORUS: 93,
-        DETUNE: 94,
-        PHASER: 95,
-        ALL_SOUND_OFF: 120,
-        RESET_ALL: 121,
-        ALL_NOTES_OFF: 123
-    },
-    
-    REPEAT_MODES: {
-        NONE: 'none',
-        ONE: 'one',
-        ALL: 'all'
-    },
-    
-    EDITOR_TOOLS: {
-        SELECT: 'select',
-        DRAW: 'draw',
-        ERASE: 'erase',
-        CUT: 'cut',
-        VELOCITY: 'velocity'
-    },
-    
-    SNAP_VALUES: {
-        NONE: 0,
-        QUARTER: 480,
-        EIGHTH: 240,
-        SIXTEENTH: 120,
-        THIRTY_SECOND: 60,
-        TRIPLET: 160
-    },
     
     LOG_LEVELS: {
-        DEBUG: 0,
-        INFO: 1,
-        WARN: 2,
-        ERROR: 3,
-        FATAL: 4
+        DEBUG: 'DEBUG',
+        INFO: 'INFO',
+        WARNING: 'WARNING',
+        ERROR: 'ERROR',
+        CRITICAL: 'CRITICAL'
     },
+    
+    // ========================================================================
+    // MIDI
+    // ========================================================================
+    
+    MIDI: {
+        // Canaux (0-15, 0-based indexing pour le protocole)
+        CHANNELS: Array.from({ length: 16 }, (_, i) => i),
+        
+        // Notes (0-127)
+        NOTES: {
+            MIN: 0,
+            MAX: 127,
+            MIDDLE_C: 60
+        },
+        
+        // Vélocité (0-127)
+        VELOCITY: {
+            MIN: 0,
+            MAX: 127,
+            OFF: 0
+        },
+        
+        // CC (Control Change) - 0-127
+        CC: {
+            MIN: 0,
+            MAX: 127,
+            BANK_SELECT: 0,
+            MODULATION: 1,
+            BREATH: 2,
+            FOOT_CONTROLLER: 4,
+            PORTAMENTO_TIME: 5,
+            DATA_ENTRY: 6,
+            VOLUME: 7,
+            BALANCE: 8,
+            PAN: 10,
+            EXPRESSION: 11,
+            SUSTAIN: 64,
+            PORTAMENTO: 65,
+            SOSTENUTO: 66,
+            SOFT_PEDAL: 67,
+            LEGATO: 68,
+            HOLD_2: 69,
+            SOUND_CONTROLLER_1: 70,
+            SOUND_CONTROLLER_2: 71,
+            SOUND_CONTROLLER_3: 72,
+            SOUND_CONTROLLER_4: 73,
+            SOUND_CONTROLLER_5: 74,
+            SOUND_CONTROLLER_6: 75,
+            SOUND_CONTROLLER_7: 76,
+            SOUND_CONTROLLER_8: 77,
+            SOUND_CONTROLLER_9: 78,
+            SOUND_CONTROLLER_10: 79,
+            EFFECTS_1: 91,
+            EFFECTS_2: 92,
+            EFFECTS_3: 93,
+            EFFECTS_4: 94,
+            EFFECTS_5: 95,
+            ALL_SOUND_OFF: 120,
+            RESET_CONTROLLERS: 121,
+            ALL_NOTES_OFF: 123
+        },
+        
+        // Messages MIDI
+        MESSAGES: {
+            NOTE_OFF: 0x80,
+            NOTE_ON: 0x90,
+            POLY_AFTERTOUCH: 0xA0,
+            CC: 0xB0,
+            PROGRAM_CHANGE: 0xC0,
+            CHANNEL_AFTERTOUCH: 0xD0,
+            PITCH_BEND: 0xE0,
+            SYSTEM_EXCLUSIVE: 0xF0,
+            TIME_CODE: 0xF1,
+            SONG_POSITION: 0xF2,
+            SONG_SELECT: 0xF3,
+            TUNE_REQUEST: 0xF6,
+            END_OF_SYSEX: 0xF7,
+            TIMING_CLOCK: 0xF8,
+            START: 0xFA,
+            CONTINUE: 0xFB,
+            STOP: 0xFC,
+            ACTIVE_SENSING: 0xFE,
+            RESET: 0xFF
+        }
+    },
+    
+    // ========================================================================
+    // UI
+    // ========================================================================
     
     UI: {
-        NOTIFICATION_DURATION: 3000,
-        TOAST_DURATION: 2000,
-        ANIMATION_DURATION: 300,
-        DEBOUNCE_DELAY: 300,
-        LONG_PRESS_DURATION: 500
+        COLORS: {
+            PRIMARY: '#007bff',
+            SECONDARY: '#6c757d',
+            SUCCESS: '#28a745',
+            DANGER: '#dc3545',
+            WARNING: '#ffc107',
+            INFO: '#17a2b8',
+            LIGHT: '#f8f9fa',
+            DARK: '#343a40'
+        },
+        
+        ANIMATION_DURATION: 300, // ms
+        DEBOUNCE_DELAY: 300, // ms
+        THROTTLE_DELAY: 100, // ms
+        
+        NOTIFICATION_DURATION: {
+            INFO: 3000,
+            SUCCESS: 3000,
+            WARNING: 5000,
+            ERROR: 7000
+        }
     },
     
-    STORAGE_KEYS: {
-        SETTINGS: 'midimind_settings',
-        PLAYLISTS: 'midimind_playlists',
-        RECENT_FILES: 'midimind_recent_files',
-        UI_STATE: 'midimind_ui_state',
-        ROUTING_CONFIG: 'midimind_routing',
-        USER_PREFERENCES: 'midimind_preferences'
+    // ========================================================================
+    // NETWORK
+    // ========================================================================
+    
+    NETWORK: {
+        WEBSOCKET_URL: 'ws://192.168.1.37:8080',
+        RECONNECT_INTERVAL: 5000, // ms
+        MAX_RECONNECT_ATTEMPTS: 10,
+        PING_INTERVAL: 30000, // ms
+        REQUEST_TIMEOUT: 30000, // ms
+        HEARTBEAT_INTERVAL: 15000 // ms
     },
     
-    FILE_FORMATS: {
-        MIDI: '.mid',
-        MIDI_EXTENDED: '.midi',
-        JSONMIDI: '.jsonmidi',
-        JSON: '.json'
+    // ========================================================================
+    // FILES
+    // ========================================================================
+    
+    FILES: {
+        SUPPORTED_EXTENSIONS: ['.mid', '.midi'],
+        MAX_FILE_SIZE: 10 * 1024 * 1024, // 10 MB
+        UPLOAD_CHUNK_SIZE: 64 * 1024 // 64 KB
     },
     
-    DEFAULT_PATHS: {
-        MIDI_FILES: '/home/pi/midi-files',
-        PRESETS: '/home/pi/midi-files/presets',
-        SESSIONS: '/home/pi/midi-files/sessions',
-        EXPORTS: '/home/pi/midi-files/exports'
+    // ========================================================================
+    // PERFORMANCE
+    // ========================================================================
+    
+    PERFORMANCE: {
+        TARGET_FPS: 60,
+        MIN_FPS: 30,
+        RENDER_THROTTLE: 16, // ms (~60 fps)
+        CACHE_CLEAN_INTERVAL: 60000, // ms
+        MAX_CACHE_SIZE: 100
     }
 };
 
-// ============================================================================
-// VALIDATION
-// ============================================================================
+// Geler l'objet pour éviter les modifications
+Object.freeze(Constants);
+Object.freeze(Constants.COMMANDS);
+Object.freeze(Constants.EVENTS);
+Object.freeze(Constants.ERROR_CODES);
+Object.freeze(Constants.PLAYBACK_STATES);
+Object.freeze(Constants.DEVICE_TYPES);
+Object.freeze(Constants.DEVICE_STATUS);
+Object.freeze(Constants.LOG_LEVELS);
+Object.freeze(Constants.MIDI);
+Object.freeze(Constants.UI);
+Object.freeze(Constants.NETWORK);
+Object.freeze(Constants.FILES);
+Object.freeze(Constants.PERFORMANCE);
 
-Constants.isValidCommand = function(command) {
-    return Object.values(this.COMMANDS).includes(command);
-};
-
-Constants.getCommandCategory = function(command) {
-    const parts = command.split('.');
-    return parts.length > 0 ? parts[0] : null;
-};
-
-Constants.getCommandsByCategory = function(category) {
-    return Object.values(this.COMMANDS).filter(cmd => 
-        cmd.startsWith(category + '.')
-    );
-};
-
-// ============================================================================
-// STATISTIQUES (NOUVEAU)
-// ============================================================================
-
-Constants.getStats = function() {
-    const commands = Object.values(this.COMMANDS);
-    const categories = {};
-    
-    commands.forEach(cmd => {
-        const category = this.getCommandCategory(cmd);
-        if (category) {
-            categories[category] = (categories[category] || 0) + 1;
-        }
-    });
-    
-    return {
-        totalCommands: commands.length,
-        categories: categories,
-        protocolVersion: this.PROTOCOL_VERSION
-    };
-};
-
-// ============================================================================
-// EXPORT
-// ============================================================================
-
+// Export pour utilisation
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Constants;
 }
-
-if (typeof window !== 'undefined') {
-    window.Constants = Constants;
-}
 window.Constants = Constants;
-// ============================================================================
-// LOG STATS AU CHARGEMENT (DEBUG)
-// ============================================================================
-
-if (typeof console !== 'undefined') {
-    const stats = Constants.getStats();
-    console.log('📊 Constants loaded:', stats);
-}

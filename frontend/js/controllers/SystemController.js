@@ -16,7 +16,7 @@ class SystemController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         this.model = models.system || models.state;
         this.view = views.system;
         this.backend = window.app?.services?.backend || window.backendService;

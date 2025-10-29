@@ -1,10 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v3.6.0 - FIXED HEARTBEAT PROTOCOL COMPATIBILITY
-// Date: 2025-10-24
+// Version: v3.7.0 - SYNCHRONIZED WITH API_COMMANDS.md v4.2.1
+// Date: 2025-10-28
 // ============================================================================
-// CORRECTIONS v3.6.0:
-// ✅ FIX CRITIQUE: Utilise sendCommand('system.status') pour heartbeat
+// CORRECTIONS v3.7.0:
+// ✅ Format de requête conforme à API_COMMANDS.md (id, type, timestamp, version, command, params, timeout)
+// ✅ Format de réponse conforme à API_COMMANDS.md (request_id, success, latency, data, error_message, error_code)
+// ✅ Support des deux formats d'ID pour compatibilité (request_id / id)
+// ✅ Timeout configurable par commande (défaut: 5000ms)
+// ✅ IDs de requête robustes (req_{timestamp}_{counter})
+// ✅ Gestion d'erreurs améliorée avec error_code et latency
+//
+// HÉRITÉES DE v3.6.0:
+// ✅ Utilise sendCommand('system.status') pour heartbeat
 // ✅ Compatible avec le protocole backend réel (request/response)
 // ✅ Détection robuste de connexion morte
 // ✅ Watchdog sur les réponses (pas seulement les pongs)
@@ -33,6 +41,7 @@ class BackendService {
             heartbeatInterval: 20000,      // Vérifier toutes les 20s
             heartbeatTimeout: 45000,       // Considérer mort si pas de réponse depuis 45s
             maxReconnectAttempts: 5
+            defaultCommandTimeout: 5000    // ✅ NOUVEAU: Timeout par défaut pour les commandes
         };
         
         // Gestion de la reconnexion
@@ -54,7 +63,7 @@ class BackendService {
         this.requestId = 0;
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized (v3.6.0)');
+        this.logger.info('BackendService', 'Service initialized (v3.7.0 - API v4.2.1)');
     }
     
     /**
@@ -375,16 +384,28 @@ class BackendService {
             // ✅ Toute réponse/event = activité backend
             this.lastActivityTime = Date.now();
             
-            // Gérer les réponses aux requêtes
-            if (data.type === 'response' && data.id) {
-                const pending = this.pendingRequests.get(data.id);
+            // ✅ Support des deux formats d'ID pour compatibilité
+            const requestId = data.request_id || data.id;
+            
+            // Gérer les réponses aux requêtes (format API_COMMANDS.md)
+            if (data.type === 'response' && requestId) {
+                const pending = this.pendingRequests.get(requestId);
                 if (pending) {
-                    this.pendingRequests.delete(data.id);
+                    this.pendingRequests.delete(requestId);
                     
-                    if (data.success) {
-                        pending.resolve(data.data);
+                    if (data.success !== false) {
+                        // ✅ Format API_COMMANDS.md: { success, latency, data }
+                        pending.resolve({
+                            success: data.success !== false,
+                            latency: data.latency,
+                            data: data.data
+                        });
                     } else {
-                        pending.reject(new Error(data.error?.message || 'Unknown error'));
+                        // ✅ Format API_COMMANDS.md: { success, latency, error_message, error_code }
+                        const error = new Error(data.error_message || data.error?.message || 'Unknown error');
+                        error.code = data.error_code || data.error?.code;
+                        error.latency = data.latency;
+                        pending.reject(error);
                     }
                 }
             }
@@ -435,42 +456,48 @@ class BackendService {
     /**
      * Envoie une commande au backend et attend la réponse (format protocole backend)
      */
-    async sendCommand(command, params = {}) {
+    async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
             if (!this.isConnected()) {
                 reject(new Error('Not connected to backend'));
                 return;
             }
             
+            // ✅ Timeout configurable (défaut: 5000ms)
+            const timeoutMs = timeout || this.config.defaultCommandTimeout || 5000;
+            
+            // ✅ ID de requête robuste (req_{timestamp}_{counter})
             const requestId = 'req_' + Date.now() + '_' + (++this.requestId);
             
-            // Timeout après 30 secondes
-            const timeout = setTimeout(() => {
+            // Timer de timeout
+            const timeoutTimer = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
-                    reject(new Error('Command timeout'));
+                    reject(new Error(`Command timeout after ${timeoutMs}ms`));
                 }
-            }, 30000);
+            }, timeoutMs);
             
             // Enregistrer avec cleanup du timeout
             this.pendingRequests.set(requestId, {
                 resolve: (data) => {
-                    clearTimeout(timeout);
+                    clearTimeout(timeoutTimer);
                     resolve(data);
                 },
                 reject: (error) => {
-                    clearTimeout(timeout);
+                    clearTimeout(timeoutTimer);
                     reject(error);
                 }
             });
             
-            // Envoyer au format backend
+            // ✅ Envoyer au format API_COMMANDS.md v4.2.1
             this.send({
                 id: requestId,
                 type: 'request',
                 timestamp: new Date().toISOString(),
+                version: '1.0',                    // ✅ NOUVEAU
                 command: command,
-                params: params
+                params: params,
+                timeout: timeoutMs                 // ✅ NOUVEAU
             });
         });
     }

@@ -15,7 +15,7 @@ class FileController extends BaseController {
         
         // Services - Initialize BEFORE everything else
         this.backend = window.app?.services?.backend || null;
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         
         // État
         this.state = {

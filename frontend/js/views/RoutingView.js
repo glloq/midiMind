@@ -28,7 +28,7 @@ class RoutingView extends BaseView {
         this.presets = [];
         
         // Logger initialization
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         
         // Mark as fully initialized
         this._fullyInitialized = true;

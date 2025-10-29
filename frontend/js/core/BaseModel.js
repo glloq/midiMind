@@ -5,7 +5,7 @@
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // CORRECTIONS v3.0.3:
-// ✅ Fixed logger initialization: use window.logger (instance) instead of window.Logger (class)
+// ✅ Fixed logger initialization: use window.logger (instance) instead of window.logger (class)
 // ✅ This fixes "TypeError: this.logger.debug is not a function" error
 // ============================================================================
 // CORRECTIONS v3.0.2:

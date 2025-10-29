@@ -1,11 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/views/HomeView.js
-// Version: v3.0.1 - CORRECTED LOGGER AND LIVEVISUALIZER
-// Date: 2025-10-24
+// Version: v3.1.0 - CORRECTED INHERITANCE AND EVENTBUS
+// Date: 2025-10-29
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
+// CORRECTIONS v3.1.0:
+// ✅ CRITIQUE: Héritage de BaseView pour cohérence avec architecture MVC
+// ✅ CRITIQUE: Ajout eventBus comme paramètre du constructeur
+// ✅ CRITIQUE: Appel super(containerId, eventBus) pour initialisation correcte
+// ✅ Suppression méthodes emit() et on() redondantes (héritées de BaseView)
+// ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ Fixed logger: use window.logger (instance) instead of window.Logger (class)
+// ✅ Fixed logger: use window.logger (instance) instead of window.logger (class)
 // ✅ Fixed MidiVisualizer: added check for class existence to prevent ReferenceError
 // ✅ Graceful degradation: visualizer features disabled if MidiVisualizer not available
 // ============================================================================
@@ -24,24 +30,16 @@
 // ============================================================================
 
 
-class HomeView {
-    constructor(container) {
-        // Resolve container properly
-        if (typeof container === 'string') {
-            this.container = document.getElementById(container) || document.querySelector(container);
-        } else if (container instanceof HTMLElement) {
-            this.container = container;
-        } else {
-            this.container = null;
-        }
+class HomeView extends BaseView {
+    constructor(containerId, eventBus) {
+        // ✅ Appel super() avec containerId et eventBus pour initialisation correcte
+        super(containerId, eventBus);
         
-        // Log if container not found
-        if (!this.container) {
-            console.error('[HomeView] Container not found:', container);
-        }
-        
+        // Propriétés spécifiques à HomeView
         this.visualizer = null;
         this.currentFile = null;
+        
+        // Logger déjà disponible via BaseView
         this.logger = window.logger || console;
     }
 
@@ -1105,24 +1103,7 @@ buildFileInfo(file) {
     // ========================================================================
     // 🔧 MÉTHODES UTILITAIRES
     // ========================================================================
-    
-    /**
-     * Émet un événement via EventBus
-     */
-    emit(eventName, data) {
-        if (this.eventBus && typeof this.eventBus.emit === 'function') {
-            this.eventBus.emit(eventName, data);
-        }
-    }
-    
-    /**
-     * Écoute un événement via EventBus
-     */
-    on(eventName, handler) {
-        if (this.eventBus && typeof this.eventBus.on === 'function') {
-            this.eventBus.on(eventName, handler);
-        }
-    }
+    // Note: Les méthodes emit() et on() sont héritées de BaseView
     
     /**
      * Liste playlists

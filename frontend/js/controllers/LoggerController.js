@@ -139,9 +139,9 @@ class LoggerController extends BaseController {
             this.logDebug('info', `Frontend log level synchronized to ${level}`);
         }
         
-        // Si window.Logger global existe
-        if (typeof window !== 'undefined' && window.Logger && typeof window.Logger.setLevel === 'function') {
-            window.Logger.setLevel(level);
+        // Si window.logger global existe
+        if (typeof window !== 'undefined' && window.logger && typeof window.logger.setLevel === 'function') {
+            window.logger.setLevel(level);
             this.logDebug('info', `Global Logger level synchronized to ${level}`);
         }
         
@@ -286,5 +286,5 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-    window.LoggerController = LoggerController;
+    window.loggerController = LoggerController;
 }

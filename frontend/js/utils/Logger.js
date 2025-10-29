@@ -161,10 +161,10 @@ class Logger {
 // EXPOSITION GLOBALE - CRITIQUE
 // ============================================================================
 if (typeof window !== 'undefined') {
-    window.Logger = Logger;
+    window.logger = Logger;
     console.log('✓ Logger class exposed globally');
 }
-window.Logger = Logger;
+window.logger = Logger;
 // ============================================================================
 // FIN DU FICHIER Logger.js v3.0.1
 // ============================================================================

@@ -14,7 +14,7 @@ class SystemView extends BaseView {
         super('system-page', eventBus);
         
         // Initialize logger first
-        this.logger = window.Logger || console;
+        this.logger = window.logger || console;
         
         // État de la vue
         this.calibrationInProgress = false;

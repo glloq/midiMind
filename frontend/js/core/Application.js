@@ -1,8 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.8 - ENRICHI AVEC NOUVELLES FONCTIONNALITÉS API
-// Date: 2025-10-28
+// Version: v3.9 - CORRECTION MODÈLES MANQUANTS + DOCUMENTATION
+// Date: 2025-10-29
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// CORRECTIONS v3.9:
+// ✅ StateModel ajouté (requis par NavigationController)
+// ✅ LoopModel ajouté (requis par LoopController)
+// ✅ LoopController ajouté et initialisé avec dépendances
+// ✅ Cohérence totale des initialisations de modèles et contrôleurs
 // ============================================================================
 // NOUVELLES FONCTIONNALITÉS v3.8:
 // ✅ BluetoothController - Gestion périphériques Bluetooth
@@ -17,7 +23,7 @@
 
 class Application {
     constructor() {
-        // État de l'application
+        // Ã‰tat de l'application
         this.state = {
             initialized: false,
             ready: false,
@@ -41,7 +47,7 @@ class Application {
             file: null
         };
         
-        // Modèles
+        // ModÃ¨les
         this.models = {
             file: null,
             playlist: null,
@@ -61,7 +67,7 @@ class Application {
             system: null,
             routing: null,
             editor: null,
-            // ✅ NOUVELLES VUES v3.8
+            // âœ… NOUVELLES VUES v3.8
             bluetooth: null,
             latency: null,
             preset: null,
@@ -69,7 +75,7 @@ class Application {
             logger: null
         };
         
-        // Contrôleurs
+        // ContrÃ´leurs
         this.controllers = {
             navigation: null,
             file: null,
@@ -82,7 +88,7 @@ class Application {
             routing: null,
             editor: null,
             home: null,
-            // ✅ NOUVEAUX CONTRÔLEURS v3.8
+            // âœ… NOUVEAUX CONTRÃ”LEURS v3.8
             bluetooth: null,
             latency: null,
             preset: null,
@@ -103,7 +109,7 @@ class Application {
                 showNotification: true,
                 allowLocalOperations: true
             },
-            // ✅ NOUVELLES CONFIGURATIONS v3.8
+            // âœ… NOUVELLES CONFIGURATIONS v3.8
             features: {
                 bluetooth: true,
                 latency: true,
@@ -113,7 +119,7 @@ class Application {
             }
         };
         
-        // Référence globale
+        // RÃ©fÃ©rence globale
         window.app = this;
     }
     
@@ -122,47 +128,47 @@ class Application {
     // ========================================================================
     
     /**
-     * Initialise l'application complète
+     * Initialise l'application complÃ¨te
      */
     async init() {
-        console.log('🚀 Initializing midiMind v3.8...');
+        console.log('ðŸš€ Initializing midiMind v3.8...');
         
         try {
-            // Étape 1: Fondations
+            // Ã‰tape 1: Fondations
             await this.initFoundations();
             
-            // Étape 2: Services
+            // Ã‰tape 2: Services
             await this.initServices();
             
-            // Étape 3: Modèles
+            // Ã‰tape 3: ModÃ¨les
             await this.initModels();
             
-            // Étape 4: Vues
+            // Ã‰tape 4: Vues
             await this.initViews();
             
-            // Étape 5: Contrôleurs
+            // Ã‰tape 5: ContrÃ´leurs
             await this.initControllers();
             
-            // Étape 6: Navigation & Router
+            // Ã‰tape 6: Navigation & Router
             await this.initNavigation();
             
-            // Étape 7: Connexion backend (non-bloquant)
+            // Ã‰tape 7: Connexion backend (non-bloquant)
             await this.connectBackend();
             
-            // Étape 8: Finalisation
+            // Ã‰tape 8: Finalisation
             await this.finalize();
             
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('✅ midiMind v3.8 initialized successfully');
-            this.logger.info('Application', '✅ Application ready with new API features');
+            console.log('âœ… midiMind v3.8 initialized successfully');
+            this.logger.info('Application', 'âœ… Application ready with new API features');
             
-            // Émettre événement ready
+            // Ã‰mettre Ã©vÃ©nement ready
             this.eventBus.emit('app:ready');
             
         } catch (error) {
-            console.error('❌ Failed to initialize application:', error);
+            console.error('âŒ Failed to initialize application:', error);
             if (this.logger && this.logger.error) {
                 this.logger.error('Application', 'Initialization failed:', error);
             }
@@ -174,14 +180,14 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('📦 Initializing foundations...');
+        console.log('ðŸ“¦ Initializing foundations...');
         
-        // EventBus (déjà instancié globalement ou créer nouveau)
+        // EventBus (dÃ©jÃ  instanciÃ© globalement ou crÃ©er nouveau)
         this.eventBus = window.eventBus || new EventBus();
         window.eventBus = this.eventBus;
         
-        // Logger - CORRIGÉ : créer une nouvelle instance
-        if (window.Logger && typeof window.Logger === 'function') {
+        // Logger - CORRIGÃ‰ : crÃ©er une nouvelle instance
+        if (window.logger && typeof window.logger === 'function') {
             this.logger = window.logger || new Logger({
                 level: this.config.logLevel,
                 eventBus: this.eventBus
@@ -213,14 +219,14 @@ class Application {
             window.notifications = this.notifications;
         }
         
-        this.logger.info('Application', '✔ Foundations initialized');
+        this.logger.info('Application', 'âœ” Foundations initialized');
     }
     
     /**
      * Initialise les services
      */
     async initServices() {
-        console.log('🔧 Initializing services...');
+        console.log('ðŸ”§ Initializing services...');
         
         // BackendService
         if (window.BackendService) {
@@ -241,7 +247,7 @@ class Application {
             this.services.midi = new MidiService(this.eventBus, this.logger);
         }
         
-        // FileService - CORRIGÉ : passer les paramètres requis
+        // FileService - CORRIGÃ‰ : passer les paramÃ¨tres requis
         if (window.FileService) {
             this.services.file = new FileService(
                 this.services.backend,
@@ -250,14 +256,14 @@ class Application {
             );
         }
         
-        this.logger.info('Application', '✔ Services initialized');
+        this.logger.info('Application', 'âœ” Services initialized');
     }
     
     /**
-     * Initialise les modèles de données
+     * Initialise les modÃ¨les de donnÃ©es
      */
     async initModels() {
-        console.log('📊 Initializing models...');
+        console.log('ðŸ“Š Initializing models...');
         
         // FileModel
         if (window.FileModel) {
@@ -322,14 +328,30 @@ class Application {
             );
         }
         
-        this.logger.info('Application', '✔ Models initialized');
+        
+        // StateModel - ✅ NOUVEAU v3.0.3 (requis par NavigationController)
+        if (window.StateModel) {
+            this.models.state = new StateModel(this.eventBus);
+            console.log('✅ StateModel initialized');
+        }
+        
+        // LoopModel - ✅ NOUVEAU v3.0.3 (requis par LoopController)
+        if (window.LoopModel) {
+            this.models.loop = new LoopModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
+            console.log('✅ LoopModel initialized');
+        }
+        this.logger.info('Application', 'âœ” Models initialized');
     }
     
     /**
      * Initialise les vues
      */
     async initViews() {
-        console.log('🎨 Initializing views...');
+        console.log('ðŸŽ¨ Initializing views...');
         
         // HomeView
         if (window.HomeView) {
@@ -337,21 +359,21 @@ class Application {
             if (typeof this.views.home.init === 'function') {
                 this.views.home.init();
             }
-            console.log('✔ HomeView initialized');
+            console.log('âœ” HomeView initialized');
         }
         
         // EditorView
         const editorElement = document.getElementById('editor');
         if (editorElement && window.EditorView) {
             this.views.editor = new EditorView(editorElement, this.eventBus, this.logger);
-            console.log('✔ EditorView initialized');
+            console.log('âœ” EditorView initialized');
         }
         
         // RoutingView
         const routingElement = document.getElementById('routing');
         if (routingElement && window.RoutingView) {
             this.views.routing = new RoutingView(routingElement, this.eventBus, this.logger);
-            console.log('✔ RoutingView initialized');
+            console.log('âœ” RoutingView initialized');
         }
         
         // KeyboardView
@@ -361,7 +383,7 @@ class Application {
             if (typeof this.views.keyboard.init === 'function') {
                 this.views.keyboard.init();
             }
-            console.log('✔ KeyboardView initialized');
+            console.log('âœ” KeyboardView initialized');
         }
         
         // InstrumentView
@@ -371,7 +393,7 @@ class Application {
             if (typeof this.views.instrument.init === 'function') {
                 this.views.instrument.init();
             }
-            console.log('✔ InstrumentView initialized');
+            console.log('âœ” InstrumentView initialized');
         }
         
         // SystemView
@@ -381,24 +403,24 @@ class Application {
             if (typeof this.views.system.init === 'function') {
                 this.views.system.init();
             }
-            console.log('✔ SystemView initialized');
+            console.log('âœ” SystemView initialized');
         }
         
         // FileView
         const fileElement = document.querySelector('.files-list');
         if (fileElement && window.FileView) {
             this.views.file = new FileView(fileElement, this.eventBus);
-            console.log('✔ FileView initialized');
+            console.log('âœ” FileView initialized');
         }
         
-        // ✅ NOUVELLES VUES v3.8
+        // âœ… NOUVELLES VUES v3.8
         this.initApiViews();
         
-        this.logger.info('Application', '✔ Views initialized');
+        this.logger.info('Application', 'âœ” Views initialized');
     }
     
     /**
-     * ✅ NOUVELLE MÉTHODE v3.8: Initialise les vues API
+     * âœ… NOUVELLE MÃ‰THODE v3.8: Initialise les vues API
      */
     initApiViews() {
         // BluetoothView
@@ -406,7 +428,7 @@ class Application {
             const bluetoothElement = document.getElementById('bluetooth');
             if (bluetoothElement) {
                 this.views.bluetooth = new BluetoothView(bluetoothElement, this.eventBus, this.logger);
-                console.log('✔ BluetoothView initialized');
+                console.log('âœ” BluetoothView initialized');
             }
         }
         
@@ -415,7 +437,7 @@ class Application {
             const latencyElement = document.getElementById('latency');
             if (latencyElement) {
                 this.views.latency = new LatencyView(latencyElement, this.eventBus, this.logger);
-                console.log('✔ LatencyView initialized');
+                console.log('âœ” LatencyView initialized');
             }
         }
         
@@ -424,34 +446,34 @@ class Application {
             const presetElement = document.getElementById('presets');
             if (presetElement) {
                 this.views.preset = new PresetView(presetElement, this.eventBus, this.logger);
-                console.log('✔ PresetView initialized');
+                console.log('âœ” PresetView initialized');
             }
         }
         
-        // NetworkMonitor (Vue de monitoring réseau)
+        // NetworkMonitor (Vue de monitoring rÃ©seau)
         if (this.config.features.network && window.NetworkMonitor) {
             const networkElement = document.getElementById('network');
             if (networkElement) {
                 this.views.network = new NetworkMonitor(networkElement, this.eventBus, this.logger);
-                console.log('✔ NetworkMonitor initialized');
+                console.log('âœ” NetworkMonitor initialized');
             }
         }
         
         // LoggerView
-        if (this.config.features.logger && window.LoggerView) {
+        if (this.config.features.logger && window.loggerView) {
             const loggerElement = document.getElementById('logger');
             if (loggerElement) {
                 this.views.logger = new LoggerView(loggerElement, this.eventBus, this.logger);
-                console.log('✔ LoggerView initialized');
+                console.log('âœ” LoggerView initialized');
             }
         }
     }
     
     /**
-     * Initialise les contrôleurs
+     * Initialise les contrÃ´leurs
      */
     async initControllers() {
-        console.log('🎮 Initializing controllers...');
+        console.log('ðŸŽ® Initializing controllers...');
         
         // NavigationController
         if (window.NavigationController) {
@@ -546,6 +568,25 @@ class Application {
             this.controllers.editor = new EditorController(
                 this.eventBus,
                 this.models,
+        
+        // LoopController - ✅ NOUVEAU v3.0.3 (enregistrement de loops)
+        if (window.LoopController && this.models.loop) {
+            this.controllers.loop = new LoopController(this.eventBus);
+            // Initialiser avec les dépendances si disponibles
+            if (this.views.loopRecorder) {
+                const metronome = window.metronomeEngine || null;
+                const keyboard = this.controllers.keyboard || null;
+                this.controllers.loop.init(
+                    this.models.loop,
+                    this.views.loopRecorder,
+                    metronome,
+                    keyboard
+                );
+                console.log('✅ LoopController initialized');
+            } else {
+                console.warn('⚠️ LoopController created but not initialized (view missing)');
+            }
+        }
                 this.views,
                 this.notifications,
                 this.debugConsole
@@ -584,14 +625,14 @@ class Application {
             );
         }
         
-        // ✅ NOUVEAUX CONTRÔLEURS v3.8
+        // âœ… NOUVEAUX CONTRÃ”LEURS v3.8
         this.initApiControllers();
         
-        this.logger.info('Application', '✔ Controllers initialized');
+        this.logger.info('Application', 'âœ” Controllers initialized');
     }
     
     /**
-     * ✅ NOUVELLE MÉTHODE v3.8: Initialise les contrôleurs API
+     * âœ… NOUVELLE MÃ‰THODE v3.8: Initialise les contrÃ´leurs API
      */
     initApiControllers() {
         // BluetoothController
@@ -603,7 +644,7 @@ class Application {
                 this.notifications,
                 this.logger
             );
-            console.log('✔ BluetoothController initialized');
+            console.log('âœ” BluetoothController initialized');
         }
         
         // LatencyController
@@ -615,7 +656,7 @@ class Application {
                 this.notifications,
                 this.logger
             );
-            console.log('✔ LatencyController initialized');
+            console.log('âœ” LatencyController initialized');
         }
         
         // PresetController
@@ -627,11 +668,11 @@ class Application {
                 this.notifications,
                 this.logger
             );
-            console.log('✔ PresetController initialized');
+            console.log('âœ” PresetController initialized');
         }
         
         // LoggerController
-        if (this.config.features.logger && window.LoggerController) {
+        if (this.config.features.logger && window.loggerController) {
             this.controllers.logger = new LoggerController(
                 this.eventBus,
                 this.services.backend,
@@ -639,7 +680,7 @@ class Application {
                 this.notifications,
                 this.logger
             );
-            console.log('✔ LoggerController initialized');
+            console.log('âœ” LoggerController initialized');
         }
         
         // NetworkMonitor (Controller)
@@ -651,7 +692,7 @@ class Application {
                 this.notifications,
                 this.logger
             );
-            console.log('✔ NetworkMonitorController initialized');
+            console.log('âœ” NetworkMonitorController initialized');
         }
     }
     
@@ -659,12 +700,12 @@ class Application {
      * Initialise la navigation
      */
     async initNavigation() {
-        console.log('🧭 Initializing navigation...');
+        console.log('ðŸ§­ Initializing navigation...');
         
         // Gestionnaire de navigation hashchange
         window.addEventListener('hashchange', () => this.handleNavigation());
         
-        // ✅ NOUVEAU v3.8: Configuration Router (si disponible)
+        // âœ… NOUVEAU v3.8: Configuration Router (si disponible)
         if (window.Router && typeof window.Router === 'function') {
             this.router = new Router({
                 mode: 'hash',
@@ -674,7 +715,7 @@ class Application {
             // Configurer les routes API
             if (typeof this.router.configureApiRoutes === 'function') {
                 this.router.configureApiRoutes(this.controllers, this.views);
-                console.log('✔ API routes configured');
+                console.log('âœ” API routes configured');
             }
             
             window.router = this.router;
@@ -683,17 +724,17 @@ class Application {
         // Navigation initiale
         this.handleNavigation();
         
-        this.logger.info('Application', '✔ Navigation initialized');
+        this.logger.info('Application', 'âœ” Navigation initialized');
     }
     
     /**
      * Connexion au backend (non-bloquant)
      */
     async connectBackend() {
-        console.log('🔌 Connecting to backend...');
+        console.log('ðŸ”Œ Connecting to backend...');
         
         if (!this.services.backend) {
-            console.warn('⚠️ Backend service not available');
+            console.warn('âš ï¸ Backend service not available');
             this.enableOfflineMode('Backend service not available');
             return;
         }
@@ -707,14 +748,14 @@ class Application {
             
             if (connected) {
                 this.state.backendConnected = true;
-                this.logger.info('Application', '✅ Backend connected');
+                this.logger.info('Application', 'âœ… Backend connected');
                 this.showConnectionStatus(true);
             } else {
                 throw new Error('Connection timeout');
             }
             
         } catch (error) {
-            console.warn('⚠️ Backend connection failed:', error.message);
+            console.warn('âš ï¸ Backend connection failed:', error.message);
             this.logger.warn('Application', 'Backend connection failed, continuing in offline mode');
             this.enableOfflineMode('Backend connection failed');
         }
@@ -734,7 +775,7 @@ class Application {
                 }
             };
             
-            // Écouter l'événement de connexion
+            // Ã‰couter l'Ã©vÃ©nement de connexion
             this.eventBus.once('backend:connected', () => {
                 clearTimeout(timeoutId);
                 resolve(true);
@@ -745,7 +786,7 @@ class Application {
                 resolve(false);
             }, timeout);
             
-            // Vérification immédiate
+            // VÃ©rification immÃ©diate
             checkConnection();
         });
     }
@@ -814,18 +855,18 @@ class Application {
      * Finalisation de l'initialisation
      */
     async finalize() {
-        console.log('🎯 Finalizing initialization...');
+        console.log('ðŸŽ¯ Finalizing initialization...');
         
         // Attacher gestionnaires d'erreurs globaux
         this.attachErrorHandlers();
         
-        // Attacher événements application
+        // Attacher Ã©vÃ©nements application
         this.attachAppEvents();
         
         // Rendre l'interface visible
         this.showInterface();
         
-        this.logger.info('Application', '✔ Initialization finalized');
+        this.logger.info('Application', 'âœ” Initialization finalized');
     }
     
     // ========================================================================
@@ -841,16 +882,16 @@ class Application {
         // Masquer toutes les pages
         this.hideAllPages();
         
-        // Afficher la page demandée
+        // Afficher la page demandÃ©e
         const pageElement = document.getElementById(page);
         if (pageElement) {
             pageElement.style.display = 'block';
             this.state.currentPage = page;
             
-            // Émettre événement de navigation
+            // Ã‰mettre Ã©vÃ©nement de navigation
             this.eventBus.emit('navigation:changed', { page, hash });
             
-            // Initialiser le contrôleur de la page si nécessaire
+            // Initialiser le contrÃ´leur de la page si nÃ©cessaire
             this.initPageController(page);
         } else {
             this.logger.warn('Application', `Page not found: ${page}`);
@@ -870,7 +911,7 @@ class Application {
     }
     
     initPageController(page) {
-        // Initialiser les contrôleurs et vues spécifiques aux pages
+        // Initialiser les contrÃ´leurs et vues spÃ©cifiques aux pages
         switch (page) {
             case 'home':
                 if (this.controllers.home && typeof this.controllers.home.init === 'function') {
@@ -887,7 +928,7 @@ class Application {
                     this.controllers.editor.init();
                 }
                 break;
-            // ✅ NOUVELLES PAGES v3.8
+            // âœ… NOUVELLES PAGES v3.8
             case 'bluetooth':
                 if (this.controllers.bluetooth && typeof this.controllers.bluetooth.init === 'function') {
                     this.controllers.bluetooth.init();
@@ -921,7 +962,7 @@ class Application {
     // ========================================================================
     
     attachErrorHandlers() {
-        // Erreurs JavaScript non capturées
+        // Erreurs JavaScript non capturÃ©es
         window.addEventListener('error', (event) => {
             if (this.logger && this.logger.error) {
                 this.logger.error('Application', 'Uncaught error:', event.error);
@@ -929,7 +970,7 @@ class Application {
             this.handleError(event.error);
         });
         
-        // Promesses rejetées non capturées
+        // Promesses rejetÃ©es non capturÃ©es
         window.addEventListener('unhandledrejection', (event) => {
             if (this.logger && this.logger.error) {
                 this.logger.error('Application', 'Unhandled rejection:', event.reason);
@@ -947,7 +988,7 @@ class Application {
             );
         }
         
-        // Logger détaillé
+        // Logger dÃ©taillÃ©
         if (this.logger && this.logger.error) {
             this.logger.error('Application', 'Error occurred:', {
                 message: error.message,
@@ -955,7 +996,7 @@ class Application {
             });
         }
         
-        // Émettre événement erreur
+        // Ã‰mettre Ã©vÃ©nement erreur
         this.eventBus.emit('app:error', { error });
     }
     
@@ -964,7 +1005,7 @@ class Application {
             this.logger.error('Application', 'Initialization error:', error);
         }
         
-        // Afficher erreur à l'utilisateur
+        // Afficher erreur Ã  l'utilisateur
         if (this.notifications && this.notifications.show) {
             this.notifications.show(
                 `Failed to initialize: ${error.message}`,
@@ -973,27 +1014,27 @@ class Application {
             );
         }
         
-        // Essayer de continuer en mode dégradé
+        // Essayer de continuer en mode dÃ©gradÃ©
         this.state.initialized = false;
         this.state.ready = false;
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS APPLICATION
+    // Ã‰VÃ‰NEMENTS APPLICATION
     // ========================================================================
     
     attachAppEvents() {
-        // Écouter la connexion backend
+        // Ã‰couter la connexion backend
         this.eventBus.on('backend:connected', () => {
-            this.logger.info('Application', '✅ Backend connected event received');
+            this.logger.info('Application', 'âœ… Backend connected event received');
             this.state.backendConnected = true;
             this.state.offlineMode = false;
             this.showConnectionStatus(true);
         });
         
-        // Écouter la déconnexion backend
+        // Ã‰couter la dÃ©connexion backend
         this.eventBus.on('websocket:disconnected', () => {
-            this.logger.warn('Application', '🔴 Backend disconnected');
+            this.logger.warn('Application', 'ðŸ”´ Backend disconnected');
             this.state.backendConnected = false;
             
             if (!this.state.offlineMode) {
@@ -1001,7 +1042,7 @@ class Application {
             }
         });
         
-        // Écouter les erreurs backend
+        // Ã‰couter les erreurs backend
         this.eventBus.on('backend:connection-failed', (data) => {
             this.logger.error('Application', 'Backend connection failed:', data);
         });
@@ -1024,7 +1065,7 @@ class Application {
             app.style.display = 'block';
         }
         
-        // S'assurer que la page home est visible au démarrage
+        // S'assurer que la page home est visible au dÃ©marrage
         const homePage = document.getElementById('home');
         if (homePage) {
             homePage.style.display = 'block';
@@ -1036,7 +1077,7 @@ class Application {
     // ========================================================================
     
     /**
-     * Obtient l'état de l'application
+     * Obtient l'Ã©tat de l'application
      * @returns {Object}
      */
     getState() {
@@ -1044,7 +1085,7 @@ class Application {
     }
     
     /**
-     * Vérifie si le backend est connecté
+     * VÃ©rifie si le backend est connectÃ©
      * @returns {boolean}
      */
     isBackendConnected() {
@@ -1052,7 +1093,7 @@ class Application {
     }
     
     /**
-     * Vérifie si en mode offline
+     * VÃ©rifie si en mode offline
      * @returns {boolean}
      */
     isOfflineMode() {
@@ -1060,7 +1101,7 @@ class Application {
     }
     
     /**
-     * Récupère un service par son nom
+     * RÃ©cupÃ¨re un service par son nom
      * @param {string} serviceName - Nom du service
      * @returns {Object|null}
      */

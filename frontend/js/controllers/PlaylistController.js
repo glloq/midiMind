@@ -112,9 +112,9 @@ class PlaylistController extends BaseController {
         this.importExport = null;
         
         // Logger - Créer une INSTANCE, pas référence à la classe
-        if (typeof window !== 'undefined' && window.Logger) {
+        if (typeof window !== 'undefined' && window.logger) {
             try {
-                this.logger = new window.Logger({
+                this.logger = new window.logger({
                     level: 'info',
                     enableConsole: true
                 });

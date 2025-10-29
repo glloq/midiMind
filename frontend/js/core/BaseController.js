@@ -447,8 +447,8 @@ class BaseController {
     logDebug(category, message, data = null) {
         if (this.debugConsole && typeof this.debugConsole.log === 'function') {
             this.debugConsole.log(category, `[${this.constructor.name}] ${message}`, data);
-        } else if (window.Logger && typeof window.Logger.log === 'function') {
-            window.Logger.log(category, `[${this.constructor.name}] ${message}`, data);
+        } else if (window.logger && typeof window.logger.log === 'function') {
+            window.logger.log(category, `[${this.constructor.name}] ${message}`, data);
         } else {
             // Fallback: console standard
             const prefix = `[${this.constructor.name}]`;

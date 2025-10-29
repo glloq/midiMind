@@ -54,10 +54,10 @@ class InstrumentView extends BaseView {
     initialize() {
         // CRITIQUE: Initialiser le logger ICI, avant toute utilisation
         if (!this.logger) {
-            if (typeof window !== 'undefined' && window.Logger) {
+            if (typeof window !== 'undefined' && window.logger) {
                 // Créer une INSTANCE de Logger, pas juste une référence à la classe
                 try {
-                    this.logger = new window.Logger({
+                    this.logger = new window.logger({
                         level: 'info',
                         enableConsole: true
                     });

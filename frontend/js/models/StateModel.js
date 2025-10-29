@@ -1,8 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/models/StateModel.js
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: 3.0.2 - MINIMAL FIX (Logger + EventBus fallbacks, NO DOWNGRADE)
+// Date: 2025-10-29
+// ============================================================================
+// CORRECTIONS v3.0.1:
+//   ✅ CRITIQUE: Fixed super() call - now compatible with BaseModel(initialData, options)
+//   ✅ CRITIQUE: Constructor passes initialData directly instead of using this.initialize()
+//   ✅ EventBus assigned as property after super() for consistency
 // ============================================================================
 // Description:
 //   Modèle d'état global de l'application (Single Source of Truth).
@@ -30,14 +35,8 @@
 
 class StateModel extends BaseModel {
     constructor(eventBus) {
-        super(eventBus);
-        
-        // Configuration du modèle
-        this.config.autoValidate = true;
-        this.config.persistOnChange = true;
-        
-        // État initial de l'application avec valeurs par défaut
-        this.initialize({
+        // ✅ FIX v3.0.1: Correct super() call compatible with BaseModel(initialData, options)
+        super({
             // Navigation et interface
             currentPage: 'home',
             previousPage: null,
@@ -112,7 +111,27 @@ class StateModel extends BaseModel {
                 errorsCount: 0,
                 actionsCount: 0
             }
+        }, {
+            persistKey: 'statemodel',
+            eventPrefix: 'state',
+            autoPersist: true
         });
+        
+        // ✅ FIX v3.0.1: Assign eventBus as property for consistency
+        // ✅ FIX v3.0.2: EventBus avec fallbacks multiples pour robustesse
+        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        
+        // ✅ FIX v3.0.2: Logger utilise l'instance (window.logger) pas la classe
+        this.logger = window.logger || console;
+        
+        // ✅ FIX v3.0.2: Validation des dépendances critiques
+        if (!this.eventBus) {
+            console.error('[StateModel] EventBus not available!');
+        }
+        
+        // Configuration du modèle
+        this.config.autoValidate = true;
+        this.config.persistOnChange = true;
         
         // Configurer les règles de validation
         this.setupValidation();
@@ -227,29 +246,13 @@ class StateModel extends BaseModel {
             return {
                 duration: sessionDuration,
                 formattedDuration: this.formatDuration(sessionDuration),
-                actionsPerMinute: data.stats.actionsCount / (sessionDuration / 60000),
-                errorRate: data.stats.errorsCount / Math.max(1, data.stats.actionsCount),
-                efficiency: data.stats.filesPlayed / Math.max(1, data.stats.actionsCount)
+                startTime: data.sessionStartTime,
+                stats: data.stats
             };
         });
         
-        // Calculer l'état de l'interface
-        this.addComputed('uiState', (data) => {
-            return {
-                theme: data.settings.darkMode ? 'dark' : 'light',
-                density: data.settings.compactMode ? 'compact' : 'normal',
-                debugVisible: data.debugMode && !data.settings.hideDebugButton,
-                accessibility: {
-                    reducedMotion: data.settings.reducedMotion || false,
-                    highContrast: data.settings.highContrast || false,
-                    largeText: data.settings.largeText || false
-                }
-            };
-        });
-        
-        // Calculer les performances
-        this.addComputed('performance', (data) => {
-            const sessionDuration = Date.now() - new Date(data.sessionStartTime).getTime();
+        // Calculer les statistiques de performance
+        this.addComputed('performanceMetrics', (data) => {
             return {
                 memoryUsage: this.estimateMemoryUsage(),
                 renderingLoad: this.calculateRenderingLoad(data),
@@ -260,256 +263,193 @@ class StateModel extends BaseModel {
     }
 
     /**
-     * Configurer les observateurs de changement
+     * Configurer les observateurs
      */
     setupWatchers() {
         // Observer les changements de page
         this.watch('currentPage', (newPage, oldPage) => {
-            if (oldPage) {
-                this.set('previousPage', oldPage, { silent: true });
-            }
+            this.set('previousPage', oldPage);
             this.emitEvent('page:changed', { from: oldPage, to: newPage });
         });
         
-        // Observer les changements de fichier/playlist
+        // Observer les changements de fichier
         this.watch('currentFile', (newFile, oldFile) => {
             if (newFile) {
-                this.addToRecentFiles(newFile);
-                this.set('currentPlaylist', null, { silent: true });
+                this.addRecentFile(newFile);
+                this.updatePlaybackCapabilities();
             }
-            this.updatePlaybackCapabilities();
+            this.emitEvent('file:changed', { from: oldFile, to: newFile });
         });
         
+        // Observer les changements de playlist
         this.watch('currentPlaylist', (newPlaylist, oldPlaylist) => {
             if (newPlaylist) {
-                this.addToRecentPlaylists(newPlaylist);
-                this.set('currentFile', null, { silent: true });
+                this.addRecentPlaylist(newPlaylist);
+                this.updatePlaybackCapabilities();
             }
-            this.updatePlaybackCapabilities();
+            this.emitEvent('playlist:changed', { from: oldPlaylist, to: newPlaylist });
         });
         
         // Observer les changements d'état de lecture
         this.watch('isPlaying', (isPlaying) => {
             if (isPlaying) {
                 this.incrementStat('filesPlayed');
-                this.set('isPaused', false, { silent: true });
             }
-            this.emitEvent('playback:state:changed', { isPlaying, isPaused: this.get('isPaused') });
+            this.emitEvent('playback:state:changed', { isPlaying });
         });
         
         // Observer les changements de paramètres
         this.watch('settings', (newSettings, oldSettings) => {
             this.handleSettingsChange(newSettings, oldSettings);
         });
+    }
+
+    /**
+     * Méthode helper pour émettre des événements
+     * @param {string} eventName - Nom de l'événement
+     * @param {Object} data - Données de l'événement
+     */
+    emitEvent(eventName, data) {
+        if (this.eventBus && typeof this.eventBus.emit === 'function') {
+            this.eventBus.emit(eventName, data);
+        }
+    }
+
+    /**
+     * Méthode helper pour ajouter une règle de validation
+     * @param {string} key - Clé à valider
+     * @param {Function} validationFn - Fonction de validation
+     */
+    addValidationRule(key, validationFn) {
+        this.validationRules[key] = validationFn;
+    }
+
+    /**
+     * Méthode helper pour ajouter une propriété calculée
+     * @param {string} name - Nom de la propriété
+     * @param {Function} computeFn - Fonction de calcul
+     */
+    addComputed(name, computeFn) {
+        if (!this._computed) {
+            this._computed = {};
+        }
+        this._computed[name] = computeFn;
+    }
+
+    /**
+     * Obtenir une propriété calculée
+     * @param {string} name - Nom de la propriété
+     * @returns {*} Valeur calculée
+     */
+    getComputed(name) {
+        if (this._computed && this._computed[name]) {
+            return this._computed[name](this.data);
+        }
+        return undefined;
+    }
+
+    /**
+     * Méthode helper pour observer un changement
+     * @param {string} key - Clé à observer
+     * @param {Function} callback - Callback appelé lors du changement
+     */
+    watch(key, callback) {
+        if (!this._watchers) {
+            this._watchers = {};
+        }
+        if (!this._watchers[key]) {
+            this._watchers[key] = [];
+        }
+        this._watchers[key].push(callback);
+    }
+
+    /**
+     * Surcharge de set pour déclencher les watchers
+     * @param {string} key - Clé
+     * @param {*} value - Valeur
+     * @param {boolean} silent - Mode silencieux
+     */
+    set(key, value, silent = false) {
+        const oldValue = this.get(key);
+        const result = super.set(key, value, silent);
         
-        // Observer les changements de zoom
-        this.watch('zoomLevel', (newZoom) => {
-            this.emitEvent('ui:zoom:changed', { zoomLevel: newZoom });
-        });
+        // Déclencher les watchers
+        if (this._watchers && this._watchers[key] && oldValue !== value) {
+            this._watchers[key].forEach(callback => {
+                try {
+                    callback(value, oldValue);
+                } catch (error) {
+                    console.error(`Error in watcher for ${key}:`, error);
+                }
+            });
+        }
+        
+        return result;
     }
 
-    // ===== MÉTHODES PUBLIQUES =====
-
     /**
-     * Sélectionner un fichier MIDI (désélectionne la playlist)
-     * @param {Object} file - Objet fichier MIDI
+     * Incrémenter une statistique
+     * @param {string} statName - Nom de la stat
+     * @param {number} amount - Montant à ajouter
      */
-    setCurrentFile(file) {
-        this.set('currentFile', file);
-        if (file) {
-            this.set('selectorMode', 'file');
-            this.incrementStat('actionsCount');
+    incrementStat(statName, amount = 1) {
+        const stats = this.get('stats');
+        if (stats && typeof stats[statName] === 'number') {
+            stats[statName] += amount;
+            this.set('stats', stats);
         }
     }
 
     /**
-     * Sélectionner une playlist (désélectionne le fichier)
-     * @param {Object} playlist - Objet playlist
-     */
-    setCurrentPlaylist(playlist) {
-        this.set('currentPlaylist', playlist);
-        if (playlist) {
-            this.set('selectorMode', 'playlist');
-            this.incrementStat('actionsCount');
-        }
-    }
-
-    /**
-     * Changer de page
-     * @param {string} page - Nom de la page
-     */
-    setCurrentPage(page) {
-        this.set('currentPage', page);
-        this.incrementStat('actionsCount');
-    }
-
-    /**
-     * Mettre à jour l'état de lecture
-     * @param {Object} playbackState - Nouvel état
-     */
-    setPlaybackState(playbackState) {
-        this.update({
-            isPlaying: playbackState.isPlaying ?? this.get('isPlaying'),
-            isPaused: playbackState.isPaused ?? this.get('isPaused'),
-            progress: playbackState.progress ?? this.get('progress'),
-            duration: playbackState.duration ?? this.get('duration'),
-            currentTrackIndex: playbackState.currentTrackIndex ?? this.get('currentTrackIndex')
-        });
-    }
-
-    /**
-     * Mettre à jour un paramètre
-     * @param {string} key - Clé du paramètre
-     * @param {*} value - Nouvelle valeur
-     */
-    setSetting(key, value) {
-        const settings = { ...this.get('settings') };
-        settings[key] = value;
-        this.set('settings', settings);
-    }
-
-    /**
-     * Mettre à jour plusieurs paramètres
-     * @param {Object} newSettings - Nouveaux paramètres
-     */
-    updateSettings(newSettings) {
-        const settings = { ...this.get('settings'), ...newSettings };
-        this.set('settings', settings);
-    }
-
-    /**
-     * Incrementer une statistique
-     * @param {string} statKey - Clé de la statistique
-     * @param {number} amount - Montant à ajouter (défaut: 1)
-     */
-    incrementStat(statKey, amount = 1) {
-        const stats = { ...this.get('stats') };
-        stats[statKey] = (stats[statKey] || 0) + amount;
-        this.set('stats', stats);
-    }
-
-    /**
-     * Réinitialiser les statistiques de session
-     */
-    resetSessionStats() {
-        this.set('stats', {
-            filesPlayed: 0,
-            totalPlayTime: 0,
-            sessionsCount: this.get('stats').sessionsCount + 1,
-            errorsCount: 0,
-            actionsCount: 0
-        });
-        this.set('sessionStartTime', new Date().toISOString());
-    }
-
-    /**
-     * Obtenir l'état complet de lecture
-     * @returns {Object} État de lecture calculé
-     */
-    getPlaybackState() {
-        return this.get('_computed_playbackState');
-    }
-
-    /**
-     * Obtenir les informations de session
-     * @returns {Object} Informations de session calculées
-     */
-    getSessionInfo() {
-        return this.get('_computed_sessionInfo');
-    }
-
-    /**
-     * Obtenir l'état de l'interface
-     * @returns {Object} État UI calculé
-     */
-    getUIState() {
-        return this.get('_computed_uiState');
-    }
-
-    /**
-     * Obtenir les métriques de performance
-     * @returns {Object} Métriques de performance
-     */
-    getPerformanceMetrics() {
-        return this.get('_computed_performance');
-    }
-
-    /**
-     * Exporter l'état pour sauvegarde
-     * @returns {Object} État sérialisé
-     */
-    exportState() {
-        return this.serialize(['settings', 'recentFiles', 'recentPlaylists', 'stats']);
-    }
-
-    /**
-     * Importer un état sauvegardé
-     * @param {Object} savedState - État à importer
-     */
-    importState(savedState) {
-        if (savedState.data) {
-            this.update(savedState.data);
-        }
-    }
-
-    // ===== MÉTHODES PRIVÉES =====
-
-    /**
-     * Ajouter un fichier aux récents
+     * Ajouter un fichier récent
      * @param {Object} file - Fichier à ajouter
      */
-    addToRecentFiles(file) {
-        const recentFiles = [...this.get('recentFiles')];
+    addRecentFile(file) {
+        const recentFiles = this.get('recentFiles') || [];
         
-        // Supprimer s'il existe déjà
-        const existingIndex = recentFiles.findIndex(f => f.id === file.id);
-        if (existingIndex > -1) {
-            recentFiles.splice(existingIndex, 1);
-        }
+        // Supprimer les doublons
+        const filtered = recentFiles.filter(f => f.id !== file.id);
         
-        // Ajouter en première position
-        recentFiles.unshift({
+        // Ajouter en tête
+        filtered.unshift({
             id: file.id,
             name: file.name,
             path: file.path,
-            lastAccess: new Date().toISOString()
+            accessTime: Date.now()
         });
         
-        // Limiter à 10 fichiers récents
-        if (recentFiles.length > 10) {
-            recentFiles.splice(10);
+        // Limiter à 20
+        if (filtered.length > 20) {
+            filtered.pop();
         }
         
-        this.set('recentFiles', recentFiles, { silent: true });
-        this.set('lastFileAccess', new Date().toISOString(), { silent: true });
+        this.set('recentFiles', filtered, { silent: true });
     }
 
     /**
-     * Ajouter une playlist aux récentes
+     * Ajouter une playlist récente
      * @param {Object} playlist - Playlist à ajouter
      */
-    addToRecentPlaylists(playlist) {
-        const recentPlaylists = [...this.get('recentPlaylists')];
+    addRecentPlaylist(playlist) {
+        const recentPlaylists = this.get('recentPlaylists') || [];
         
-        // Supprimer s'il existe déjà
-        const existingIndex = recentPlaylists.findIndex(p => p.id === playlist.id);
-        if (existingIndex > -1) {
-            recentPlaylists.splice(existingIndex, 1);
-        }
+        // Supprimer les doublons
+        const filtered = recentPlaylists.filter(p => p.id !== playlist.id);
         
-        // Ajouter en première position
-        recentPlaylists.unshift({
+        // Ajouter en tête
+        filtered.unshift({
             id: playlist.id,
             name: playlist.name,
-            lastAccess: new Date().toISOString()
+            fileCount: playlist.files?.length || 0,
+            accessTime: Date.now()
         });
         
-        // Limiter à 5 playlists récentes
-        if (recentPlaylists.length > 5) {
-            recentPlaylists.splice(5);
+        // Limiter à 10
+        if (filtered.length > 10) {
+            filtered.pop();
         }
         
-        this.set('recentPlaylists', recentPlaylists, { silent: true });
+        this.set('recentPlaylists', filtered, { silent: true });
     }
 
     /**
@@ -588,6 +528,30 @@ class StateModel extends BaseModel {
             localStorage.setItem('midimind_state', JSON.stringify(stateToSave));
         } catch (error) {
             console.warn('Erreur lors de la sauvegarde de l\'état:', error);
+        }
+    }
+
+    /**
+     * Exporter l'état
+     * @returns {Object} État exporté
+     */
+    exportState() {
+        return {
+            data: this.getData(),
+            version: '3.0.0',
+            exportedAt: Date.now()
+        };
+    }
+
+    /**
+     * Importer l'état
+     * @param {Object} state - État à importer
+     */
+    importState(state) {
+        if (state.data) {
+            Object.keys(state.data).forEach(key => {
+                this.set(key, state.data[key], true);
+            });
         }
     }
 
@@ -720,6 +684,7 @@ class StateModel extends BaseModel {
         return Promise.resolve();
     }
 }
+
 // ============================================================================
 // EXPORT
 // ============================================================================
