@@ -1,44 +1,47 @@
 // ============================================================================
 // Fichier: frontend/js/models/RoutingModel.js
-// Version: v3.1.01 - FIXED (Methods inside class)
-// Date: 2025-10-23
+// Version: v3.1.02 - FIXED LOGGER PROTECTION
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.1.01:
+// CORRECTIONS v3.1.02:
 // ✓ Toutes les méthodes sont maintenant DANS la classe
 // ✓ Suppression du code hors classe
 // ✓ Méthodes setCurrentFile, getRouting, clearAll, etc. correctement placées
+// ✓ Protection logger pour éviter erreurs undefined
 // ============================================================================
 
 
 class RoutingModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✓ FIX: Correct super() call
         super({}, {
             persistKey: 'routingmodel',
             eventPrefix: 'routing',
             autoPersist: true
         });
         
-        // ✓ FIX: Assign immediately
-        this.eventBus = eventBus;
-        this.logger = logger;
-        this.backend = backend;
+        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.backend = backend || window.backendService || window.app?.services?.backend;
+        this.logger = logger || window.logger || console;
         
-        // ✓ FIX: Initialize data directly
+        if (!this.eventBus) console.error('[RoutingModel] EventBus not available!');
+        if (!this.backend) console.warn('[RoutingModel] BackendService not available');
+        
         this.data = {
             channels: this.createDefaultChannels(),
             devices: [],
             globalMute: false,
             globalSolo: false,
             masterVolume: 100,
-            currentFile: null  // ✓ FIX: Ajouté dans data
+            currentFile: null
         };
         
-        this.logger.info('RoutingModel', '✓ Model initialized v3.1.01');
+        if (this.logger && typeof this.logger.info === 'function') {
+            if (this.logger && typeof this.logger.info === 'function') this.logger.info('RoutingModel', '✓ Model initialized v3.1.02');
+        }
     }
     
     // ========================================================================
-    // CRÉATION CANAUX PAR DÉFAUT - SIMPLIFIÉ
+    // CRÉATION CANAUX PAR DÃ‰FAUT - SIMPLIFIÉ
     // ========================================================================
     
     createDefaultChannels() {
@@ -88,7 +91,7 @@ class RoutingModel extends BaseModel {
         const channel = channels[channelNumber];
         
         if (!channel) {
-            this.logger.warn('RoutingModel', `Invalid channel: ${channelNumber}`);
+            if (this.logger && typeof this.logger.warn === 'function') this.logger.warn('RoutingModel', `Invalid channel: ${channelNumber}`);
             return false;
         }
         
@@ -97,8 +100,8 @@ class RoutingModel extends BaseModel {
         
         this.set('channels', [...channels]);
         
-        this.logger.info('RoutingModel', 
-            `Channel ${channelNumber} → ${deviceId || 'unassigned'}`);
+        if (this.logger && typeof this.logger.info === 'function') this.logger.info('RoutingModel', 
+            `Channel ${channelNumber} â†’ ${deviceId || 'unassigned'}`);
         
         this.eventBus.emit('routing:channel-assigned', {
             channel: channelNumber,
@@ -114,7 +117,7 @@ class RoutingModel extends BaseModel {
     }
     
     // ========================================================================
-    // CONTRÔLES DE BASE
+    // CONTRÃ”LES DE BASE
     // ========================================================================
     
     muteChannel(channelNumber, muted = null) {
@@ -231,7 +234,7 @@ class RoutingModel extends BaseModel {
         this.set('globalSolo', false);
         this.set('masterVolume', 100);
         
-        this.logger.info('RoutingModel', 'All routing reset');
+        if (this.logger && typeof this.logger.info === 'function') this.logger.info('RoutingModel', 'All routing reset');
         
         this.eventBus.emit('routing:reset');
     }
@@ -261,7 +264,7 @@ class RoutingModel extends BaseModel {
     }
     
     // ========================================================================
-    // MÉTHODES AJOUTÉES POUR COMPATIBILITÉ (maintenant DANS la classe)
+    // MÃ‰THODES AJOUTÃ‰ES POUR COMPATIBILITÃ‰ (maintenant DANS la classe)
     // ========================================================================
     
     /**
@@ -304,7 +307,7 @@ class RoutingModel extends BaseModel {
     }
     
     /**
-     * Assigne un instrument à un canal
+     * Assigne un instrument Ã  un canal
      */
     assignInstrument(channelId, instrumentId) {
         this.assignChannelToDevice(channelId, instrumentId);
@@ -370,7 +373,7 @@ class RoutingModel extends BaseModel {
     }
     
     // ========================================================================
-    // MÉTHODES HÉRITÉES/OVERRIDES
+    // MÃ‰THODES HÃ‰RITÃ‰ES/OVERRIDES
     // ========================================================================
     
     /**
