@@ -1,20 +1,17 @@
 // ============================================================================
 // Fichier: frontend/scripts/services/MidiService.js
+// Version: 3.0.1 - LOGGER PROTECTION
+// Date: 2025-10-30
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
-// Description:
-//   Service centralisé pour toutes les opérations MIDI.
-//   Parse les fichiers, gère les métadonnées, convertit les formats.
-//
-// Auteur: midiMind Team
-// Date: 2025-10-04
-// Version: 3.0.0
+// CORRECTIONS v3.0.1:
+// ✅ Protection logger avec méthode log() sécurisée
 // ============================================================================
 
 class MidiService {
     constructor(eventBus, logger) {
         this.eventBus = eventBus;
-        this.logger = logger;
+        this.logger = logger || console;
         
         // Cache des métadonnées parsées
         this.metadataCache = new Map();
@@ -46,10 +43,21 @@ class MidiService {
     // ========================================================================
     
     initialize() {
-        this.logger.info('MidiService', 'Initializing MIDI service...');
+        this.log('info', 'MidiService', 'Initializing MIDI service...');
         
         // Nettoyer le cache périodiquement
         setInterval(() => this.cleanCache(), 60000); // Toutes les minutes
+    }
+    
+    /**
+     * Log sécurisé avec fallback
+     */
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        } else {
+            console[level]?.(...args) || console.log(...args);
+        }
     }
     
     // ========================================================================
@@ -64,7 +72,7 @@ class MidiService {
      */
     async parseFile(data, fileName = 'unknown.mid') {
         try {
-            this.logger.debug('MidiService', `Parsing file: ${fileName}`);
+            this.log('debug', 'MidiService', `Parsing file: ${fileName}`);
             
             // Vérifier le cache
             const cacheKey = this.generateCacheKey(data);
@@ -98,7 +106,7 @@ class MidiService {
             return metadata;
             
         } catch (error) {
-            this.logger.error('MidiService', `Failed to parse file ${fileName}:`, error);
+            this.log('error', 'MidiService', `Failed to parse file ${fileName}:`, error);
             this.stats.parseErrors++;
             throw error;
         }
@@ -235,8 +243,8 @@ class MidiService {
             const eventType = status & 0xF0;
             
             switch (eventType) {
-                case 0x90: // Note On
                 case 0x80: // Note Off
+                case 0x90: // Note On
                     const note = view.getUint8(position++);
                     const velocity = view.getUint8(position++);
                     
@@ -247,7 +255,7 @@ class MidiService {
                     }
                     break;
                     
-                case 0xA0: // Poly Aftertouch
+                case 0xA0: // Polyphonic Aftertouch
                 case 0xB0: // Control Change
                 case 0xE0: // Pitch Bend
                     position += 2;
@@ -447,7 +455,7 @@ class MidiService {
         }
         
         if (expiredKeys.length > 0) {
-            this.logger.debug('MidiService', `Cleaned ${expiredKeys.length} expired cache entries`);
+            this.log('debug', 'MidiService', `Cleaned ${expiredKeys.length} expired cache entries`);
         }
     }
     
@@ -456,7 +464,7 @@ class MidiService {
      */
     clearCache() {
         this.metadataCache.clear();
-        this.logger.info('MidiService', 'Cache cleared');
+        this.log('info', 'MidiService', 'Cache cleared');
     }
     
     // ========================================================================
@@ -483,4 +491,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.MidiService = MidiService;
 }
- window.MidiService = MidiService;

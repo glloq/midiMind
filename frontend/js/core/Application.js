@@ -264,7 +264,7 @@ class Application {
         
         // MidiService
         if (window.MidiService) {
-            this.services.midi = new MidiService(this.eventBus);
+            this.services.midi = new MidiService(this.eventBus, this.logger);
         }
         
         // FileService
