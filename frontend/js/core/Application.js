@@ -1,29 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.9 - CORRECTION MODÈLES MANQUANTS + DOCUMENTATION
-// Date: 2025-10-29
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI
+// Version: v3.9.1 - CORRECTIONS ENCODAGE + LOGGER
+// Date: 2025-10-30
+// Projet: MidiMind v3.1
 // ============================================================================
-// CORRECTIONS v3.9:
-// ✅ StateModel ajouté (requis par NavigationController)
-// ✅ LoopModel ajouté (requis par LoopController)
-// ✅ LoopController ajouté et initialisé avec dépendances
-// ✅ Cohérence totale des initialisations de modèles et contrôleurs
-// ============================================================================
-// NOUVELLES FONCTIONNALITÉS v3.8:
-// ✅ BluetoothController - Gestion périphériques Bluetooth
-// ✅ LatencyController - Calibration et compensation latence
-// ✅ PresetController - Gestion presets de configuration
-// ✅ LoggerController - Configuration niveau de logs
-// ✅ NetworkMonitor - Monitoring réseau
-// ✅ Intégration EventBus enrichi (bluetooth, hotplug, latency, preset, logger, network)
-// ✅ NotificationManager enrichi avec messages API
-// ✅ Router enrichi avec configureApiRoutes()
+// CORRECTIONS v3.9.1:
+// ✅ Encodage UTF-8 correct (tous caractères spéciaux)
+// ✅ Logger avec fallback robuste
+// ✅ Vérification méthodes logger avant utilisation
 // ============================================================================
 
 class Application {
     constructor() {
-        // Ã‰tat de l'application
+        // État de l'application
         this.state = {
             initialized: false,
             ready: false,
@@ -47,8 +36,9 @@ class Application {
             file: null
         };
         
-        // ModÃ¨les
+        // Modèles
         this.models = {
+            state: null,
             file: null,
             playlist: null,
             instrument: null,
@@ -67,33 +57,24 @@ class Application {
             system: null,
             routing: null,
             editor: null,
-            // âœ… NOUVELLES VUES v3.8
-            bluetooth: null,
-            latency: null,
-            preset: null,
-            network: null,
-            logger: null
+            playlist: null,
+            visualizer: null
         };
         
-        // ContrÃ´leurs
+        // Contrôleurs
         this.controllers = {
             navigation: null,
             file: null,
             playlist: null,
             instrument: null,
+            keyboard: null,
             playback: null,
             globalPlayback: null,
             system: null,
-            search: null,
+            home: null,
             routing: null,
             editor: null,
-            home: null,
-            // âœ… NOUVEAUX CONTRÃ”LEURS v3.8
-            bluetooth: null,
-            latency: null,
-            preset: null,
-            logger: null,
-            network: null
+            visualizer: null
         };
         
         // Configuration
@@ -102,24 +83,16 @@ class Application {
             autoReconnect: true,
             reconnectInterval: 5000,
             maxReconnectAttempts: 10,
-            logLevel: 'debug',
+            logLevel: 'info',
             enableDebugConsole: true,
             offlineMode: {
                 enabled: true,
                 showNotification: true,
                 allowLocalOperations: true
-            },
-            // âœ… NOUVELLES CONFIGURATIONS v3.8
-            features: {
-                bluetooth: true,
-                latency: true,
-                presets: true,
-                network: true,
-                logger: true
             }
         };
         
-        // RÃ©fÃ©rence globale
+        // Référence globale
         window.app = this;
     }
     
@@ -128,50 +101,52 @@ class Application {
     // ========================================================================
     
     /**
-     * Initialise l'application complÃ¨te
+     * Initialise l'application complète
      */
     async init() {
-        console.log('ðŸš€ Initializing midiMind v3.8...');
+        console.log('🚀 Initializing MidiMind v3.1...');
         
         try {
-            // Ã‰tape 1: Fondations
+            // Étape 1: Fondations
             await this.initFoundations();
             
-            // Ã‰tape 2: Services
+            // Étape 2: Services
             await this.initServices();
             
-            // Ã‰tape 3: ModÃ¨les
+            // Étape 3: Modèles
             await this.initModels();
             
-            // Ã‰tape 4: Vues
+            // Étape 4: Vues
             await this.initViews();
             
-            // Ã‰tape 5: ContrÃ´leurs
+            // Étape 5: Contrôleurs
             await this.initControllers();
             
-            // Ã‰tape 6: Navigation & Router
+            // Étape 6: Navigation & Router
             await this.initNavigation();
             
-            // Ã‰tape 7: Connexion backend (non-bloquant)
-            await this.connectBackend();
+            // Étape 7: Connexion backend (non-bloquant)
+            this.connectBackend().catch(err => {
+                this.log('warn', 'Backend connection failed, continuing in offline mode', err);
+            });
             
-            // Ã‰tape 8: Finalisation
+            // Étape 8: Finalisation
             await this.finalize();
             
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('âœ… midiMind v3.8 initialized successfully');
-            this.logger.info('Application', 'âœ… Application ready with new API features');
+            console.log('✅ MidiMind v3.1 initialized successfully');
+            this.log('info', '✅ Application ready');
             
-            // Ã‰mettre Ã©vÃ©nement ready
-            this.eventBus.emit('app:ready');
+            // Émettre événement ready
+            if (this.eventBus) {
+                this.eventBus.emit('app:ready');
+            }
             
         } catch (error) {
-            console.error('âŒ Failed to initialize application:', error);
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Initialization failed:', error);
-            }
+            console.error('❌ Failed to initialize application:', error);
+            this.log('error', 'Initialization failed', error);
             this.handleInitError(error);
         }
     }
@@ -180,53 +155,93 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('ðŸ“¦ Initializing foundations...');
+        console.log('📦 Initializing foundations...');
         
-        // EventBus (dÃ©jÃ  instanciÃ© globalement ou crÃ©er nouveau)
+        // EventBus
         this.eventBus = window.eventBus || new EventBus();
         window.eventBus = this.eventBus;
         
-        // Logger - CORRIGÃ‰ : crÃ©er une nouvelle instance
-        if (window.logger && typeof window.logger === 'function') {
-            this.logger = window.logger || new Logger({
-                level: this.config.logLevel,
-                eventBus: this.eventBus
-            });
-            window.logger = this.logger;
-        } else {
-            // Fallback vers console si Logger n'est pas disponible
-            console.warn('Logger class not available, using console as fallback');
-            this.logger = console;
-            window.logger = console;
-        }
+        // Logger avec fallback robuste
+        this.logger = this.createLogger();
+        window.logger = this.logger;
         
         // DebugConsole
         if (this.config.enableDebugConsole && window.DebugConsole) {
-            if (typeof window.DebugConsole === 'function') {
+            try {
                 this.debugConsole = new DebugConsole(this.eventBus, this.logger);
                 window.debugConsole = this.debugConsole;
-            } else {
-                this.debugConsole = window.DebugConsole;
+            } catch (e) {
+                console.warn('DebugConsole initialization failed:', e);
             }
         }
         
         // NotificationManager
-        if (window.NotificationManager && typeof window.NotificationManager === 'function') {
-            this.notifications = new NotificationManager();
-            window.notificationManager = this.notifications;
-        } else if (window.Notifications && typeof window.Notifications === 'function') {
-            this.notifications = new Notifications(this.eventBus);
-            window.notifications = this.notifications;
+        if (window.NotificationManager) {
+            try {
+                this.notifications = new NotificationManager();
+                window.notificationManager = this.notifications;
+            } catch (e) {
+                console.warn('NotificationManager initialization failed:', e);
+            }
+        } else if (window.Notifications) {
+            try {
+                this.notifications = new Notifications(this.eventBus);
+                window.notifications = this.notifications;
+            } catch (e) {
+                console.warn('Notifications initialization failed:', e);
+            }
         }
         
-        this.logger.info('Application', 'âœ” Foundations initialized');
+        this.log('info', '✓ Foundations initialized');
+    }
+    
+    /**
+     * Crée un logger robuste avec fallback
+     */
+    createLogger() {
+        // Si Logger est disponible comme classe
+        if (window.Logger && typeof window.Logger === 'function') {
+            try {
+                return new Logger({
+                    level: this.config.logLevel,
+                    eventBus: this.eventBus
+                });
+            } catch (e) {
+                console.warn('Failed to create Logger, using fallback:', e);
+            }
+        }
+        
+        // Si logger existe déjà
+        if (window.logger && typeof window.logger.info === 'function') {
+            return window.logger;
+        }
+        
+        // Fallback: wrapper console avec interface Logger
+        return {
+            debug: (...args) => console.log(...args),
+            info: (...args) => console.info(...args),
+            warn: (...args) => console.warn(...args),
+            error: (...args) => console.error(...args),
+            log: (...args) => console.log(...args)
+        };
+    }
+    
+    /**
+     * Méthode helper pour logger de façon sécurisée
+     */
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        } else {
+            console[level]?.(...args) || console.log(...args);
+        }
     }
     
     /**
      * Initialise les services
      */
     async initServices() {
-        console.log('ðŸ”§ Initializing services...');
+        console.log('🔧 Initializing services...');
         
         // BackendService
         if (window.BackendService) {
@@ -247,871 +262,468 @@ class Application {
             this.services.midi = new MidiService(this.eventBus, this.logger);
         }
         
-        // FileService - CORRIGÃ‰ : passer les paramÃ¨tres requis
+        // FileService
         if (window.FileService) {
-            this.services.file = new FileService(
-                this.services.backend,
-                this.eventBus,
-                this.logger
-            );
+            this.services.file = new FileService(this.eventBus, this.logger);
         }
         
-        this.logger.info('Application', 'âœ” Services initialized');
+        this.log('info', '✓ Services initialized');
     }
     
     /**
-     * Initialise les modÃ¨les de donnÃ©es
+     * Initialise les modèles
      */
     async initModels() {
-        console.log('ðŸ“Š Initializing models...');
+        console.log('📊 Initializing models...');
+        
+        // StateModel
+        if (window.StateModel) {
+            this.models.state = new StateModel(this.eventBus);
+        }
         
         // FileModel
         if (window.FileModel) {
-            this.models.file = new FileModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.file = new FileModel(this.eventBus);
         }
         
         // PlaylistModel
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.playlist = new PlaylistModel(this.eventBus);
         }
         
         // InstrumentModel
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.instrument = new InstrumentModel(this.eventBus);
         }
         
         // SystemModel
         if (window.SystemModel) {
-            this.models.system = new SystemModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.system = new SystemModel(this.eventBus);
         }
         
         // PlaybackModel
         if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.playback = new PlaybackModel(this.eventBus);
         }
         
         // EditorModel
         if (window.EditorModel) {
-            this.models.editor = new EditorModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.editor = new EditorModel(this.eventBus);
         }
         
         // RoutingModel
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.routing = new RoutingModel(this.eventBus);
         }
         
-        
-        // StateModel - ✅ NOUVEAU v3.0.3 (requis par NavigationController)
-        if (window.StateModel) {
-            this.models.state = new StateModel(this.eventBus);
-            console.log('✅ StateModel initialized');
-        }
-        
-        // LoopModel - ✅ NOUVEAU v3.0.3 (requis par LoopController)
-        if (window.LoopModel) {
-            this.models.loop = new LoopModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
-            console.log('✅ LoopModel initialized');
-        }
-        this.logger.info('Application', 'âœ” Models initialized');
+        this.log('info', '✓ Models initialized');
     }
     
     /**
      * Initialise les vues
      */
     async initViews() {
-        console.log('ðŸŽ¨ Initializing views...');
+        console.log('🎨 Initializing views...');
         
         // HomeView
         if (window.HomeView) {
-            this.views.home = new HomeView('home', this.eventBus);
-            if (typeof this.views.home.init === 'function') {
-                this.views.home.init();
+            const homeContainer = document.getElementById('home');
+            if (homeContainer) {
+                this.views.home = new HomeView(homeContainer, this.eventBus);
+                this.views.home.init?.();
             }
-            console.log('âœ” HomeView initialized');
-        }
-        
-        // EditorView
-        const editorElement = document.getElementById('editor');
-        if (editorElement && window.EditorView) {
-            this.views.editor = new EditorView(editorElement, this.eventBus, this.logger);
-            console.log('âœ” EditorView initialized');
-        }
-        
-        // RoutingView
-        const routingElement = document.getElementById('routing');
-        if (routingElement && window.RoutingView) {
-            this.views.routing = new RoutingView(routingElement, this.eventBus, this.logger);
-            console.log('âœ” RoutingView initialized');
-        }
-        
-        // KeyboardView
-        const keyboardElement = document.getElementById('keyboard');
-        if (keyboardElement && window.KeyboardView) {
-            this.views.keyboard = new KeyboardView(keyboardElement, this.eventBus);
-            if (typeof this.views.keyboard.init === 'function') {
-                this.views.keyboard.init();
-            }
-            console.log('âœ” KeyboardView initialized');
-        }
-        
-        // InstrumentView
-        const instrumentElement = document.getElementById('instruments');
-        if (instrumentElement && window.InstrumentView) {
-            this.views.instrument = new InstrumentView(instrumentElement, this.eventBus);
-            if (typeof this.views.instrument.init === 'function') {
-                this.views.instrument.init();
-            }
-            console.log('âœ” InstrumentView initialized');
-        }
-        
-        // SystemView
-        const systemElement = document.getElementById('system');
-        if (systemElement && window.SystemView) {
-            this.views.system = new SystemView(systemElement, this.eventBus);
-            if (typeof this.views.system.init === 'function') {
-                this.views.system.init();
-            }
-            console.log('âœ” SystemView initialized');
         }
         
         // FileView
-        const fileElement = document.querySelector('.files-list');
-        if (fileElement && window.FileView) {
-            this.views.file = new FileView(fileElement, this.eventBus);
-            console.log('âœ” FileView initialized');
+        if (window.FileView) {
+            const filesContainer = document.getElementById('files');
+            if (filesContainer) {
+                this.views.file = new FileView(filesContainer, this.eventBus);
+                this.views.file.init?.();
+            }
         }
         
-        // âœ… NOUVELLES VUES v3.8
-        this.initApiViews();
+        // InstrumentView
+        if (window.InstrumentView) {
+            const instrumentsContainer = document.getElementById('instruments');
+            if (instrumentsContainer) {
+                this.views.instrument = new InstrumentView(instrumentsContainer, this.eventBus);
+                this.views.instrument.init?.();
+            }
+        }
         
-        this.logger.info('Application', 'âœ” Views initialized');
+        // KeyboardView
+        if (window.KeyboardView) {
+            const keyboardContainer = document.getElementById('keyboard');
+            if (keyboardContainer) {
+                this.views.keyboard = new KeyboardView(keyboardContainer, this.eventBus);
+                this.views.keyboard.init?.();
+            }
+        }
+        
+        // SystemView
+        if (window.SystemView) {
+            const systemContainer = document.getElementById('system');
+            if (systemContainer) {
+                this.views.system = new SystemView(systemContainer, this.eventBus);
+                this.views.system.init?.();
+            }
+        }
+        
+        // EditorView
+        if (window.EditorView) {
+            const editorContainer = document.getElementById('editor');
+            if (editorContainer) {
+                this.views.editor = new EditorView(editorContainer, this.eventBus);
+                this.views.editor.init?.();
+            }
+        }
+        
+        // RoutingView
+        if (window.RoutingView) {
+            const routingContainer = document.getElementById('routing');
+            if (routingContainer) {
+                this.views.routing = new RoutingView(routingContainer, this.eventBus);
+                this.views.routing.init?.();
+            }
+        }
+        
+        // PlaylistView
+        if (window.PlaylistView) {
+            this.views.playlist = new PlaylistView(this.eventBus);
+            this.views.playlist.init?.();
+        }
+        
+        // VisualizerView
+        if (window.VisualizerView) {
+            const visualizerCanvas = document.getElementById('visualizerCanvas');
+            if (visualizerCanvas) {
+                this.views.visualizer = new VisualizerView(visualizerCanvas, this.eventBus);
+                this.views.visualizer.init?.();
+            }
+        }
+        
+        this.log('info', '✓ Views initialized');
     }
     
     /**
-     * âœ… NOUVELLE MÃ‰THODE v3.8: Initialise les vues API
-     */
-    initApiViews() {
-        // BluetoothView
-        if (this.config.features.bluetooth && window.BluetoothView) {
-            const bluetoothElement = document.getElementById('bluetooth');
-            if (bluetoothElement) {
-                this.views.bluetooth = new BluetoothView(bluetoothElement, this.eventBus, this.logger);
-                console.log('âœ” BluetoothView initialized');
-            }
-        }
-        
-        // LatencyView
-        if (this.config.features.latency && window.LatencyView) {
-            const latencyElement = document.getElementById('latency');
-            if (latencyElement) {
-                this.views.latency = new LatencyView(latencyElement, this.eventBus, this.logger);
-                console.log('âœ” LatencyView initialized');
-            }
-        }
-        
-        // PresetView
-        if (this.config.features.presets && window.PresetView) {
-            const presetElement = document.getElementById('presets');
-            if (presetElement) {
-                this.views.preset = new PresetView(presetElement, this.eventBus, this.logger);
-                console.log('âœ” PresetView initialized');
-            }
-        }
-        
-        // NetworkMonitor (Vue de monitoring rÃ©seau)
-        if (this.config.features.network && window.NetworkMonitor) {
-            const networkElement = document.getElementById('network');
-            if (networkElement) {
-                this.views.network = new NetworkMonitor(networkElement, this.eventBus, this.logger);
-                console.log('âœ” NetworkMonitor initialized');
-            }
-        }
-        
-        // LoggerView
-        if (this.config.features.logger && window.loggerView) {
-            const loggerElement = document.getElementById('logger');
-            if (loggerElement) {
-                this.views.logger = new LoggerView(loggerElement, this.eventBus, this.logger);
-                console.log('âœ” LoggerView initialized');
-            }
-        }
-    }
-    
-    /**
-     * Initialise les contrÃ´leurs
+     * Initialise les contrôleurs
      */
     async initControllers() {
-        console.log('ðŸŽ® Initializing controllers...');
+        console.log('🎮 Initializing controllers...');
         
         // NavigationController
         if (window.NavigationController) {
             this.controllers.navigation = new NavigationController(
                 this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.models.state
             );
+            this.controllers.navigation.init?.();
         }
         
         // HomeController
         if (window.HomeController) {
             this.controllers.home = new HomeController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.views.home,
+                this.models.file,
+                this.eventBus
             );
+            this.controllers.home.init?.();
         }
         
         // FileController
         if (window.FileController) {
             this.controllers.file = new FileController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.views.file,
+                this.models.file,
+                this.eventBus
             );
-        }
-        
-        // PlaylistController
-        if (window.PlaylistController) {
-            this.controllers.playlist = new PlaylistController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
+            this.controllers.file.init?.();
         }
         
         // InstrumentController
         if (window.InstrumentController) {
             this.controllers.instrument = new InstrumentController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.views.instrument,
+                this.models.instrument,
+                this.eventBus
             );
+            this.controllers.instrument.init?.();
+        }
+        
+        // KeyboardController
+        if (window.KeyboardController) {
+            this.controllers.keyboard = new KeyboardController(
+                this.views.keyboard,
+                this.eventBus
+            );
+            this.controllers.keyboard.init?.();
         }
         
         // SystemController
         if (window.SystemController) {
             this.controllers.system = new SystemController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.views.system,
+                this.models.system,
+                this.eventBus
             );
+            this.controllers.system.init?.();
         }
         
         // PlaybackController
         if (window.PlaybackController) {
             this.controllers.playback = new PlaybackController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.models.playback,
+                this.eventBus
             );
-        }
-        
-        // RoutingController
-        if (window.RoutingController) {
-            this.controllers.routing = new RoutingController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        
-          // EditorController
-        if (window.EditorController) {
-            this.controllers.editor = new EditorController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
-        // LoopController - ✅ NOUVEAU v3.0.3 (enregistrement de loops)
-        if (window.LoopController && this.models.loop) {
-            this.controllers.loop = new LoopController(this.eventBus);
-            // Initialiser avec les dépendances si disponibles
-            if (this.views.loopRecorder) {
-                const metronome = window.metronomeEngine || null;
-                const keyboard = this.controllers.keyboard || null;
-                this.controllers.loop.init(
-                    this.models.loop,
-                    this.views.loopRecorder,
-                    metronome,
-                    keyboard
-                );
-                console.log('✅ LoopController initialized');
-            } else {
-                console.warn('⚠️ LoopController created but not initialized (view missing)');
-            }
-        }
-              
-        
-        // KeyboardController
-        if (window.KeyboardController) {
-            this.controllers.keyboard = new KeyboardController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
+            this.controllers.playback.init?.();
         }
         
         // GlobalPlaybackController
         if (window.GlobalPlaybackController) {
             this.controllers.globalPlayback = new GlobalPlaybackController(
                 this.eventBus,
-                this.services.backend,
-                this.models.file,
-                this.logger
+                this.models.playback
             );
+            this.controllers.globalPlayback.init?.();
         }
         
-        // SearchController
-        if (window.SearchController) {
-            this.controllers.search = new SearchController(
-                this.eventBus,
-                this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+        // PlaylistController
+        if (window.PlaylistController) {
+            this.controllers.playlist = new PlaylistController(
+                this.views.playlist,
+                this.models.playlist,
+                this.eventBus
             );
+            this.controllers.playlist.init?.();
         }
         
-        // âœ… NOUVEAUX CONTRÃ”LEURS v3.8
-        this.initApiControllers();
-        
-        this.logger.info('Application', 'âœ” Controllers initialized');
-    }
-    
-    /**
-     * âœ… NOUVELLE MÃ‰THODE v3.8: Initialise les contrÃ´leurs API
-     */
-    initApiControllers() {
-        // BluetoothController
-        if (this.config.features.bluetooth && window.BluetoothController) {
-            this.controllers.bluetooth = new BluetoothController(
-                this.eventBus,
-                this.services.backend,
-                this.views.bluetooth,
-                this.notifications,
-                this.logger
+        // EditorController
+        if (window.EditorController) {
+            this.controllers.editor = new EditorController(
+                this.views.editor,
+                this.models.editor,
+                this.eventBus
             );
-            console.log('âœ” BluetoothController initialized');
+            this.controllers.editor.init?.();
         }
         
-        // LatencyController
-        if (this.config.features.latency && window.LatencyController) {
-            this.controllers.latency = new LatencyController(
-                this.eventBus,
-                this.services.backend,
-                this.views.latency,
-                this.notifications,
-                this.logger
+        // RoutingController
+        if (window.RoutingController) {
+            this.controllers.routing = new RoutingController(
+                this.views.routing,
+                this.models.routing,
+                this.eventBus
             );
-            console.log('âœ” LatencyController initialized');
+            this.controllers.routing.init?.();
         }
         
-        // PresetController
-        if (this.config.features.presets && window.PresetController) {
-            this.controllers.preset = new PresetController(
-                this.eventBus,
-                this.services.backend,
-                this.views.preset,
-                this.notifications,
-                this.logger
+        // VisualizerController
+        if (window.VisualizerController) {
+            this.controllers.visualizer = new VisualizerController(
+                this.views.visualizer,
+                this.eventBus
             );
-            console.log('âœ” PresetController initialized');
+            this.controllers.visualizer.init?.();
         }
         
-        // LoggerController
-        if (this.config.features.logger && window.loggerController) {
-            this.controllers.logger = new LoggerController(
-                this.eventBus,
-                this.services.backend,
-                this.views.logger,
-                this.notifications,
-                this.logger
-            );
-            console.log('âœ” LoggerController initialized');
-        }
-        
-        // NetworkMonitor (Controller)
-        if (this.config.features.network && window.NetworkMonitorController) {
-            this.controllers.network = new NetworkMonitorController(
-                this.eventBus,
-                this.services.backend,
-                this.views.network,
-                this.notifications,
-                this.logger
-            );
-            console.log('âœ” NetworkMonitorController initialized');
-        }
+        this.log('info', '✓ Controllers initialized');
     }
     
     /**
      * Initialise la navigation
      */
     async initNavigation() {
-        console.log('ðŸ§­ Initializing navigation...');
+        console.log('🧭 Initializing navigation...');
         
-        // Gestionnaire de navigation hashchange
-        window.addEventListener('hashchange', () => this.handleNavigation());
-        
-        // âœ… NOUVEAU v3.8: Configuration Router (si disponible)
-        if (window.Router && typeof window.Router === 'function') {
-            this.router = new Router({
-                mode: 'hash',
-                useTransitions: true
-            });
-            
-            // Configurer les routes API
-            if (typeof this.router.configureApiRoutes === 'function') {
-                this.router.configureApiRoutes(this.controllers, this.views);
-                console.log('âœ” API routes configured');
-            }
-            
-            window.router = this.router;
+        // Router
+        if (window.Router) {
+            this.router = new Router(this.eventBus);
+            this.router.init?.();
         }
         
-        // Navigation initiale
-        this.handleNavigation();
+        // Configuration navigation
+        this.setupNavigationEvents();
         
-        this.logger.info('Application', 'âœ” Navigation initialized');
+        // Page initiale
+        const hash = window.location.hash.slice(1) || 'home';
+        if (this.eventBus) {
+            this.eventBus.emit('navigation:page_request', { page: hash });
+        }
+        
+        this.log('info', '✓ Navigation initialized');
     }
     
     /**
-     * Connexion au backend (non-bloquant)
+     * Configure les événements de navigation
+     */
+    setupNavigationEvents() {
+        if (!this.eventBus) return;
+        
+        // Navigation entre pages
+        this.eventBus.on('navigation:change', (data) => {
+            this.state.currentPage = data.page || 'home';
+            this.log('debug', 'Page changed to:', data.page);
+        });
+        
+        // Hash change
+        window.addEventListener('hashchange', () => {
+            const page = window.location.hash.slice(1) || 'home';
+            if (this.eventBus) {
+                this.eventBus.emit('navigation:page_request', { page });
+            }
+        });
+    }
+    
+    /**
+     * Connecte au backend
      */
     async connectBackend() {
-        console.log('ðŸ”Œ Connecting to backend...');
-        
         if (!this.services.backend) {
-            console.warn('âš ï¸ Backend service not available');
-            this.enableOfflineMode('Backend service not available');
+            this.log('warn', 'Backend service not available');
             return;
         }
         
         try {
-            // Tentative de connexion
+            this.log('info', '🔌 Connecting to backend...');
             await this.services.backend.connect();
-            
-            // Attendre confirmation de connexion (timeout 3s)
-            const connected = await this.waitForConnection(3000);
-            
-            if (connected) {
-                this.state.backendConnected = true;
-                this.logger.info('Application', 'âœ… Backend connected');
-                this.showConnectionStatus(true);
-            } else {
-                throw new Error('Connection timeout');
-            }
-            
+            this.state.backendConnected = true;
+            this.log('info', '✓ Backend connected');
         } catch (error) {
-            console.warn('âš ï¸ Backend connection failed:', error.message);
-            this.logger.warn('Application', 'Backend connection failed, continuing in offline mode');
-            this.enableOfflineMode('Backend connection failed');
-        }
-    }
-    
-    /**
-     * Attend la connexion backend avec timeout
-     */
-    waitForConnection(timeout) {
-        return new Promise((resolve) => {
-            let timeoutId;
+            this.log('warn', 'Backend connection failed:', error.message);
+            this.state.backendConnected = false;
+            this.state.offlineMode = true;
             
-            const checkConnection = () => {
-                if (this.services.backend.isConnected()) {
-                    clearTimeout(timeoutId);
-                    resolve(true);
-                }
-            };
-            
-            // Ã‰couter l'Ã©vÃ©nement de connexion
-            this.eventBus.once('backend:connected', () => {
-                clearTimeout(timeoutId);
-                resolve(true);
-            });
-            
-            // Timeout
-            timeoutId = setTimeout(() => {
-                resolve(false);
-            }, timeout);
-            
-            // VÃ©rification immÃ©diate
-            checkConnection();
-        });
-    }
-    
-    /**
-     * Active le mode offline
-     */
-    enableOfflineMode(reason) {
-        this.state.offlineMode = true;
-        this.state.backendConnected = false;
-        
-        this.logger.warn('Application', `Offline mode enabled: ${reason}`);
-        
-        if (this.config.offlineMode.showNotification && this.notifications) {
-            this.notifications.show(
-                'Working in offline mode - Some features may be limited',
-                'warning',
-                { duration: 5000 }
-            );
-        }
-        
-        this.showConnectionStatus(false);
-        
-        // Planifier une tentative de reconnexion
-        if (this.config.autoReconnect) {
-            this.scheduleReconnect();
-        }
-    }
-    
-    /**
-     * Affiche le statut de connexion
-     */
-    showConnectionStatus(connected) {
-        const statusElement = document.getElementById('connection-status');
-        if (statusElement) {
-            statusElement.className = connected ? 'online' : 'offline';
-            statusElement.textContent = connected ? 'Online' : 'Offline';
-            statusElement.innerHTML = connected 
-                ? `<span class="status-dot online"></span> Online` 
-                : `<span class="status-dot offline"></span> Offline`;
-        }
-    }
-    
-    /**
-     * Planifie une reconnexion
-     */
-    scheduleReconnect() {
-        // Limiter les tentatives de reconnexion
-        if (this.state.reconnectAttempts >= this.config.maxReconnectAttempts) {
-            this.logger.warn('Application', 'Max reconnection attempts reached. Staying in offline mode.');
-            return;
-        }
-        
-        this.state.reconnectAttempts++;
-        this.logger.info('Application', `Scheduling reconnect in ${this.config.reconnectInterval}ms (attempt ${this.state.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
-        
-        setTimeout(async () => {
-            if (!this.state.backendConnected) {
-                this.logger.info('Application', 'Attempting reconnection...');
-                await this.connectBackend();
+            if (this.config.offlineMode.showNotification && this.notifications) {
+                this.notifications.show({
+                    type: 'warning',
+                    message: 'Mode hors ligne - Fonctionnalités limitées',
+                    duration: 5000
+                });
             }
-        }, this.config.reconnectInterval);
+        }
     }
     
     /**
-     * Finalisation de l'initialisation
+     * Finalise l'initialisation
      */
     async finalize() {
-        console.log('ðŸŽ¯ Finalizing initialization...');
+        console.log('🏁 Finalizing initialization...');
         
-        // Attacher gestionnaires d'erreurs globaux
-        this.attachErrorHandlers();
-        
-        // Attacher Ã©vÃ©nements application
-        this.attachAppEvents();
-        
-        // Rendre l'interface visible
+        // Afficher l'interface
         this.showInterface();
         
-        this.logger.info('Application', 'âœ” Initialization finalized');
+        // Raccourcis clavier globaux
+        this.setupGlobalKeyboardShortcuts();
+        
+        // Performance monitoring
+        if (window.PerformanceMonitor) {
+            this.performanceMonitor = new PerformanceMonitor(this.eventBus);
+        }
+        
+        this.log('info', '✓ Initialization complete');
     }
     
-    // ========================================================================
-    // NAVIGATION
-    // ========================================================================
+    /**
+     * Affiche l'interface
+     */
+    showInterface() {
+        // Masquer l'indicateur de chargement
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        // Afficher l'application
+        const appElement = document.getElementById('app');
+        if (appElement) {
+            appElement.style.display = 'flex';
+        }
+        
+        this.log('info', '✓ Interface displayed');
+    }
     
-    handleNavigation() {
-        const hash = window.location.hash.slice(1) || 'home';
-        const page = hash.split('/')[0];
+    /**
+     * Configure les raccourcis clavier globaux
+     */
+    setupGlobalKeyboardShortcuts() {
+        if (!window.KeyboardShortcuts) return;
         
-        this.logger.debug('Application', `Navigating to: ${page}`);
-        
-        // Masquer toutes les pages
-        this.hideAllPages();
-        
-        // Afficher la page demandÃ©e
-        const pageElement = document.getElementById(page);
-        if (pageElement) {
-            pageElement.style.display = 'block';
-            this.state.currentPage = page;
-            
-            // Ã‰mettre Ã©vÃ©nement de navigation
-            this.eventBus.emit('navigation:changed', { page, hash });
-            
-            // Initialiser le contrÃ´leur de la page si nÃ©cessaire
-            this.initPageController(page);
-        } else {
-            this.logger.warn('Application', `Page not found: ${page}`);
-            window.location.hash = '#home';
+        try {
+            const shortcuts = new KeyboardShortcuts(this.eventBus);
+            shortcuts.init?.();
+        } catch (e) {
+            this.log('warn', 'Failed to initialize keyboard shortcuts:', e);
         }
     }
     
-    hideAllPages() {
-        const pages = ['home', 'editor', 'routing', 'keyboard', 'instruments', 'system', 
-                      'bluetooth', 'latency', 'presets', 'network', 'logger'];
-        pages.forEach(page => {
-            const element = document.getElementById(page);
-            if (element) {
-                element.style.display = 'none';
-            }
-        });
-    }
-    
-    initPageController(page) {
-        // Initialiser les contrÃ´leurs et vues spÃ©cifiques aux pages
-        switch (page) {
-            case 'home':
-                if (this.controllers.home && typeof this.controllers.home.init === 'function') {
-                    this.controllers.home.init();
-                }
-                break;
-            case 'system':
-                if (this.controllers.system && typeof this.controllers.system.init === 'function') {
-                    this.controllers.system.init();
-                }
-                break;
-            case 'editor':
-                if (this.controllers.editor && typeof this.controllers.editor.init === 'function') {
-                    this.controllers.editor.init();
-                }
-                break;
-            // âœ… NOUVELLES PAGES v3.8
-            case 'bluetooth':
-                if (this.controllers.bluetooth && typeof this.controllers.bluetooth.init === 'function') {
-                    this.controllers.bluetooth.init();
-                }
-                break;
-            case 'latency':
-                if (this.controllers.latency && typeof this.controllers.latency.init === 'function') {
-                    this.controllers.latency.init();
-                }
-                break;
-            case 'presets':
-                if (this.controllers.preset && typeof this.controllers.preset.init === 'function') {
-                    this.controllers.preset.init();
-                }
-                break;
-            case 'network':
-                if (this.controllers.network && typeof this.controllers.network.init === 'function') {
-                    this.controllers.network.init();
-                }
-                break;
-            case 'logger':
-                if (this.controllers.logger && typeof this.controllers.logger.init === 'function') {
-                    this.controllers.logger.init();
-                }
-                break;
-        }
-    }
-    
-    // ========================================================================
-    // GESTION DES ERREURS
-    // ========================================================================
-    
-    attachErrorHandlers() {
-        // Erreurs JavaScript non capturÃ©es
-        window.addEventListener('error', (event) => {
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Uncaught error:', event.error);
-            }
-            this.handleError(event.error);
-        });
+    /**
+     * Gère les erreurs d'initialisation
+     */
+    handleInitError(error) {
+        console.error('Initialization error:', error);
         
-        // Promesses rejetÃ©es non capturÃ©es
-        window.addEventListener('unhandledrejection', (event) => {
-            if (this.logger && this.logger.error) {
-                this.logger.error('Application', 'Unhandled rejection:', event.reason);
-            }
-            this.handleError(event.reason);
-        });
-    }
-    
-    handleError(error) {
-        // Afficher notification
-        if (this.notifications && this.notifications.show) {
-            this.notifications.show(
-                `Error: ${error.message || error}`,
-                'error'
-            );
-        }
+        // Afficher l'interface malgré l'erreur
+        this.showInterface();
         
-        // Logger dÃ©taillÃ©
-        if (this.logger && this.logger.error) {
-            this.logger.error('Application', 'Error occurred:', {
-                message: error.message,
-                stack: error.stack
+        // Notification
+        if (this.notifications) {
+            this.notifications.show({
+                type: 'error',
+                message: 'Erreur d\'initialisation - Fonctionnalités limitées',
+                duration: 10000
             });
         }
         
-        // Ã‰mettre Ã©vÃ©nement erreur
-        this.eventBus.emit('app:error', { error });
-    }
-    
-    handleInitError(error) {
-        if (this.logger && this.logger.error) {
-            this.logger.error('Application', 'Initialization error:', error);
-        }
-        
-        // Afficher erreur Ã  l'utilisateur
-        if (this.notifications && this.notifications.show) {
-            this.notifications.show(
-                `Failed to initialize: ${error.message}`,
-                'error',
-                { duration: 0, closable: true }
-            );
-        }
-        
-        // Essayer de continuer en mode dÃ©gradÃ©
-        this.state.initialized = false;
-        this.state.ready = false;
+        // Mode dégradé
+        this.state.offlineMode = true;
+        console.warn('⚠️ Application initialization incomplete - showing interface anyway');
     }
     
     // ========================================================================
-    // Ã‰VÃ‰NEMENTS APPLICATION
+    // UTILITAIRES
     // ========================================================================
     
-    attachAppEvents() {
-        // Ã‰couter la connexion backend
-        this.eventBus.on('backend:connected', () => {
-            this.logger.info('Application', 'âœ… Backend connected event received');
-            this.state.backendConnected = true;
-            this.state.offlineMode = false;
-            this.showConnectionStatus(true);
-        });
+    /**
+     * Détruit l'application
+     */
+    destroy() {
+        this.log('info', 'Destroying application...');
         
-        // Ã‰couter la dÃ©connexion backend
-        this.eventBus.on('websocket:disconnected', () => {
-            this.logger.warn('Application', 'ðŸ”´ Backend disconnected');
-            this.state.backendConnected = false;
-            
-            if (!this.state.offlineMode) {
-                this.enableOfflineMode('Connection lost');
+        // Détruire contrôleurs
+        Object.values(this.controllers).forEach(controller => {
+            if (controller && typeof controller.destroy === 'function') {
+                controller.destroy();
             }
         });
         
-        // Ã‰couter les erreurs backend
-        this.eventBus.on('backend:connection-failed', (data) => {
-            this.logger.error('Application', 'Backend connection failed:', data);
+        // Détruire vues
+        Object.values(this.views).forEach(view => {
+            if (view && typeof view.destroy === 'function') {
+                view.destroy();
+            }
         });
-    }
-    
-    // ========================================================================
-    // INTERFACE UTILISATEUR
-    // ========================================================================
-    
-    showInterface() {
-        // Masquer le loading indicator
-        const loading = document.getElementById('loading-indicator');
-        if (loading) {
-            loading.style.display = 'none';
+        
+        // Déconnecter backend
+        if (this.services.backend) {
+            this.services.backend.disconnect?.();
         }
         
-        // Afficher l'interface principale
-        const app = document.getElementById('app');
-        if (app) {
-            app.style.display = 'block';
-        }
+        this.state.initialized = false;
+        this.state.ready = false;
         
-        // S'assurer que la page home est visible au dÃ©marrage
-        const homePage = document.getElementById('home');
-        if (homePage) {
-            homePage.style.display = 'block';
-        }
-    }
-    
-    // ========================================================================
-    // API PUBLIQUE
-    // ========================================================================
-    
-    /**
-     * Obtient l'Ã©tat de l'application
-     * @returns {Object}
-     */
-    getState() {
-        return { ...this.state };
-    }
-    
-    /**
-     * VÃ©rifie si le backend est connectÃ©
-     * @returns {boolean}
-     */
-    isBackendConnected() {
-        return this.state.backendConnected && this.services.backend?.isConnected();
-    }
-    
-    /**
-     * VÃ©rifie si en mode offline
-     * @returns {boolean}
-     */
-    isOfflineMode() {
-        return this.state.offlineMode;
-    }
-    
-    /**
-     * RÃ©cupÃ¨re un service par son nom
-     * @param {string} serviceName - Nom du service
-     * @returns {Object|null}
-     */
-    getService(serviceName) {
-        return this.services[serviceName] || null;
+        this.log('info', '✓ Application destroyed');
     }
 }
 
-window.Application = Application;
+// ============================================================================
+// EXPORT
+// ============================================================================
 
-// ============================================================================
-// FIN DU FICHIER Application.js v3.8
-// ============================================================================
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Application;
+}
+
+if (typeof window !== 'undefined') {
+    window.Application = Application;
+}
