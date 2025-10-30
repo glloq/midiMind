@@ -1,11 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/KeyboardController.js
-// Version: v3.1.1 - FIXED BACKEND
-// Date: 2025-01-24
+// Chemin: frontend/js/controllers/KeyboardController.js
+// Version: v3.1.2 - FIXED DOUBLE INITIALIZATION
+// Date: 2025-10-31
 // ============================================================================
-// CORRECTIONS v3.1.1:
-// ✅ Ajout initialisation this.backend = window.backendService
-// ✅ Vérification backend avant sendCommand
+// CORRECTIONS v3.1.2:
+// ✅ CRITIQUE: Removed duplicate this.initialize() call from constructor
+// ✅ BaseController already calls initialize() via autoInitialize
+// ✅ Fixes "this.eventBus.once is not a function" error
 // ============================================================================
 
 class KeyboardController extends BaseController {
@@ -47,7 +49,7 @@ class KeyboardController extends BaseController {
         
         this.logDebug('keyboard', `✓ KeyboardController initialized (mode: ${this.mode})`);
         
-        this.initialize();
+        // ✅ REMOVED: this.initialize() - BaseController calls it automatically via autoInitialize
     }
     
     // ========================================================================
@@ -100,46 +102,58 @@ class KeyboardController extends BaseController {
             'a': 60, 'w': 61, 's': 62, 'e': 63, 'd': 64, 'f': 65,
             't': 66, 'g': 67, 'y': 68, 'h': 69, 'u': 70, 'j': 71,
             'k': 72, 'o': 73, 'l': 74, 'p': 75, ';': 76, '\'': 77,
-            ']': 78
+            'z': 48, 'x': 50, 'c': 52, 'v': 53, 'b': 55, 'n': 57,
+            'm': 59, ',': 60, '.': 62, '/': 64
         };
     }
     
+    handleKeyDown(e) {
+        const key = e.key.toLowerCase();
+        const noteNumber = this.keyboardMap[key];
+        
+        if (noteNumber === undefined || this.pressedKeys.has(key)) {
+            return;
+        }
+        
+        this.pressedKeys.add(key);
+        this.sendNoteOn(noteNumber);
+    }
+    
+    handleKeyUp(e) {
+        const key = e.key.toLowerCase();
+        const noteNumber = this.keyboardMap[key];
+        
+        if (noteNumber === undefined) {
+            return;
+        }
+        
+        this.pressedKeys.delete(key);
+        this.sendNoteOff(noteNumber);
+    }
+    
     // ========================================================================
-    // CHARGEMENT DEVICES
+    // GESTION DEVICES
     // ========================================================================
     
     async loadAvailableDevices() {
-        // ✅ Vérifier backend
         if (!this.backend || !this.backend.isConnected()) {
-            this.logDebug('keyboard', 'Backend not available for loading devices', 'warn');
+            this.logDebug('keyboard', 'Backend not ready for device scan');
             return;
         }
         
         try {
-            // Essayer latency.list d'abord
-            let response = await this.backend.sendCommand('latency.list');
+            const response = await this.backend.sendCommand('device:scan');
+            this.availableDevices = response.devices || [];
+            this.logDebug('keyboard', `${this.availableDevices.length} devices available`);
             
-            if (response.success && response.devices) {
-                this.availableDevices = response.devices;
-                this.logDebug('keyboard', `✓ Loaded ${response.devices.length} devices from latency.list`);
-            } else {
-                // Fallback sur devices.list
-                response = await this.backend.sendCommand('devices.list');
-                
-                if (response.success && response.devices) {
-                    this.availableDevices = response.devices;
-                    this.logDebug('keyboard', `✓ Loaded ${response.devices.length} devices from devices.list`);
-                }
-            }
-            
-            // Émettre événement
+            // Notifier la vue
             this.eventBus.emit('keyboard:devices-loaded', {
                 devices: this.availableDevices
             });
             
         } catch (error) {
-            this.logDebug('keyboard', `Failed to load devices: ${error.message}`, 'error');
-            this.showError('Erreur chargement instruments');
+            this.logDebug('keyboard', `Device scan failed: ${error.message}`, 'error');
+            this.availableDevices = [];
         }
     }
     
@@ -148,193 +162,171 @@ class KeyboardController extends BaseController {
     // ========================================================================
     
     async selectInstrument(instrumentId) {
-        if (!this.backend || !this.backend.isConnected()) {
-            this.showError('Backend non connecté');
-            return;
-        }
+        this.logDebug('keyboard', `Selecting instrument: ${instrumentId}`);
         
         try {
-            const response = await this.backend.sendCommand('latency.get', {
-                device_id: instrumentId
-            });
+            // Récupérer profil instrument
+            this.selectedInstrument = instrumentId;
             
-            if (response.success) {
-                this.selectedInstrument = instrumentId;
-                this.instrumentProfile = response.profile || {};
-                this.noteMapping = response.note_mappings || null;
+            // Charger profile depuis InstrumentModel si disponible
+            const instrumentModel = this.getModel('instrument');
+            if (instrumentModel && instrumentModel.getInstrument) {
+                this.instrumentProfile = instrumentModel.getInstrument(instrumentId);
                 
-                // Mettre à jour note range si disponible
-                if (this.instrumentProfile.note_range) {
-                    this.noteRange = this.instrumentProfile.note_range;
+                // Mettre à jour note range si profile disponible
+                if (this.instrumentProfile && this.instrumentProfile.noteRange) {
+                    this.noteRange = this.instrumentProfile.noteRange;
                 }
                 
-                this.logDebug('keyboard', `✓ Selected instrument: ${instrumentId}`);
-                this.eventBus.emit('keyboard:instrument-selected', {
-                    instrumentId,
-                    profile: this.instrumentProfile
-                });
+                // Charger note mapping si disponible
+                if (this.instrumentProfile && this.instrumentProfile.noteMapping) {
+                    this.noteMapping = this.instrumentProfile.noteMapping;
+                }
             }
+            
+            this.logDebug('keyboard', `Instrument selected: ${instrumentId}`);
+            
+            // Notifier vue
+            this.eventBus.emit('keyboard:instrument-selected', {
+                instrumentId,
+                profile: this.instrumentProfile,
+                noteRange: this.noteRange
+            });
+            
         } catch (error) {
-            this.logDebug('keyboard', `Failed to select instrument: ${error.message}`, 'error');
-            this.showError('Erreur sélection instrument');
+            this.handleError(error, `Failed to select instrument ${instrumentId}`);
         }
     }
     
     // ========================================================================
-    // PLAYBACK
+    // ENVOI NOTES MIDI
     // ========================================================================
     
-    handleKeyDown(event) {
-        const key = event.key.toLowerCase();
-        
-        if (!this.keyboardMap[key] || this.pressedKeys.has(key)) {
-            return;
-        }
-        
-        this.pressedKeys.add(key);
-        const note = this.keyboardMap[key];
-        
-        this.playNote(note, this.currentVelocity);
-    }
-    
-    handleKeyUp(event) {
-        const key = event.key.toLowerCase();
-        
-        if (!this.keyboardMap[key]) {
-            return;
-        }
-        
-        this.pressedKeys.delete(key);
-        const note = this.keyboardMap[key];
-        
-        this.stopNote(note);
-    }
-    
-    async playNote(note, velocity = 100) {
-        if (!this.backend || !this.backend.isConnected()) {
-            return;
-        }
-        
+    sendNoteOn(noteNumber, velocity = null) {
         if (!this.selectedInstrument) {
-            this.showWarning('Aucun instrument sélectionné');
+            this.logDebug('keyboard', 'No instrument selected', 'warn');
             return;
         }
         
-        // Appliquer note mapping si existe
-        const mappedNote = this.noteMapping 
-            ? (this.noteMapping[note] || note)
-            : note;
+        // Appliquer mapping si disponible
+        const mappedNote = this.noteMapping ? 
+            (this.noteMapping[noteNumber] || noteNumber) : 
+            noteNumber;
         
-        try {
-            await this.backend.sendCommand('midi.send', {
-                device_id: this.selectedInstrument,
-                message: {
-                    type: 'note_on',
-                    note: mappedNote,
-                    velocity: velocity
-                }
-            });
-            
-            this.activeNotes.set(note, {
-                velocity,
-                timestamp: Date.now()
-            });
-            
-            this.stats.notesPlayed++;
-            
-            this.eventBus.emit('keyboard:note-on', {
-                note: mappedNote,
-                velocity
-            });
-            
-        } catch (error) {
-            this.logDebug('keyboard', `Failed to play note: ${error.message}`, 'error');
-            this.stats.errors++;
+        // Vérifier range
+        if (mappedNote < this.noteRange.min || mappedNote > this.noteRange.max) {
+            this.logDebug('keyboard', `Note ${mappedNote} outside range ${this.noteRange.min}-${this.noteRange.max}`, 'warn');
+            return;
         }
+        
+        const finalVelocity = velocity || this.currentVelocity;
+        
+        // Enregistrer note active
+        this.activeNotes.set(noteNumber, {
+            note: mappedNote,
+            velocity: finalVelocity,
+            startTime: Date.now()
+        });
+        
+        // Envoyer au backend
+        if (this.enablePlayback && this.backend && this.backend.isConnected()) {
+            this.backend.sendCommand('midi:note-on', {
+                instrument: this.selectedInstrument,
+                note: mappedNote,
+                velocity: finalVelocity
+            }).catch(err => {
+                this.logDebug('keyboard', `Note-on failed: ${err.message}`, 'error');
+            });
+        }
+        
+        // Notifier vue
+        this.eventBus.emit('keyboard:note-on', {
+            note: mappedNote,
+            velocity: finalVelocity,
+            originalNote: noteNumber
+        });
+        
+        this.stats.notesPlayed++;
     }
     
-    async stopNote(note) {
-        if (!this.backend || !this.backend.isConnected()) {
-            return;
-        }
+    sendNoteOff(noteNumber) {
+        const noteInfo = this.activeNotes.get(noteNumber);
+        if (!noteInfo) return;
         
-        if (!this.selectedInstrument || !this.activeNotes.has(note)) {
-            return;
-        }
+        const duration = Date.now() - noteInfo.startTime;
+        this.stats.totalDuration += duration;
         
-        const mappedNote = this.noteMapping 
-            ? (this.noteMapping[note] || note)
-            : note;
-        
-        try {
-            await this.backend.sendCommand('midi.send', {
-                device_id: this.selectedInstrument,
-                message: {
-                    type: 'note_off',
-                    note: mappedNote,
-                    velocity: 0
-                }
+        // Envoyer au backend
+        if (this.enablePlayback && this.backend && this.backend.isConnected()) {
+            this.backend.sendCommand('midi:note-off', {
+                instrument: this.selectedInstrument,
+                note: noteInfo.note
+            }).catch(err => {
+                this.logDebug('keyboard', `Note-off failed: ${err.message}`, 'error');
             });
-            
-            const noteInfo = this.activeNotes.get(note);
-            if (noteInfo) {
-                const duration = Date.now() - noteInfo.timestamp;
-                this.stats.totalDuration += duration;
-            }
-            
-            this.activeNotes.delete(note);
-            
-            this.eventBus.emit('keyboard:note-off', {
-                note: mappedNote
-            });
-            
-        } catch (error) {
-            this.logDebug('keyboard', `Failed to stop note: ${error.message}`, 'error');
-            this.stats.errors++;
         }
+        
+        // Notifier vue
+        this.eventBus.emit('keyboard:note-off', {
+            note: noteInfo.note,
+            duration,
+            originalNote: noteNumber
+        });
+        
+        this.activeNotes.delete(noteNumber);
     }
     
     // ========================================================================
-    // UTILITIES
+    // STATS
     // ========================================================================
     
     getStats() {
+        const avgDuration = this.stats.notesPlayed > 0 ? 
+            Math.round(this.stats.totalDuration / this.stats.notesPlayed) : 
+            0;
+        
         return {
-            ...this.stats,
+            notesPlayed: this.stats.notesPlayed,
+            avgDuration,
             activeNotes: this.activeNotes.size,
-            pressedKeys: this.pressedKeys.size,
-            selectedInstrument: this.selectedInstrument,
-            availableDevices: this.availableDevices.length
+            errors: this.stats.errors
         };
     }
     
-    reset() {
-        // Arrêter toutes les notes actives
-        for (const note of this.activeNotes.keys()) {
-            this.stopNote(note);
-        }
-        
-        this.activeNotes.clear();
-        this.pressedKeys.clear();
-        
+    resetStats() {
         this.stats = {
             notesPlayed: 0,
             totalDuration: 0,
             errors: 0
         };
         
-        this.logDebug('keyboard', '✓ Controller reset');
+        this.eventBus.emit('keyboard:stats-reset');
+    }
+    
+    // ========================================================================
+    // CLEANUP
+    // ========================================================================
+    
+    cleanup() {
+        // Arrêter toutes les notes actives
+        for (const [noteNumber] of this.activeNotes) {
+            this.sendNoteOff(noteNumber);
+        }
+        
+        this.activeNotes.clear();
+        this.pressedKeys.clear();
+        
+        super.cleanup();
     }
 }
 
-// ============================================================================
-// EXPORT
-// ============================================================================
-
+// Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = KeyboardController;
 }
 
-if (typeof window !== 'undefined') {
-    window.KeyboardController = KeyboardController;
-}
+window.KeyboardController = KeyboardController;
+
+// ============================================================================
+// FIN DU FICHIER KeyboardController.js v3.1.2
+// ============================================================================
