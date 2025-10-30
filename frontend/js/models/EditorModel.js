@@ -4,12 +4,12 @@
 // Date: 2025-10-23
 // ============================================================================
 // CORRECTIONS v3.1.0:
-// ✓ Ajout de toutes les méthodes d'édition (addNote, updateNote, deleteNotes)
-// ✓ Ajout de undo/redo avec HistoryManager
-// ✓ Ajout de copy/paste avec ClipboardManager
-// ✓ Ajout des méthodes CC (Control Change)
-// ✓ Ajout des méthodes de statistiques
-// ✓ Gestion complète du cycle de vie (destroy, close)
+// âœ“ Ajout de toutes les mÃ©thodes d'Ã©dition (addNote, updateNote, deleteNotes)
+// âœ“ Ajout de undo/redo avec HistoryManager
+// âœ“ Ajout de copy/paste avec ClipboardManager
+// âœ“ Ajout des mÃ©thodes CC (Control Change)
+// âœ“ Ajout des mÃ©thodes de statistiques
+// âœ“ Gestion complÃ¨te du cycle de vie (destroy, close)
 // ============================================================================
 
 
@@ -21,14 +21,19 @@ class EditorModel extends BaseModel {
             autoPersist: false
         });
         
-        this.eventBus = eventBus;
-        this.logger = logger;
-        this.backend = backend;
+        // Protection: Fallback sur window.logger ou console
+        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.backend = backend || window.backendService || window.app?.services?.backend;
+        this.logger = logger || window.logger || console;
         
-        // Données MIDI
+        // Validation
+        if (!this.eventBus) console.error('[EditorModel] EventBus not available!');
+        if (!this.backend) console.warn('[EditorModel] BackendService not available');
+        
+        // DonnÃ©es MIDI
         this.midiData = null;
         
-        // État du modèle
+        // Ã‰tat du modÃ¨le
         this.state = {
             fileId: null,
             filePath: null,
@@ -36,7 +41,7 @@ class EditorModel extends BaseModel {
             isLoaded: false,
             lastSaved: null,
             
-            // Sélection
+            // SÃ©lection
             selectedNotes: [],
             selectedTracks: []
         };
@@ -58,7 +63,7 @@ class EditorModel extends BaseModel {
         // Compteur pour IDs uniques
         this.nextNoteId = 1000;
         
-        this.logger.info('EditorModel', '✓ Model initialized (complete version)');
+        if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', 'âœ“ Model initialized (complete version)');
     }
     
     // ========================================================================
@@ -66,7 +71,7 @@ class EditorModel extends BaseModel {
     // ========================================================================
     
     load(midiData, fileId, filePath) {
-        this.logger.info('EditorModel', `Loading file: ${filePath}`);
+        if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', `Loading file: ${filePath}`);
         
         this.midiData = midiData;
         this.state.fileId = fileId;
@@ -75,7 +80,7 @@ class EditorModel extends BaseModel {
         this.state.isLoaded = true;
         this.state.lastSaved = Date.now();
         
-        // Réinitialiser historique et sélection
+        // RÃ©initialiser historique et sÃ©lection
         this.clearHistory();
         this.clearSelection();
         
@@ -93,7 +98,7 @@ class EditorModel extends BaseModel {
     
     unload() {
         if (this.state.isModified) {
-            this.logger.warn('EditorModel', 'Unloading modified file');
+            if (this.logger && typeof this.logger.warn === 'function') this.logger.warn('EditorModel', 'Unloading modified file');
         }
         
         this.midiData = null;
@@ -115,11 +120,11 @@ class EditorModel extends BaseModel {
     
     destroy() {
         this.unload();
-        this.logger.info('EditorModel', 'Model destroyed');
+        if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', 'Model destroyed');
     }
     
     // ========================================================================
-    // DONNÉES
+    // DONNÃ‰ES
     // ========================================================================
     
     getData() {
@@ -209,7 +214,7 @@ class EditorModel extends BaseModel {
     }
     
     // ========================================================================
-    // ÉDITION - NOTES
+    // Ã‰DITION - NOTES
     // ========================================================================
     
     addNote(noteData) {
@@ -229,7 +234,7 @@ class EditorModel extends BaseModel {
             track.notes = [];
         }
         
-        // Créer la note avec un ID unique
+        // CrÃ©er la note avec un ID unique
         const note = {
             id: noteData.id || this.nextNoteId++,
             time: noteData.time || 0,
@@ -244,7 +249,7 @@ class EditorModel extends BaseModel {
         // Ajouter la note
         track.notes.push(note);
         
-        // Marquer comme modifié
+        // Marquer comme modifiÃ©
         this.markModified();
         
         this.eventBus.emit('editor:note-added', { trackIndex, note });
@@ -273,7 +278,7 @@ class EditorModel extends BaseModel {
                         updates 
                     });
                     
-                    // Appliquer les mises à jour
+                    // Appliquer les mises Ã  jour
                     Object.assign(track.notes[noteIndex], updates);
                     
                     this.markModified();
@@ -299,7 +304,7 @@ class EditorModel extends BaseModel {
                 const note = this.updateNote(noteId, updates);
                 updatedNotes.push(note);
             } catch (error) {
-                this.logger.warn('EditorModel', `Failed to update note ${noteId}: ${error.message}`);
+                if (this.logger && typeof this.logger.warn === 'function') this.logger.warn('EditorModel', `Failed to update note ${noteId}: ${error.message}`);
             }
         });
         
@@ -434,7 +439,7 @@ class EditorModel extends BaseModel {
     }
     
     // ========================================================================
-    // SÉLECTION
+    // SÃ‰LECTION
     // ========================================================================
     
     selectNote(trackIndex, noteId) {
@@ -548,7 +553,7 @@ class EditorModel extends BaseModel {
         const time = pasteTime !== null ? pasteTime : this.getCurrentPasteTime();
         const copiedNotes = this.clipboard.content;
         
-        // Trouver le temps minimum dans les notes copiées
+        // Trouver le temps minimum dans les notes copiÃ©es
         const minTime = Math.min(...copiedNotes.map(n => n.time));
         const timeOffset = time - minTime;
         
@@ -567,11 +572,11 @@ class EditorModel extends BaseModel {
                 const addedNote = this.addNote({ ...newNote, trackIndex });
                 pastedNotes.push(addedNote);
             } catch (error) {
-                this.logger.warn('EditorModel', `Failed to paste note: ${error.message}`);
+                if (this.logger && typeof this.logger.warn === 'function') this.logger.warn('EditorModel', `Failed to paste note: ${error.message}`);
             }
         });
         
-        // Sélectionner les notes collées
+        // SÃ©lectionner les notes collÃ©es
         this.selectNotes(pastedNotes);
         
         this.eventBus.emit('editor:pasted', { notes: pastedNotes });
@@ -580,7 +585,7 @@ class EditorModel extends BaseModel {
     }
     
     getCurrentPasteTime() {
-        // Par défaut, coller au début de la sélection ou à 0
+        // Par dÃ©faut, coller au dÃ©but de la sÃ©lection ou Ã  0
         const selected = this.getSelectedNotes();
         if (selected.length > 0) {
             return Math.min(...selected.map(n => n.time));
@@ -651,15 +656,15 @@ class EditorModel extends BaseModel {
     }
     
     applyUndo(state) {
-        // Implémentation simplifiée - à améliorer selon les besoins
-        this.logger.debug('EditorModel', `Undo: ${state.action}`);
-        // TODO: Implémenter les actions spécifiques
+        // ImplÃ©mentation simplifiÃ©e - Ã  amÃ©liorer selon les besoins
+        if (this.logger && typeof this.logger.debug === 'function') this.logger.debug('EditorModel', `Undo: ${state.action}`);
+        // TODO: ImplÃ©menter les actions spÃ©cifiques
     }
     
     applyRedo(state) {
-        // Implémentation simplifiée - à améliorer selon les besoins
-        this.logger.debug('EditorModel', `Redo: ${state.action}`);
-        // TODO: Implémenter les actions spécifiques
+        // ImplÃ©mentation simplifiÃ©e - Ã  amÃ©liorer selon les besoins
+        if (this.logger && typeof this.logger.debug === 'function') this.logger.debug('EditorModel', `Redo: ${state.action}`);
+        // TODO: ImplÃ©menter les actions spÃ©cifiques
     }
     
     canUndo() {
@@ -685,7 +690,7 @@ class EditorModel extends BaseModel {
         }
         
         try {
-            this.logger.info('EditorModel', `Saving file: ${this.state.filePath}`);
+            if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', `Saving file: ${this.state.filePath}`);
             
             const response = await this.backend.sendCommand('editor.save', {
                 file_id: this.state.fileId,
@@ -707,7 +712,7 @@ class EditorModel extends BaseModel {
             throw new Error(response.error || 'Save failed');
             
         } catch (error) {
-            this.logger.error('EditorModel', `Save failed: ${error.message}`);
+            if (this.logger && typeof this.logger.error === 'function') this.logger.error('EditorModel', `Save failed: ${error.message}`);
             throw error;
         }
     }
@@ -718,7 +723,7 @@ class EditorModel extends BaseModel {
         }
         
         try {
-            this.logger.info('EditorModel', `Saving file as: ${newFilePath}`);
+            if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', `Saving file as: ${newFilePath}`);
             
             const response = await this.backend.sendCommand('editor.save-as', {
                 file_id: this.state.fileId,
@@ -743,7 +748,7 @@ class EditorModel extends BaseModel {
             throw new Error(response.error || 'Save as failed');
             
         } catch (error) {
-            this.logger.error('EditorModel', `Save as failed: ${error.message}`);
+            if (this.logger && typeof this.logger.error === 'function') this.logger.error('EditorModel', `Save as failed: ${error.message}`);
             throw error;
         }
     }
