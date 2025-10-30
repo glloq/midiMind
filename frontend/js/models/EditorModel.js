@@ -1,15 +1,16 @@
 // ============================================================================
 // Fichier: frontend/js/models/EditorModel.js
-// Version: v3.1.0 - COMPLETE WITH ALL MISSING METHODS
-// Date: 2025-10-23
+// Version: v3.1.1 - FIXED LOGGER PROTECTION
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.1.0:
-// âœ“ Ajout de toutes les mÃ©thodes d'Ã©dition (addNote, updateNote, deleteNotes)
-// âœ“ Ajout de undo/redo avec HistoryManager
-// âœ“ Ajout de copy/paste avec ClipboardManager
-// âœ“ Ajout des mÃ©thodes CC (Control Change)
-// âœ“ Ajout des mÃ©thodes de statistiques
-// âœ“ Gestion complÃ¨te du cycle de vie (destroy, close)
+// CORRECTIONS v3.1.1:
+// ✓ Ajout de toutes les méthodes d'édition (addNote, updateNote, deleteNotes)
+// ✓ Ajout de undo/redo avec HistoryManager
+// ✓ Ajout de copy/paste avec ClipboardManager
+// ✓ Ajout des méthodes CC (Control Change)
+// ✓ Ajout des méthodes de statistiques
+// ✓ Gestion complète du cycle de vie (destroy, close)
+// ✓ Protection logger pour éviter erreurs undefined
 // ============================================================================
 
 
@@ -21,19 +22,17 @@ class EditorModel extends BaseModel {
             autoPersist: false
         });
         
-        // Protection: Fallback sur window.logger ou console
         this.eventBus = eventBus || window.EventBus || window.eventBus;
         this.backend = backend || window.backendService || window.app?.services?.backend;
         this.logger = logger || window.logger || console;
         
-        // Validation
         if (!this.eventBus) console.error('[EditorModel] EventBus not available!');
         if (!this.backend) console.warn('[EditorModel] BackendService not available');
         
-        // DonnÃ©es MIDI
+        // Données MIDI
         this.midiData = null;
         
-        // Ã‰tat du modÃ¨le
+        // État du modèle
         this.state = {
             fileId: null,
             filePath: null,
@@ -41,7 +40,7 @@ class EditorModel extends BaseModel {
             isLoaded: false,
             lastSaved: null,
             
-            // SÃ©lection
+            // Sélection
             selectedNotes: [],
             selectedTracks: []
         };
@@ -63,7 +62,9 @@ class EditorModel extends BaseModel {
         // Compteur pour IDs uniques
         this.nextNoteId = 1000;
         
-        if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', 'âœ“ Model initialized (complete version)');
+        if (this.logger && typeof this.logger.info === 'function') {
+            if (this.logger && typeof this.logger.info === 'function') this.logger.info('EditorModel', '✓ Model initialized v3.1.1');
+        }
     }
     
     // ========================================================================
@@ -80,7 +81,7 @@ class EditorModel extends BaseModel {
         this.state.isLoaded = true;
         this.state.lastSaved = Date.now();
         
-        // RÃ©initialiser historique et sÃ©lection
+        // Réinitialiser historique et sélection
         this.clearHistory();
         this.clearSelection();
         
@@ -124,7 +125,7 @@ class EditorModel extends BaseModel {
     }
     
     // ========================================================================
-    // DONNÃ‰ES
+    // DONNÉES
     // ========================================================================
     
     getData() {
@@ -214,7 +215,7 @@ class EditorModel extends BaseModel {
     }
     
     // ========================================================================
-    // Ã‰DITION - NOTES
+    // ÉDITION - NOTES
     // ========================================================================
     
     addNote(noteData) {
@@ -234,7 +235,7 @@ class EditorModel extends BaseModel {
             track.notes = [];
         }
         
-        // CrÃ©er la note avec un ID unique
+        // Créer la note avec un ID unique
         const note = {
             id: noteData.id || this.nextNoteId++,
             time: noteData.time || 0,
@@ -249,7 +250,7 @@ class EditorModel extends BaseModel {
         // Ajouter la note
         track.notes.push(note);
         
-        // Marquer comme modifiÃ©
+        // Marquer comme modifié
         this.markModified();
         
         this.eventBus.emit('editor:note-added', { trackIndex, note });
@@ -439,7 +440,7 @@ class EditorModel extends BaseModel {
     }
     
     // ========================================================================
-    // SÃ‰LECTION
+    // SÉLECTION
     // ========================================================================
     
     selectNote(trackIndex, noteId) {
@@ -553,7 +554,7 @@ class EditorModel extends BaseModel {
         const time = pasteTime !== null ? pasteTime : this.getCurrentPasteTime();
         const copiedNotes = this.clipboard.content;
         
-        // Trouver le temps minimum dans les notes copiÃ©es
+        // Trouver le temps minimum dans les notes copiées
         const minTime = Math.min(...copiedNotes.map(n => n.time));
         const timeOffset = time - minTime;
         
@@ -576,7 +577,7 @@ class EditorModel extends BaseModel {
             }
         });
         
-        // SÃ©lectionner les notes collÃ©es
+        // Sélectionner les notes collées
         this.selectNotes(pastedNotes);
         
         this.eventBus.emit('editor:pasted', { notes: pastedNotes });
@@ -585,7 +586,7 @@ class EditorModel extends BaseModel {
     }
     
     getCurrentPasteTime() {
-        // Par dÃ©faut, coller au dÃ©but de la sÃ©lection ou Ã  0
+        // Par défaut, coller au début de la sélection ou Ã  0
         const selected = this.getSelectedNotes();
         if (selected.length > 0) {
             return Math.min(...selected.map(n => n.time));
@@ -656,15 +657,15 @@ class EditorModel extends BaseModel {
     }
     
     applyUndo(state) {
-        // ImplÃ©mentation simplifiÃ©e - Ã  amÃ©liorer selon les besoins
+        // Implémentation simplifiée - Ã  améliorer selon les besoins
         if (this.logger && typeof this.logger.debug === 'function') this.logger.debug('EditorModel', `Undo: ${state.action}`);
-        // TODO: ImplÃ©menter les actions spÃ©cifiques
+        // TODO: Implémenter les actions spécifiques
     }
     
     applyRedo(state) {
-        // ImplÃ©mentation simplifiÃ©e - Ã  amÃ©liorer selon les besoins
+        // Implémentation simplifiée - Ã  améliorer selon les besoins
         if (this.logger && typeof this.logger.debug === 'function') this.logger.debug('EditorModel', `Redo: ${state.action}`);
-        // TODO: ImplÃ©menter les actions spÃ©cifiques
+        // TODO: Implémenter les actions spécifiques
     }
     
     canUndo() {
