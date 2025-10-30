@@ -1,23 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/HomeController.js
-// Version: 3.2.0-complete
-// Date: 2025-10-15
+// Version: 3.2.1-fixed-double-init
+// Date: 2025-10-31
 // ============================================================================
 // Description:
-//   ContrÃ´leur de la page d'accueil - VERSION COMPLÃˆTE
-//   Fusion de BaseController (v3.1.0) + Toutes fonctionnalitÃ©s (v3.0.1)
+//   Contrôleur de la page d'accueil - VERSION COMPLETE
+//   Fusion de BaseController (v3.1.0) + Toutes fonctionnalités (v3.0.1)
+//
+// CORRECTIONS v3.2.1:
+//   ✅ CRITIQUE: Fix double initialisation (BaseController.autoInitialize + Application.init())
+//   ✅ Ajout flag _dataLoaded pour éviter chargement multiple
+//   ✅ Ajout flag _viewRendered pour éviter rendu multiple
+//   ✅ méthode init() appelle onInitialize si pas encore initialisé
+//   ✅ loadInitialData() protégée contre appels multiples
 //
 // CORRECTIONS v3.2.0:
-//   âœ… HÃ©rite de BaseController
-//   âœ… Utilise models/views/notifications
-//   âœ… PrÃ©serve TOUTES les fonctionnalitÃ©s de v3.0.1
-//   âœ… Ajout destroy() complet
-//   âœ… Gestion playlists complÃ¨te (manage, edit, delete, load)
-//   âœ… Gestion routing complÃ¨te (auto-route, presets)
-//   âœ… Gestion fichiers complÃ¨te (upload, refresh)
-//   âœ… IntÃ©gration backend v3.0
+//   ✅ Hérite de BaseController
+//   ✅ Utilise models/views/notifications
+//   ✅ Préserve TOUTES les fonctionnalités de v3.0.1
+//   ✅ Ajout destroy() complet
+//   ✅ Gestion playlists complète (manage, edit, delete, load)
+//   ✅ Gestion routing complète (auto-route, presets)
+//   ✅ Gestion fichiers complète (upload, refresh)
+//   ✅ Intégration backend v3.0
 //
-// FonctionnalitÃ©s:
+// Fonctionnalités:
 //   - Playback (play, pause, stop, seek, tempo)
 //   - Playlists (create, edit, delete, load, manage)
 //   - Routing (assign, auto-route, presets)
@@ -29,24 +36,24 @@ class HomeController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // âœ… ModÃ¨les
-        this.playbackModel = models.playback;
-        this.routingModel = models.routing;
-        this.fileModel = models.file;
-        this.playlistModel = models.playlist;
+        // ✅ Modèles
+        this.playbackModel = models?.playback || null;
+        this.routingModel = models?.routing || null;
+        this.fileModel = models?.file || null;
+        this.playlistModel = models?.playlist || null;
         
-        // âœ… Vue
-        this.homeView = views.home;
-        this.view = views.home; // Alias pour compatibilitÃ©
+        // ✅ Vue
+        this.homeView = views?.home || null;
+        this.view = views?.home || null; // Alias pour compatibilité
         
-        // âœ… RÃ©fÃ©rences aux autres controllers
+        // ✅ Références aux autres controllers
         this.playbackController = null;
         this.playlistController = null;
         
-        // âœ… Backend
+        // ✅ Backend
         this.backend = window.backendService;
         
-        // Ã‰tat du contrÃ´leur home
+        // État du contrôleur home
         this.homeState = {
             currentFile: null,
             playbackState: 'stopped', // stopped, playing, paused
@@ -54,7 +61,7 @@ class HomeController extends BaseController {
             isPlaying: false
         };
         
-        // Aliases pour compatibilitÃ© avec ancien code
+        // Aliases pour compatibilité avec ancien code
         this.currentFile = null;
         this.playbackState = 'stopped';
         this.currentTime = 0;
@@ -63,7 +70,12 @@ class HomeController extends BaseController {
         // Timer pour position
         this.playbackTimer = null;
         
-        // ✅ REMOVED: this.initialize() - BaseController calls it via autoInitialize
+        // ✅ NOUVEAU: Flags pour éviter double initialisation
+        this._dataLoaded = false;
+        this._viewRendered = false;
+        
+        // ✅ NOTE: BaseController appelle automatiquement initialize() via autoInitialize
+        // qui appelle onInitialize() puis bindEvents()
     }
     
     // ========================================================================
@@ -71,13 +83,14 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Hook d'initialisation personnalisÃ©e
+     * Hook d'initialisation personnalisée
      * Override de BaseController.onInitialize()
+     * ✅ APPELE AUTOMATIQUEMENT par BaseController.initialize()
      */
     onInitialize() {
-        this.logDebug('home', 'Initializing HomeController v3.2.0...');
+        this.logDebug('home', 'HomeController.onInitialize() - v3.2.1');
         
-        // RÃ©cupÃ©rer rÃ©fÃ©rence aux controllers
+        // Récupérer référence aux controllers
         if (window.app && window.app.controllers) {
             this.playbackController = window.app.controllers.playback;
             this.playlistController = window.app.controllers.playlist;
@@ -91,64 +104,112 @@ class HomeController extends BaseController {
             this.playlistController = window.playlistController;
         }
         
-        // VÃ©rifier dÃ©pendances
+        // Vérifier dépendances
         if (!this.backend) {
-            this.logDebug('error', 'BackendService not available');
-            this.showNotification('Backend service not available');
+            this.logDebug('warning', 'BackendService not available');
+            if (this.notifications) {
+                this.notifications.show({
+                    type: 'warning',
+                    message: 'Backend service not available',
+                    duration: 3000
+                });
+            }
         }
         
-        // Initialiser la vue
-        if (this.view) {
-            this.view.init?.();
+        // Initialiser la vue (si pas encore rendue)
+        if (this.view && !this._viewRendered) {
+            if (typeof this.view.init === 'function') {
+                this.view.init();
+            }
+            this._viewRendered = true;
         }
         
-        // Charger donnÃ©es initiales
-        this.loadInitialData();
+        // Charger données initiales (si pas encore chargées)
+        if (!this._dataLoaded) {
+            this.loadInitialData();
+        }
         
-        this.logDebug('home', 'âœ“ HomeController v3.2.0 initialized');
+        this.logDebug('home', '✓ HomeController.onInitialize() complete');
     }
     
-	/**
- * MÃ©thode init() publique appelÃ©e par Application.js
- */
-init() {
-    this.logDebug('home', 'HomeController.init() called');
-    
-    // S'assurer que la vue est rendue
-    if (this.homeView && typeof this.homeView.render === 'function') {
-        this.homeView.render();
-        this.logDebug('home', 'HomeView rendered from controller');
-    }
-    
-    // Charger les donnÃ©es initiales
-    this.loadInitialData();
-}
-
-/**
- * Charge les donnÃ©es initiales
- */
-loadInitialData() {
-    // Charger fichiers rÃ©cents
-    if (this.fileModel) {
-        const recentFiles = this.fileModel.get('recentFiles') || [];
-        this.logDebug('home', `Loaded ${recentFiles.length} recent files`);
-    }
-    
-    // Charger playlists
-    if (this.playlistModel) {
-        const playlists = this.playlistModel.get('playlists') || [];
-        this.logDebug('home', `Loaded ${playlists.length} playlists`);
-    }
-}
     /**
-     * Binding des Ã©vÃ©nements
+     * ✅ Méthode init() publique appelée par Application.js
+     * Prévient la double initialisation grâce aux flags
+     */
+    init() {
+        this.logDebug('home', 'HomeController.init() called by Application');
+        
+        // Si déjà initialisé par BaseController, juste rendre la vue
+        if (this.state.isInitialized) {
+            this.logDebug('home', 'Already initialized, just rendering view');
+            
+            // S'assurer que la vue est rendue
+            if (this.homeView && !this._viewRendered) {
+                if (typeof this.homeView.render === 'function') {
+                    this.homeView.render();
+                    this._viewRendered = true;
+                    this.logDebug('home', 'HomeView rendered');
+                }
+            }
+            
+            // Charger données si pas encore fait
+            if (!this._dataLoaded) {
+                this.loadInitialData();
+            }
+            
+            return;
+        }
+        
+        // Sinon, initialiser complètement
+        this.logDebug('home', 'Not yet initialized, calling onInitialize');
+        this.onInitialize();
+    }
+    
+    /**
+     * ✅ Charge les données initiales
+     * Protégée contre les appels multiples
+     */
+    loadInitialData() {
+        // Protéger contre double chargement
+        if (this._dataLoaded) {
+            this.logDebug('home', 'Data already loaded, skipping');
+            return;
+        }
+        
+        this.logDebug('home', 'Loading initial data...');
+        
+        try {
+            // Charger fichiers récents
+            if (this.fileModel) {
+                const recentFiles = this.fileModel.get?.('recentFiles') || [];
+                this.logDebug('home', `Loaded ${recentFiles.length} recent files`);
+            }
+            
+            // Charger playlists
+            if (this.playlistModel) {
+                const playlists = this.playlistModel.get?.('playlists') || [];
+                this.logDebug('home', `Loaded ${playlists.length} playlists`);
+            }
+            
+            // Marquer comme chargé
+            this._dataLoaded = true;
+            this.logDebug('home', '✓ Initial data loaded');
+            
+        } catch (error) {
+            this.handleError('Failed to load initial data', error);
+        }
+    }
+    
+    /**
+     * Binding des événements
      * Override de BaseController.bindEvents()
+     * ✅ APPELE AUTOMATIQUEMENT par BaseController.initialize()
      */
     bindEvents() {
         this.logDebug('home', 'Binding home events...');
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS FICHIERS
+        // EVENEMENTS FICHIERS
         // ========================================================================
         
         this.subscribe('file:list:updated', (data) => {
@@ -169,7 +230,7 @@ loadInitialData() {
         this.subscribe('file:loaded', (data) => this.handleFileLoaded(data));
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS PLAYBACK
+        // EVENEMENTS PLAYBACK
         // ========================================================================
         
         this.subscribe('playback:started', () => {
@@ -220,7 +281,7 @@ loadInitialData() {
         this.subscribe('playback:positionUpdated', (data) => this.updatePlaybackPosition(data));
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS ROUTING
+        // EVENEMENTS ROUTING
         // ========================================================================
         
         this.subscribe('routing:changed', () => this.updateRoutingDisplay());
@@ -228,7 +289,7 @@ loadInitialData() {
         this.subscribe('routing:disabled', (data) => this.handleRoutingDisabled(data));
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS PLAYLIST
+        // EVENEMENTS PLAYLIST
         // ========================================================================
         
         this.subscribe('playlist:changed', (data) => {
@@ -256,13 +317,13 @@ loadInitialData() {
         });
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS BACKEND
+        // EVENEMENTS BACKEND
         // ========================================================================
         
         this.subscribe('backend:connected', () => this.onBackendConnected());
         this.subscribe('backend:disconnected', () => this.onBackendDisconnected());
         
-        this.logDebug('home', 'âœ“ Events bound');
+        this.logDebug('home', '✓ Events bound');
     }
     
     /**
@@ -272,7 +333,7 @@ loadInitialData() {
     destroy() {
         this.logDebug('home', 'Destroying HomeController...');
         
-        // 1. ArrÃªter timers
+        // 1. Arrêter timers
         this.stopProgressTimer();
         
         // 2. Cleanup state
@@ -280,16 +341,18 @@ loadInitialData() {
         this.homeState.isPlaying = false;
         this.currentFile = null;
         this.isPlaying = false;
+        this._dataLoaded = false;
+        this._viewRendered = false;
         
         // 3. Cleanup vue
-        if (this.view) {
-            this.view.destroy?.();
+        if (this.view && typeof this.view.destroy === 'function') {
+            this.view.destroy();
         }
         
         // 4. Appeler parent
         super.destroy();
         
-        this.logDebug('home', 'âœ“ HomeController destroyed');
+        this.logDebug('home', '✓ HomeController destroyed');
     }
     
     // ========================================================================
@@ -297,46 +360,8 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Charge les donnÃ©es initiales
-     */
-    async loadInitialData() {
-        this.logDebug('home', 'Loading initial data...');
-        
-        try {
-            // Charger les fichiers
-            if (this.fileModel) {
-                const files = await this.fileModel.loadAll?.();
-                if (files && this.view && this.view.updateFileList) {
-                    this.view.updateFileList(files);
-                }
-            }
-            
-            // Charger les instruments
-            if (window.instrumentModel) {
-                await window.instrumentModel.loadAll?.();
-            }
-            
-            // Charger les playlists
-            if (this.playlistModel) {
-                await this.playlistModel.loadAll?.();
-            }
-            
-            // Charger les presets de routing
-            if (this.routingModel) {
-                await this.routingModel.loadAllPresets?.();
-            }
-            
-            this.logDebug('home', 'âœ“ Initial data loaded');
-        }
-        catch (error) {
-            this.handleError('Load initial data failed', error);
-            this.showNotification('Failed to load initial data');
-        }
-    }
-    
-    /**
-     * GÃ¨re la sÃ©lection d'un fichier
-     * @param {Object} data - DonnÃ©es du fichier
+     * Gère la sélection d'un fichier
+     * @param {Object} data - Données du fichier
      */
     async handleFileSelected(data) {
         this.logDebug('home', 'File selected', data);
@@ -353,8 +378,8 @@ loadInitialData() {
     }
     
     /**
-     * GÃ¨re le chargement d'un fichier
-     * @param {Object} data - DonnÃ©es du fichier
+     * Gère le chargement d'un fichier
+     * @param {Object} data - Données du fichier
      */
     handleFileLoaded(data) {
         this.logDebug('home', 'File loaded', data);
@@ -362,12 +387,12 @@ loadInitialData() {
         this.currentFile = data.file;
         this.homeState.currentFile = data.file;
         
-        // Mettre Ã  jour la vue
+        // Mettre à jour la vue
         if (this.view && this.view.updateCurrentFile) {
             this.view.updateCurrentFile(data.file);
         }
         
-        // Mettre Ã  jour le modÃ¨le
+        // Mettre à jour le modèle
         if (this.fileModel && this.fileModel.set) {
             this.fileModel.set('currentFile', data.file);
         }
@@ -383,21 +408,21 @@ loadInitialData() {
         this.logDebug('home', `Loading file: ${fileId}`);
         
         try {
-            // RÃ©cupÃ©rer le fichier
-            const file = await this.fileModel.get?.(fileId);
+            // Récupérer le fichier
+            const file = await this.fileModel?.get?.(fileId);
             
             if (!file) {
                 throw new Error('File not found');
             }
             
-            // Convertir en MidiJSON si nÃ©cessaire
+            // Convertir en MidiJSON si nécessaire
             if (!file.midiJson) {
                 if (typeof MidiJsonConverter !== 'undefined') {
                     const converter = new MidiJsonConverter();
                     file.midiJson = await converter.midiToJson(file.data);
                     
                     // Sauvegarder la version JSON
-                    if (this.fileModel.update) {
+                    if (this.fileModel?.update) {
                         await this.fileModel.update(fileId, { midiJson: file.midiJson });
                     }
                 }
@@ -406,7 +431,7 @@ loadInitialData() {
             this.currentFile = file;
             this.homeState.currentFile = file;
             
-            // Mettre Ã  jour la vue
+            // Mettre à jour la vue
             if (this.view && this.view.updateCurrentFile) {
                 this.view.updateCurrentFile(file);
             }
@@ -416,7 +441,7 @@ loadInitialData() {
                 this.routingModel.setCurrentFile(file);
             }
             
-            // Mettre Ã  jour les canaux
+            // Mettre à jour les canaux
             if (file.midiJson) {
                 const channels = file.midiJson.channels || [];
                 const instruments = window.instrumentModel?.getAll?.() || [];
@@ -437,7 +462,7 @@ loadInitialData() {
             this.emitEvent('file:loaded', { file });
             
             this.showSuccess(`File loaded: ${file.name}`);
-            this.logDebug('home', `âœ“ File loaded: ${file.name}`);
+            this.logDebug('home', `✓ File loaded: ${file.name}`);
         }
         catch (error) {
             this.handleError('Load file failed', error);
@@ -446,13 +471,13 @@ loadInitialData() {
     }
     
     /**
-     * RafraÃ®chit la liste des fichiers
+     * Rafraîchit la liste des fichiers
      */
     async refreshFiles() {
         this.logDebug('home', 'Refreshing files...');
         
         try {
-            const files = await this.fileModel.loadAll?.();
+            const files = await this.fileModel?.loadAll?.();
             
             if (files && this.view && this.view.updateFileList) {
                 this.view.updateFileList(files);
@@ -472,7 +497,7 @@ loadInitialData() {
     uploadFile() {
         this.logDebug('home', 'Upload file requested');
         
-        // CrÃ©er un input file temporaire
+        // Créer un input file temporaire
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.mid,.midi';
@@ -494,7 +519,7 @@ loadInitialData() {
                 const midiJson = await converter.midiToJson(arrayBuffer);
                 
                 // Sauvegarder
-                const savedFile = await this.fileModel.create?.({
+                const savedFile = await this.fileModel?.create?.({
                     name: file.name,
                     data: arrayBuffer,
                     midiJson: midiJson,
@@ -504,7 +529,7 @@ loadInitialData() {
                 
                 this.showSuccess(`File "${file.name}" uploaded`);
                 
-                // RafraÃ®chir la liste
+                // Rafraîchir la liste
                 await this.refreshFiles();
                 
                 // Charger le fichier
@@ -522,11 +547,11 @@ loadInitialData() {
     }
     
     /**
-     * SÃ©lectionne le premier fichier
+     * Sélectionne le premier fichier
      */
     async selectFirstFile() {
         try {
-            const files = await this.fileModel.getAll?.();
+            const files = await this.fileModel?.getAll?.();
             
             if (files && files.length > 0) {
                 await this.loadFile(files[0].id);
@@ -538,7 +563,7 @@ loadInitialData() {
     }
     
     // ========================================================================
-    // CONTRÃ”LES DE LECTURE
+    // CONTROLES DE LECTURE
     // ========================================================================
     
     /**
@@ -588,7 +613,7 @@ loadInitialData() {
     }
     
     /**
-     * ArrÃªte la lecture
+     * Arrête la lecture
      */
     async stop() {
         this.logDebug('home', 'Stop requested');
@@ -632,7 +657,7 @@ loadInitialData() {
     }
     
     /**
-     * Fichier prÃ©cÃ©dent
+     * Fichier précédent
      */
     async previous() {
         this.logDebug('home', 'Previous requested');
@@ -686,7 +711,7 @@ loadInitialData() {
     }
     
     /**
-     * DÃ©finit le tempo
+     * Définit le tempo
      * @param {number} percent - Tempo en pourcentage (0-200%)
      */
     async setTempo(percent) {
@@ -701,7 +726,7 @@ loadInitialData() {
     }
     
     /**
-     * GÃ¨re la fin de lecture
+     * Gère la fin de lecture
      */
     async onPlaybackEnded() {
         this.logDebug('home', 'Playback ended');
@@ -729,8 +754,8 @@ loadInitialData() {
     }
     
     /**
-     * Met Ã  jour l'Ã©tat de lecture depuis le backend
-     * @param {Object} data - Ã‰tat playback
+     * Met à jour l'état de lecture depuis le backend
+     * @param {Object} data - État playback
      */
     updatePlaybackState(data) {
         this.logDebug('home', 'Playback state updated', data);
@@ -757,7 +782,7 @@ loadInitialData() {
     }
     
     /**
-     * Met Ã  jour la position de lecture depuis le backend
+     * Met à jour la position de lecture depuis le backend
      * @param {Object} data - {position: number}
      */
     updatePlaybackPosition(data) {
@@ -773,8 +798,8 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Assigne un instrument Ã  un canal
-     * @param {number} channel - NumÃ©ro de canal
+     * Assigne un instrument à un canal
+     * @param {number} channel - Numéro de canal
      * @param {string} instrumentId - ID de l'instrument
      */
     async assignInstrument(channel, instrumentId) {
@@ -791,7 +816,7 @@ loadInitialData() {
                 }
             }
             
-            // Mettre Ã  jour l'affichage
+            // Mettre à jour l'affichage
             this.updateRoutingDisplay();
             
             // Appliquer au playback controller
@@ -955,7 +980,7 @@ loadInitialData() {
     }
     
     /**
-     * Met Ã  jour l'affichage du routing
+     * Met à jour l'affichage du routing
      */
     updateRoutingDisplay() {
         this.logDebug('home', 'Updating routing display');
@@ -972,7 +997,7 @@ loadInitialData() {
                 }
             }
             
-            // Mettre Ã  jour les statistiques
+            // Mettre à jour les statistiques
             if (this.routingModel && this.routingModel.getGlobalCompatibility) {
                 const stats = this.routingModel.getGlobalCompatibility();
                 
@@ -987,8 +1012,8 @@ loadInitialData() {
     }
     
     /**
-     * GÃ¨re l'activation d'une route
-     * @param {Object} data - DonnÃ©es de la route
+     * Gère l'activation d'une route
+     * @param {Object} data - Données de la route
      */
     handleRoutingEnabled(data) {
         this.logDebug('home', 'Route enabled', data);
@@ -997,8 +1022,8 @@ loadInitialData() {
     }
     
     /**
-     * GÃ¨re la dÃ©sactivation d'une route
-     * @param {Object} data - DonnÃ©es de la route
+     * Gère la désactivation d'une route
+     * @param {Object} data - Données de la route
      */
     handleRoutingDisabled(data) {
         this.logDebug('home', 'Route disabled', data);
@@ -1011,26 +1036,26 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * GÃ¨re la playlist - Ouvre l'Ã©diteur de playlist
+     * Gère la playlist - Ouvre l'éditeur de playlist
      */
     managePlaylist() {
         this.logDebug('home', 'Manage playlist requested');
         
-        // VÃ©rifier que ModalController est disponible
+        // Vérifier que ModalController est disponible
         if (!window.app || !window.app.modalController) {
             this.logDebug('error', 'ModalController not available');
             this.showNotification('Modal system not initialized');
             return;
         }
         
-        // VÃ©rifier que PlaylistController est disponible
+        // Vérifier que PlaylistController est disponible
         if (!this.playlistController) {
             this.logDebug('error', 'PlaylistController not available');
             this.showNotification('Playlist system not initialized');
             return;
         }
         
-        // DÃ©terminer le mode: Ã©dition ou crÃ©ation
+        // Déterminer le mode: édition ou création
         const currentPlaylist = this.playlistController.state?.currentPlaylist;
         
         if (currentPlaylist) {
@@ -1041,7 +1066,7 @@ loadInitialData() {
     }
     
     /**
-     * Ouvre l'Ã©diteur pour crÃ©er une nouvelle playlist
+     * Ouvre l'éditeur pour créer une nouvelle playlist
      */
     createNewPlaylist() {
         this.logDebug('home', 'Create new playlist requested');
@@ -1059,7 +1084,7 @@ loadInitialData() {
     }
     
     /**
-     * Ã‰dite la playlist courante
+     * Édite la playlist courante
      */
     editCurrentPlaylist() {
         this.logDebug('home', 'Edit current playlist requested');
@@ -1084,7 +1109,7 @@ loadInitialData() {
     }
     
     /**
-     * Ã‰dite une playlist spÃ©cifique par son ID
+     * Édite une playlist spécifique par son ID
      * @param {string} playlistId - ID de la playlist
      */
     editPlaylist(playlistId) {
@@ -1109,7 +1134,7 @@ loadInitialData() {
     
     /**
      * Supprime une playlist avec confirmation
-     * @param {string} playlistId - ID de la playlist Ã  supprimer
+     * @param {string} playlistId - ID de la playlist à supprimer
      */
     async deletePlaylist(playlistId) {
         this.logDebug('home', `Delete playlist: ${playlistId}`);
@@ -1125,7 +1150,7 @@ loadInitialData() {
         }
         
         try {
-            // RÃ©cupÃ©rer les infos de la playlist pour le message de confirmation
+            // Récupérer les infos de la playlist pour le message de confirmation
             const playlistModel = this.playlistController.playlistModel;
             const playlist = playlistModel?.getPlaylist?.(playlistId);
             
@@ -1137,7 +1162,7 @@ loadInitialData() {
             // Demander confirmation
             const confirmed = confirm(
                 `Voulez-vous vraiment supprimer la playlist "${playlist.name}" ?\n\n` +
-                `Cette action est irrÃ©versible.`
+                `Cette action est irréversible.`
             );
             
             if (!confirmed) {
@@ -1150,9 +1175,9 @@ loadInitialData() {
                 const success = await this.playlistController.deletePlaylist(playlistId);
                 
                 if (success) {
-                    this.showSuccess(`Playlist "${playlist.name}" supprimÃ©e`);
+                    this.showSuccess(`Playlist "${playlist.name}" supprimée`);
                 } else {
-                    this.showNotification('Ã‰chec de la suppression');
+                    this.showNotification('Échec de la suppression');
                 }
             }
         }
@@ -1203,7 +1228,7 @@ loadInitialData() {
                 await this.loadFile(firstFileId);
                 
                 this.logDebug('home', 'First file loaded, ready to play');
-                this.showSuccess(`Playlist "${playlist.name}" chargÃ©e`);
+                this.showSuccess(`Playlist "${playlist.name}" chargée`);
             } else {
                 this.showInfo('Playlist vide');
             }
@@ -1215,7 +1240,7 @@ loadInitialData() {
     }
     
     /**
-     * Ajoute rapidement un fichier Ã  la playlist courante
+     * Ajoute rapidement un fichier à la playlist courante
      * @param {string} fileId - ID du fichier
      */
     async quickAddToPlaylist(fileId) {
@@ -1229,10 +1254,10 @@ loadInitialData() {
         const currentPlaylist = this.playlistController.state?.currentPlaylist;
         
         if (!currentPlaylist) {
-            // Pas de playlist courante - proposer d'en crÃ©er une
+            // Pas de playlist courante - proposer d'en créer une
             const createNew = confirm(
                 'Aucune playlist active.\n\n' +
-                'Voulez-vous crÃ©er une nouvelle playlist ?'
+                'Voulez-vous créer une nouvelle playlist ?'
             );
             
             if (createNew) {
@@ -1242,14 +1267,14 @@ loadInitialData() {
         }
         
         try {
-            // Ajouter Ã  la playlist courante
+            // Ajouter à la playlist courante
             if (this.playlistController.addFileToPlaylist) {
                 const success = await this.playlistController.addFileToPlaylist(currentPlaylist.id, fileId);
                 
                 if (success) {
                     const file = this.fileModel?.getFileById?.(fileId) || this.fileModel?.get?.(fileId);
                     const fileName = file?.name || file?.filename || 'fichier';
-                    this.showSuccess(`"${fileName}" ajoutÃ© Ã  "${currentPlaylist.name}"`);
+                    this.showSuccess(`"${fileName}" ajouté à "${currentPlaylist.name}"`);
                 }
             }
         }
@@ -1260,7 +1285,7 @@ loadInitialData() {
     }
     
     /**
-     * CrÃ©e une nouvelle playlist avec un fichier initial
+     * Crée une nouvelle playlist avec un fichier initial
      * @param {string} fileId - ID du fichier
      */
     async createNewPlaylistWithFile(fileId) {
@@ -1280,12 +1305,12 @@ loadInitialData() {
         }
         
         try {
-            // CrÃ©er la playlist avec le fichier
+            // Créer la playlist avec le fichier
             if (this.playlistController.createPlaylist) {
                 const playlist = await this.playlistController.createPlaylist(playlistName.trim(), [fileId]);
                 
                 if (playlist) {
-                    this.showSuccess(`Playlist "${playlist.name}" crÃ©Ã©e`);
+                    this.showSuccess(`Playlist "${playlist.name}" créée`);
                     
                     // Charger la nouvelle playlist
                     if (this.playlistController.loadPlaylist) {
@@ -1296,7 +1321,7 @@ loadInitialData() {
         }
         catch (error) {
             this.handleError('Create playlist with file failed', error);
-            this.showNotification('Erreur lors de la crÃ©ation');
+            this.showNotification('Erreur lors de la création');
         }
     }
     
@@ -1305,9 +1330,9 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Active/dÃ©sactive un canal dans le visualizer
-     * @param {number} channel - NumÃ©ro de canal
-     * @param {boolean} enabled - ActivÃ©
+     * Active/désactive un canal dans le visualizer
+     * @param {number} channel - Numéro de canal
+     * @param {boolean} enabled - Activé
      */
     toggleChannel(channel, enabled) {
         this.logDebug('home', `Toggle channel ${channel}: ${enabled}`);
@@ -1318,9 +1343,9 @@ loadInitialData() {
     }
     
     /**
-     * Obtient les notes Ã  venir
+     * Obtient les notes à venir
      * @param {number} currentTime - Temps actuel en ms
-     * @returns {Array} Notes Ã  venir
+     * @returns {Array} Notes à venir
      */
     getUpcomingNotes(currentTime) {
         if (!this.currentFile || !this.currentFile.midiJson) {
@@ -1348,13 +1373,13 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * DÃ©marre le timer de progression
+     * Démarre le timer de progression
      */
     startProgressTimer() {
         this.stopProgressTimer();
         
         this.playbackTimer = setInterval(() => {
-            this.currentTime += 100; // IncrÃ©ment de 100ms
+            this.currentTime += 100; // Incrément de 100ms
             this.homeState.currentTime += 100;
             
             if (this.currentFile) {
@@ -1362,14 +1387,14 @@ loadInitialData() {
                     this.view.updateProgress(this.currentTime, this.currentFile.duration);
                 }
                 
-                // Mettre Ã  jour les notes Ã  venir
+                // Mettre à jour les notes à venir
                 const upcomingNotes = this.getUpcomingNotes(this.currentTime);
                 if (this.view && this.view.updateNotePreview) {
                     this.view.updateNotePreview(upcomingNotes);
                 }
             }
             
-            // ArrÃªter si on dÃ©passe la durÃ©e
+            // Arrêter si on dépasse la durée
             if (this.currentFile && this.currentTime >= this.currentFile.duration) {
                 this.onPlaybackEnded();
             }
@@ -1379,7 +1404,7 @@ loadInitialData() {
     }
     
     /**
-     * ArrÃªte le timer de progression
+     * Arrête le timer de progression
      */
     stopProgressTimer() {
         if (this.playbackTimer) {
@@ -1394,7 +1419,7 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Ouvre l'Ã©diteur MIDI
+     * Ouvre l'éditeur MIDI
      */
     openEditor() {
         this.logDebug('home', 'Open editor requested');
@@ -1404,10 +1429,10 @@ loadInitialData() {
             return;
         }
         
-        // Sauvegarder l'Ã©tat actuel
+        // Sauvegarder l'état actuel
         this.pause();
         
-        // Naviguer vers l'Ã©diteur
+        // Naviguer vers l'éditeur
         window.location.hash = '#editor';
         
         // L'EditorController prendra le relais
@@ -1417,7 +1442,7 @@ loadInitialData() {
     }
     
     /**
-     * Ouvre les rÃ©glages
+     * Ouvre les réglages
      */
     openSettings() {
         this.logDebug('home', 'Open settings requested');
@@ -1429,13 +1454,13 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Met Ã  jour la vue
+     * Met à jour la vue
      */
     updateView() {
         try {
             if (!this.view) return;
             
-            // PrÃ©parer les donnÃ©es pour la vue
+            // Préparer les données pour la vue
             const viewData = {
                 currentFile: this.currentFile,
                 playbackState: this.playbackState,
@@ -1445,7 +1470,7 @@ loadInitialData() {
                 routes: this.routingModel ? (this.routingModel.getRoutes?.() || []) : []
             };
             
-            // Mettre Ã  jour la vue
+            // Mettre à jour la vue
             if (this.view.update) {
                 this.view.update(viewData);
             }
@@ -1460,7 +1485,7 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * GÃ¨re la connexion au backend
+     * Gère la connexion au backend
      */
     onBackendConnected() {
         this.logDebug('home', 'Backend connected');
@@ -1469,12 +1494,12 @@ loadInitialData() {
     }
     
     /**
-     * GÃ¨re la dÃ©connexion du backend
+     * Gère la déconnexion du backend
      */
     onBackendDisconnected() {
         this.logDebug('home', 'Backend disconnected');
         
-        // ArrÃªter lecture
+        // Arrêter lecture
         this.isPlaying = false;
         this.playbackState = 'stopped';
         this.homeState.isPlaying = false;
@@ -1487,13 +1512,13 @@ loadInitialData() {
     }
     
     /**
-     * RafraÃ®chit les donnÃ©es depuis le backend
+     * Rafraîchit les données depuis le backend
      */
     async refreshData() {
         this.logDebug('home', 'Refreshing data...');
         
         try {
-            // RÃ©cupÃ©rer Ã©tat playback
+            // Récupérer état playback
             if (this.backend) {
                 const playbackStatus = await this.backend.sendCommand('playback.status', {});
                 
@@ -1502,10 +1527,10 @@ loadInitialData() {
                 }
             }
             
-            // Mettre Ã  jour routing
+            // Mettre à jour routing
             this.updateRoutingDisplay();
             
-            // Mettre Ã  jour vue
+            // Mettre à jour vue
             this.updateView();
         }
         catch (error) {
@@ -1518,9 +1543,9 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Calcule la durÃ©e totale de fichiers
+     * Calcule la durée totale de fichiers
      * @param {Array} files - Liste de fichiers
-     * @returns {number} DurÃ©e totale en ms
+     * @returns {number} Durée totale en ms
      */
     calculateTotalDuration(files) {
         if (!files || !Array.isArray(files)) return 0;
@@ -1548,8 +1573,8 @@ loadInitialData() {
     // ========================================================================
     
     /**
-     * Retourne l'Ã©tat actuel
-     * @returns {Object} Ã‰tat
+     * Retourne l'état actuel
+     * @returns {Object} État
      */
     getState() {
         return {
@@ -1574,8 +1599,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.HomeController = HomeController;
 }
-window.HomeController = HomeController;
 
 // ============================================================================
-// FIN DU FICHIER HomeController.js v3.2.0-complete
+// FIN DU FICHIER HomeController.js v3.2.1-fixed-double-init
 // ============================================================================
