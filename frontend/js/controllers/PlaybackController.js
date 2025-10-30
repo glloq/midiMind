@@ -4,32 +4,32 @@
 // Date: 2025-10-21
 // ============================================================================
 // CORRECTIONS v3.2.0:
-// ✅ Initialisation différée si backend pas disponible
-// ✅ Écoute événement 'backend:connected' pour init
-// ✅ Mode graceful si backend absent (UI désactivée)
-// ✅ Notifications utilisateur claires
-// ✅ Ré-activation automatique quand backend se connecte
-// ✅ Conservation de toutes les fonctionnalités v3.1.0
+// âœ… Initialisation diffÃ©rÃ©e si backend pas disponible
+// âœ… Ã‰coute Ã©vÃ©nement 'backend:connected' pour init
+// âœ… Mode graceful si backend absent (UI dÃ©sactivÃ©e)
+// âœ… Notifications utilisateur claires
+// âœ… RÃ©-activation automatique quand backend se connecte
+// âœ… Conservation de toutes les fonctionnalitÃ©s v3.1.0
 // ============================================================================
 
 class PlaybackController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // ✅ Modèles
+        // âœ… ModÃ¨les
         this.playbackModel = models.playback;
         this.fileModel = models.file;
         this.playlistModel = models.playlist;
         
-        // ✅ Vue
+        // âœ… Vue
         this.view = views.playback;
         
-        // ✅ Backend
+        // âœ… Backend
         this.backend = window.backendService;
         
-        // État local
+        // Ã‰tat local
         this.state = {
-            ...this.state,  // Hérite de BaseController
+            ...this.state,  // HÃ©rite de BaseController
             playing: false,
             position: 0,
             duration: 0,
@@ -37,30 +37,30 @@ class PlaybackController extends BaseController {
             loop: false,
             volume: 100,
             loadedFile: null,
-            // ← NOUVEAU
+            // â† NOUVEAU
             backendReady: false,
             deferredInit: false
         };
         
-        // Timer pour mise à jour position
+        // Timer pour mise Ã  jour position
         this.positionUpdateTimer = null;
         
-        // ← MODIFIÉ: Vérifier si backend est prêt avant d'initialiser
+        // â† MODIFIÃ‰: VÃ©rifier si backend est prÃªt avant d'initialiser
         if (this.backend && this.backend.isConnected()) {
             // Backend disponible, initialiser normalement
-            this.initialize();
+            // ✅ REMOVED: this.initialize() - BaseController calls it via autoInitialize
         } else {
-            // Backend pas prêt, différer l'initialisation
+            // Backend pas prÃªt, diffÃ©rer l'initialisation
             this.state.deferredInit = true;
             this.logDebug('playback', 'Backend not ready, deferring PlaybackController initialization');
             
-            // Écouter la connexion du backend
+            // Ã‰couter la connexion du backend
             this.eventBus.once('backend:connected', () => {
                 this.logDebug('playback', 'Backend connected, initializing PlaybackController now');
                 this.initialize();
             });
             
-            // Désactiver l'UI en attendant
+            // DÃ©sactiver l'UI en attendant
             this.disableUI();
         }
     }
@@ -70,13 +70,13 @@ class PlaybackController extends BaseController {
     // ========================================================================
     
     /**
-     * Hook d'initialisation personnalisée
+     * Hook d'initialisation personnalisÃ©e
      * Override de BaseController.onInitialize()
      */
     onInitialize() {
         this.logDebug('playback', 'Initializing PlaybackController...');
         
-        // Vérifier dépendances
+        // VÃ©rifier dÃ©pendances
         if (!this.backend) {
             this.logDebug('error', 'BackendService not available');
             this.showError('Backend service not available');
@@ -97,18 +97,18 @@ class PlaybackController extends BaseController {
         // Activer l'UI
         this.enableUI();
         
-        this.logDebug('playback', '✅ PlaybackController initialized');
+        this.logDebug('playback', 'âœ… PlaybackController initialized');
     }
     
     /**
-     * Binding des événements
+     * Binding des Ã©vÃ©nements
      * Override de BaseController.bindEvents()
      */
     bindEvents() {
         this.logDebug('playback', 'Binding playback events...');
         
         // ========================================================================
-        // ÉVÉNEMENTS UI → CONTROLLER
+        // Ã‰VÃ‰NEMENTS UI â†’ CONTROLLER
         // ========================================================================
         
         this.subscribe('playback:play', () => this.play(), {
@@ -131,7 +131,7 @@ class PlaybackController extends BaseController {
         this.subscribe('playback:load-file', (data) => this.loadFile(data.fileId));
         
         // ========================================================================
-        // ÉVÉNEMENTS BACKEND → CONTROLLER
+        // Ã‰VÃ‰NEMENTS BACKEND â†’ CONTROLLER
         // ========================================================================
         
         this.subscribe('backend:playback:state-changed', (data) => {
@@ -147,7 +147,7 @@ class PlaybackController extends BaseController {
         });
         
         // ========================================================================
-        // ÉVÉNEMENTS MODEL → CONTROLLER
+        // Ã‰VÃ‰NEMENTS MODEL â†’ CONTROLLER
         // ========================================================================
         
         if (this.playbackModel) {
@@ -157,10 +157,10 @@ class PlaybackController extends BaseController {
         }
         
         // ========================================================================
-        // ÉVÉNEMENTS BACKEND CONNECTION
+        // Ã‰VÃ‰NEMENTS BACKEND CONNECTION
         // ========================================================================
         
-        // ← NOUVEAU: Écouter reconnexion backend
+        // â† NOUVEAU: Ã‰couter reconnexion backend
         this.subscribe('backend:connected', () => {
             this.logDebug('playback', 'Backend reconnected, re-enabling playback');
             this.state.backendReady = true;
@@ -176,10 +176,10 @@ class PlaybackController extends BaseController {
             this.logDebug('playback', 'Backend disconnected, disabling playback');
             this.state.backendReady = false;
             this.disableUI();
-            this.stop(); // Arrêter la lecture
+            this.stop(); // ArrÃªter la lecture
         });
         
-        this.logDebug('playback', '✅ Events bound');
+        this.logDebug('playback', 'âœ… Events bound');
     }
     
     /**
@@ -189,7 +189,7 @@ class PlaybackController extends BaseController {
     onDestroy() {
         this.logDebug('playback', 'Destroying PlaybackController...');
         
-        // Arrêter la lecture
+        // ArrÃªter la lecture
         this.stop();
         
         // Nettoyer le timer
@@ -198,19 +198,19 @@ class PlaybackController extends BaseController {
             this.positionUpdateTimer = null;
         }
         
-        this.logDebug('playback', '✓ PlaybackController destroyed');
+        this.logDebug('playback', 'âœ“ PlaybackController destroyed');
     }
     
     // ========================================================================
-    // GESTION UI (ACTIVER/DÉSACTIVER)
+    // GESTION UI (ACTIVER/DÃ‰SACTIVER)
     // ========================================================================
     
     /**
-     * Désactive l'UI du playback
+     * DÃ©sactive l'UI du playback
      * @private
      */
     disableUI() {
-        // Désactiver tous les boutons de lecture
+        // DÃ©sactiver tous les boutons de lecture
         const playButtons = document.querySelectorAll('.playback-control');
         playButtons.forEach(button => {
             button.disabled = true;
@@ -256,7 +256,7 @@ class PlaybackController extends BaseController {
      * @private
      */
     enableUI() {
-        // Réactiver tous les boutons de lecture
+        // RÃ©activer tous les boutons de lecture
         const playButtons = document.querySelectorAll('.playback-control');
         playButtons.forEach(button => {
             button.disabled = false;
@@ -300,7 +300,7 @@ class PlaybackController extends BaseController {
                 this.state.playing = true;
                 this.startPositionUpdate();
                 this.eventBus.emit('playback:started');
-                this.logDebug('playback', '✅ Playback started');
+                this.logDebug('playback', 'âœ… Playback started');
             } else {
                 throw new Error(response.error || 'Failed to start playback');
             }
@@ -327,7 +327,7 @@ class PlaybackController extends BaseController {
                 this.state.playing = false;
                 this.stopPositionUpdate();
                 this.eventBus.emit('playback:paused');
-                this.logDebug('playback', '✅ Playback paused');
+                this.logDebug('playback', 'âœ… Playback paused');
             } else {
                 throw new Error(response.error || 'Failed to pause playback');
             }
@@ -338,7 +338,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Arrête la lecture
+     * ArrÃªte la lecture
      */
     async stop() {
         if (!this.state.backendReady) {
@@ -355,7 +355,7 @@ class PlaybackController extends BaseController {
                 this.state.position = 0;
                 this.stopPositionUpdate();
                 this.eventBus.emit('playback:stopped');
-                this.logDebug('playback', '✅ Playback stopped');
+                this.logDebug('playback', 'âœ… Playback stopped');
             } else {
                 throw new Error(response.error || 'Failed to stop playback');
             }
@@ -384,7 +384,7 @@ class PlaybackController extends BaseController {
             if (response.success) {
                 this.state.position = position;
                 this.eventBus.emit('playback:seeked', { position });
-                this.logDebug('playback', `✅ Seeked to ${position}s`);
+                this.logDebug('playback', `âœ… Seeked to ${position}s`);
             } else {
                 throw new Error(response.error || 'Failed to seek');
             }
@@ -395,7 +395,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Définit le tempo
+     * DÃ©finit le tempo
      * @param {number} tempo - Tempo en BPM
      */
     async setTempo(tempo) {
@@ -413,7 +413,7 @@ class PlaybackController extends BaseController {
             if (response.success) {
                 this.state.tempo = tempo;
                 this.eventBus.emit('playback:tempo-changed', { tempo });
-                this.logDebug('playback', `✅ Tempo set to ${tempo} BPM`);
+                this.logDebug('playback', `âœ… Tempo set to ${tempo} BPM`);
             } else {
                 throw new Error(response.error || 'Failed to set tempo');
             }
@@ -431,8 +431,8 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Définit l'état du loop
-     * @param {boolean} loop - Activer/désactiver le loop
+     * DÃ©finit l'Ã©tat du loop
+     * @param {boolean} loop - Activer/dÃ©sactiver le loop
      */
     async setLoop(loop) {
         if (!this.state.backendReady) {
@@ -449,7 +449,7 @@ class PlaybackController extends BaseController {
             if (response.success) {
                 this.state.loop = loop;
                 this.eventBus.emit('playback:loop-changed', { loop });
-                this.logDebug('playback', `✅ Loop ${loop ? 'enabled' : 'disabled'}`);
+                this.logDebug('playback', `âœ… Loop ${loop ? 'enabled' : 'disabled'}`);
             } else {
                 throw new Error(response.error || 'Failed to set loop');
             }
@@ -460,7 +460,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Démarre le métronome
+     * DÃ©marre le mÃ©tronome
      */
     async startMetronome() {
         if (!this.state.backendReady) {
@@ -474,7 +474,7 @@ class PlaybackController extends BaseController {
             
             if (response.success) {
                 this.eventBus.emit('metronome:started');
-                this.logDebug('playback', '✅ Metronome started');
+                this.logDebug('playback', 'âœ… Metronome started');
                 this.showSuccess('Metronome started');
             } else {
                 throw new Error(response.error || 'Failed to start metronome');
@@ -486,7 +486,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Arrête le métronome
+     * ArrÃªte le mÃ©tronome
      */
     async stopMetronome() {
         if (!this.state.backendReady) {
@@ -500,7 +500,7 @@ class PlaybackController extends BaseController {
             
             if (response.success) {
                 this.eventBus.emit('metronome:stopped');
-                this.logDebug('playback', '✅ Metronome stopped');
+                this.logDebug('playback', 'âœ… Metronome stopped');
             } else {
                 throw new Error(response.error || 'Failed to stop metronome');
             }
@@ -511,7 +511,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Active/désactive le loop
+     * Active/dÃ©sactive le loop
      */
     async toggleLoop() {
         if (!this.state.backendReady) {
@@ -530,7 +530,7 @@ class PlaybackController extends BaseController {
             if (response.success) {
                 this.state.loop = newLoop;
                 this.eventBus.emit('playback:loop-changed', { loop: newLoop });
-                this.logDebug('playback', `✅ Loop ${newLoop ? 'enabled' : 'disabled'}`);
+                this.logDebug('playback', `âœ… Loop ${newLoop ? 'enabled' : 'disabled'}`);
             } else {
                 throw new Error(response.error || 'Failed to toggle loop');
             }
@@ -541,7 +541,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Définit le volume
+     * DÃ©finit le volume
      * @param {number} volume - Volume (0-100)
      */
     async setVolume(volume) {
@@ -559,7 +559,7 @@ class PlaybackController extends BaseController {
             if (response.success) {
                 this.state.volume = volume;
                 this.eventBus.emit('playback:volume-changed', { volume });
-                this.logDebug('playback', `✅ Volume set to ${volume}`);
+                this.logDebug('playback', `âœ… Volume set to ${volume}`);
             } else {
                 throw new Error(response.error || 'Failed to set volume');
             }
@@ -590,7 +590,7 @@ class PlaybackController extends BaseController {
                 this.state.loadedFile = fileId;
                 this.state.duration = response.data?.duration || 0;
                 this.eventBus.emit('playback:file-loaded', { fileId, duration: this.state.duration });
-                this.logDebug('playback', `✅ File loaded: ${fileId}`);
+                this.logDebug('playback', `âœ… File loaded: ${fileId}`);
                 this.showSuccess(`File loaded: ${fileId}`);
             } else {
                 throw new Error(response.error || 'Failed to load file');
@@ -606,11 +606,11 @@ class PlaybackController extends BaseController {
     // ========================================================================
     
     /**
-     * Démarre la mise à jour de la position
+     * DÃ©marre la mise Ã  jour de la position
      * @private
      */
     startPositionUpdate() {
-        this.stopPositionUpdate(); // Au cas où
+        this.stopPositionUpdate(); // Au cas oÃ¹
         
         this.positionUpdateTimer = setInterval(async () => {
             try {
@@ -630,7 +630,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Arrête la mise à jour de la position
+     * ArrÃªte la mise Ã  jour de la position
      * @private
      */
     stopPositionUpdate() {
@@ -641,12 +641,12 @@ class PlaybackController extends BaseController {
     }
     
     // ========================================================================
-    // HANDLERS ÉVÉNEMENTS BACKEND
+    // HANDLERS Ã‰VÃ‰NEMENTS BACKEND
     // ========================================================================
     
     /**
-     * Gère un changement d'état du playback
-     * @param {Object} data - Données de l'état
+     * GÃ¨re un changement d'Ã©tat du playback
+     * @param {Object} data - DonnÃ©es de l'Ã©tat
      */
     handlePlaybackStateChanged(data) {
         this.state.playing = data.playing;
@@ -662,7 +662,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Gère un changement de position
+     * GÃ¨re un changement de position
      * @param {Object} data - Position
      */
     handlePositionChanged(data) {
@@ -671,7 +671,7 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Gère la fin de lecture
+     * GÃ¨re la fin de lecture
      */
     handlePlaybackFinished() {
         this.state.playing = false;
@@ -682,15 +682,15 @@ class PlaybackController extends BaseController {
     }
     
     // ========================================================================
-    // MISE À JOUR UI
+    // MISE Ã€ JOUR UI
     // ========================================================================
     
     /**
-     * Met à jour l'UI avec les données
-     * @param {Object} data - Données de l'état
+     * Met Ã  jour l'UI avec les donnÃ©es
+     * @param {Object} data - DonnÃ©es de l'Ã©tat
      */
     updateUI(data) {
-        // À implémenter selon votre UI
+        // Ã€ implÃ©menter selon votre UI
         this.eventBus.emit('playback:ui-update', data);
     }
     
@@ -699,8 +699,8 @@ class PlaybackController extends BaseController {
     // ========================================================================
     
     /**
-     * Gère une erreur
-     * @param {string} operation - Opération en cours
+     * GÃ¨re une erreur
+     * @param {string} operation - OpÃ©ration en cours
      * @param {Error} error - Erreur
      */
     handleError(operation, error) {

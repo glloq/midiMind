@@ -6,11 +6,11 @@
 // Modifications:
 //   - Support devices.getInfo, devices.getConnected, devices.disconnectAll
 //   - Gestion hot-plug (startHotPlug, stopHotPlug, getHotPlugStatus)
-//   - Gestion format API v4.2.1 (request/response standardisé)
-//   - Détection automatique périphériques (hot-plug monitoring)
-//   - Informations détaillées par périphérique
+//   - Gestion format API v4.2.1 (request/response standardisÃ©)
+//   - DÃ©tection automatique pÃ©riphÃ©riques (hot-plug monitoring)
+//   - Informations dÃ©taillÃ©es par pÃ©riphÃ©rique
 //   - Gestion codes erreur API
-//   - Filtrage périphériques connectés/disponibles
+//   - Filtrage pÃ©riphÃ©riques connectÃ©s/disponibles
 // ============================================================================
 
 class InstrumentController extends BaseController {
@@ -22,7 +22,7 @@ class InstrumentController extends BaseController {
         this.view = views.instrument;
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // État des périphériques
+        // Ã‰tat des pÃ©riphÃ©riques
         this.devices = new Map(); // device_id -> device info
         this.connectedDevices = new Set();
         
@@ -31,17 +31,17 @@ class InstrumentController extends BaseController {
         this.hotPlugInterval = 2000; // ms
         this.hotPlugTimer = null;
         
-        // Cache des infos périphériques
+        // Cache des infos pÃ©riphÃ©riques
         this.deviceInfoCache = new Map();
         this.deviceInfoCacheTTL = 30000; // 30 secondes
         
-        // État de scan
+        // Ã‰tat de scan
         this.isScanning = false;
         this.lastScanTime = null;
         
         this._fullyInitialized = true;
         this.bindEvents();
-        this.initialize();
+        // ✅ REMOVED: this.initialize() - BaseController calls it via autoInitialize
     }
 
     // ========================================================================
@@ -53,7 +53,7 @@ class InstrumentController extends BaseController {
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
         
-        // Périphériques (événements du backend)
+        // PÃ©riphÃ©riques (Ã©vÃ©nements du backend)
         this.eventBus.on('backend:device:connected', (data) => this.handleDeviceConnected(data));
         this.eventBus.on('backend:device:disconnected', (data) => this.handleDeviceDisconnected(data));
         this.eventBus.on('backend:device:discovered', (data) => this.handleDeviceDiscovered(data));
@@ -72,7 +72,7 @@ class InstrumentController extends BaseController {
         this.eventBus.on('instruments:request_refresh', () => this.refreshDeviceList());
         
         if (this.logger?.info) {
-            this.logger.info('InstrumentController', '✓ Events bound');
+            this.logger.info('InstrumentController', 'âœ“ Events bound');
         }
     }
 
@@ -81,7 +81,7 @@ class InstrumentController extends BaseController {
             this.logger.info('InstrumentController', 'Initializing...');
         }
 
-        // Si backend connecté, charger périphériques
+        // Si backend connectÃ©, charger pÃ©riphÃ©riques
         if (this.backend?.isConnected()) {
             await this.onBackendConnected();
         }
@@ -89,26 +89,26 @@ class InstrumentController extends BaseController {
 
     async onBackendConnected() {
         if (this.logger?.info) {
-            this.logger.info('InstrumentController', '✅ Backend connected');
+            this.logger.info('InstrumentController', 'âœ… Backend connected');
         }
 
         try {
-            // Charger liste périphériques
+            // Charger liste pÃ©riphÃ©riques
             await this.scanDevices();
             
-            // Charger périphériques connectés
+            // Charger pÃ©riphÃ©riques connectÃ©s
             await this.loadConnectedDevices();
             
-            // Démarrer hot-plug si configuré
+            // DÃ©marrer hot-plug si configurÃ©
             const hotPlugStatus = await this.getHotPlugStatus();
             if (hotPlugStatus?.enabled) {
                 this.hotPlugEnabled = true;
                 if (this.logger?.info) {
-                    this.logger.info('InstrumentController', '✓ Hot-plug already enabled');
+                    this.logger.info('InstrumentController', 'âœ“ Hot-plug already enabled');
                 }
             }
             
-            // Rafraîchir la vue
+            // RafraÃ®chir la vue
             this.refreshView();
             
         } catch (error) {
@@ -120,24 +120,24 @@ class InstrumentController extends BaseController {
 
     onBackendDisconnected() {
         if (this.logger?.warn) {
-            this.logger.warn('InstrumentController', '🔴 Backend disconnected');
+            this.logger.warn('InstrumentController', 'ðŸ”´ Backend disconnected');
         }
         
-        // Arrêter hot-plug local (backend gérera le sien)
+        // ArrÃªter hot-plug local (backend gÃ©rera le sien)
         this.stopHotPlugMonitoring();
         
-        // Marquer tous comme déconnectés
+        // Marquer tous comme dÃ©connectÃ©s
         this.connectedDevices.clear();
         
         this.refreshView();
     }
 
     // ========================================================================
-    // SCAN ET LISTE PÉRIPHÉRIQUES
+    // SCAN ET LISTE PÃ‰RIPHÃ‰RIQUES
     // ========================================================================
 
     /**
-     * Scan tous les périphériques MIDI disponibles
+     * Scan tous les pÃ©riphÃ©riques MIDI disponibles
      * @param {boolean} fullScan - Scan complet ou rapide
      * @returns {Promise<Array>}
      */
@@ -163,7 +163,7 @@ class InstrumentController extends BaseController {
             if (response.success) {
                 const devices = response.data?.devices || [];
                 
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 devices.forEach(device => {
                     this.devices.set(device.id, device);
                 });
@@ -172,16 +172,16 @@ class InstrumentController extends BaseController {
                 
                 if (this.logger?.info) {
                     this.logger.info('InstrumentController', 
-                        `✓ Scan complete: ${devices.length} devices found`);
+                        `âœ“ Scan complete: ${devices.length} devices found`);
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instruments:scan_complete', { 
                     devices, 
                     count: devices.length 
                 });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return devices;
@@ -199,7 +199,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Liste tous les périphériques disponibles
+     * Liste tous les pÃ©riphÃ©riques disponibles
      * @returns {Promise<Array>}
      */
     async listDevices() {
@@ -213,14 +213,14 @@ class InstrumentController extends BaseController {
             if (response.success) {
                 const devices = response.data?.devices || [];
                 
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 devices.forEach(device => {
                     this.devices.set(device.id, device);
                 });
                 
                 if (this.logger?.debug) {
                     this.logger.debug('InstrumentController', 
-                        `✓ Listed ${devices.length} devices`);
+                        `âœ“ Listed ${devices.length} devices`);
                 }
                 
                 return devices;
@@ -236,7 +236,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient uniquement les périphériques connectés
+     * Obtient uniquement les pÃ©riphÃ©riques connectÃ©s
      * @returns {Promise<Array>}
      */
     async getConnectedDevices() {
@@ -250,7 +250,7 @@ class InstrumentController extends BaseController {
             if (response.success) {
                 const devices = response.data?.devices || [];
                 
-                // Mettre à jour la liste des connectés
+                // Mettre Ã  jour la liste des connectÃ©s
                 this.connectedDevices.clear();
                 devices.forEach(device => {
                     this.connectedDevices.add(device.id);
@@ -259,7 +259,7 @@ class InstrumentController extends BaseController {
                 
                 if (this.logger?.debug) {
                     this.logger.debug('InstrumentController', 
-                        `✓ ${devices.length} devices connected`);
+                        `âœ“ ${devices.length} devices connected`);
                 }
                 
                 return devices;
@@ -275,7 +275,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient les informations détaillées d'un périphérique
+     * Obtient les informations dÃ©taillÃ©es d'un pÃ©riphÃ©rique
      * @param {string} deviceId
      * @param {boolean} useCache - Utiliser cache si disponible
      * @returns {Promise<Object>}
@@ -285,7 +285,7 @@ class InstrumentController extends BaseController {
             throw new Error('Backend not available');
         }
 
-        // Vérifier cache
+        // VÃ©rifier cache
         if (useCache) {
             const cached = this.deviceInfoCache.get(deviceId);
             if (cached && (Date.now() - cached.timestamp < this.deviceInfoCacheTTL)) {
@@ -307,7 +307,7 @@ class InstrumentController extends BaseController {
                     timestamp: Date.now()
                 });
                 
-                // Mettre à jour le device dans la map
+                // Mettre Ã  jour le device dans la map
                 if (this.devices.has(deviceId)) {
                     this.devices.set(deviceId, { ...this.devices.get(deviceId), ...info });
                 }
@@ -326,11 +326,11 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // CONNEXION / DÉCONNEXION
+    // CONNEXION / DÃ‰CONNEXION
     // ========================================================================
 
     /**
-     * Connecte un périphérique MIDI
+     * Connecte un pÃ©riphÃ©rique MIDI
      * @param {string} deviceId
      * @returns {Promise<boolean>}
      */
@@ -348,13 +348,13 @@ class InstrumentController extends BaseController {
                 this.connectedDevices.add(deviceId);
                 
                 if (this.logger?.info) {
-                    this.logger.info('InstrumentController', `✓ Device connected: ${deviceId}`);
+                    this.logger.info('InstrumentController', `âœ“ Device connected: ${deviceId}`);
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instrument:connected', { deviceId });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return true;
@@ -379,7 +379,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Déconnecte un périphérique MIDI
+     * DÃ©connecte un pÃ©riphÃ©rique MIDI
      * @param {string} deviceId
      * @returns {Promise<boolean>}
      */
@@ -398,13 +398,13 @@ class InstrumentController extends BaseController {
                 
                 if (this.logger?.info) {
                     this.logger.info('InstrumentController', 
-                        `✓ Device disconnected: ${deviceId}`);
+                        `âœ“ Device disconnected: ${deviceId}`);
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instrument:disconnected', { deviceId });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return true;
@@ -429,7 +429,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Déconnecte tous les périphériques
+     * DÃ©connecte tous les pÃ©riphÃ©riques
      * @returns {Promise<boolean>}
      */
     async disconnectAllDevices() {
@@ -444,10 +444,10 @@ class InstrumentController extends BaseController {
                 this.connectedDevices.clear();
                 
                 if (this.logger?.info) {
-                    this.logger.info('InstrumentController', '✓ All devices disconnected');
+                    this.logger.info('InstrumentController', 'âœ“ All devices disconnected');
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instruments:all_disconnected');
                 
                 // Notification
@@ -457,7 +457,7 @@ class InstrumentController extends BaseController {
                     duration: 3000
                 });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return true;
@@ -481,12 +481,12 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // HOT-PLUG (DÉTECTION AUTOMATIQUE)
+    // HOT-PLUG (DÃ‰TECTION AUTOMATIQUE)
     // ========================================================================
 
     /**
-     * Démarre la surveillance hot-plug
-     * @param {number} intervalMs - Intervalle de scan en ms (défaut: 2000)
+     * DÃ©marre la surveillance hot-plug
+     * @param {number} intervalMs - Intervalle de scan en ms (dÃ©faut: 2000)
      * @returns {Promise<boolean>}
      */
     async startHotPlug(intervalMs = 2000) {
@@ -505,10 +505,10 @@ class InstrumentController extends BaseController {
                 
                 if (this.logger?.info) {
                     this.logger.info('InstrumentController', 
-                        `✓ Hot-plug started (interval: ${intervalMs}ms)`);
+                        `âœ“ Hot-plug started (interval: ${intervalMs}ms)`);
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instruments:hotplug_started', { intervalMs });
                 
                 // Notification
@@ -518,7 +518,7 @@ class InstrumentController extends BaseController {
                     duration: 3000
                 });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return true;
@@ -534,7 +534,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Arrête la surveillance hot-plug
+     * ArrÃªte la surveillance hot-plug
      * @returns {Promise<boolean>}
      */
     async stopHotPlug() {
@@ -549,10 +549,10 @@ class InstrumentController extends BaseController {
                 this.hotPlugEnabled = false;
                 
                 if (this.logger?.info) {
-                    this.logger.info('InstrumentController', '✓ Hot-plug stopped');
+                    this.logger.info('InstrumentController', 'âœ“ Hot-plug stopped');
                 }
                 
-                // Émettre événement
+                // Ã‰mettre Ã©vÃ©nement
                 this.eventBus.emit('instruments:hotplug_stopped');
                 
                 // Notification
@@ -562,7 +562,7 @@ class InstrumentController extends BaseController {
                     duration: 3000
                 });
                 
-                // Rafraîchir la vue
+                // RafraÃ®chir la vue
                 this.refreshView();
                 
                 return true;
@@ -636,7 +636,7 @@ class InstrumentController extends BaseController {
         }, this.hotPlugInterval);
         
         if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', '✓ Local hot-plug monitoring started');
+            this.logger.debug('InstrumentController', 'âœ“ Local hot-plug monitoring started');
         }
     }
 
@@ -648,7 +648,7 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // ÉVÉNEMENTS BACKEND
+    // Ã‰VÃ‰NEMENTS BACKEND
     // ========================================================================
 
     handleDeviceConnected(data) {
@@ -659,13 +659,13 @@ class InstrumentController extends BaseController {
             
             if (this.logger?.info) {
                 this.logger.info('InstrumentController', 
-                    `📥 Device connected: ${deviceId}`);
+                    `ðŸ“¥ Device connected: ${deviceId}`);
             }
             
             // Invalider cache info
             this.deviceInfoCache.delete(deviceId);
             
-            // Rafraîchir la vue
+            // RafraÃ®chir la vue
             this.refreshView();
             
             // Notification
@@ -685,10 +685,10 @@ class InstrumentController extends BaseController {
             
             if (this.logger?.info) {
                 this.logger.info('InstrumentController', 
-                    `📤 Device disconnected: ${deviceId}`);
+                    `ðŸ“¤ Device disconnected: ${deviceId}`);
             }
             
-            // Rafraîchir la vue
+            // RafraÃ®chir la vue
             this.refreshView();
             
             // Notification
@@ -708,10 +708,10 @@ class InstrumentController extends BaseController {
             
             if (this.logger?.debug) {
                 this.logger.debug('InstrumentController', 
-                    `🔍 Device discovered: ${device.id}`);
+                    `ðŸ” Device discovered: ${device.id}`);
             }
             
-            // Rafraîchir la vue
+            // RafraÃ®chir la vue
             this.refreshView();
         }
     }
@@ -767,7 +767,7 @@ class InstrumentController extends BaseController {
     // ========================================================================
 
     /**
-     * Charge la liste des périphériques connectés
+     * Charge la liste des pÃ©riphÃ©riques connectÃ©s
      */
     async loadConnectedDevices() {
         try {
@@ -781,7 +781,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Vérifie si un périphérique est connecté
+     * VÃ©rifie si un pÃ©riphÃ©rique est connectÃ©
      * @param {string} deviceId
      * @returns {boolean}
      */
@@ -790,7 +790,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient un périphérique du cache
+     * Obtient un pÃ©riphÃ©rique du cache
      * @param {string} deviceId
      * @returns {Object|null}
      */
@@ -799,7 +799,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient tous les périphériques disponibles
+     * Obtient tous les pÃ©riphÃ©riques disponibles
      * @returns {Array}
      */
     getAllDevices() {
@@ -807,7 +807,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient tous les périphériques connectés (du cache local)
+     * Obtient tous les pÃ©riphÃ©riques connectÃ©s (du cache local)
      * @returns {Array}
      */
     getConnectedDevicesFromCache() {
@@ -817,7 +817,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Obtient tous les périphériques disponibles mais non connectés
+     * Obtient tous les pÃ©riphÃ©riques disponibles mais non connectÃ©s
      * @returns {Array}
      */
     getAvailableDevices() {
@@ -827,8 +827,8 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Filtre les périphériques par type
-     * @param {number} type - Type de périphérique
+     * Filtre les pÃ©riphÃ©riques par type
+     * @param {number} type - Type de pÃ©riphÃ©rique
      * @returns {Array}
      */
     getDevicesByType(type) {
@@ -838,7 +838,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Recherche un périphérique par nom
+     * Recherche un pÃ©riphÃ©rique par nom
      * @param {string} query - Terme de recherche
      * @returns {Array}
      */
@@ -851,19 +851,19 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Nettoie le cache des infos périphériques
+     * Nettoie le cache des infos pÃ©riphÃ©riques
      */
     clearDeviceInfoCache() {
         this.deviceInfoCache.clear();
         
         if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', '✓ Device info cache cleared');
+            this.logger.debug('InstrumentController', 'âœ“ Device info cache cleared');
         }
     }
 
     /**
-     * Nettoie les périphériques obsolètes du cache
-     * @param {number} maxAge - Age max en ms (défaut: 5 minutes)
+     * Nettoie les pÃ©riphÃ©riques obsolÃ¨tes du cache
+     * @param {number} maxAge - Age max en ms (dÃ©faut: 5 minutes)
      */
     cleanupDeviceCache(maxAge = 300000) {
         const now = Date.now();
@@ -878,12 +878,12 @@ class InstrumentController extends BaseController {
 
         if (cleaned > 0 && this.logger?.debug) {
             this.logger.debug('InstrumentController', 
-                `✓ Cleaned ${cleaned} expired cache entries`);
+                `âœ“ Cleaned ${cleaned} expired cache entries`);
         }
     }
 
     // ========================================================================
-    // ÉVÉNEMENTS PAGE
+    // Ã‰VÃ‰NEMENTS PAGE
     // ========================================================================
 
     onInstrumentsPageActive() {
@@ -891,10 +891,10 @@ class InstrumentController extends BaseController {
             this.logger.debug('InstrumentController', 'Instruments page active');
         }
 
-        // Rafraîchir la liste
+        // RafraÃ®chir la liste
         this.refreshDeviceList();
         
-        // Vérifier statut hot-plug
+        // VÃ©rifier statut hot-plug
         if (this.backend?.isConnected()) {
             this.getHotPlugStatus().catch(() => {});
         }
@@ -907,25 +907,25 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // LEGACY / COMPATIBILITÉ
+    // LEGACY / COMPATIBILITÃ‰
     // ========================================================================
 
     /**
-     * Scan périphériques (alias pour compatibilité)
+     * Scan pÃ©riphÃ©riques (alias pour compatibilitÃ©)
      */
     async scan() {
         return await this.scanDevices(false);
     }
 
     /**
-     * Connecte un instrument (alias pour compatibilité)
+     * Connecte un instrument (alias pour compatibilitÃ©)
      */
     async connect(deviceId) {
         return await this.connectDevice(deviceId);
     }
 
     /**
-     * Déconnecte un instrument (alias pour compatibilité)
+     * DÃ©connecte un instrument (alias pour compatibilitÃ©)
      */
     async disconnect(deviceId) {
         return await this.disconnectDevice(deviceId);
@@ -936,7 +936,7 @@ class InstrumentController extends BaseController {
     // ========================================================================
 
     /**
-     * Obtient les statistiques des périphériques
+     * Obtient les statistiques des pÃ©riphÃ©riques
      * @returns {Object}
      */
     getStats() {
@@ -956,7 +956,7 @@ class InstrumentController extends BaseController {
     // ========================================================================
 
     destroy() {
-        // Arrêter hot-plug
+        // ArrÃªter hot-plug
         this.stopHotPlugMonitoring();
         
         // Nettoyer caches
