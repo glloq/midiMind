@@ -1,23 +1,11 @@
-<!-- ============================================================================
-Fichier: frontend/index.html
-Version: v3.9.0 - CORRECTIONS INTERFACE
-Date: 2025-10-30
-============================================================================ 
-CORRECTIONS v3.9.0:
-✅ Navigation déplacée SOUS le header (plus dans le header)
-✅ Structure: Header (logo + playback + debug) → Navigation → Main Content
-✅ Interface cohérente et fonctionnelle
-============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI Mind - Système d'Orchestration MIDI v3.1</title>
+    <title>MIDI Mind - v3.1 Corrigé</title>
     
-    <!-- ========================================================================
-         STYLES CSS
-         ======================================================================== -->
+    <!-- Styles -->
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/components.css">
     <link rel="stylesheet" href="styles/pages.css">
@@ -28,20 +16,14 @@ CORRECTIONS v3.9.0:
     <link rel="stylesheet" href="styles/editor.css">
     <link rel="stylesheet" href="styles/routing.css">
     <link rel="stylesheet" href="styles/visualizer.css">
+    <link rel="stylesheet" href="styles/playlist.css">
     <link rel="stylesheet" href="styles/themes.css">
 </head>
 <body>
-    <!-- ========================================================================
-         MAIN APP CONTAINER
-         ======================================================================== -->
     <div id="app" style="display: none;">
-        
-        <!-- ========================================================================
-             HEADER - Logo et contrôles principaux
-             ======================================================================== -->
+        <!-- Header -->
         <header class="app-header">
             <div class="header-content">
-                <!-- Logo -->
                 <div class="header-logo">
                     <div class="logo-icon">🎹</div>
                     <div class="logo-text">
@@ -49,8 +31,6 @@ CORRECTIONS v3.9.0:
                         <span class="logo-version">v3.1</span>
                     </div>
                 </div>
-                
-                <!-- Barre de lecture globale -->
                 <div class="global-playback-bar">
                     <div class="playback-info">
                         <span class="current-file-name" id="globalFileName">Aucun fichier</span>
@@ -58,43 +38,19 @@ CORRECTIONS v3.9.0:
                         <span class="separator">/</span>
                         <span class="total-time" id="globalDuration">00:00</span>
                     </div>
-                    
                     <div class="playback-controls">
-                        <!-- Boutons playlist (masqués si pas de playlist) -->
-                        <button class="control-btn btn-prev" id="globalPrev" title="Précédent" style="display: none;">
-                            ⮜️
-                        </button>
-                        
-                        <!-- Boutons de lecture -->
-                        <button class="control-btn btn-play" id="globalPlay" title="Lecture">
-                            ▶️
-                        </button>
-                        <button class="control-btn btn-pause" id="globalPause" title="Pause" style="display: none;">
-                            ⏸️
-                        </button>
-                        <button class="control-btn btn-stop" id="globalStop" title="Stop">
-                            ⏹️
-                        </button>
-                        
-                        <!-- Boutons playlist -->
-                        <button class="control-btn btn-next" id="globalNext" title="Suivant" style="display: none;">
-                            ⮞️
-                        </button>
+                        <button class="control-btn btn-play" id="globalPlay" title="Lecture">▶️</button>
+                        <button class="control-btn btn-pause" id="globalPause" title="Pause" style="display: none;">⏸️</button>
+                        <button class="control-btn btn-stop" id="globalStop" title="Stop">⏹️</button>
                     </div>
-                    
-                    <!-- Barre de progression -->
                     <div class="playback-progress">
                         <div class="progress-bar">
                             <div class="progress-fill" id="globalProgress"></div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Bouton debug (coccinelle) -->
                 <div class="header-debug">
-                    <button class="btn-debug" id="btnToggleDebug" title="Afficher/Masquer les logs">
-                        🐞
-                    </button>
+                    <button class="btn-debug" id="btnToggleDebug" title="Debug">🐞</button>
                     <div class="connection-status" id="connectionStatus">
                         <span class="status-dot"></span>
                         <span class="status-text">Déconnecté</span>
@@ -103,9 +59,7 @@ CORRECTIONS v3.9.0:
             </div>
         </header>
 
-        <!-- ========================================================================
-             NAVIGATION PRINCIPALE - Sous le header
-             ======================================================================== -->
+        <!-- Navigation -->
         <nav class="main-nav">
             <a href="#home" class="nav-item active" data-page="home">
                 <span class="nav-icon">🏠</span>
@@ -129,17 +83,13 @@ CORRECTIONS v3.9.0:
             </a>
         </nav>
 
-        <!-- ========================================================================
-             CONSOLE DE DEBUG (cachée par défaut)
-             ======================================================================== -->
+        <!-- Debug Console -->
         <div class="debug-console" id="debugConsole" style="display: none;">
             <div class="debug-header">
                 <span class="debug-title">🐞 Console de Debug</span>
                 <button class="btn-close-debug" id="btnCloseDebug">×</button>
             </div>
-            <div class="debug-content" id="debugContent">
-                <!-- Logs affichés ici -->
-            </div>
+            <div class="debug-content" id="debugContent"></div>
             <div class="debug-controls">
                 <button class="btn-clear-logs" id="btnClearLogs">Effacer</button>
                 <select class="log-level-select" id="logLevelSelect">
@@ -152,257 +102,88 @@ CORRECTIONS v3.9.0:
             </div>
         </div>
 
-        <!-- ========================================================================
-             MAIN CONTENT - Pages
-             ======================================================================== -->
+        <!-- Main Content -->
         <main class="app-main">
-            
-            <!-- ================================================================
-                 PAGE HOME - Sélection + Visualizer + Routing
-                 ================================================================ -->
+            <!-- PAGE HOME -->
             <div id="home" class="page active">
-                <div class="home-layout">
-                    
-                    <!-- Sélection de fichier -->
-                    <div class="home-file-selection">
-                        <div class="section-header">
-                            <h2>📁 Fichier actif</h2>
-                            <button class="btn-change-file" id="btnChangeFile">Changer</button>
-                        </div>
-                        
-                        <div class="current-file-display" id="currentFileDisplay">
-                            <div class="file-icon">🎵</div>
-                            <div class="file-info">
-                                <div class="file-name">Aucun fichier sélectionné</div>
-                                <div class="file-stats">Sélectionnez un fichier pour commencer</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Visualizer MIDI -->
-                    <div class="home-visualizer">
-                        <div class="section-header">
-                            <h2>🎵 Visualiseur MIDI</h2>
-                        </div>
-                        
-                        <div class="visualizer-container" id="homeVisualizer">
-                            <canvas id="visualizerCanvas"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Barre d'instruments avec mute global -->
-                    <div class="home-instruments-bar">
-                        <div class="section-header">
-                            <h2>🎸 Instruments connectés</h2>
-                            <button class="btn-mute-all" id="btnMuteAll" title="Mute All">
-                                🔇 Mute All
-                            </button>
-                        </div>
-                        
-                        <div class="instruments-list" id="homeInstrumentsList">
-                            <!-- Généré par HomeView -->
-                        </div>
-                    </div>
-                    
+                <div id="home-view">
+                    <!-- Généré par HomeView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE FICHIERS - Liste + Edition + Routes + Playlists
-                 ================================================================ -->
+            <!-- PAGE FILES -->
             <div id="files" class="page">
-                <div class="page-header">
-                    <h1>📁 Gestion des Fichiers</h1>
-                </div>
-                
-                <div class="files-layout">
-                    <!-- Liste des fichiers MIDI JSON -->
-                    <div class="files-section">
-                        <div class="section-header">
-                            <h2>Fichiers MIDI JSON</h2>
-                            <div class="section-actions">
-                                <button class="btn-action btn-primary" id="btnUploadFile">
-                                    ⬆️ Uploader
-                                </button>
-                                <button class="btn-action" id="btnRefreshFiles">
-                                    🔄 Actualiser
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="files-grid" id="filesGrid">
-                            <!-- Généré par FileView -->
-                        </div>
-                    </div>
-                    
-                    <!-- Gestion des playlists -->
-                    <div class="playlists-section">
-                        <div class="section-header">
-                            <h2>Playlists</h2>
-                            <button class="btn-action btn-create" id="btnCreatePlaylist">
-                                ➕ Nouvelle Playlist
-                            </button>
-                        </div>
-                        
-                        <div class="playlists-grid" id="playlistsGrid">
-                            <!-- Généré par PlaylistView -->
-                        </div>
-                    </div>
+                <div id="file-view">
+                    <!-- Généré par FileView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE INSTRUMENTS - Connexion + Paramètres
-                 ================================================================ -->
+            <!-- PAGE INSTRUMENTS -->
             <div id="instruments" class="page">
-                <div class="page-header">
-                    <h1>🎸 Gestion des Instruments</h1>
-                </div>
-                
-                <div class="instruments-layout">
-                    <!-- Recherche et connexion -->
-                    <div class="instruments-discover">
-                        <div class="section-header">
-                            <h2>Rechercher et connecter</h2>
-                            <div class="discover-controls">
-                                <button class="btn-scan" id="btnScanUSB">
-                                    🔌 Scan USB
-                                </button>
-                                <button class="btn-scan" id="btnScanBluetooth">
-                                    📡 Scan Bluetooth
-                                </button>
-                                <button class="btn-scan" id="btnScanNetwork">
-                                    🌐 Scan Réseau
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="devices-found" id="devicesFound">
-                            <!-- Généré par InstrumentView -->
-                        </div>
-                    </div>
-                    
-                    <!-- Instruments connectés -->
-                    <div class="instruments-connected">
-                        <div class="section-header">
-                            <h2>Instruments connectés</h2>
-                        </div>
-                        
-                        <div class="devices-list" id="connectedDevices">
-                            <!-- Généré par InstrumentView -->
-                        </div>
-                    </div>
+                <div id="instrument-view">
+                    <!-- Généré par InstrumentView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE KEYBOARD
-                 ================================================================ -->
+            <!-- PAGE KEYBOARD -->
             <div id="keyboard" class="page">
-                <div class="keyboard-container" id="keyboardContainer">
+                <div id="keyboard-view">
                     <!-- Généré par KeyboardView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE SYSTÈME - Réglages
-                 ================================================================ -->
+            <!-- PAGE SYSTEM -->
             <div id="system" class="page">
-                <div class="page-header">
-                    <h1>⚙️ Réglages Système</h1>
-                </div>
-                
-                <div class="system-layout">
-                    <!-- Paramètres généraux -->
-                    <div class="system-section">
-                        <h2>Paramètres généraux</h2>
-                        <div class="settings-grid" id="generalSettings">
-                            <!-- Généré par SystemView -->
-                        </div>
-                    </div>
-                    
-                    <!-- Paramètres MIDI -->
-                    <div class="system-section">
-                        <h2>Configuration MIDI</h2>
-                        <div class="settings-grid" id="midiSettings">
-                            <!-- Généré par SystemView -->
-                        </div>
-                    </div>
-                    
-                    <!-- Performance -->
-                    <div class="system-section">
-                        <h2>Performance</h2>
-                        <div class="settings-grid" id="performanceSettings">
-                            <!-- Généré par SystemView -->
-                        </div>
-                    </div>
-                    
-                    <!-- Actions système -->
-                    <div class="system-section">
-                        <h2>Actions système</h2>
-                        <div class="system-actions">
-                            <button class="btn-action btn-danger" id="btnRestartServices">
-                                🔄 Redémarrer services
-                            </button>
-                            <button class="btn-action btn-warning" id="btnClearCache">
-                                🗑️ Vider le cache
-                            </button>
-                            <button class="btn-action" id="btnExportSettings">
-                                💾 Exporter config
-                            </button>
-                        </div>
-                    </div>
+                <div id="system-view">
+                    <!-- Généré par SystemView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE EDITOR (Modal plein écran)
-                 ================================================================ -->
+            <!-- PAGE EDITOR (Modal) -->
             <div id="editor" class="page page-fullscreen" style="display: none;">
-                <div class="editor-container" id="editorContainer">
+                <div id="editor-view">
                     <!-- Généré par EditorView -->
                 </div>
             </div>
             
-            <!-- ================================================================
-                 PAGE ROUTING (Modal)
-                 ================================================================ -->
+            <!-- PAGE ROUTING (Modal) -->
             <div id="routing" class="page page-modal" style="display: none;">
-                <div class="routing-container" id="routingContainer">
+                <div id="routing-view">
                     <!-- Généré par RoutingView -->
                 </div>
             </div>
             
+            <!-- PAGE PLAYLIST (Modal) -->
+            <div id="playlist" class="page page-modal" style="display: none;">
+                <div id="playlist-view">
+                    <!-- Généré par PlaylistView -->
+                </div>
+            </div>
+            
+            <!-- VISUALIZER (peut être intégré dans d'autres pages) -->
+            <div id="visualizer-view" style="display: none;">
+                <!-- Généré par VisualizerView -->
+            </div>
         </main>
 
-        <!-- ========================================================================
-             MODALS & OVERLAYS
-             ======================================================================== -->
+        <!-- Modal Overlay -->
         <div id="modal-overlay" class="modal-overlay" style="display: none;">
-            <div class="modal-content" id="modalContent">
-                <!-- Contenu modal dynamique -->
-            </div>
+            <div class="modal-content" id="modalContent"></div>
         </div>
-
     </div>
 
-    <!-- ========================================================================
-         LOADING INDICATOR
-         ======================================================================== -->
+    <!-- Loading -->
     <div id="loading-indicator" class="loading-indicator">
         <div class="spinner"></div>
         <p>Chargement de MIDI Mind...</p>
     </div>
 
-    <!-- ========================================================================
-         SCRIPTS - ORDRE CRITIQUE
-         ======================================================================== -->
-    
-    <!-- Configuration -->
+    <!-- Scripts - Ordre CRITIQUE -->
+    <!-- Config -->
     <script src="js/config/AppConfig.js"></script>
     <script src="js/config/PerformanceConfig.js"></script>
 
-    <!-- Utilitaires de base -->
+    <!-- Utils -->
     <script src="js/utils/Logger.js"></script>
     <script src="js/utils/DebugConsole.js"></script>
     <script src="js/utils/Constants.js"></script>
@@ -415,7 +196,7 @@ CORRECTIONS v3.9.0:
     <script src="js/utils/KeyboardShortcuts.js"></script>
     <script src="js/utils/ApiClient.js"></script>
 
-    <!-- Event Bus (critique) -->
+    <!-- EventBus -->
     <script src="js/core/EventBus.js"></script>
 
     <!-- Services -->
@@ -424,12 +205,12 @@ CORRECTIONS v3.9.0:
     <script src="js/services/MidiService.js"></script>
     <script src="js/services/BackendService.js"></script>
 
-    <!-- Classes de base -->
+    <!-- Base Classes -->
     <script src="js/core/BaseModel.js"></script>
     <script src="js/core/BaseView.js"></script>
     <script src="js/core/BaseController.js"></script>
 
-    <!-- Modèles -->
+    <!-- Models -->
     <script src="js/models/StateModel.js"></script>
     <script src="js/models/FileModel.js"></script>
     <script src="js/models/InstrumentModel.js"></script>
@@ -439,7 +220,7 @@ CORRECTIONS v3.9.0:
     <script src="js/models/PlaybackModel.js"></script>
     <script src="js/models/PlaylistModel.js"></script>
 
-    <!-- Vues -->
+    <!-- Views -->
     <script src="js/views/HomeView.js"></script>
     <script src="js/views/FileView.js"></script>
     <script src="js/views/InstrumentView.js"></script>
@@ -450,7 +231,7 @@ CORRECTIONS v3.9.0:
     <script src="js/views/PlaylistView.js"></script>
     <script src="js/views/VisualizerView.js"></script>
 
-    <!-- Contrôleurs -->
+    <!-- Controllers -->
     <script src="js/controllers/NavigationController.js"></script>
     <script src="js/controllers/HomeController.js"></script>
     <script src="js/controllers/FileController.js"></script>
@@ -468,8 +249,7 @@ CORRECTIONS v3.9.0:
     <script src="js/core/Application.js"></script>
     <script src="js/core/Router.js"></script>
 
-    <!-- Initialisation -->
+    <!-- Init -->
     <script src="js/main.js"></script>
-
 </body>
 </html>
