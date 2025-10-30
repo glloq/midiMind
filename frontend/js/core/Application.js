@@ -1,8 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.9.1 - CORRECTIONS ENCODAGE + LOGGER
+// Version: v3.9.2 - FIX ORDRE PARAMÈTRES CONTRÔLEURS
 // Date: 2025-10-30
 // Projet: MidiMind v3.1
+// ============================================================================
+// CORRECTIONS v3.9.2:
+// ✅ CRITIQUE: Ordre correct des paramètres pour TOUS les contrôleurs
+// ✅ BaseController attend: (eventBus, models, views, notifications, debugConsole)
+// ✅ Correction: FileController, HomeController, InstrumentController, etc.
 // ============================================================================
 // CORRECTIONS v3.9.1:
 // ✅ Encodage UTF-8 correct (tous caractères spéciaux)
@@ -254,22 +259,25 @@ class Application {
         
         // StorageService
         if (window.StorageService) {
-            this.services.storage = new StorageService(this.eventBus, this.logger);
+            this.services.storage = new StorageService();
         }
         
         // MidiService
         if (window.MidiService) {
-            this.services.midi = new MidiService(this.eventBus, this.logger);
+            this.services.midi = new MidiService(this.eventBus);
         }
         
         // FileService
         if (window.FileService) {
             this.services.file = new FileService(
                 this.services.backend,
-                this.eventBus,
-                this.logger
+                this.eventBus
             );
         }
+        
+        // Rendre services disponibles globalement
+        window.backendService = this.services.backend;
+        window.storageService = this.services.storage;
         
         this.log('info', '✓ Services initialized');
     }
@@ -282,42 +290,52 @@ class Application {
         
         // StateModel
         if (window.StateModel) {
-            this.models.state = new StateModel(this.eventBus, this.logger);
+            this.models.state = new StateModel(this.eventBus);
         }
         
         // FileModel
         if (window.FileModel) {
-            this.models.file = new FileModel(this.eventBus, this.logger);
+            this.models.file = new FileModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger
+            );
         }
         
         // PlaylistModel
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(this.eventBus, this.logger);
+            this.models.playlist = new PlaylistModel(this.eventBus);
         }
         
         // InstrumentModel
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(this.eventBus, this.logger);
+            this.models.instrument = new InstrumentModel(this.eventBus);
         }
         
         // SystemModel
         if (window.SystemModel) {
-            this.models.system = new SystemModel(this.eventBus, this.logger);
+            this.models.system = new SystemModel(
+                this.eventBus,
+                this.services.backend
+            );
         }
         
         // PlaybackModel
         if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(this.eventBus, this.logger);
+            this.models.playback = new PlaybackModel(this.eventBus);
         }
         
         // EditorModel
         if (window.EditorModel) {
-            this.models.editor = new EditorModel(this.eventBus, this.logger);
+            this.models.editor = new EditorModel(this.eventBus);
         }
         
         // RoutingModel
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(this.eventBus, this.logger);
+            this.models.routing = new RoutingModel(
+                this.eventBus,
+                this.services.backend
+            );
         }
         
         this.log('info', '✓ Models initialized');
@@ -331,80 +349,47 @@ class Application {
         
         // HomeView
         if (window.HomeView) {
-            const homeContainer = document.getElementById('home');
-            if (homeContainer) {
-                this.views.home = new HomeView(homeContainer, this.eventBus);
-                this.views.home.init?.();
-            }
+            this.views.home = new HomeView('home-view', this.eventBus);
         }
         
         // FileView
         if (window.FileView) {
-            const filesContainer = document.getElementById('files');
-            if (filesContainer) {
-                this.views.file = new FileView(filesContainer, this.eventBus);
-                this.views.file.init?.();
-            }
+            this.views.file = new FileView('file-view', this.eventBus);
         }
         
         // InstrumentView
         if (window.InstrumentView) {
-            const instrumentsContainer = document.getElementById('instruments');
-            if (instrumentsContainer) {
-                this.views.instrument = new InstrumentView(instrumentsContainer, this.eventBus);
-                this.views.instrument.init?.();
-            }
+            this.views.instrument = new InstrumentView('instrument-view', this.eventBus);
         }
         
         // KeyboardView
         if (window.KeyboardView) {
-            const keyboardContainer = document.getElementById('keyboard');
-            if (keyboardContainer) {
-                this.views.keyboard = new KeyboardView(keyboardContainer, this.eventBus);
-                this.views.keyboard.init?.();
-            }
+            this.views.keyboard = new KeyboardView('keyboard-view', this.eventBus, this.debugConsole);
         }
         
         // SystemView
         if (window.SystemView) {
-            const systemContainer = document.getElementById('system');
-            if (systemContainer) {
-                this.views.system = new SystemView(systemContainer, this.eventBus);
-                this.views.system.init?.();
-            }
-        }
-        
-        // EditorView
-        if (window.EditorView) {
-            const editorContainer = document.getElementById('editor');
-            if (editorContainer) {
-                this.views.editor = new EditorView(editorContainer, this.eventBus);
-                this.views.editor.init?.();
-            }
+            this.views.system = new SystemView('system-view', this.eventBus);
         }
         
         // RoutingView
         if (window.RoutingView) {
-            const routingContainer = document.getElementById('routing');
-            if (routingContainer) {
-                this.views.routing = new RoutingView(routingContainer, this.eventBus);
-                this.views.routing.init?.();
-            }
+            this.views.routing = new RoutingView('routing-view', this.eventBus);
+        }
+        
+        // EditorView
+        if (window.EditorView) {
+            this.views.editor = new EditorView('editor-view', this.eventBus);
         }
         
         // PlaylistView
         if (window.PlaylistView) {
-            this.views.playlist = new PlaylistView(this.eventBus);
-            this.views.playlist.init?.();
+            this.views.playlist = new PlaylistView('playlist-view', this.eventBus);
         }
         
         // VisualizerView
         if (window.VisualizerView) {
-            const visualizerCanvas = document.getElementById('visualizerCanvas');
-            if (visualizerCanvas) {
-                this.views.visualizer = new VisualizerView(visualizerCanvas, this.eventBus);
-                this.views.visualizer.init?.();
-            }
+            this.views.visualizer = new VisualizerView('visualizer-view', this.eventBus);
         }
         
         this.log('info', '✓ Views initialized');
@@ -425,32 +410,38 @@ class Application {
             this.controllers.navigation.init?.();
         }
         
-        // HomeController
+        // HomeController - ✅ CORRIGÉ
         if (window.HomeController) {
             this.controllers.home = new HomeController(
-                this.views.home,
-                this.models.file,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.home.init?.();
         }
         
-        // FileController
+        // FileController - ✅ CORRIGÉ
         if (window.FileController) {
             this.controllers.file = new FileController(
-                this.views.file,
-                this.models.file,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.file.init?.();
         }
         
-        // InstrumentController
+        // InstrumentController - ✅ CORRIGÉ
         if (window.InstrumentController) {
             this.controllers.instrument = new InstrumentController(
-                this.views.instrument,
-                this.models.instrument,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.instrument.init?.();
         }
@@ -464,12 +455,14 @@ class Application {
             this.controllers.keyboard.init?.();
         }
         
-        // SystemController
+        // SystemController - ✅ CORRIGÉ
         if (window.SystemController) {
             this.controllers.system = new SystemController(
-                this.views.system,
-                this.models.system,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.system.init?.();
         }
@@ -492,32 +485,38 @@ class Application {
             this.controllers.globalPlayback.init?.();
         }
         
-        // PlaylistController
+        // PlaylistController - ✅ CORRIGÉ
         if (window.PlaylistController) {
             this.controllers.playlist = new PlaylistController(
-                this.views.playlist,
-                this.models.playlist,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.playlist.init?.();
         }
         
-        // EditorController
+        // EditorController - ✅ CORRIGÉ
         if (window.EditorController) {
             this.controllers.editor = new EditorController(
-                this.views.editor,
-                this.models.editor,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.editor.init?.();
         }
         
-        // RoutingController
+        // RoutingController - ✅ CORRIGÉ
         if (window.RoutingController) {
             this.controllers.routing = new RoutingController(
-                this.views.routing,
-                this.models.routing,
-                this.eventBus
+                this.eventBus,
+                this.models,
+                this.views,
+                this.notifications,
+                this.debugConsole
             );
             this.controllers.routing.init?.();
         }

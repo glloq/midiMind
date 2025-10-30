@@ -1,12 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
-// Version: v3.0.3-FIXED
-// Date: 2025-10-20
+// Version: v3.0.4-FIXED-MERGE
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.0.3:
-// ✅ Fixed initialization order (logger before initialize call)
-// ✅ Added _fullyInitialized flag pattern
-// ✅ Protected initialize() method
+// CORRECTIONS v3.0.4:
+// ✅ CRITIQUE: Fusionne state/config au lieu de les écraser
+// ✅ Utilise Object.assign pour préserver propriétés de BaseController
+// ✅ Conserve toutes les fonctionnalités existantes
 // ============================================================================
 
 class FileController extends BaseController {
@@ -17,21 +17,21 @@ class FileController extends BaseController {
         this.backend = window.app?.services?.backend || null;
         this.logger = window.logger || console;
         
-        // État
-        this.state = {
+        // ✅ FUSIONNER state au lieu d'écraser
+        Object.assign(this.state, {
             currentDirectory: '/midi',
             selectedFile: null,
             isLoading: false,
             lastRefresh: null
-        };
+        });
         
-        // Configuration
-        this.config = {
+        // ✅ FUSIONNER config au lieu d'écraser
+        Object.assign(this.config, {
             maxFileSize: 10 * 1024 * 1024, // 10 MB
             allowedExtensions: ['.mid', '.midi'],
             autoRefresh: true,
             confirmDelete: true
-        };
+        });
         
         // Mark as fully initialized
         this._fullyInitialized = true;
@@ -243,13 +243,9 @@ class FileController extends BaseController {
                 { duration: 2000 }
             );
             
-            if (this.logger && this.logger.info) {
-                this.logger.info('FileController', '✓ File loaded successfully');
-            }
-            
         } catch (error) {
             if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Failed to load file:', error);
+                this.logger.error('FileController', 'Load file failed:', error);
             }
             
             this.showNotification(
@@ -257,8 +253,6 @@ class FileController extends BaseController {
                 'error',
                 { duration: 5000 }
             );
-            
-            throw error;
         }
     }
     
@@ -267,20 +261,16 @@ class FileController extends BaseController {
      * @private
      */
     async handleFileLoad(data) {
-        const fileId = data.fileId || data.id || data.file_id || data.filePath;
+        const fileId = data.fileId || data.id || data.file_id;
         
         if (!fileId) {
-            if (this.logger && this.logger.warn) {
-                this.logger.warn('FileController', 'No file ID provided for load');
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'No file ID provided for load');
             }
             return;
         }
         
-        try {
-            await this.loadFile(fileId);
-        } catch (error) {
-            // Erreur déjà gérée dans loadFile()
-        }
+        await this.loadFile(fileId);
     }
     
     // ========================================================================
@@ -290,47 +280,41 @@ class FileController extends BaseController {
     /**
      * Upload un fichier MIDI
      * @param {File} file - Fichier à uploader
-     * @param {Function} onProgress - Callback progression
-     * @returns {Promise<Object>} Fichier uploadé
+     * @returns {Promise<boolean>} Succès
      */
-    async uploadFile(file, onProgress = null) {
+    async uploadFile(file) {
         if (this.logger && this.logger.info) {
             this.logger.info('FileController', `Uploading file: ${file.name}`);
         }
         
         try {
-            // Validation
-            if (!file) {
-                throw new Error('No file provided');
-            }
-            
+            // Vérifier taille
             if (file.size > this.config.maxFileSize) {
-                throw new Error(`File too large (max ${this.config.maxFileSize / 1024 / 1024}MB)`);
+                throw new Error(`File too large (max ${this.config.maxFileSize / 1024 / 1024} MB)`);
             }
             
-            const ext = '.' + file.name.split('.').pop().toLowerCase();
-            if (!this.config.allowedExtensions.includes(ext)) {
+            // Vérifier extension
+            const extension = '.' + file.name.split('.').pop().toLowerCase();
+            if (!this.config.allowedExtensions.includes(extension)) {
                 throw new Error(`Invalid file type (allowed: ${this.config.allowedExtensions.join(', ')})`);
             }
             
             // Afficher loader
             this.showLoading(true);
             
-            // Lire fichier en base64
-            const base64 = await this.fileToBase64(file);
+            // Convertir en base64
+            const base64Content = await this.fileToBase64(file);
             
-            // Upload via backend
+            // Uploader via backend
             const result = await this.backend.sendCommand('files.upload', {
                 filename: file.name,
-                content: base64,
+                content: base64Content,
                 directory: this.state.currentDirectory
             });
             
             if (result.success === false) {
                 throw new Error(result.error || 'Upload failed');
             }
-            
-            const uploadedFile = result.data;
             
             if (this.logger && this.logger.info) {
                 this.logger.info('FileController', `✓ File uploaded: ${file.name}`);
@@ -348,11 +332,11 @@ class FileController extends BaseController {
             
             // Émettre événement
             this.eventBus.emit('file:uploaded', {
-                file: uploadedFile,
-                originalFile: file
+                filename: file.name,
+                fileId: result.data?.file_id
             });
             
-            return uploadedFile;
+            return true;
             
         } catch (error) {
             if (this.logger && this.logger.error) {
@@ -360,12 +344,12 @@ class FileController extends BaseController {
             }
             
             this.showNotification(
-                `Upload failed: ${error.message}`,
+                `Failed to upload file: ${error.message}`,
                 'error',
                 { duration: 5000 }
             );
             
-            throw error;
+            return false;
             
         } finally {
             this.showLoading(false);
@@ -377,7 +361,7 @@ class FileController extends BaseController {
      * @private
      */
     async handleFileUpload(data) {
-        const { file, onProgress } = data;
+        const file = data.file || data.files?.[0];
         
         if (!file) {
             if (this.logger && this.logger.error) {
@@ -386,11 +370,7 @@ class FileController extends BaseController {
             return;
         }
         
-        try {
-            await this.uploadFile(file, onProgress);
-        } catch (error) {
-            // Erreur déjà gérée dans uploadFile()
-        }
+        await this.uploadFile(file);
     }
     
     // ========================================================================
@@ -501,6 +481,76 @@ class FileController extends BaseController {
         }
         
         await this.deleteFile(fileId);
+    }
+    
+    // ========================================================================
+    // RENOMMER FICHIER
+    // ========================================================================
+    
+    /**
+     * Renomme un fichier
+     * @param {string} fileId - ID du fichier
+     * @param {string} newName - Nouveau nom
+     * @returns {Promise<boolean>} Succès
+     */
+    async renameFile(fileId, newName) {
+        if (this.logger && this.logger.info) {
+            this.logger.info('FileController', `Renaming file: ${fileId} → ${newName}`);
+        }
+        
+        try {
+            const result = await this.backend.sendCommand('files.rename', {
+                file_id: fileId,
+                new_name: newName
+            });
+            
+            if (result.success === false) {
+                throw new Error(result.error || 'Rename failed');
+            }
+            
+            // Rafraîchir liste
+            await this.refreshFileList();
+            
+            // Notification
+            this.showNotification(
+                `File renamed to: ${newName}`,
+                'success',
+                { duration: 2000 }
+            );
+            
+            return true;
+            
+        } catch (error) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Rename failed:', error);
+            }
+            
+            this.showNotification(
+                `Failed to rename file: ${error.message}`,
+                'error',
+                { duration: 5000 }
+            );
+            
+            return false;
+        }
+    }
+    
+    /**
+     * Handler pour événement file:rename
+     * @private
+     */
+    async handleFileRename(data) {
+        const fileId = data.fileId || data.id || data.file_id;
+        const newName = data.newName || data.name;
+        
+        if (!fileId || !newName) {
+            if (this.logger && this.logger.error) {
+                this.logger.error('FileController', 'Invalid rename parameters');
+            }
+            return;
+        }
+        
+        await this.renameFile(fileId, newName);
     }
     
     // ========================================================================
@@ -635,5 +685,5 @@ if (typeof window !== 'undefined') {
 window.FileController = FileController;
 
 // ============================================================================
-// FIN DU FICHIER FileController.js v3.0.3-FIXED
+// FIN DU FICHIER FileController.js v3.0.4-FIXED-MERGE
 // ============================================================================
