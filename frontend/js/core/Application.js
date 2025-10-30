@@ -264,7 +264,11 @@ class Application {
         
         // FileService
         if (window.FileService) {
-            this.services.file = new FileService(this.eventBus, this.logger);
+            this.services.file = new FileService(
+                this.services.backend,
+                this.eventBus,
+                this.logger
+            );
         }
         
         this.log('info', '✓ Services initialized');
