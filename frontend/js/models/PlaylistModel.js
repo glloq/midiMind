@@ -1,17 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaylistModel.js
-// Version: v3.1.0 - COMPLETE WITH ALL MISSING METHODS
-// Date: 2025-10-23
+// Version: v3.1.1 - FIXED LOGGER PROTECTION
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.1.0:
-// ✓ Ajout de la gestion de queue (addToQueue, removeFromQueue, clearQueue)
-// ✓ Ajout des modes de lecture (shuffle, repeat, autoAdvance)
-// ✓ Ajout de updatePlaylist, addFile, removeFile
-// ✓ Ajout de getPlaylistById, getQueueStats
-// ✓ Ajout de playQueue, addMultipleToQueue, reorderQueue
+// CORRECTIONS v3.1.1:
+// ✅ CRITIQUE: Protection contre logger undefined
+// ✅ Utilise logger || window.logger || console comme fallback
+// ✅ Vérification avant chaque appel logger.info/error
 // ============================================================================
-
-
 
 class PlaylistModel extends BaseModel {
     constructor(eventBus, backend, logger) {
@@ -21,9 +17,18 @@ class PlaylistModel extends BaseModel {
             autoPersist: true
         });
         
-        this.eventBus = eventBus;
-        this.logger = logger;
-        this.backend = backend;
+        // ✅ PROTECTION: Fallback sur window.logger ou console
+        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.backend = backend || window.backendService || window.app?.services?.backend;
+        this.logger = logger || window.logger || console;
+        
+        // Validation des dépendances critiques
+        if (!this.eventBus) {
+            console.error('[PlaylistModel] EventBus not available!');
+        }
+        if (!this.backend) {
+            console.warn('[PlaylistModel] BackendService not available');
+        }
         
         // Données du modèle
         this.data = {
@@ -41,7 +46,10 @@ class PlaylistModel extends BaseModel {
             autoAdvance: true
         };
         
-        this.logger.info('PlaylistModel', '✓ Model initialized (complete version)');
+        // ✅ Vérification avant utilisation
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaylistModel', '✓ Model initialized (v3.1.1)');
+        }
     }
     
     // ========================================================================
@@ -62,8 +70,13 @@ class PlaylistModel extends BaseModel {
         playlists.push(playlist);
         this.set('playlists', playlists);
         
-        this.logger.info('PlaylistModel', `Playlist created: ${name}`);
-        this.eventBus.emit('playlist:created', { playlist });
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaylistModel', `Playlist created: ${name}`);
+        }
+        
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:created', { playlist });
+        }
         
         return playlist;
     }
@@ -83,8 +96,13 @@ class PlaylistModel extends BaseModel {
         this.set('queue', [...playlist.files]);
         this.set('queueIndex', 0);
         
-        this.logger.info('PlaylistModel', `Playlist loaded: ${playlist.name}`);
-        this.eventBus.emit('playlist:loaded', { playlist });
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaylistModel', `Playlist loaded: ${playlist.name}`);
+        }
+        
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:loaded', { playlist });
+        }
         
         return playlist;
     }
@@ -99,8 +117,13 @@ class PlaylistModel extends BaseModel {
             this.set('queue', []);
         }
         
-        this.logger.info('PlaylistModel', `Playlist deleted: ${playlistId}`);
-        this.eventBus.emit('playlist:deleted', { playlistId });
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaylistModel', `Playlist deleted: ${playlistId}`);
+        }
+        
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:deleted', { playlistId });
+        }
         
         return true;
     }
@@ -126,7 +149,9 @@ class PlaylistModel extends BaseModel {
             this.set('currentPlaylist', playlists[index]);
         }
         
-        this.eventBus.emit('playlist:updated', { playlist: playlists[index] });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:updated', { playlist: playlists[index] });
+        }
         
         return playlists[index];
     }
@@ -156,7 +181,9 @@ class PlaylistModel extends BaseModel {
                 this.set('queue', queue);
             }
             
-            this.eventBus.emit('playlist:file-added', { playlistId, fileId });
+            if (this.eventBus) {
+                this.eventBus.emit('playlist:file-added', { playlistId, fileId });
+            }
         }
         
         return playlist;
@@ -187,7 +214,9 @@ class PlaylistModel extends BaseModel {
                 }
             }
             
-            this.eventBus.emit('playlist:file-removed', { playlistId, fileId });
+            if (this.eventBus) {
+                this.eventBus.emit('playlist:file-removed', { playlistId, fileId });
+            }
         }
         
         return playlist;
@@ -202,7 +231,9 @@ class PlaylistModel extends BaseModel {
         queue.push(fileId);
         this.set('queue', queue);
         
-        this.eventBus.emit('playlist:queue-updated', { queue });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:queue-updated', { queue });
+        }
         
         return queue;
     }
@@ -212,7 +243,9 @@ class PlaylistModel extends BaseModel {
         queue.push(...fileIds);
         this.set('queue', queue);
         
-        this.eventBus.emit('playlist:queue-updated', { queue });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:queue-updated', { queue });
+        }
         
         return queue;
     }
@@ -235,7 +268,9 @@ class PlaylistModel extends BaseModel {
                 }
             }
             
-            this.eventBus.emit('playlist:queue-updated', { queue });
+            if (this.eventBus) {
+                this.eventBus.emit('playlist:queue-updated', { queue });
+            }
             
             return removed;
         }
@@ -247,7 +282,9 @@ class PlaylistModel extends BaseModel {
         this.set('queue', []);
         this.set('queueIndex', 0);
         
-        this.eventBus.emit('playlist:queue-cleared');
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:queue-cleared');
+        }
         
         return true;
     }
@@ -274,7 +311,9 @@ class PlaylistModel extends BaseModel {
             this.set('queueIndex', queueIndex + 1);
         }
         
-        this.eventBus.emit('playlist:queue-reordered', { queue });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:queue-reordered', { queue });
+        }
         
         return queue;
     }
@@ -290,7 +329,9 @@ class PlaylistModel extends BaseModel {
         
         const file = queue[0];
         
-        this.eventBus.emit('playlist:queue-play', { file, index: 0 });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:queue-play', { file, index: 0 });
+        }
         
         return file;
     }
@@ -349,10 +390,12 @@ class PlaylistModel extends BaseModel {
         
         const file = queue[newIndex];
         
-        this.eventBus.emit('playlist:next', { 
-            file, 
-            index: newIndex
-        });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:next', { 
+                file, 
+                index: newIndex
+            });
+        }
         
         return file;
     }
@@ -374,10 +417,12 @@ class PlaylistModel extends BaseModel {
         
         const file = queue[newIndex];
         
-        this.eventBus.emit('playlist:previous', { 
-            file, 
-            index: newIndex
-        });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:previous', { 
+                file, 
+                index: newIndex
+            });
+        }
         
         return file;
     }
@@ -393,7 +438,9 @@ class PlaylistModel extends BaseModel {
         
         const file = queue[index];
         
-        this.eventBus.emit('playlist:jump', { file, index });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:jump', { file, index });
+        }
         
         return file;
     }
@@ -410,7 +457,9 @@ class PlaylistModel extends BaseModel {
             this.shuffleQueue();
         }
         
-        this.eventBus.emit('playlist:shuffle-changed', { enabled });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:shuffle-changed', { enabled });
+        }
         
         return enabled;
     }
@@ -419,7 +468,9 @@ class PlaylistModel extends BaseModel {
         // mode: 'none', 'one', 'all'
         this.set('repeat', mode);
         
-        this.eventBus.emit('playlist:repeat-changed', { mode });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:repeat-changed', { mode });
+        }
         
         return mode;
     }
@@ -427,7 +478,9 @@ class PlaylistModel extends BaseModel {
     setAutoAdvance(enabled) {
         this.set('autoAdvance', enabled);
         
-        this.eventBus.emit('playlist:autoadvance-changed', { enabled });
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:autoadvance-changed', { enabled });
+        }
         
         return enabled;
     }
@@ -493,7 +546,9 @@ class PlaylistModel extends BaseModel {
     
     set(key, value) {
         this.data[key] = value;
-        this.emit(`${this.options.eventPrefix}:${key}-changed`, value);
+        if (this.eventBus) {
+            this.eventBus.emit(`${this.config.eventPrefix}:${key}-changed`, value);
+        }
     }
 }
 
@@ -508,5 +563,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PlaylistModel = PlaylistModel;
 }
-
-window.PlaylistModel = PlaylistModel;

@@ -1,29 +1,36 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaybackModel.js
-// Version: v3.1.02 - FIXED (Methods inside class)
-// Date: 2025-10-23
+// Version: v3.1.03 - FIXED LOGGER PROTECTION
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.1.02:
-// ✓ Toutes les méthodes sont maintenant DANS la classe
-// ✓ Suppression du code hors classe
-// ✓ Méthodes get/set/update/setLoopPoints/watch correctement placées
+// CORRECTIONS v3.1.03:
+// ✅ CRITIQUE: Protection contre logger undefined
+// ✅ Utilise logger || window.logger || console comme fallback
+// ✅ Vérification avant chaque appel logger.info/warn/debug/error
 // ============================================================================
 
 class PlaybackModel extends BaseModel {
     constructor(eventBus, backend, logger) {
-        // ✓ FIX: Correct super() call
         super({}, {
             persistKey: 'playbackmodel',
             eventPrefix: 'playback',
             autoPersist: false
         });
         
-        // ✓ FIX: Assign immediately
-        this.eventBus = eventBus;
-        this.logger = logger;
-        this.backend = backend;
+        // ✅ PROTECTION: Fallback sur window.logger ou console
+        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.backend = backend || window.backendService || window.app?.services?.backend;
+        this.logger = logger || window.logger || console;
         
-        // ✓ FIX: Initialize data directly
+        // Validation des dépendances
+        if (!this.eventBus) {
+            console.error('[PlaybackModel] EventBus not available!');
+        }
+        if (!this.backend) {
+            console.warn('[PlaybackModel] BackendService not available');
+        }
+        
+        // Initialisation des données
         this.data = {
             // État de lecture
             state: 'STOPPED', // PLAYING, PAUSED, STOPPED
@@ -72,7 +79,10 @@ class PlaybackModel extends BaseModel {
             loopCheckInterval: 100
         };
         
-        this.logger.info('PlaybackModel', '✓ Model initialized v3.1.02');
+        // ✅ Vérification avant utilisation
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaybackModel', '✓ Model initialized v3.1.03');
+        }
     }
     
     // ========================================================================
@@ -81,7 +91,9 @@ class PlaybackModel extends BaseModel {
     
     updateFromBackend(backendData) {
         if (!backendData?.player) {
-            this.logger.warn('PlaybackModel', 'Invalid backend data received');
+            if (this.logger && typeof this.logger.warn === 'function') {
+                this.logger.warn('PlaybackModel', 'Invalid backend data received');
+            }
             return;
         }
         
@@ -103,8 +115,10 @@ class PlaybackModel extends BaseModel {
             trackCount: player.trackCount || 0
         }, { silent: true });
         
-        this.logger.debug('PlaybackModel', 
-            `Synced with backend: pos=${player.position}ms, state=${player.state}`);
+        if (this.logger && typeof this.logger.debug === 'function') {
+            this.logger.debug('PlaybackModel', 
+                `Synced with backend: pos=${player.position}ms, state=${player.state}`);
+        }
     }
     
     // ========================================================================
@@ -126,16 +140,18 @@ class PlaybackModel extends BaseModel {
                 this.set('progress', progress, { silent: true });
                 
                 // Émettre événement
-                this.eventBus.emit('playback:position-update', {
-                    position: currentPos + increment,
-                    progress: progress
-                });
+                if (this.eventBus) {
+                    this.eventBus.emit('playback:position-update', {
+                        position: currentPos + increment,
+                        progress: progress
+                    });
+                }
             }
         }, 1000 / 60); // 60 FPS
         
         // Timer backend pour correction (lent)
         this.backendSyncTimer = setInterval(async () => {
-            if (this.get('state') === 'PLAYING') {
+            if (this.get('state') === 'PLAYING' && this.backend) {
                 try {
                     const status = await this.backend.sendCommand('playback.status', {});
                     if (status.success && status.data) {
@@ -150,12 +166,16 @@ class PlaybackModel extends BaseModel {
                         }
                     }
                 } catch (error) {
-                    this.logger.warn('PlaybackModel', 'Failed to sync position:', error);
+                    if (this.logger && typeof this.logger.warn === 'function') {
+                        this.logger.warn('PlaybackModel', 'Failed to sync position:', error);
+                    }
                 }
             }
         }, 1000); // Sync toutes les 1 seconde
         
-        this.logger.debug('PlaybackModel', 'Position update started');
+        if (this.logger && typeof this.logger.debug === 'function') {
+            this.logger.debug('PlaybackModel', 'Position update started');
+        }
     }
     
     stopPositionUpdate() {
@@ -167,7 +187,9 @@ class PlaybackModel extends BaseModel {
             clearInterval(this.backendSyncTimer);
             this.backendSyncTimer = null;
         }
-        this.logger.debug('PlaybackModel', 'Position update stopped');
+        if (this.logger && typeof this.logger.debug === 'function') {
+            this.logger.debug('PlaybackModel', 'Position update stopped');
+        }
     }
     
     // ========================================================================
@@ -186,31 +208,41 @@ class PlaybackModel extends BaseModel {
             loopEnd: loopEnd
         });
         
-        this.logger.info('PlaybackModel', 
-            enabled 
-                ? `Loop enabled: ${loopStart}ms → ${loopEnd}ms` 
-                : 'Loop disabled');
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaybackModel', 
+                enabled 
+                    ? `Loop enabled: ${loopStart}ms → ${loopEnd}ms` 
+                    : 'Loop disabled');
+        }
         
-        this.eventBus.emit('playback:loop-changed', {
-            enabled,
-            start: loopStart,
-            end: loopEnd
-        });
+        if (this.eventBus) {
+            this.eventBus.emit('playback:loop-changed', {
+                enabled,
+                start: loopStart,
+                end: loopEnd
+            });
+        }
     }
     
     setRepeatMode(mode) {
         const validModes = ['none', 'one', 'all'];
         
         if (!validModes.includes(mode)) {
-            this.logger.warn('PlaybackModel', `Invalid repeat mode: ${mode}`);
+            if (this.logger && typeof this.logger.warn === 'function') {
+                this.logger.warn('PlaybackModel', `Invalid repeat mode: ${mode}`);
+            }
             return;
         }
         
         this.set('repeatMode', mode);
         
-        this.logger.info('PlaybackModel', `Repeat mode: ${mode}`);
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaybackModel', `Repeat mode: ${mode}`);
+        }
         
-        this.eventBus.emit('playback:repeat-changed', { mode });
+        if (this.eventBus) {
+            this.eventBus.emit('playback:repeat-changed', { mode });
+        }
     }
     
     checkLoopBoundaries(position) {
@@ -218,14 +250,18 @@ class PlaybackModel extends BaseModel {
         const loopEnd = this.get('loopEnd');
         
         if (position >= loopEnd) {
-            this.logger.debug('PlaybackModel', 'Loop boundary reached');
+            if (this.logger && typeof this.logger.debug === 'function') {
+                this.logger.debug('PlaybackModel', 'Loop boundary reached');
+            }
             
             this.set('position', loopStart, { silent: false });
             
-            this.eventBus.emit('playback:loop-triggered', {
-                from: loopEnd,
-                to: loopStart
-            });
+            if (this.eventBus) {
+                this.eventBus.emit('playback:loop-triggered', {
+                    from: loopEnd,
+                    to: loopStart
+                });
+            }
         }
     }
     
@@ -299,20 +335,13 @@ class PlaybackModel extends BaseModel {
     }
     
     // ========================================================================
-    // MÉTHODES AJOUTÉES POUR COMPATIBILITÉ (maintenant DANS la classe)
+    // MÉTHODES OVERRIDES
     // ========================================================================
     
-    /**
-     * Override get() depuis BaseModel si nécessaire
-     */
     get(key) {
         return this.data[key];
     }
     
-    /**
-     * Override set() depuis BaseModel si nécessaire
-     * Supporte options { silent: true/false }
-     */
     set(key, value, options = {}) {
         this.data[key] = value;
         if (!options.silent && this.eventBus) {
@@ -320,10 +349,6 @@ class PlaybackModel extends BaseModel {
         }
     }
     
-    /**
-     * Override update() depuis BaseModel si nécessaire
-     * Supporte options { silent: true/false }
-     */
     update(updates, options = {}) {
         Object.assign(this.data, updates);
         if (!options.silent && this.eventBus) {
@@ -331,16 +356,10 @@ class PlaybackModel extends BaseModel {
         }
     }
     
-    /**
-     * Alias pour setLoop pour compatibilité
-     */
     setLoopPoints(start, end) {
         this.setLoop(true, start, end);
     }
     
-    /**
-     * Surveille les changements d'une clé
-     */
     watch(key, callback) {
         if (this.eventBus) {
             this.eventBus.on('playback:' + key + '-changed', callback);
@@ -352,13 +371,19 @@ class PlaybackModel extends BaseModel {
     // ========================================================================
     
     destroy() {
-        this.logger.info('PlaybackModel', 'Destroying...');
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaybackModel', 'Destroying...');
+        }
         
         this.stopPositionUpdate();
         
-        super.destroy();
+        if (super.destroy) {
+            super.destroy();
+        }
         
-        this.logger.info('PlaybackModel', '✓ Destroyed');
+        if (this.logger && typeof this.logger.info === 'function') {
+            this.logger.info('PlaybackModel', '✓ Destroyed');
+        }
     }
 }
 
@@ -373,6 +398,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PlaybackModel = PlaybackModel;
 }
-
-// Export par défaut
-window.PlaybackModel = PlaybackModel;
