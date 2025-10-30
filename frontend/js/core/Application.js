@@ -259,7 +259,7 @@ class Application {
         
         // StorageService
         if (window.StorageService) {
-            this.services.storage = new StorageService();
+            this.services.storage = new StorageService(this.eventBus, this.logger);
         }
         
         // MidiService
@@ -271,7 +271,8 @@ class Application {
         if (window.FileService) {
             this.services.file = new FileService(
                 this.services.backend,
-                this.eventBus
+                this.eventBus,
+                this.logger
             );
         }
         
