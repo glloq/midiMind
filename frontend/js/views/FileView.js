@@ -1,635 +1,514 @@
 // ============================================================================
-// 📄 Fichier: frontend/js/views/FileView.js
-// Version: v1.1.0 - SELECTION & CONTEXT MENU
-// Date: 2025-10-10
-// 🎹 Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Fichier: frontend/js/views/FileView.js
+// Version: v3.8.0 - PAGE FICHIERS REFACTORISÉE
+// Date: 2025-10-29
+// Projet: MidiMind v3.1
 // ============================================================================
-// 📝 Description:
-//   Vue améliorée pour afficher la liste des fichiers MIDI.
-//
-// NOUVEAU v1.1.0:
-//   ✅ Sélection multiple (Ctrl+Click, Shift+Click, Ctrl+A)
-//   ✅ Menu contextuel clic droit
-//   ✅ Drag & drop vers playlist/queue
-//   ✅ Indicateur fichiers sélectionnés
-//   ✅ Actions bulk sur sélection
-//
-// 👤 Auteur: midiMind Team
+// FONCTIONNALITÉS v3.8.0:
+// ✅ Liste des fichiers MIDI JSON
+// ✅ Bouton éditer (ouvre l'éditeur)
+// ✅ Bouton routes (1→1 simple ou N→N complexe)
+// ✅ Gestion complète des playlists
 // ============================================================================
 
-class FileView extends BaseView {
-    constructor(containerId, eventBus) {
-        super(containerId, eventBus);
+class FileView {
+    constructor(container, eventBus) {
+        // Container
+        if (typeof container === 'string') {
+            this.container = document.getElementById(container) || document.querySelector(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
+        } else {
+            this.container = null;
+        }
         
-        // État de la vue
-        this.viewState = {
-            files: [],
-            selectedFiles: [],
-            lastSelectedIndex: -1,
-            contextMenuOpen: false,
-            searchQuery: '',
-            sortBy: 'name',
-            sortOrder: 'asc'
-        };
+        if (!this.container) {
+            console.error('[FileView] Container not found:', container);
+        }
         
-        // Configuration
-        this.config = {
-            autoRender: true,
-            enableMultiSelect: true,
-            enableContextMenu: true,
-            enableDragDrop: true
-        };
-        
+        this.eventBus = eventBus;
         this.logger = window.logger || console;
-        this.init();
-    }
-    
-    init() {
-        this.setupGlobalEvents();
-        this.logger.info('FileView', '🎵 FileView v1.1.0 initialized with multi-select');
-    }
-    
-    // ========================================================================
-    // TEMPLATE PRINCIPAL
-    // ========================================================================
-    
-    buildTemplate(data = {}) {
-        const state = { ...this.viewState, ...data };
-        const selectedCount = state.selectedFiles.length;
         
-        return `
-            <div class="file-view-container">
-                
-                <!-- Header avec compteur sélection -->
-                <div class="file-view-header">
-                    <div class="file-header-left">
-                        <h2 class="file-view-title">📁 Fichiers MIDI</h2>
-                        <span class="file-count">${state.files.length} fichier(s)</span>
-                        ${selectedCount > 0 ? `
-                            <span class="selected-count">${selectedCount} sélectionné(s)</span>
-                        ` : ''}
+        // État
+        this.state = {
+            files: [],
+            playlists: [],
+            selectedFile: null,
+            selectedPlaylist: null
+        };
+        
+        // Éléments DOM
+        this.elements = {};
+    }
+
+    // ========================================================================
+    // INITIALISATION
+    // ========================================================================
+
+    init() {
+        if (!this.container) {
+            this.logger.error('[FileView] Cannot initialize: container not found');
+            return;
+        }
+        
+        this.render();
+        this.cacheElements();
+        this.attachEvents();
+        this.loadData();
+        
+        this.logger.info('[FileView] Initialized');
+    }
+
+    render() {
+        if (!this.container) return;
+        
+        this.container.innerHTML = `
+            <div class="page-header">
+                <h1>📁 Gestion des Fichiers</h1>
+            </div>
+            
+            <div class="files-layout">
+                <!-- Section Fichiers -->
+                <div class="files-section">
+                    <div class="section-header">
+                        <h2>Fichiers MIDI JSON</h2>
+                        <button class="btn-action" id="btnRefreshFiles">
+                            🔄 Actualiser
+                        </button>
                     </div>
                     
-                    <div class="file-header-right">
-                        <!-- Barre de recherche -->
-                        <div class="search-box">
-                            <input type="text" 
-                                   class="search-input" 
-                                   placeholder="🔍 Rechercher..."
-                                   value="${state.searchQuery}"
-                                   onkeyup="app.fileView.onSearch(this.value)">
-                        </div>
-                        
-                        <!-- Actions bulk si sélection -->
-                        ${selectedCount > 0 ? this.renderBulkActions(selectedCount) : ''}
+                    <div class="files-grid" id="filesGrid">
+                        ${this.renderEmptyFiles()}
                     </div>
                 </div>
                 
-                <!-- Liste des fichiers -->
-                <div class="file-list" 
-                     data-file-list
-                     oncontextmenu="return app.fileView.onContextMenu(event)">
-                    ${state.files.length === 0 
-                        ? this.renderEmptyState()
-                        : state.files.map((file, index) => 
-                            this.renderFileItem(file, index, state)
-                          ).join('')
-                    }
+                <!-- Section Playlists -->
+                <div class="playlists-section">
+                    <div class="section-header">
+                        <h2>Playlists</h2>
+                        <button class="btn-action btn-create" id="btnCreatePlaylist">
+                            ➕ Nouvelle Playlist
+                        </button>
+                    </div>
+                    
+                    <div class="playlists-grid" id="playlistsGrid">
+                        ${this.renderEmptyPlaylists()}
+                    </div>
                 </div>
-                
-                <!-- Menu contextuel -->
-                ${this.renderContextMenu()}
-                
             </div>
         `;
     }
-    
+
+    cacheElements() {
+        this.elements = {
+            filesGrid: document.getElementById('filesGrid'),
+            playlistsGrid: document.getElementById('playlistsGrid'),
+            btnRefreshFiles: document.getElementById('btnRefreshFiles'),
+            btnCreatePlaylist: document.getElementById('btnCreatePlaylist')
+        };
+    }
+
+    attachEvents() {
+        // Boutons
+        if (this.elements.btnRefreshFiles) {
+            this.elements.btnRefreshFiles.addEventListener('click', () => this.refreshFiles());
+        }
+        if (this.elements.btnCreatePlaylist) {
+            this.elements.btnCreatePlaylist.addEventListener('click', () => this.createPlaylist());
+        }
+        
+        // Délégation d'événements
+        if (this.elements.filesGrid) {
+            this.elements.filesGrid.addEventListener('click', (e) => this.handleFileAction(e));
+        }
+        if (this.elements.playlistsGrid) {
+            this.elements.playlistsGrid.addEventListener('click', (e) => this.handlePlaylistAction(e));
+        }
+        
+        // EventBus
+        this.setupEventBusListeners();
+    }
+
+    setupEventBusListeners() {
+        if (!this.eventBus) return;
+        
+        this.eventBus.on('files:loaded', (data) => {
+            this.state.files = data.files || [];
+            this.renderFilesGrid();
+        });
+        
+        this.eventBus.on('playlists:loaded', (data) => {
+            this.state.playlists = data.playlists || [];
+            this.renderPlaylistsGrid();
+        });
+        
+        this.eventBus.on('file:updated', () => {
+            this.refreshFiles();
+        });
+        
+        this.eventBus.on('playlist:updated', () => {
+            this.refreshPlaylists();
+        });
+    }
+
     // ========================================================================
-    // ITEMS FICHIERS
+    // RENDU DES FICHIERS
     // ========================================================================
-    
-    renderFileItem(file, index, state) {
-        const isSelected = state.selectedFiles.some(f => f.id === file.id);
+
+    renderFilesGrid() {
+        if (!this.elements.filesGrid) return;
+        
+        if (!this.state.files || this.state.files.length === 0) {
+            this.elements.filesGrid.innerHTML = this.renderEmptyFiles();
+            return;
+        }
+        
+        this.elements.filesGrid.innerHTML = this.state.files
+            .map(file => this.renderFileCard(file))
+            .join('');
+    }
+
+    renderFileCard(file) {
         const duration = this.formatDuration(file.duration || 0);
+        const tracks = file.tracks || 0;
+        const notes = file.noteCount || 0;
         
         return `
-            <div class="file-item ${isSelected ? 'selected' : ''}" 
-                 data-file-id="${file.id}"
-                 data-file-index="${index}"
-                 draggable="${this.config.enableDragDrop}"
-                 onclick="app.fileView.onFileClick(event, ${index})"
-                 ondblclick="app.fileView.onFileDoubleClick('${file.id}')"
-                 ondragstart="app.fileView.onFileDragStart(event, ${index})"
-                 ondragend="app.fileView.onFileDragEnd(event)">
-                
-                <!-- Checkbox sélection -->
-                ${this.config.enableMultiSelect ? `
-                    <div class="file-checkbox">
-                        <input type="checkbox" 
-                               ${isSelected ? 'checked' : ''}
-                               onclick="event.stopPropagation(); app.fileView.toggleFileSelection(${index})">
-                    </div>
-                ` : ''}
-                
-                <!-- Icône -->
-                <div class="file-icon">🎵</div>
-                
-                <!-- Infos -->
-                <div class="file-info">
-                    <div class="file-name" title="${this.escapeHtml(file.name)}">
-                        ${this.escapeHtml(file.name)}
-                    </div>
-                    <div class="file-metadata">
-                        ${duration ? `<span>⏱️ ${duration}</span>` : ''}
-                        ${file.trackCount ? `<span>🎹 ${file.trackCount} pistes</span>` : ''}
-                        ${file.bpm ? `<span>🥁 ${file.bpm} BPM</span>` : ''}
+            <div class="file-card" data-file-id="${file.id}">
+                <div class="file-card-header">
+                    <div class="file-card-icon">🎵</div>
+                    <div class="file-card-info">
+                        <div class="file-card-name">${file.name || 'Sans nom'}</div>
+                        <div class="file-card-meta">
+                            <span>⏱️ ${duration}</span>
+                            <span>🎹 ${tracks} pistes</span>
+                            <span>🎼 ${notes} notes</span>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Taille -->
-                ${file.size ? `
-                    <div class="file-size">${this.formatFileSize(file.size)}</div>
-                ` : ''}
-                
-                <!-- Actions rapides -->
-                <div class="file-actions">
-                    <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.fileView.playFile('${file.id}')"
-                            title="Lire">
-                        ▶️
+                <div class="file-card-actions">
+                    <button class="file-card-btn btn-edit" data-action="edit" data-file-id="${file.id}">
+                        <span>✏️</span>
+                        <span>Éditer</span>
+                    </button>
+                    <button class="file-card-btn btn-routes" data-action="routes" data-file-id="${file.id}">
+                        <span>🔀</span>
+                        <span>Routes</span>
                     </button>
                 </div>
-                
             </div>
         `;
     }
-    
-    // ========================================================================
-    // ACTIONS BULK
-    // ========================================================================
-    
-    renderBulkActions(count) {
-        return `
-            <div class="bulk-actions">
-                <button class="btn btn-sm btn-primary" 
-                        onclick="app.fileView.addSelectedToPlaylist()"
-                        title="Ajouter à la playlist">
-                    ➕ Playlist
-                </button>
-                <button class="btn btn-sm btn-secondary" 
-                        onclick="app.fileView.addSelectedToQueue()"
-                        title="Ajouter à la queue">
-                    📋 Queue
-                </button>
-                <button class="btn btn-sm btn-danger" 
-                        onclick="app.fileView.clearSelection()"
-                        title="Désélectionner tout">
-                    ✖️
-                </button>
-            </div>
-        `;
-    }
-    
-    // ========================================================================
-    // MENU CONTEXTUEL
-    // ========================================================================
-    
-    renderContextMenu() {
-        return `
-            <div id="file-context-menu" 
-                 class="context-menu" 
-                 style="display: none;"
-                 data-context-menu>
-                <div class="context-menu-item" onclick="app.fileView.contextPlay()">
-                    <span class="icon">▶️</span>
-                    Lire
-                </div>
-                <div class="context-menu-item" onclick="app.fileView.contextAddToPlaylist()">
-                    <span class="icon">➕</span>
-                    Ajouter à la playlist
-                </div>
-                <div class="context-menu-item" onclick="app.fileView.contextAddToQueue()">
-                    <span class="icon">📋</span>
-                    Ajouter à la queue
-                </div>
-                <div class="context-menu-divider"></div>
-                <div class="context-menu-item" onclick="app.fileView.contextInfo()">
-                    <span class="icon">ℹ️</span>
-                    Informations
-                </div>
-                <div class="context-menu-item danger" onclick="app.fileView.contextDelete()">
-                    <span class="icon">🗑️</span>
-                    Supprimer
-                </div>
-            </div>
-        `;
-    }
-    
-    renderEmptyState() {
+
+    renderEmptyFiles() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">📭</div>
-                <p>Aucun fichier</p>
+                <div class="empty-state-icon">🎵</div>
+                <div class="empty-state-text">Aucun fichier MIDI</div>
+                <div class="empty-state-hint">Les fichiers MIDI JSON apparaîtront ici</div>
             </div>
         `;
     }
-    
+
     // ========================================================================
-    // SÉLECTION MULTIPLE
+    // RENDU DES PLAYLISTS
     // ========================================================================
-    
-    /**
-     * Gère le clic sur un fichier avec Ctrl/Shift
-     */
-    onFileClick(event, index) {
-        event.preventDefault();
+
+    renderPlaylistsGrid() {
+        if (!this.elements.playlistsGrid) return;
         
-        const file = this.viewState.files[index];
+        if (!this.state.playlists || this.state.playlists.length === 0) {
+            this.elements.playlistsGrid.innerHTML = this.renderEmptyPlaylists();
+            return;
+        }
+        
+        this.elements.playlistsGrid.innerHTML = this.state.playlists
+            .map(playlist => this.renderPlaylistCard(playlist))
+            .join('');
+    }
+
+    renderPlaylistCard(playlist) {
+        const fileCount = playlist.files ? playlist.files.length : 0;
+        const totalDuration = this.calculatePlaylistDuration(playlist);
+        
+        return `
+            <div class="playlist-card" data-playlist-id="${playlist.id}">
+                <div class="playlist-card-header">
+                    <div class="playlist-card-icon">📋</div>
+                    <div class="playlist-card-info">
+                        <div class="playlist-card-name">${playlist.name || 'Sans nom'}</div>
+                        <div class="playlist-card-count">${fileCount} fichiers - ${totalDuration}</div>
+                    </div>
+                </div>
+                
+                <div class="playlist-card-actions">
+                    <button class="playlist-card-btn" data-action="edit-playlist" data-playlist-id="${playlist.id}">
+                        <span>✏️</span>
+                        <span>Éditer</span>
+                    </button>
+                    <button class="playlist-card-btn" data-action="play-playlist" data-playlist-id="${playlist.id}">
+                        <span>▶️</span>
+                        <span>Lire</span>
+                    </button>
+                    <button class="playlist-card-btn btn-delete" data-action="delete-playlist" data-playlist-id="${playlist.id}">
+                        <span>🗑️</span>
+                        <span>Supprimer</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderEmptyPlaylists() {
+        return `
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">Aucune playlist</div>
+                <div class="empty-state-hint">Créez une playlist pour organiser vos fichiers</div>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // ACTIONS FICHIERS
+    // ========================================================================
+
+    handleFileAction(e) {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        
+        const action = button.dataset.action;
+        const fileId = button.dataset.fileId;
+        const file = this.state.files.find(f => f.id === fileId);
+        
         if (!file) return;
         
-        if (event.ctrlKey || event.metaKey) {
-            // Ctrl+Click : Toggle individuel
-            this.toggleFileSelection(index);
-        } else if (event.shiftKey && this.viewState.lastSelectedIndex >= 0) {
-            // Shift+Click : Sélection de plage
-            this.selectRange(this.viewState.lastSelectedIndex, index);
-        } else {
-            // Click simple : Sélection unique
-            this.selectSingleFile(index);
+        switch (action) {
+            case 'edit':
+                this.editFile(file);
+                break;
+            case 'routes':
+                this.editRoutes(file);
+                break;
         }
-        
-        this.viewState.lastSelectedIndex = index;
     }
-    
-    /**
-     * Toggle sélection d'un fichier
-     */
-    toggleFileSelection(index) {
-        const file = this.viewState.files[index];
-        const isSelected = this.viewState.selectedFiles.some(f => f.id === file.id);
+
+    editFile(file) {
+        this.logger.info('[FileView] Edit file:', file.name);
         
-        if (isSelected) {
-            this.viewState.selectedFiles = this.viewState.selectedFiles.filter(
-                f => f.id !== file.id
-            );
-        } else {
-            this.viewState.selectedFiles.push(file);
+        if (this.eventBus) {
+            this.eventBus.emit('file:edit_requested', { file });
+            this.eventBus.emit('navigation:page_request', { page: 'editor', data: { file } });
         }
+    }
+
+    editRoutes(file) {
+        this.logger.info('[FileView] Edit routes for file:', file.name);
         
-        this.updateFileItemState(index);
-        this.updateHeader();
+        // Modal pour choisir le mode de routing
+        if (this.eventBus) {
+            this.eventBus.emit('file:routes_requested', { file });
+            this.showRoutingModeModal(file);
+        }
     }
-    
-    /**
-     * Sélectionne un seul fichier
-     */
-    selectSingleFile(index) {
-        const file = this.viewState.files[index];
-        this.viewState.selectedFiles = [file];
-        this.updateAllFilesState();
-        this.updateHeader();
-    }
-    
-    /**
-     * Sélectionne une plage de fichiers (Shift+Click)
-     */
-    selectRange(startIndex, endIndex) {
-        const start = Math.min(startIndex, endIndex);
-        const end = Math.max(startIndex, endIndex);
+
+    showRoutingModeModal(file) {
+        // Créer un modal pour choisir entre 1→1 et N→N
+        const modalContent = `
+            <div class="routing-mode-modal">
+                <h2>Mode de routing pour ${file.name}</h2>
+                <p>Choisissez le mode de routing :</p>
+                <div class="routing-mode-buttons">
+                    <button class="btn-routing-mode" data-mode="simple">
+                        <span class="mode-icon">→</span>
+                        <span class="mode-title">Simple (1→1)</span>
+                        <span class="mode-desc">Un canal d'entrée vers un canal de sortie</span>
+                    </button>
+                    <button class="btn-routing-mode" data-mode="complex">
+                        <span class="mode-icon">⚡</span>
+                        <span class="mode-title">Complexe (N→N)</span>
+                        <span class="mode-desc">Plusieurs canaux avec routage avancé</span>
+                    </button>
+                </div>
+            </div>
+        `;
         
-        this.viewState.selectedFiles = this.viewState.files.slice(start, end + 1);
-        this.updateAllFilesState();
-        this.updateHeader();
+        if (this.eventBus) {
+            this.eventBus.emit('modal:show', {
+                content: modalContent,
+                onAction: (mode) => {
+                    this.eventBus.emit('navigation:page_request', {
+                        page: 'routing',
+                        data: { file, mode }
+                    });
+                }
+            });
+        }
     }
-    
-    /**
-     * Sélectionne tous les fichiers (Ctrl+A)
-     */
-    selectAll() {
-        this.viewState.selectedFiles = [...this.viewState.files];
-        this.updateAllFilesState();
-        this.updateHeader();
+
+    refreshFiles() {
+        this.logger.info('[FileView] Refreshing files...');
+        
+        if (this.eventBus) {
+            this.eventBus.emit('files:refresh_requested');
+        }
     }
-    
-    /**
-     * Désélectionne tout
-     */
-    clearSelection() {
-        this.viewState.selectedFiles = [];
-        this.updateAllFilesState();
-        this.updateHeader();
-    }
-    
+
     // ========================================================================
-    // MENU CONTEXTUEL
+    // ACTIONS PLAYLISTS
     // ========================================================================
-    
-    /**
-     * Affiche le menu contextuel
-     */
-    onContextMenu(event) {
-        if (!this.config.enableContextMenu) return true;
+
+    handlePlaylistAction(e) {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
         
-        event.preventDefault();
+        const action = button.dataset.action;
+        const playlistId = button.dataset.playlistId;
+        const playlist = this.state.playlists.find(p => p.id === playlistId);
         
-        // Trouver le fichier cliqué
-        const fileItem = event.target.closest('.file-item');
-        if (!fileItem) return false;
+        if (!playlist && action !== 'create-playlist') return;
         
-        const fileId = fileItem.getAttribute('data-file-id');
-        const fileIndex = parseInt(fileItem.getAttribute('data-file-index'));
-        
-        // Si le fichier n'est pas dans la sélection, le sélectionner
-        const isSelected = this.viewState.selectedFiles.some(f => f.id === fileId);
-        if (!isSelected) {
-            this.selectSingleFile(fileIndex);
-        }
-        
-        // Afficher le menu
-        this.showContextMenu(event.clientX, event.clientY);
-        
-        return false;
-    }
-    
-    /**
-     * Affiche le menu aux coordonnées données
-     */
-    showContextMenu(x, y) {
-        const menu = document.querySelector('[data-context-menu]');
-        if (!menu) return;
-        
-        // Positionner et afficher
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
-        menu.style.display = 'block';
-        
-        this.viewState.contextMenuOpen = true;
-    }
-    
-    /**
-     * Cache le menu contextuel
-     */
-    hideContextMenu() {
-        const menu = document.querySelector('[data-context-menu]');
-        if (menu) {
-            menu.style.display = 'none';
-        }
-        this.viewState.contextMenuOpen = false;
-    }
-    
-    // ========================================================================
-    // ACTIONS MENU CONTEXTUEL
-    // ========================================================================
-    
-    contextPlay() {
-        const selected = this.viewState.selectedFiles;
-        if (selected.length > 0) {
-            this.playFile(selected[0].id);
-        }
-        this.hideContextMenu();
-    }
-    
-    contextAddToPlaylist() {
-        this.addSelectedToPlaylist();
-        this.hideContextMenu();
-    }
-    
-    contextAddToQueue() {
-        this.addSelectedToQueue();
-        this.hideContextMenu();
-    }
-    
-    contextInfo() {
-        const selected = this.viewState.selectedFiles;
-        if (selected.length > 0) {
-            this.showFileInfo(selected[0].id);
-        }
-        this.hideContextMenu();
-    }
-    
-    contextDelete() {
-        this.deleteSelected();
-        this.hideContextMenu();
-    }
-    
-    // ========================================================================
-    // DRAG & DROP
-    // ========================================================================
-    
-    onFileDragStart(event, index) {
-        const file = this.viewState.files[index];
-        
-        // Si le fichier n'est pas sélectionné, le sélectionner
-        const isSelected = this.viewState.selectedFiles.some(f => f.id === file.id);
-        if (!isSelected) {
-            this.selectSingleFile(index);
-        }
-        
-        // Stocker les IDs des fichiers sélectionnés
-        const fileIds = this.viewState.selectedFiles.map(f => f.id);
-        event.dataTransfer.setData('application/json', JSON.stringify(fileIds));
-        event.dataTransfer.effectAllowed = 'copy';
-        
-        // Effet visuel
-        event.target.classList.add('dragging');
-    }
-    
-    onFileDragEnd(event) {
-        event.target.classList.remove('dragging');
-    }
-    
-    // ========================================================================
-    // ACTIONS
-    // ========================================================================
-    
-    onFileDoubleClick(fileId) {
-        this.playFile(fileId);
-    }
-    
-    playFile(fileId) {
-        if (window.app?.playlistController) {
-            window.app.playlistController.playFile(fileId);
+        switch (action) {
+            case 'edit-playlist':
+                this.editPlaylist(playlist);
+                break;
+            case 'play-playlist':
+                this.playPlaylist(playlist);
+                break;
+            case 'delete-playlist':
+                this.deletePlaylist(playlist);
+                break;
         }
     }
-    
-    addSelectedToPlaylist() {
-        const fileIds = this.viewState.selectedFiles.map(f => f.id);
-        if (fileIds.length === 0) return;
+
+    createPlaylist() {
+        this.logger.info('[FileView] Create new playlist');
         
-        if (window.app?.playlistController) {
-            window.app.playlistController.addMultipleFiles(fileIds);
-        }
-        
-        this.showSuccess(`${fileIds.length} fichier(s) ajouté(s) à la playlist`);
-    }
-    
-    addSelectedToQueue() {
-        const fileIds = this.viewState.selectedFiles.map(f => f.id);
-        if (fileIds.length === 0) return;
-        
-        if (window.app?.playlistController) {
-            window.app.playlistController.addMultipleToQueue(fileIds);
-        }
-        
-        this.showSuccess(`${fileIds.length} fichier(s) ajouté(s) à la queue`);
-    }
-    
-    deleteSelected() {
-        const count = this.viewState.selectedFiles.length;
-        if (count === 0) return;
-        
-        const confirmed = confirm(
-            `Supprimer ${count} fichier(s) sélectionné(s) ?\n\nCette action est irréversible.`
-        );
-        
-        if (!confirmed) return;
-        
-        const fileIds = this.viewState.selectedFiles.map(f => f.id);
-        
-        if (window.app?.fileController) {
-            window.app.fileController.deleteMultiple(fileIds);
-        }
-        
-        this.clearSelection();
-    }
-    
-    showFileInfo(fileId) {
-        if (window.app?.fileController) {
-            window.app.fileController.showFileInfo(fileId);
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:create_requested');
+            this.showPlaylistEditorModal(null);
         }
     }
-    
-    onSearch(query) {
-        this.viewState.searchQuery = query;
-        // Trigger search via controller
-        if (window.app?.fileController) {
-            window.app.fileController.searchFiles(query);
+
+    editPlaylist(playlist) {
+        this.logger.info('[FileView] Edit playlist:', playlist.name);
+        
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:edit_requested', { playlist });
+            this.showPlaylistEditorModal(playlist);
         }
     }
-    
-    // ========================================================================
-    // MISE À JOUR UI
-    // ========================================================================
-    
-    updateFileItemState(index) {
-        const fileItem = this.container?.querySelector(
-            `[data-file-index="${index}"]`
-        );
+
+    playPlaylist(playlist) {
+        this.logger.info('[FileView] Play playlist:', playlist.name);
         
-        if (!fileItem) return;
-        
-        const file = this.viewState.files[index];
-        const isSelected = this.viewState.selectedFiles.some(f => f.id === file.id);
-        
-        if (isSelected) {
-            fileItem.classList.add('selected');
-        } else {
-            fileItem.classList.remove('selected');
-        }
-        
-        const checkbox = fileItem.querySelector('input[type="checkbox"]');
-        if (checkbox) {
-            checkbox.checked = isSelected;
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:play_requested', { playlist });
+            this.eventBus.emit('navigation:page_request', { page: 'home' });
         }
     }
-    
-    updateAllFilesState() {
-        this.viewState.files.forEach((_, index) => {
-            this.updateFileItemState(index);
-        });
+
+    deletePlaylist(playlist) {
+        this.logger.info('[FileView] Delete playlist:', playlist.name);
+        
+        // Confirmation
+        if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+            if (this.eventBus) {
+                this.eventBus.emit('playlist:delete_requested', { playlist });
+            }
+        }
     }
-    
-    updateHeader() {
-        // Re-render juste le header si possible, sinon full render
-        if (this.container) {
-            const header = this.container.querySelector('.file-view-header');
-            if (header) {
-                const selectedCount = this.viewState.selectedFiles.length;
-                const countEl = header.querySelector('.selected-count');
-                const bulkActions = header.querySelector('.bulk-actions');
-                
-                if (selectedCount > 0) {
-                    if (!countEl) {
-                        const newCount = document.createElement('span');
-                        newCount.className = 'selected-count';
-                        newCount.textContent = `${selectedCount} sélectionné(s)`;
-                        header.querySelector('.file-header-left').appendChild(newCount);
-                    } else {
-                        countEl.textContent = `${selectedCount} sélectionné(s)`;
-                    }
+
+    showPlaylistEditorModal(playlist) {
+        // Modal pour créer/éditer une playlist
+        const isNew = !playlist;
+        const title = isNew ? 'Nouvelle Playlist' : `Éditer ${playlist.name}`;
+        
+        const modalContent = `
+            <div class="playlist-editor-modal">
+                <h2>${title}</h2>
+                <div class="playlist-editor-form">
+                    <div class="form-group">
+                        <label>Nom de la playlist</label>
+                        <input type="text" id="playlistName" value="${playlist ? playlist.name : ''}" />
+                    </div>
                     
-                    if (!bulkActions) {
-                        const rightSection = header.querySelector('.file-header-right');
-                        const div = document.createElement('div');
-                        div.innerHTML = this.renderBulkActions(selectedCount);
-                        rightSection.appendChild(div.firstChild);
-                    }
-                } else {
-                    if (countEl) countEl.remove();
-                    if (bulkActions) bulkActions.remove();
-                }
-            }
+                    <div class="form-group">
+                        <label>Fichiers</label>
+                        <div class="playlist-files-selector" id="playlistFilesSelector">
+                            <!-- Généré dynamiquement -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="btn-action" id="btnSavePlaylist">💾 Enregistrer</button>
+                        <button class="btn-action btn-cancel" id="btnCancelPlaylist">❌ Annuler</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        if (this.eventBus) {
+            this.eventBus.emit('modal:show', { content: modalContent });
         }
     }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS GLOBAUX
-    // ========================================================================
-    
-    setupGlobalEvents() {
-        // Ctrl+A pour sélectionner tout
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                // Seulement si focus dans file view
-                if (this.container?.contains(document.activeElement)) {
-                    e.preventDefault();
-                    this.selectAll();
-                }
-            }
-        });
+
+    refreshPlaylists() {
+        this.logger.info('[FileView] Refreshing playlists...');
         
-        // Clic ailleurs ferme le menu contextuel
-        document.addEventListener('click', (e) => {
-            if (this.viewState.contextMenuOpen) {
-                const menu = document.querySelector('[data-context-menu]');
-                if (menu && !menu.contains(e.target)) {
-                    this.hideContextMenu();
-                }
-            }
-        });
+        if (this.eventBus) {
+            this.eventBus.emit('playlists:refresh_requested');
+        }
     }
-    
+
+    // ========================================================================
+    // CHARGEMENT DES DONNÉES
+    // ========================================================================
+
+    loadData() {
+        if (this.eventBus) {
+            this.eventBus.emit('files:load_requested');
+            this.eventBus.emit('playlists:load_requested');
+        }
+    }
+
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
-    
-    formatDuration(ms) {
-        if (!ms) return '00:00';
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${minutes}:${s.toString().padStart(2, '0')}`;
+
+    formatDuration(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
-    
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 B';
-        const units = ['B', 'KB', 'MB', 'GB'];
-        const k = 1024;
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
-    }
-    
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    showSuccess(message) {
-        console.log('✅', message);
-        if (window.app?.notifications) {
-            window.app.notifications.success(message);
+
+    calculatePlaylistDuration(playlist) {
+        if (!playlist.files || playlist.files.length === 0) {
+            return '0:00';
         }
+        
+        const totalSeconds = playlist.files.reduce((sum, fileId) => {
+            const file = this.state.files.find(f => f.id === fileId);
+            return sum + (file ? file.duration || 0 : 0);
+        }, 0);
+        
+        return this.formatDuration(totalSeconds);
+    }
+
+    // ========================================================================
+    // CLEANUP
+    // ========================================================================
+
+    destroy() {
+        if (this.eventBus) {
+            this.eventBus.off('files:loaded');
+            this.eventBus.off('playlists:loaded');
+            this.eventBus.off('file:updated');
+            this.eventBus.off('playlist:updated');
+        }
+        
+        this.logger.info('[FileView] Destroyed');
     }
 }
 

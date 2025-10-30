@@ -1,509 +1,627 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v3.0.9 - FIXED LOGGER INITIALIZATION
-// Date: 2025-10-24
+// Version: v3.8.0 - PAGE INSTRUMENTS REFACTORISÉE
+// Date: 2025-10-29
+// Projet: MidiMind v3.1
 // ============================================================================
-// CORRECTIONS v3.0.9:
-// ✅ CRITIQUE: Fixed logger initialization - create instance not class reference
-// ✅ CRITIQUE: Override initialize() to prevent premature render
-// ✅ CRITIQUE: Initialize logger in initialize() before any log calls
-// ✅ Proper fallback to console if Logger not available
-// ============================================================================
-// VERSION ÉQUILIBRÉE - Features utiles sans complexité excessive
-// FIX: Proper initialization order to prevent undefined displayConfig error
+// FONCTIONNALITÉS v3.8.0:
+// ✅ Recherche et connexion (USB, Bluetooth, Réseau)
+// ✅ Liste des instruments connectés
+// ✅ Paramètres de délais par instrument
+// ✅ Affichage paramètres selon type de connexion
 // ============================================================================
 
-class InstrumentView extends BaseView {
-    constructor(containerId, eventBus) {
-        super(containerId, eventBus);
-        
-        // Configure to prevent auto-render during construction
-        this.config.autoRender = false;
-        this.config.name = 'InstrumentView';
-        
-        // État local
-        this.localState = {
-            selectedInstruments: new Set(),
-            expandedInstruments: new Set(),
-            displayMode: 'normal' // normal, compact, detailed
-        };
-        
-        // Configuration
-        this.displayConfig = {
-            compactMode: false,
-            showMetrics: true,
-            showCapabilities: true
-        };
-        
-        // Couleurs de connexion
-        this.connectionColors = {
-            'usb': '#3498db',
-            'bluetooth': '#9b59b6',
-            'network': '#1abc9c',
-            'virtual': '#95a5a6'
-        };
-        
-        // Logger - sera initialisé dans initialize()
-        this.logger = null;
-    }
-    
-    /**
-     * OVERRIDE de BaseView.initialize()
-     * Appelée par BaseView constructor AVANT que notre constructor soit fini
-     */
-    initialize() {
-        // CRITIQUE: Initialiser le logger ICI, avant toute utilisation
-        if (!this.logger) {
-            if (typeof window !== 'undefined' && window.logger) {
-                // Créer une INSTANCE de Logger, pas juste une référence à la classe
-                try {
-                    this.logger = new window.logger({
-                        level: 'info',
-                        enableConsole: true
-                    });
-                } catch (e) {
-                    console.warn('[InstrumentView] Failed to create Logger instance, using console fallback');
-                    this.logger = console;
-                }
-            } else {
-                // Fallback vers console
-                this.logger = console;
-            }
-        }
-        
-        // Initialiser les propriétés critiques si elles n'existent pas encore
-        if (!this.displayConfig) {
-            this.displayConfig = {
-                compactMode: false,
-                showMetrics: true,
-                showCapabilities: true
-            };
-        }
-        
-        if (!this.localState) {
-            this.localState = {
-                selectedInstruments: new Set(),
-                expandedInstruments: new Set(),
-                displayMode: 'normal'
-            };
-        }
-        
-        if (!this.connectionColors) {
-            this.connectionColors = {
-                'usb': '#3498db',
-                'bluetooth': '#9b59b6',
-                'network': '#1abc9c',
-                'virtual': '#95a5a6'
-            };
-        }
-        
-        // Désactiver autoRender
-        this.config.autoRender = false;
-        
-        // Vérifier container
-        if (!this.container) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('InstrumentView', 'Container not found');
-            } else {
-                console.error('[InstrumentView] Container not found');
-            }
-            return;
-        }
-        
-        // Maintenant on peut logger en toute sécurité
-        if (this.logger && this.logger.info) {
-            this.logger.info('InstrumentView', '✓ View initialized (balanced version)');
+class InstrumentView {
+    constructor(container, eventBus) {
+        // Container
+        if (typeof container === 'string') {
+            this.container = document.getElementById(container) || document.querySelector(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
         } else {
-            console.log('[InstrumentView] ✓ View initialized (balanced version)');
+            this.container = null;
         }
         
-        // Hook personnalisé
-        if (typeof this.onInitialize === 'function') {
-            this.onInitialize();
+        if (!this.container) {
+            console.error('[InstrumentView] Container not found:', container);
         }
         
-        // Ne PAS rendre automatiquement - le controller le fera
-    }
-    
-    /**
-     * Hook appelé par initialize() après que tout soit prêt
-     */
-    onInitialize() {
-        // Prêt pour le rendu si nécessaire
-    }
-    
-    // ========================================================================
-    // RENDU PRINCIPAL
-    // ========================================================================
-    
-    buildTemplate(data = {}) {
-        const tempDiv = document.createElement("div");
-        const oldContainer = this.container;
-        this.container = tempDiv;
-        this.render();
-        this.container = oldContainer;
-        return tempDiv.innerHTML;
+        this.eventBus = eventBus;
+        this.logger = window.logger || console;
+        
+        // État
+        this.state = {
+            connectedDevices: [],
+            discoveredDevices: [],
+            scanning: {
+                usb: false,
+                bluetooth: false,
+                network: false
+            },
+            selectedDevice: null
+        };
+        
+        // Éléments DOM
+        this.elements = {};
     }
 
-    render(data = {}) {
+    // ========================================================================
+    // INITIALISATION
+    // ========================================================================
+
+    init() {
         if (!this.container) {
-            if (this.logger && this.logger.warn) {
-                this.logger.warn('InstrumentView', 'Container not found');
-            } else {
-                console.warn('[InstrumentView] Container not found');
-            }
+            this.logger.error('[InstrumentView] Cannot initialize: container not found');
             return;
         }
         
-        // Safety check: ensure displayConfig exists
-        if (!this.displayConfig) {
-            if (this.logger && this.logger.warn) {
-                this.logger.warn('InstrumentView', 'displayConfig not initialized yet, skipping render');
-            } else {
-                console.warn('[InstrumentView] displayConfig not initialized yet, skipping render');
-            }
-            return;
-        }
+        this.render();
+        this.cacheElements();
+        this.attachEvents();
+        this.loadConnectedDevices();
         
-        const instruments = data.instruments || [];
+        this.logger.info('[InstrumentView] Initialized');
+    }
+
+    render() {
+        if (!this.container) return;
         
-        const html = `
-            <div class="instrument-view">
-                
-                <!-- Header avec actions -->
-                <div class="instrument-header">
-                    <div class="header-title">
-                        <h2>🎹 Instruments MIDI</h2>
-                        <span class="instrument-count">${instruments.length} instrument${instruments.length > 1 ? 's' : ''}</span>
+        this.container.innerHTML = `
+            <div class="page-header">
+                <h1>🎸 Gestion des Instruments</h1>
+            </div>
+            
+            <div class="instruments-layout">
+                <!-- Recherche et connexion -->
+                <div class="instruments-discover">
+                    <div class="section-header">
+                        <h2>Rechercher et connecter</h2>
+                        <div class="discover-controls">
+                            <button class="btn-scan" id="btnScanUSB" data-type="usb">
+                                🔌 Scan USB
+                            </button>
+                            <button class="btn-scan" id="btnScanBluetooth" data-type="bluetooth">
+                                📡 Scan Bluetooth
+                            </button>
+                            <button class="btn-scan" id="btnScanNetwork" data-type="network">
+                                🌐 Scan Réseau
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="header-actions">
-                        ${this.renderDisplayModeButtons()}
-                        <button class="btn btn-primary" id="btn-refresh-instruments">
-                            🔄 Rafraîchir
-                        </button>
+                    <div class="devices-found" id="devicesFound">
+                        ${this.renderEmptyDiscovery()}
                     </div>
                 </div>
                 
-                <!-- Liste des instruments -->
-                <div class="instruments-list" id="instruments-list">
-                    ${instruments.length > 0 ? 
-                        instruments.map(inst => this.renderInstrument(inst)).join('') :
-                        this.renderEmptyState()
-                    }
-                </div>
-            </div>
-        `;
-        
-        this.container.innerHTML = html;
-        this.attachEventListeners();
-    }
-    
-    // ========================================================================
-    // COMPOSANTS UI
-    // ========================================================================
-    
-    renderDisplayModeButtons() {
-        return `
-            <div class="display-mode-buttons">
-                <button class="btn btn-sm ${this.localState.displayMode === 'normal' ? 'active' : ''}" 
-                        data-mode="normal" title="Vue normale">
-                    📋
-                </button>
-                <button class="btn btn-sm ${this.localState.displayMode === 'compact' ? 'active' : ''}" 
-                        data-mode="compact" title="Vue compacte">
-                    ⬜
-                </button>
-                <button class="btn btn-sm ${this.localState.displayMode === 'detailed' ? 'active' : ''}" 
-                        data-mode="detailed" title="Vue détaillée">
-                    📊
-                </button>
-            </div>
-        `;
-    }
-    
-    renderInstrument(instrument) {
-        const isExpanded = this.localState.expandedInstruments.has(instrument.id);
-        const isSelected = this.localState.selectedInstruments.has(instrument.id);
-        
-        return `
-            <div class="instrument-card ${isSelected ? 'selected' : ''}" data-instrument-id="${instrument.id}">
-                <div class="instrument-header-card">
-                    <div class="instrument-info">
-                        ${this.renderConnectionBadge(instrument.connection_type)}
-                        <h3 class="instrument-name">${this.escapeHTML(instrument.name || instrument.id)}</h3>
-                        ${instrument.port ? `<span class="instrument-port">${this.escapeHTML(instrument.port)}</span>` : ''}
+                <!-- Instruments connectés -->
+                <div class="instruments-connected">
+                    <div class="section-header">
+                        <h2>Instruments connectés</h2>
                     </div>
                     
-                    <div class="instrument-actions">
-                        ${this.renderInstrumentStatus(instrument)}
-                        <button class="btn-icon btn-expand" data-action="toggle-expand" title="${isExpanded ? 'Réduire' : 'Développer'}">
-                            ${isExpanded ? '▼' : '▶'}
-                        </button>
+                    <div class="devices-list" id="connectedDevices">
+                        ${this.renderEmptyConnected()}
                     </div>
                 </div>
-                
-                ${isExpanded ? this.renderInstrumentDetails(instrument) : ''}
             </div>
         `;
     }
-    
-    renderConnectionBadge(type) {
-        const color = this.connectionColors[type] || '#95a5a6';
-        const icons = {
-            'usb': '🔌',
-            'bluetooth': '📶',
-            'network': '🌐',
-            'virtual': '💻'
+
+    cacheElements() {
+        this.elements = {
+            btnScanUSB: document.getElementById('btnScanUSB'),
+            btnScanBluetooth: document.getElementById('btnScanBluetooth'),
+            btnScanNetwork: document.getElementById('btnScanNetwork'),
+            devicesFound: document.getElementById('devicesFound'),
+            connectedDevices: document.getElementById('connectedDevices')
         };
-        const icon = icons[type] || '❓';
+    }
+
+    attachEvents() {
+        // Boutons de scan
+        if (this.elements.btnScanUSB) {
+            this.elements.btnScanUSB.addEventListener('click', () => this.scanDevices('usb'));
+        }
+        if (this.elements.btnScanBluetooth) {
+            this.elements.btnScanBluetooth.addEventListener('click', () => this.scanDevices('bluetooth'));
+        }
+        if (this.elements.btnScanNetwork) {
+            this.elements.btnScanNetwork.addEventListener('click', () => this.scanDevices('network'));
+        }
+        
+        // Délégation d'événements
+        if (this.elements.devicesFound) {
+            this.elements.devicesFound.addEventListener('click', (e) => this.handleDiscoveredDeviceAction(e));
+        }
+        if (this.elements.connectedDevices) {
+            this.elements.connectedDevices.addEventListener('click', (e) => this.handleConnectedDeviceAction(e));
+        }
+        
+        // EventBus
+        this.setupEventBusListeners();
+    }
+
+    setupEventBusListeners() {
+        if (!this.eventBus) return;
+        
+        this.eventBus.on('instruments:scan_started', (data) => {
+            this.handleScanStarted(data.type);
+        });
+        
+        this.eventBus.on('instruments:scan_completed', (data) => {
+            this.handleScanCompleted(data.type, data.devices);
+        });
+        
+        this.eventBus.on('instruments:device_connected', (data) => {
+            this.handleDeviceConnected(data.device);
+        });
+        
+        this.eventBus.on('instruments:device_disconnected', (data) => {
+            this.handleDeviceDisconnected(data.device);
+        });
+        
+        this.eventBus.on('instruments:list_updated', (data) => {
+            this.state.connectedDevices = data.devices || [];
+            this.renderConnectedDevices();
+        });
+    }
+
+    // ========================================================================
+    // SCAN DES PÉRIPHÉRIQUES
+    // ========================================================================
+
+    scanDevices(type) {
+        this.logger.info(`[InstrumentView] Scanning ${type} devices...`);
+        
+        this.state.scanning[type] = true;
+        this.updateScanButton(type, true);
+        
+        if (this.eventBus) {
+            this.eventBus.emit('instruments:scan_requested', { type });
+        }
+        
+        // Simuler un scan (sera remplacé par vraie logique)
+        setTimeout(() => {
+            this.handleScanCompleted(type, this.getMockDevices(type));
+        }, 2000);
+    }
+
+    handleScanStarted(type) {
+        this.state.scanning[type] = true;
+        this.updateScanButton(type, true);
+    }
+
+    handleScanCompleted(type, devices) {
+        this.state.scanning[type] = false;
+        this.updateScanButton(type, false);
+        
+        // Filtrer les périphériques déjà connectés
+        this.state.discoveredDevices = (devices || []).filter(device => {
+            return !this.state.connectedDevices.some(connected => connected.id === device.id);
+        });
+        
+        this.renderDiscoveredDevices();
+    }
+
+    updateScanButton(type, scanning) {
+        const buttonMap = {
+            usb: this.elements.btnScanUSB,
+            bluetooth: this.elements.btnScanBluetooth,
+            network: this.elements.btnScanNetwork
+        };
+        
+        const button = buttonMap[type];
+        if (!button) return;
+        
+        if (scanning) {
+            button.classList.add('scanning');
+            button.disabled = true;
+        } else {
+            button.classList.remove('scanning');
+            button.disabled = false;
+        }
+    }
+
+    // ========================================================================
+    // RENDU DES PÉRIPHÉRIQUES DÉCOUVERTS
+    // ========================================================================
+
+    renderDiscoveredDevices() {
+        if (!this.elements.devicesFound) return;
+        
+        if (!this.state.discoveredDevices || this.state.discoveredDevices.length === 0) {
+            this.elements.devicesFound.innerHTML = this.renderEmptyDiscovery();
+            return;
+        }
+        
+        this.elements.devicesFound.innerHTML = this.state.discoveredDevices
+            .map(device => this.renderDeviceCard(device))
+            .join('');
+    }
+
+    renderDeviceCard(device) {
+        const icon = this.getDeviceIcon(device.type);
+        const typeLabel = this.getTypeLabel(device.type);
         
         return `
-            <span class="connection-badge" style="background-color: ${color};" title="${type}">
-                ${icon}
-            </span>
-        `;
-    }
-    
-    renderInstrumentStatus(instrument) {
-        const isActive = instrument.status === 'active' || instrument.is_connected;
-        
-        return `
-            <span class="status-indicator ${isActive ? 'active' : 'inactive'}" 
-                  title="${isActive ? 'Connecté' : 'Déconnecté'}">
-                ${isActive ? '🟢' : '🔴'}
-            </span>
-        `;
-    }
-    
-    renderInstrumentDetails(instrument) {
-        return `
-            <div class="instrument-details">
-                ${this.displayConfig.showMetrics ? this.renderMetrics(instrument) : ''}
-                ${this.displayConfig.showCapabilities ? this.renderCapabilities(instrument) : ''}
-                ${this.renderActions(instrument)}
-            </div>
-        `;
-    }
-    
-    renderMetrics(instrument) {
-        const metrics = instrument.metrics || {};
-        
-        return `
-            <div class="instrument-metrics">
-                <h4>Métriques</h4>
-                <div class="metrics-grid">
-                    <div class="metric-item">
-                        <span class="metric-label">Notes jouées</span>
-                        <span class="metric-value">${metrics.notes_played || 0}</span>
+            <div class="device-card" data-device-id="${device.id}">
+                <div class="device-card-header">
+                    <div class="device-card-icon">${icon}</div>
+                    <div class="device-card-info">
+                        <div class="device-card-name">${device.name || 'Périphérique inconnu'}</div>
+                        <div class="device-card-type">${typeLabel}</div>
                     </div>
-                    <div class="metric-item">
-                        <span class="metric-label">Latence</span>
-                        <span class="metric-value">${metrics.latency || 0}ms</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-label">Messages/s</span>
-                        <span class="metric-value">${metrics.messages_per_second || 0}</span>
-                    </div>
+                </div>
+                
+                <div class="device-card-actions">
+                    <button class="btn-connect" data-action="connect" data-device-id="${device.id}">
+                        🔗 Connecter
+                    </button>
                 </div>
             </div>
         `;
     }
-    
-    renderCapabilities(instrument) {
-        const caps = instrument.capabilities || {};
-        
-        return `
-            <div class="instrument-capabilities">
-                <h4>Capacités</h4>
-                <div class="capabilities-list">
-                    ${caps.channels ? `<span class="capability">📻 ${caps.channels} canaux</span>` : ''}
-                    ${caps.polyphony ? `<span class="capability">🎵 Polyphonie: ${caps.polyphony}</span>` : ''}
-                    ${caps.program_change ? `<span class="capability">✓ Program Change</span>` : ''}
-                    ${caps.pitch_bend ? `<span class="capability">✓ Pitch Bend</span>` : ''}
-                </div>
-            </div>
-        `;
-    }
-    
-    renderActions(instrument) {
-        return `
-            <div class="instrument-actions-bar">
-                <button class="btn btn-sm btn-primary" data-action="select" data-instrument-id="${instrument.id}">
-                    ${this.localState.selectedInstruments.has(instrument.id) ? '✓ Sélectionné' : 'Sélectionner'}
-                </button>
-                <button class="btn btn-sm btn-secondary" data-action="configure" data-instrument-id="${instrument.id}">
-                    ⚙️ Configurer
-                </button>
-                <button class="btn btn-sm btn-secondary" data-action="test" data-instrument-id="${instrument.id}">
-                    🎵 Tester
-                </button>
-            </div>
-        `;
-    }
-    
-    renderEmptyState() {
+
+    renderEmptyDiscovery() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">🎹</div>
-                <h3>Aucun instrument détecté</h3>
-                <p>Connectez un instrument MIDI et cliquez sur "Rafraîchir"</p>
-                <button class="btn btn-primary" id="btn-scan-instruments">
-                    🔍 Scanner les instruments
-                </button>
+                <div class="empty-state-icon">🔍</div>
+                <div class="empty-state-text">Aucun périphérique trouvé</div>
+                <div class="empty-state-hint">Lancez un scan pour rechercher des instruments</div>
             </div>
         `;
     }
-    
+
     // ========================================================================
-    // EVENT LISTENERS
+    // RENDU DES PÉRIPHÉRIQUES CONNECTÉS
     // ========================================================================
-    
-    attachEventListeners() {
-        // Bouton rafraîchir
-        const refreshBtn = this.container.querySelector('#btn-refresh-instruments');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                this.emit('instruments:refresh');
-            });
+
+    renderConnectedDevices() {
+        if (!this.elements.connectedDevices) return;
+        
+        if (!this.state.connectedDevices || this.state.connectedDevices.length === 0) {
+            this.elements.connectedDevices.innerHTML = this.renderEmptyConnected();
+            return;
         }
         
-        // Bouton scanner
-        const scanBtn = this.container.querySelector('#btn-scan-instruments');
-        if (scanBtn) {
-            scanBtn.addEventListener('click', () => {
-                this.emit('instruments:scan');
-            });
+        this.elements.connectedDevices.innerHTML = this.state.connectedDevices
+            .map(device => this.renderConnectedDevice(device))
+            .join('');
+    }
+
+    renderConnectedDevice(device) {
+        const icon = this.getDeviceIcon(device.type);
+        const isExpanded = this.state.selectedDevice && this.state.selectedDevice.id === device.id;
+        
+        return `
+            <div class="connected-device ${isExpanded ? 'expanded' : ''}" data-device-id="${device.id}">
+                <div class="connected-device-header">
+                    <div class="connected-device-icon">${icon}</div>
+                    <div class="connected-device-info">
+                        <div class="connected-device-name">${device.name || 'Périphérique inconnu'}</div>
+                        <div class="connected-device-status">
+                            <span class="status-indicator"></span>
+                            <span>Connecté</span>
+                        </div>
+                    </div>
+                    <div class="connected-device-actions">
+                        <button class="btn-settings" data-action="settings" data-device-id="${device.id}">
+                            ⚙️ Réglages
+                        </button>
+                        <button class="btn-disconnect" data-action="disconnect" data-device-id="${device.id}">
+                            🔌 Déconnecter
+                        </button>
+                    </div>
+                </div>
+                
+                ${isExpanded ? this.renderDeviceSettings(device) : ''}
+            </div>
+        `;
+    }
+
+    renderDeviceSettings(device) {
+        return `
+            <div class="instrument-settings-panel">
+                <h3>Paramètres de ${device.name}</h3>
+                
+                <!-- Délai/Latence -->
+                <div class="settings-group">
+                    <label class="settings-label">Délai (ms)</label>
+                    <input 
+                        type="number" 
+                        class="settings-input" 
+                        value="${device.latency || 0}" 
+                        min="0" 
+                        max="1000"
+                        data-setting="latency"
+                        data-device-id="${device.id}"
+                    />
+                    <div class="settings-info">Compensation de latence pour ce périphérique</div>
+                </div>
+                
+                ${this.renderTypeSpecificSettings(device)}
+                
+                <div class="settings-actions">
+                    <button class="btn-action" data-action="save-settings" data-device-id="${device.id}">
+                        💾 Enregistrer
+                    </button>
+                    <button class="btn-action" data-action="reset-settings" data-device-id="${device.id}">
+                        🔄 Réinitialiser
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderTypeSpecificSettings(device) {
+        switch (device.type) {
+            case 'bluetooth':
+                return this.renderBluetoothSettings(device);
+            case 'network':
+                return this.renderNetworkSettings(device);
+            case 'usb':
+                return this.renderUSBSettings(device);
+            default:
+                return '';
         }
-        
-        // Boutons de mode d'affichage
-        const modeButtons = this.container.querySelectorAll('.display-mode-buttons button');
-        modeButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const mode = e.currentTarget.dataset.mode;
-                this.setDisplayMode(mode);
-            });
-        });
-        
-        // Boutons d'expansion
-        const expandButtons = this.container.querySelectorAll('[data-action="toggle-expand"]');
-        expandButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const card = e.target.closest('.instrument-card');
-                const instrumentId = card.dataset.instrumentId;
-                this.toggleExpand(instrumentId);
-            });
-        });
-        
-        // Boutons de sélection
-        const selectButtons = this.container.querySelectorAll('[data-action="select"]');
-        selectButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const instrumentId = e.currentTarget.dataset.instrumentId;
-                this.toggleSelect(instrumentId);
-            });
-        });
-        
-        // Boutons de configuration
-        const configButtons = this.container.querySelectorAll('[data-action="configure"]');
-        configButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const instrumentId = e.currentTarget.dataset.instrumentId;
-                this.emit('instruments:configure', { instrumentId });
-            });
-        });
-        
-        // Boutons de test
-        const testButtons = this.container.querySelectorAll('[data-action="test"]');
-        testButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const instrumentId = e.currentTarget.dataset.instrumentId;
-                this.emit('instruments:test', { instrumentId });
-            });
-        });
     }
-    
-    // ========================================================================
-    // ACTIONS
-    // ========================================================================
-    
-    setDisplayMode(mode) {
-        this.localState.displayMode = mode;
-        this.displayConfig.compactMode = (mode === 'compact');
-        this.render();
+
+    renderBluetoothSettings(device) {
+        const signalStrength = device.signalStrength || 0;
+        const battery = device.battery || 100;
+        
+        return `
+            <div class="settings-group">
+                <label class="settings-label">Signal Bluetooth</label>
+                <div class="signal-indicator">
+                    <div class="signal-bar" style="width: ${signalStrength}%"></div>
+                    <span>${signalStrength}%</span>
+                </div>
+            </div>
+            
+            <div class="settings-group">
+                <label class="settings-label">Batterie</label>
+                <div class="battery-indicator">
+                    <div class="battery-level" style="width: ${battery}%"></div>
+                    <span>${battery}%</span>
+                </div>
+            </div>
+        `;
     }
-    
-    toggleExpand(instrumentId) {
-        if (this.localState.expandedInstruments.has(instrumentId)) {
-            this.localState.expandedInstruments.delete(instrumentId);
+
+    renderNetworkSettings(device) {
+        return `
+            <div class="settings-group">
+                <label class="settings-label">Adresse IP</label>
+                <input 
+                    type="text" 
+                    class="settings-input" 
+                    value="${device.ip || ''}" 
+                    data-setting="ip"
+                    data-device-id="${device.id}"
+                />
+            </div>
+            
+            <div class="settings-group">
+                <label class="settings-label">Port</label>
+                <input 
+                    type="number" 
+                    class="settings-input" 
+                    value="${device.port || 5004}" 
+                    data-setting="port"
+                    data-device-id="${device.id}"
+                />
+            </div>
+        `;
+    }
+
+    renderUSBSettings(device) {
+        return `
+            <div class="settings-group">
+                <label class="settings-label">Port USB</label>
+                <input 
+                    type="text" 
+                    class="settings-input" 
+                    value="${device.port || ''}" 
+                    readonly
+                />
+                <div class="settings-info">Le port USB est détecté automatiquement</div>
+            </div>
+        `;
+    }
+
+    renderEmptyConnected() {
+        return `
+            <div class="empty-state">
+                <div class="empty-state-icon">🎸</div>
+                <div class="empty-state-text">Aucun instrument connecté</div>
+                <div class="empty-state-hint">Scannez et connectez des instruments</div>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // ACTIONS SUR LES PÉRIPHÉRIQUES
+    // ========================================================================
+
+    handleDiscoveredDeviceAction(e) {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        
+        const action = button.dataset.action;
+        const deviceId = button.dataset.deviceId;
+        const device = this.state.discoveredDevices.find(d => d.id === deviceId);
+        
+        if (!device) return;
+        
+        if (action === 'connect') {
+            this.connectDevice(device);
+        }
+    }
+
+    handleConnectedDeviceAction(e) {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        
+        const action = button.dataset.action;
+        const deviceId = button.dataset.deviceId;
+        const device = this.state.connectedDevices.find(d => d.id === deviceId);
+        
+        if (!device) return;
+        
+        switch (action) {
+            case 'settings':
+                this.toggleDeviceSettings(device);
+                break;
+            case 'disconnect':
+                this.disconnectDevice(device);
+                break;
+            case 'save-settings':
+                this.saveDeviceSettings(device);
+                break;
+            case 'reset-settings':
+                this.resetDeviceSettings(device);
+                break;
+        }
+    }
+
+    connectDevice(device) {
+        this.logger.info('[InstrumentView] Connecting device:', device.name);
+        
+        if (this.eventBus) {
+            this.eventBus.emit('instruments:connect_requested', { device });
+        }
+    }
+
+    disconnectDevice(device) {
+        this.logger.info('[InstrumentView] Disconnecting device:', device.name);
+        
+        if (confirm(`Déconnecter ${device.name} ?`)) {
+            if (this.eventBus) {
+                this.eventBus.emit('instruments:disconnect_requested', { device });
+            }
+        }
+    }
+
+    toggleDeviceSettings(device) {
+        if (this.state.selectedDevice && this.state.selectedDevice.id === device.id) {
+            this.state.selectedDevice = null;
         } else {
-            this.localState.expandedInstruments.add(instrumentId);
-        }
-        this.render();
-    }
-    
-    toggleSelect(instrumentId) {
-        if (this.localState.selectedInstruments.has(instrumentId)) {
-            this.localState.selectedInstruments.delete(instrumentId);
-        } else {
-            this.localState.selectedInstruments.add(instrumentId);
+            this.state.selectedDevice = device;
         }
         
-        this.emit('instruments:selection:changed', {
-            instrumentId,
-            selected: this.localState.selectedInstruments.has(instrumentId),
-            selectedInstruments: Array.from(this.localState.selectedInstruments)
+        this.renderConnectedDevices();
+    }
+
+    saveDeviceSettings(device) {
+        this.logger.info('[InstrumentView] Saving settings for:', device.name);
+        
+        // Récupérer les valeurs des inputs
+        const settings = {};
+        const inputs = this.container.querySelectorAll(`[data-device-id="${device.id}"][data-setting]`);
+        
+        inputs.forEach(input => {
+            const setting = input.dataset.setting;
+            settings[setting] = input.value;
         });
         
-        this.render();
+        if (this.eventBus) {
+            this.eventBus.emit('instruments:settings_saved', { device, settings });
+        }
     }
-    
+
+    resetDeviceSettings(device) {
+        this.logger.info('[InstrumentView] Resetting settings for:', device.name);
+        
+        if (confirm(`Réinitialiser les paramètres de ${device.name} ?`)) {
+            if (this.eventBus) {
+                this.eventBus.emit('instruments:settings_reset', { device });
+            }
+        }
+    }
+
+    handleDeviceConnected(device) {
+        this.state.connectedDevices.push(device);
+        this.renderConnectedDevices();
+        
+        // Retirer des découverts
+        this.state.discoveredDevices = this.state.discoveredDevices.filter(d => d.id !== device.id);
+        this.renderDiscoveredDevices();
+    }
+
+    handleDeviceDisconnected(device) {
+        this.state.connectedDevices = this.state.connectedDevices.filter(d => d.id !== device.id);
+        this.renderConnectedDevices();
+    }
+
     // ========================================================================
-    // API PUBLIQUE
+    // CHARGEMENT DES DONNÉES
     // ========================================================================
-    
-    updateInstruments(instruments) {
-        this.render({ instruments });
+
+    loadConnectedDevices() {
+        if (this.eventBus) {
+            this.eventBus.emit('instruments:load_requested');
+        }
     }
-    
-    selectInstrument(instrumentId) {
-        this.localState.selectedInstruments.add(instrumentId);
-        this.render();
-    }
-    
-    deselectInstrument(instrumentId) {
-        this.localState.selectedInstruments.delete(instrumentId);
-        this.render();
-    }
-    
-    clearSelection() {
-        this.localState.selectedInstruments.clear();
-        this.render();
-    }
-    
-    getSelectedInstruments() {
-        return Array.from(this.localState.selectedInstruments);
-    }
-    
+
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
-    
-    escapeHTML(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+
+    getDeviceIcon(type) {
+        const icons = {
+            usb: '🔌',
+            bluetooth: '📡',
+            network: '🌐',
+            virtual: '💻'
+        };
+        return icons[type] || '🎸';
     }
-    
-    // ========================================================================
-    // DESTRUCTION
-    // ========================================================================
-    
-    destroy() {
-        this.localState.selectedInstruments.clear();
-        this.localState.expandedInstruments.clear();
+
+    getTypeLabel(type) {
+        const labels = {
+            usb: 'USB',
+            bluetooth: 'Bluetooth',
+            network: 'Réseau',
+            virtual: 'Virtuel'
+        };
+        return labels[type] || 'Inconnu';
+    }
+
+    getMockDevices(type) {
+        // Mock data pour le développement
+        const mockDevices = {
+            usb: [
+                { id: 'usb1', name: 'Roland FP-30X', type: 'usb', port: '/dev/usb1' },
+                { id: 'usb2', name: 'Yamaha P-125', type: 'usb', port: '/dev/usb2' }
+            ],
+            bluetooth: [
+                { id: 'bt1', name: 'MIDI Bluetooth 1', type: 'bluetooth', signalStrength: 85, battery: 75 },
+                { id: 'bt2', name: 'MIDI Bluetooth 2', type: 'bluetooth', signalStrength: 92, battery: 100 }
+            ],
+            network: [
+                { id: 'net1', name: 'rtpMIDI Session', type: 'network', ip: '192.168.1.100', port: 5004 }
+            ]
+        };
         
-        super.destroy();
+        return mockDevices[type] || [];
+    }
+
+    // ========================================================================
+    // CLEANUP
+    // ========================================================================
+
+    destroy() {
+        if (this.eventBus) {
+            this.eventBus.off('instruments:scan_started');
+            this.eventBus.off('instruments:scan_completed');
+            this.eventBus.off('instruments:device_connected');
+            this.eventBus.off('instruments:device_disconnected');
+            this.eventBus.off('instruments:list_updated');
+        }
+        
+        this.logger.info('[InstrumentView] Destroyed');
     }
 }
 
