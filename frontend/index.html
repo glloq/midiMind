@@ -1,16 +1,12 @@
 <!-- ============================================================================
 Fichier: frontend/index.html
-Version: v3.8.0 - INTERFACE REFACTORISÉE COHÉRENTE
-Date: 2025-10-29
+Version: v3.9.0 - CORRECTIONS INTERFACE
+Date: 2025-10-30
 ============================================================================ 
-NOUVELLES FONCTIONNALITÉS v3.8.0:
-✅ Menu principal simplifié avec logo et barre de lecture
-✅ Coccinelle debug en haut à droite
-✅ Navigation: Home + Fichiers + Instruments + Keyboard + Système
-✅ Page Home: sélection + visualizer + barre instruments + mute global
-✅ Page Fichiers: liste + édition + routes + playlists
-✅ Page Instruments: connexion + paramètres délais
-✅ Interface cohérente et minimaliste
+CORRECTIONS v3.9.0:
+✅ Navigation déplacée SOUS le header (plus dans le header)
+✅ Structure: Header (logo + playback + debug) → Navigation → Main Content
+✅ Interface cohérente et fonctionnelle
 ============================================================================ -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -41,7 +37,7 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
     <div id="app" style="display: none;">
         
         <!-- ========================================================================
-             HEADER - Menu principal avec logo et contrôles
+             HEADER - Logo et contrôles principaux
              ======================================================================== -->
         <header class="app-header">
             <div class="header-content">
@@ -66,7 +62,7 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
                     <div class="playback-controls">
                         <!-- Boutons playlist (masqués si pas de playlist) -->
                         <button class="control-btn btn-prev" id="globalPrev" title="Précédent" style="display: none;">
-                            ⏮️
+                            ⮜️
                         </button>
                         
                         <!-- Boutons de lecture -->
@@ -82,7 +78,7 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
                         
                         <!-- Boutons playlist -->
                         <button class="control-btn btn-next" id="globalNext" title="Suivant" style="display: none;">
-                            ⏭️
+                            ⮞️
                         </button>
                     </div>
                     
@@ -105,31 +101,33 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
                     </div>
                 </div>
             </div>
-            
-            <!-- Navigation principale -->
-            <nav class="main-nav">
-                <a href="#home" class="nav-item active" data-page="home">
-                    <span class="nav-icon">🏠</span>
-                    <span class="nav-label">Home</span>
-                </a>
-                <a href="#files" class="nav-item" data-page="files">
-                    <span class="nav-icon">📁</span>
-                    <span class="nav-label">Fichiers</span>
-                </a>
-                <a href="#instruments" class="nav-item" data-page="instruments">
-                    <span class="nav-icon">🎸</span>
-                    <span class="nav-label">Instruments</span>
-                </a>
-                <a href="#keyboard" class="nav-item" data-page="keyboard">
-                    <span class="nav-icon">🎹</span>
-                    <span class="nav-label">Keyboard</span>
-                </a>
-                <a href="#system" class="nav-item" data-page="system">
-                    <span class="nav-icon">⚙️</span>
-                    <span class="nav-label">Système</span>
-                </a>
-            </nav>
         </header>
+
+        <!-- ========================================================================
+             NAVIGATION PRINCIPALE - Sous le header
+             ======================================================================== -->
+        <nav class="main-nav">
+            <a href="#home" class="nav-item active" data-page="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Home</span>
+            </a>
+            <a href="#files" class="nav-item" data-page="files">
+                <span class="nav-icon">📁</span>
+                <span class="nav-label">Fichiers</span>
+            </a>
+            <a href="#instruments" class="nav-item" data-page="instruments">
+                <span class="nav-icon">🎸</span>
+                <span class="nav-label">Instruments</span>
+            </a>
+            <a href="#keyboard" class="nav-item" data-page="keyboard">
+                <span class="nav-icon">🎹</span>
+                <span class="nav-label">Keyboard</span>
+            </a>
+            <a href="#system" class="nav-item" data-page="system">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Système</span>
+            </a>
+        </nav>
 
         <!-- ========================================================================
              CONSOLE DE DEBUG (cachée par défaut)
@@ -165,54 +163,47 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
             <div id="home" class="page active">
                 <div class="home-layout">
                     
-                    <!-- Sélection fichiers/playlists -->
-                    <div class="home-selector">
-                        <div class="selector-tabs">
-                            <button class="selector-tab active" data-mode="files">Fichiers</button>
-                            <button class="selector-tab" data-mode="playlists">Playlists</button>
+                    <!-- Sélection de fichier -->
+                    <div class="home-file-selection">
+                        <div class="section-header">
+                            <h2>📁 Fichier actif</h2>
+                            <button class="btn-change-file" id="btnChangeFile">Changer</button>
                         </div>
                         
-                        <div class="selector-content">
-                            <!-- Liste des fichiers -->
-                            <div class="files-list" id="filesList">
-                                <!-- Généré par HomeView -->
-                            </div>
-                            
-                            <!-- Liste des playlists -->
-                            <div class="playlists-list" id="playlistsList" style="display: none;">
-                                <!-- Généré par HomeView -->
+                        <div class="current-file-display" id="currentFileDisplay">
+                            <div class="file-icon">🎵</div>
+                            <div class="file-info">
+                                <div class="file-name">Aucun fichier sélectionné</div>
+                                <div class="file-stats">Sélectionnez un fichier pour commencer</div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Visualizer avec barre instruments -->
+                    <!-- Visualizer MIDI -->
                     <div class="home-visualizer">
-                        <!-- Barre instruments avec routing -->
-                        <div class="instruments-bar">
-                            <div class="instruments-title">
-                                <span class="icon">🎸</span>
-                                <span class="label">Instruments actifs</span>
-                            </div>
-                            <div class="instruments-list" id="activeInstruments">
-                                <!-- Généré dynamiquement -->
-                            </div>
-                            <div class="instruments-actions">
-                                <button class="btn-mute-all" id="btnMuteAll" title="Mute/Unmute tous les canaux">
-                                    <span class="mute-icon">🔇</span>
-                                    <span class="mute-label">Mute All</span>
-                                </button>
-                            </div>
+                        <div class="section-header">
+                            <h2>🎵 Visualiseur MIDI</h2>
                         </div>
                         
-                        <!-- Canvas visualizer -->
-                        <div class="visualizer-container">
-                            <canvas id="visualizerCanvas" class="visualizer-canvas"></canvas>
-                            <div class="visualizer-info" id="visualizerInfo">
-                                <span class="note-count">0 notes</span>
-                                <span class="active-channels">0 canaux actifs</span>
-                            </div>
+                        <div class="visualizer-container" id="homeVisualizer">
+                            <canvas id="visualizerCanvas"></canvas>
                         </div>
                     </div>
+                    
+                    <!-- Barre d'instruments avec mute global -->
+                    <div class="home-instruments-bar">
+                        <div class="section-header">
+                            <h2>🎸 Instruments connectés</h2>
+                            <button class="btn-mute-all" id="btnMuteAll" title="Mute All">
+                                🔇 Mute All
+                            </button>
+                        </div>
+                        
+                        <div class="instruments-list" id="homeInstrumentsList">
+                            <!-- Généré par HomeView -->
+                        </div>
+                    </div>
+                    
                 </div>
             </div>
             
@@ -229,9 +220,14 @@ NOUVELLES FONCTIONNALITÉS v3.8.0:
                     <div class="files-section">
                         <div class="section-header">
                             <h2>Fichiers MIDI JSON</h2>
-                            <button class="btn-action" id="btnRefreshFiles">
-                                🔄 Actualiser
-                            </button>
+                            <div class="section-actions">
+                                <button class="btn-action btn-primary" id="btnUploadFile">
+                                    ⬆️ Uploader
+                                </button>
+                                <button class="btn-action" id="btnRefreshFiles">
+                                    🔄 Actualiser
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="files-grid" id="filesGrid">

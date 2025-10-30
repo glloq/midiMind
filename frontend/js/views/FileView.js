@@ -1,14 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v3.8.0 - PAGE FICHIERS REFACTORISÉE
-// Date: 2025-10-29
+// Version: v3.9.0 - CORRECTIONS INTERFACE
+// Date: 2025-10-30
 // Projet: MidiMind v3.1
 // ============================================================================
-// FONCTIONNALITÉS v3.8.0:
-// ✅ Liste des fichiers MIDI JSON
-// ✅ Bouton éditer (ouvre l'éditeur)
-// ✅ Bouton routes (1→1 simple ou N→N complexe)
-// ✅ Gestion complète des playlists
+// CORRECTIONS v3.9.0:
+// ✅ Bouton Upload ajouté dans la section fichiers
+// ✅ Gestion de l'événement upload
 // ============================================================================
 
 class FileView {
@@ -72,9 +70,14 @@ class FileView {
                 <div class="files-section">
                     <div class="section-header">
                         <h2>Fichiers MIDI JSON</h2>
-                        <button class="btn-action" id="btnRefreshFiles">
-                            🔄 Actualiser
-                        </button>
+                        <div class="section-actions">
+                            <button class="btn-action btn-primary" id="btnUploadFile">
+                                ⬆️ Uploader
+                            </button>
+                            <button class="btn-action" id="btnRefreshFiles">
+                                🔄 Actualiser
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="files-grid" id="filesGrid">
@@ -103,6 +106,7 @@ class FileView {
         this.elements = {
             filesGrid: document.getElementById('filesGrid'),
             playlistsGrid: document.getElementById('playlistsGrid'),
+            btnUploadFile: document.getElementById('btnUploadFile'),
             btnRefreshFiles: document.getElementById('btnRefreshFiles'),
             btnCreatePlaylist: document.getElementById('btnCreatePlaylist')
         };
@@ -110,6 +114,9 @@ class FileView {
 
     attachEvents() {
         // Boutons
+        if (this.elements.btnUploadFile) {
+            this.elements.btnUploadFile.addEventListener('click', () => this.uploadFile());
+        }
         if (this.elements.btnRefreshFiles) {
             this.elements.btnRefreshFiles.addEventListener('click', () => this.refreshFiles());
         }
@@ -230,7 +237,7 @@ class FileView {
 
     renderPlaylistCard(playlist) {
         const fileCount = playlist.files ? playlist.files.length : 0;
-        const totalDuration = this.calculatePlaylistDuration(playlist);
+        const duration = this.calculatePlaylistDuration(playlist);
         
         return `
             <div class="playlist-card" data-playlist-id="${playlist.id}">
@@ -238,22 +245,24 @@ class FileView {
                     <div class="playlist-card-icon">📋</div>
                     <div class="playlist-card-info">
                         <div class="playlist-card-name">${playlist.name || 'Sans nom'}</div>
-                        <div class="playlist-card-count">${fileCount} fichiers - ${totalDuration}</div>
+                        <div class="playlist-card-meta">
+                            <span>📁 ${fileCount} fichiers</span>
+                            <span>⏱️ ${duration}</span>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="playlist-card-actions">
-                    <button class="playlist-card-btn" data-action="edit-playlist" data-playlist-id="${playlist.id}">
-                        <span>✏️</span>
-                        <span>Éditer</span>
-                    </button>
-                    <button class="playlist-card-btn" data-action="play-playlist" data-playlist-id="${playlist.id}">
+                    <button class="playlist-card-btn btn-play" data-action="play-playlist" data-playlist-id="${playlist.id}">
                         <span>▶️</span>
                         <span>Lire</span>
                     </button>
+                    <button class="playlist-card-btn btn-edit" data-action="edit-playlist" data-playlist-id="${playlist.id}">
+                        <span>✏️</span>
+                        <span>Éditer</span>
+                    </button>
                     <button class="playlist-card-btn btn-delete" data-action="delete-playlist" data-playlist-id="${playlist.id}">
                         <span>🗑️</span>
-                        <span>Supprimer</span>
                     </button>
                 </div>
             </div>
@@ -292,6 +301,50 @@ class FileView {
                 this.editRoutes(file);
                 break;
         }
+    }
+
+    uploadFile() {
+        this.logger.info('[FileView] Upload file requested');
+        
+        if (this.eventBus) {
+            this.eventBus.emit('file:upload_requested');
+        }
+        
+        // Créer un input file pour sélectionner le fichier
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,.mid,.midi';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.handleFileUpload(file);
+            }
+        };
+        input.click();
+    }
+
+    handleFileUpload(file) {
+        this.logger.info('[FileView] Uploading file:', file.name);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target.result;
+                
+                if (this.eventBus) {
+                    this.eventBus.emit('file:upload', {
+                        filename: file.name,
+                        content: content
+                    });
+                }
+                
+                this.logger.info('[FileView] File uploaded successfully');
+            } catch (error) {
+                this.logger.error('[FileView] Error uploading file:', error);
+            }
+        };
+        
+        reader.readAsText(file);
     }
 
     editFile(file) {
