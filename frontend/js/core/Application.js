@@ -563,12 +563,16 @@ class Application {
             );
         }
         
-        // EditorController
+          // EditorController
         if (window.EditorController) {
             this.controllers.editor = new EditorController(
                 this.eventBus,
                 this.models,
-        
+                this.views,
+                this.notifications,
+                this.debugConsole
+            );
+        }
         // LoopController - ✅ NOUVEAU v3.0.3 (enregistrement de loops)
         if (window.LoopController && this.models.loop) {
             this.controllers.loop = new LoopController(this.eventBus);
@@ -587,11 +591,7 @@ class Application {
                 console.warn('⚠️ LoopController created but not initialized (view missing)');
             }
         }
-                this.views,
-                this.notifications,
-                this.debugConsole
-            );
-        }
+              
         
         // KeyboardController
         if (window.KeyboardController) {

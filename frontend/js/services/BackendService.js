@@ -40,7 +40,7 @@ class BackendService {
             timeoutInterval: 5000,
             heartbeatInterval: 20000,      // Vérifier toutes les 20s
             heartbeatTimeout: 45000,       // Considérer mort si pas de réponse depuis 45s
-            maxReconnectAttempts: 5
+            maxReconnectAttempts: 5,
             defaultCommandTimeout: 5000    // ✅ NOUVEAU: Timeout par défaut pour les commandes
         };
         
