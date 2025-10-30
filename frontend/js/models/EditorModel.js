@@ -22,7 +22,7 @@ class EditorModel extends BaseModel {
             autoPersist: false
         });
         
-        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.eventBus = eventBus || window.eventBus || window.eventBus;
         this.backend = backend || window.backendService || window.app?.services?.backend;
         this.logger = logger || window.logger || console;
         

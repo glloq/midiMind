@@ -18,7 +18,7 @@ class PlaybackModel extends BaseModel {
         });
         
         // ✅ PROTECTION: Fallback sur window.logger ou console
-        this.eventBus = eventBus || window.EventBus || window.eventBus;
+        this.eventBus = eventBus || window.eventBus || window.eventBus;
         this.backend = backend || window.backendService || window.app?.services?.backend;
         this.logger = logger || window.logger || console;
         
