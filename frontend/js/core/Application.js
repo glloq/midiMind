@@ -282,42 +282,42 @@ class Application {
         
         // StateModel
         if (window.StateModel) {
-            this.models.state = new StateModel(this.eventBus);
+            this.models.state = new StateModel(this.eventBus, this.logger);
         }
         
         // FileModel
         if (window.FileModel) {
-            this.models.file = new FileModel(this.eventBus);
+            this.models.file = new FileModel(this.eventBus, this.logger);
         }
         
         // PlaylistModel
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(this.eventBus);
+            this.models.playlist = new PlaylistModel(this.eventBus, this.logger);
         }
         
         // InstrumentModel
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(this.eventBus);
+            this.models.instrument = new InstrumentModel(this.eventBus, this.logger);
         }
         
         // SystemModel
         if (window.SystemModel) {
-            this.models.system = new SystemModel(this.eventBus);
+            this.models.system = new SystemModel(this.eventBus, this.logger);
         }
         
         // PlaybackModel
         if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(this.eventBus);
+            this.models.playback = new PlaybackModel(this.eventBus, this.logger);
         }
         
         // EditorModel
         if (window.EditorModel) {
-            this.models.editor = new EditorModel(this.eventBus);
+            this.models.editor = new EditorModel(this.eventBus, this.logger);
         }
         
         // RoutingModel
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(this.eventBus);
+            this.models.routing = new RoutingModel(this.eventBus, this.logger);
         }
         
         this.log('info', '✓ Models initialized');

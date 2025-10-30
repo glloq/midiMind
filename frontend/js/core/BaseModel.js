@@ -1,47 +1,38 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseModel.js
-// Version: v3.0.3 - CORRECTED LOGGER INSTANCE
-// Date: 2025-10-24
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: v3.1.0 - LOGGER ROBUSTE
+// Date: 2025-10-30
 // ============================================================================
-// CORRECTIONS v3.0.3:
-// ✅ Fixed logger initialization: use window.logger (instance) instead of window.logger (class)
-// ✅ This fixes "TypeError: this.logger.debug is not a function" error
-// ============================================================================
-// CORRECTIONS v3.0.2:
-// ✓ Removed ES6 import statements (not compatible with script tags)
-// ✓ Using global variables instead (EventBus, Logger, etc.)
-// ✓ Compatible with non-module script loading
-// ============================================================================
-// Description:
-//   Classe de base pour tous les modèles de données de l'application.
-//   Fournit la structure commune pour la gestion d'état, validation,
-//   persistence et événements.
-//
-// Fonctionnalités:
-//   - Gestion d'état avec get/set
-//   - Validation de données
-//   - Persistence (localStorage/IndexedDB)
-//   - Système d'événements
-//   - Historique des changements
-//
-// Architecture:
-//   - Pattern Observer pour notifications
-//   - Validation déclarative avec règles
-//   - Storage abstrait (localStorage par défaut)
+// CORRECTIONS v3.1.0:
+// ✅ Accepte eventBus et logger comme paramètres
+// ✅ Fallback logger robuste avec toutes méthodes
+// ✅ Compatible avec anciens modèles (backward compatible)
 // ============================================================================
 
-/**
- * @class BaseModel
- * @description Classe de base abstraite pour tous les modèles de données
- */
 class BaseModel {
     /**
      * Constructeur du modèle de base
-     * @param {Object} initialData - Données initiales
+     * @param {EventBus} eventBus - Bus d'événements
+     * @param {Logger} logger - Logger (optionnel)
+     * @param {Object} initialData - Données initiales (optionnel)
      * @param {Object} options - Options de configuration
      */
-    constructor(initialData = {}, options = {}) {
+    constructor(eventBus, logger, initialData = {}, options = {}) {
+        // Support ancien style (backward compatible)
+        // Si eventBus est un objet et pas une instance EventBus, c'est initialData
+        if (eventBus && typeof eventBus === 'object' && !eventBus.emit) {
+            options = logger || {};
+            initialData = eventBus;
+            logger = null;
+            eventBus = null;
+        }
+        
+        // EventBus
+        this.eventBus = eventBus || window.eventBus || null;
+        
+        // Logger avec fallback robuste
+        this.logger = logger || this.createFallbackLogger();
+        
         // Données du modèle
         this.data = { ...initialData };
         
@@ -58,7 +49,7 @@ class BaseModel {
         this.config = {
             autoPersist: options.autoPersist !== false,
             persistKey: options.persistKey || this.constructor.name.toLowerCase(),
-            storageType: options.storageType || 'localStorage', // 'localStorage' | 'indexedDB'
+            storageType: options.storageType || 'localStorage',
             validateOnSet: options.validateOnSet !== false,
             eventPrefix: options.eventPrefix || this.constructor.name.toLowerCase(),
             debounceMs: options.debounceMs || 300,
@@ -68,59 +59,68 @@ class BaseModel {
         // Règles de validation (à définir dans les classes filles)
         this.validationRules = {};
         
-        // Historique des changements (pour undo/redo)
+        // Historique des changements
         this.history = {
             past: [],
             future: [],
             maxSize: options.historyMaxSize || 50
         };
         
-        // EventBus pour communication (global)
-        this.eventBus = window.EventBus || null;
-        
-        // Logger (global)
-        this.logger = window.logger || console;
-        
         // Timers pour debounce
         this._persistTimer = null;
         this._validationTimer = null;
         
-        this.logger.debug(`${this.constructor.name}`, 'Model created');
+        this.log('debug', `${this.constructor.name}`, 'Model created');
+    }
+    
+    /**
+     * Crée un logger fallback robuste
+     */
+    createFallbackLogger() {
+        // Si window.logger existe et a les bonnes méthodes
+        if (window.logger && typeof window.logger.info === 'function') {
+            return window.logger;
+        }
+        
+        // Fallback vers console avec interface complète
+        return {
+            debug: (...args) => console.log('[DEBUG]', ...args),
+            info: (...args) => console.info('[INFO]', ...args),
+            warn: (...args) => console.warn('[WARN]', ...args),
+            error: (...args) => console.error('[ERROR]', ...args),
+            log: (...args) => console.log(...args)
+        };
+    }
+    
+    /**
+     * Log sécurisé
+     */
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        } else {
+            console[level]?.(...args) || console.log(...args);
+        }
     }
 
     // ========================================================================
     // MÉTHODES D'ACCÈS AUX DONNÉES
     // ========================================================================
 
-    /**
-     * Récupère une valeur du modèle
-     * @param {string} key - Clé à récupérer (supporte notation pointée: 'user.name')
-     * @param {*} defaultValue - Valeur par défaut si non trouvée
-     * @returns {*} Valeur
-     */
     get(key, defaultValue = undefined) {
         if (key.includes('.')) {
-            // Navigation profonde
             return this._getDeep(this.data, key.split('.'), defaultValue);
         }
-        
         return this.data.hasOwnProperty(key) ? this.data[key] : defaultValue;
     }
 
-    /**
-     * Définit une valeur dans le modèle
-     * @param {string} key - Clé à définir
-     * @param {*} value - Valeur
-     * @param {boolean} silent - Si true, ne déclenche pas d'événements
-     * @returns {boolean} Succès
-     */
     set(key, value, silent = false) {
         const oldValue = this.get(key);
         
         // Validation si activée
         if (this.config.validateOnSet && this.validationRules[key]) {
             if (!this.validateField(key, value)) {
-                this.logger.warn(`${this.constructor.name}`, `Validation failed for ${key}`);
+                this.log('warn', `${this.constructor.name}`, `Validation failed for ${key}`);
                 return false;
             }
         }
@@ -151,64 +151,22 @@ class BaseModel {
             });
         }
         
-        // Auto-persistence
+        // Auto-persist si activé
         if (this.config.autoPersist) {
-            this._debouncedPersist();
+            this._debouncePersist();
         }
         
         return true;
     }
 
-    /**
-     * Met à jour plusieurs valeurs
-     * @param {Object} updates - Objet avec les mises à jour
-     * @param {boolean} silent - Si true, ne déclenche pas d'événements
-     * @returns {boolean} Succès
-     */
-    update(updates, silent = false) {
-        if (!updates || typeof updates !== 'object') {
-            return false;
-        }
+    setMultiple(values, silent = false) {
+        Object.entries(values).forEach(([key, value]) => {
+            this.set(key, value, true);
+        });
         
-        let success = true;
-        
-        for (const [key, value] of Object.entries(updates)) {
-            if (!this.set(key, value, true)) {
-                success = false;
-            }
-        }
-        
-        // Émettre un seul événement pour toutes les modifications
-        if (!silent && this.eventBus && success) {
-            this.eventBus.emit(`${this.config.eventPrefix}:updated`, {
-                updates,
-                model: this
-            });
-        }
-        
-        return success;
-    }
-
-    /**
-     * Supprime une clé
-     * @param {string} key - Clé à supprimer
-     * @returns {boolean} Succès
-     */
-    delete(key) {
-        if (!this.data.hasOwnProperty(key)) {
-            return false;
-        }
-        
-        const oldValue = this.data[key];
-        delete this.data[key];
-        
-        this.meta.dirty = true;
-        this.meta.lastModified = Date.now();
-        
-        if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:deleted`, {
-                key,
-                oldValue,
+        if (!silent && this.eventBus) {
+            this.eventBus.emit(`${this.config.eventPrefix}:changed`, {
+                keys: Object.keys(values),
                 model: this
             });
         }
@@ -216,23 +174,18 @@ class BaseModel {
         return true;
     }
 
-    /**
-     * Réinitialise le modèle
-     * @param {Object} newData - Nouvelles données (optionnel)
-     */
-    reset(newData = {}) {
-        const oldData = { ...this.data };
-        
-        this.data = { ...newData };
+    getAll() {
+        return { ...this.data };
+    }
+
+    reset() {
+        this.data = {};
         this.meta.dirty = false;
-        this.meta.lastModified = Date.now();
+        this.history.past = [];
+        this.history.future = [];
         
         if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:reset`, {
-                oldData,
-                newData: this.data,
-                model: this
-            });
+            this.eventBus.emit(`${this.config.eventPrefix}:reset`, { model: this });
         }
     }
 
@@ -240,293 +193,220 @@ class BaseModel {
     // NAVIGATION PROFONDE
     // ========================================================================
 
-    /**
-     * Récupère une valeur en profondeur
-     * @private
-     */
-    _getDeep(obj, keys, defaultValue) {
+    _getDeep(obj, path, defaultValue) {
         let current = obj;
-        
-        for (const key of keys) {
-            if (current === null || current === undefined) {
+        for (const key of path) {
+            if (current && typeof current === 'object' && key in current) {
+                current = current[key];
+            } else {
                 return defaultValue;
             }
-            
-            current = current[key];
         }
-        
-        return current !== undefined ? current : defaultValue;
+        return current;
     }
 
-    /**
-     * Définit une valeur en profondeur
-     * @private
-     */
-    _setDeep(obj, keys, value) {
-        if (keys.length === 0) return;
-        
-        const lastKey = keys.pop();
+    _setDeep(obj, path, value) {
+        const last = path.pop();
         let current = obj;
         
-        for (const key of keys) {
-            if (!(key in current) || typeof current[key] !== 'object') {
+        for (const key of path) {
+            if (!(key in current)) {
                 current[key] = {};
             }
             current = current[key];
         }
         
-        current[lastKey] = value;
+        current[last] = value;
     }
 
     // ========================================================================
     // VALIDATION
     // ========================================================================
 
-    /**
-     * Valide un champ
-     * @param {string} field - Champ à valider
-     * @param {*} value - Valeur
-     * @returns {boolean} Résultat de validation
-     */
-    validateField(field, value) {
-        const rules = this.validationRules[field];
+    validateField(key, value) {
+        const rules = this.validationRules[key];
         if (!rules) return true;
         
-        const rulesArray = Array.isArray(rules) ? rules : [rules];
-        
-        for (const rule of rulesArray) {
-            try {
-                const result = rule(value, this.data);
-                if (result !== true) {
-                    this.meta.errors[field] = result || `Validation échouée pour ${field}`;
-                    return false;
-                }
-            } catch (error) {
-                this.meta.errors[field] = error.message;
+        for (const [ruleName, ruleConfig] of Object.entries(rules)) {
+            const validator = this._getValidator(ruleName);
+            if (validator && !validator(value, ruleConfig)) {
+                this.meta.errors[key] = {
+                    rule: ruleName,
+                    message: ruleConfig.message || `Validation failed for ${key}`
+                };
                 return false;
             }
         }
         
-        delete this.meta.errors[field];
+        delete this.meta.errors[key];
         return true;
     }
 
-    /**
-     * Valide toutes les données
-     * @returns {boolean} Résultat global de la validation
-     */
-    validateAll() {
+    validate() {
         this.meta.errors = {};
         let isValid = true;
         
-        for (const field in this.validationRules) {
-            if (this.data.hasOwnProperty(field)) {
-                if (!this.validateField(field, this.data[field])) {
-                    isValid = false;
-                }
+        for (const key of Object.keys(this.validationRules)) {
+            if (!this.validateField(key, this.get(key))) {
+                isValid = false;
             }
         }
         
         return isValid;
     }
 
-    /**
-     * Récupère les erreurs de validation
-     * @returns {Object} Erreurs par champ
-     */
-    getErrors() {
-        return { ...this.meta.errors };
-    }
-
-    /**
-     * Vérifie si le modèle est valide
-     * @returns {boolean} Validité
-     */
-    isValid() {
-        return Object.keys(this.meta.errors).length === 0;
+    _getValidator(ruleName) {
+        const validators = {
+            required: (value) => value !== null && value !== undefined && value !== '',
+            minLength: (value, { min }) => String(value).length >= min,
+            maxLength: (value, { max }) => String(value).length <= max,
+            min: (value, { min }) => Number(value) >= min,
+            max: (value, { max }) => Number(value) <= max,
+            pattern: (value, { regex }) => new RegExp(regex).test(String(value)),
+            email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))
+        };
+        
+        return validators[ruleName];
     }
 
     // ========================================================================
     // PERSISTENCE
     // ========================================================================
 
-    /**
-     * Sauvegarde les données
-     * @returns {Promise<boolean>} Succès de la sauvegarde
-     */
     async persist() {
+        if (!this.meta.dirty) return;
+        
         try {
-            this.logger.debug(`${this.constructor.name}`, 
-                `Persisting to ${this.config.storageType}`);
-            
-            const dataToSave = {
-                data: this.data,
-                meta: {
-                    version: this.meta.version,
-                    lastModified: Date.now(),
-                    savedAt: new Date().toISOString()
-                }
-            };
+            const data = this.serialize();
             
             if (this.config.storageType === 'localStorage') {
-                localStorage.setItem(
-                    this.config.persistKey,
-                    JSON.stringify(dataToSave)
-                );
+                localStorage.setItem(this.config.persistKey, JSON.stringify(data));
             } else if (this.config.storageType === 'indexedDB') {
-                // TODO: Implémenter IndexedDB
-                console.warn('IndexedDB not implemented yet');
+                await this._persistToIndexedDB(data);
             }
             
             this.meta.dirty = false;
-            
-            if (this.eventBus) {
-                this.eventBus.emit(`${this.config.eventPrefix}:persisted`, {
-                    model: this
-                });
-            }
-            
-            return true;
+            this.log('debug', `${this.constructor.name}`, 'Persisted to storage');
             
         } catch (error) {
-            this.logger.error(`${this.constructor.name}`, 
-                `Persist error: ${error.message}`);
-            return false;
+            this.log('error', `${this.constructor.name}`, 'Persist failed:', error);
         }
     }
 
-    /**
-     * Charge les données depuis le storage
-     * @returns {Promise<boolean>} Succès du chargement
-     */
     async load() {
         try {
-            this.logger.debug(`${this.constructor.name}`, 
-                `Loading from ${this.config.storageType}`);
-            
-            let savedData = null;
+            let data;
             
             if (this.config.storageType === 'localStorage') {
                 const stored = localStorage.getItem(this.config.persistKey);
                 if (stored) {
-                    savedData = JSON.parse(stored);
+                    data = JSON.parse(stored);
                 }
+            } else if (this.config.storageType === 'indexedDB') {
+                data = await this._loadFromIndexedDB();
             }
             
-            if (savedData && savedData.data) {
-                this.data = savedData.data;
-                this.meta.lastModified = savedData.meta.lastModified;
-                this.meta.version = savedData.meta.version || 1;
-                this.meta.dirty = false;
-                
-                if (this.eventBus) {
-                    this.eventBus.emit(`${this.config.eventPrefix}:loaded`, {
-                        model: this
-                    });
-                }
-                
+            if (data) {
+                this.deserialize(data);
+                this.log('debug', `${this.constructor.name}`, 'Loaded from storage');
                 return true;
             }
             
-            return false;
-            
         } catch (error) {
-            this.logger.error(`${this.constructor.name}`, 
-                `Load error: ${error.message}`);
-            return false;
-        }
-    }
-
-    /**
-     * Persistence avec debounce
-     * @private
-     */
-    _debouncedPersist() {
-        if (this._persistTimer) {
-            clearTimeout(this._persistTimer);
+            this.log('error', `${this.constructor.name}`, 'Load failed:', error);
         }
         
+        return false;
+    }
+
+    _debouncePersist() {
+        clearTimeout(this._persistTimer);
         this._persistTimer = setTimeout(() => {
             this.persist();
         }, this.config.debounceMs);
     }
 
     // ========================================================================
-    // HISTORIQUE
+    // SERIALIZATION
     // ========================================================================
 
-    /**
-     * Ajoute à l'historique
-     * @private
-     */
+    serialize() {
+        return {
+            data: this.data,
+            meta: {
+                version: this.meta.version,
+                lastModified: this.meta.lastModified
+            }
+        };
+    }
+
+    deserialize(serialized) {
+        if (serialized.data) {
+            this.data = serialized.data;
+        }
+        if (serialized.meta) {
+            this.meta.version = serialized.meta.version || 1;
+            this.meta.lastModified = serialized.meta.lastModified;
+        }
+        this.meta.dirty = false;
+    }
+
+    // ========================================================================
+    // HISTORIQUE (UNDO/REDO)
+    // ========================================================================
+
     _addToHistory(key, oldValue) {
-        this.history.past.push({
-            key,
-            value: oldValue,
-            timestamp: Date.now()
-        });
+        this.history.past.push({ key, value: oldValue, timestamp: Date.now() });
         
-        // Limiter la taille
         if (this.history.past.length > this.history.maxSize) {
             this.history.past.shift();
         }
         
-        // Vider future
         this.history.future = [];
     }
 
-    /**
-     * Annuler la dernière modification
-     * @returns {boolean} Succès
-     */
     undo() {
-        if (this.history.past.length === 0) {
-            return false;
-        }
+        if (this.history.past.length === 0) return false;
         
-        const entry = this.history.past.pop();
-        const currentValue = this.get(entry.key);
+        const lastChange = this.history.past.pop();
+        const currentValue = this.get(lastChange.key);
         
         this.history.future.push({
-            key: entry.key,
+            key: lastChange.key,
             value: currentValue,
             timestamp: Date.now()
         });
         
-        this.set(entry.key, entry.value, true);
+        this.set(lastChange.key, lastChange.value, true);
         
         if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:undo`, {
-                model: this
+            this.eventBus.emit(`${this.config.eventPrefix}:undo`, { 
+                key: lastChange.key,
+                model: this 
             });
         }
         
         return true;
     }
 
-    /**
-     * Refaire la dernière modification annulée
-     * @returns {boolean} Succès
-     */
     redo() {
-        if (this.history.future.length === 0) {
-            return false;
-        }
+        if (this.history.future.length === 0) return false;
         
-        const entry = this.history.future.pop();
-        const currentValue = this.get(entry.key);
+        const nextChange = this.history.future.pop();
+        const currentValue = this.get(nextChange.key);
         
         this.history.past.push({
-            key: entry.key,
+            key: nextChange.key,
             value: currentValue,
             timestamp: Date.now()
         });
         
-        this.set(entry.key, entry.value, true);
+        this.set(nextChange.key, nextChange.value, true);
         
         if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:redo`, {
-                model: this
+            this.eventBus.emit(`${this.config.eventPrefix}:redo`, { 
+                key: nextChange.key,
+                model: this 
             });
         }
         
@@ -534,55 +414,53 @@ class BaseModel {
     }
 
     // ========================================================================
-    // MÉTHODES UTILITAIRES
+    // ÉVÉNEMENTS
     // ========================================================================
 
-    /**
-     * Vérifie si le modèle a été modifié
-     * @returns {boolean}
-     */
-    isDirty() {
-        return this.meta.dirty;
-    }
-
-    /**
-     * Réinitialise le flag dirty
-     */
-    markClean() {
-        this.meta.dirty = false;
-    }
-
-    /**
-     * Obtient toutes les données
-     * @returns {Object}
-     */
-    getData() {
-        return { ...this.data };
-    }
-
-    /**
-     * Convertit le modèle en JSON
-     * @returns {Object}
-     */
-    toJSON() {
-        return {
-            data: this.data,
-            meta: this.meta
-        };
-    }
-
-    /**
-     * Nettoie les ressources
-     */
-    destroy() {
-        if (this._persistTimer) {
-            clearTimeout(this._persistTimer);
+    on(event, callback) {
+        if (this.eventBus) {
+            this.eventBus.on(`${this.config.eventPrefix}:${event}`, callback);
         }
-        if (this._validationTimer) {
-            clearTimeout(this._validationTimer);
+    }
+
+    off(event, callback) {
+        if (this.eventBus) {
+            this.eventBus.off(`${this.config.eventPrefix}:${event}`, callback);
+        }
+    }
+
+    emit(event, data) {
+        if (this.eventBus) {
+            this.eventBus.emit(`${this.config.eventPrefix}:${event}`, data);
+        }
+    }
+
+    // ========================================================================
+    // UTILITAIRES
+    // ========================================================================
+
+    toJSON() {
+        return this.serialize();
+    }
+
+    toString() {
+        return JSON.stringify(this.data, null, 2);
+    }
+
+    clone() {
+        const ModelClass = this.constructor;
+        return new ModelClass(this.eventBus, this.logger, { ...this.data }, { ...this.config });
+    }
+
+    destroy() {
+        clearTimeout(this._persistTimer);
+        clearTimeout(this._validationTimer);
+        
+        if (this.meta.dirty && this.config.autoPersist) {
+            this.persist();
         }
         
-        this.logger.debug(`${this.constructor.name}`, 'Model destroyed');
+        this.log('debug', `${this.constructor.name}`, 'Model destroyed');
     }
 }
 
