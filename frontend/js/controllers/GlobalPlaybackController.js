@@ -120,7 +120,12 @@ class GlobalPlaybackController {
     }
     
     setupBackendSync() {
-        if (!this.backend || !this.backend.isConnected()) {
+        if (!this.backend || typeof this.backend.isConnected !== 'function') {
+            this.log('warn', 'GlobalPlayback', 'Backend not available');
+            return;
+        }
+        
+        if (!this.backend.isConnected()) {
             this.log('warn', 'GlobalPlayback', 'Backend not connected');
             return;
         }
@@ -133,7 +138,9 @@ class GlobalPlaybackController {
     }
     
     async syncWithBackend() {
-        if (!this.backend || !this.backend.isConnected()) return;
+        if (!this.backend || typeof this.backend.isConnected !== 'function' || !this.backend.isConnected()) {
+            return;
+        }
         
         try {
             const status = await this.backend.send('playback.getStatus', {});
@@ -146,7 +153,7 @@ class GlobalPlaybackController {
     }
     
     async load(filename) {
-        if (!this.backend || !this.backend.isConnected()) {
+        if (!this.backend || typeof this.backend.isConnected !== 'function' || !this.backend.isConnected()) {
             this.log('error', 'GlobalPlayback', 'Backend not connected');
             return false;
         }
