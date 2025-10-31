@@ -1,36 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseModel.js
-// Version: v3.1.0 - LOGGER ROBUSTE
-// Date: 2025-10-30
+// Chemin réel: frontend/js/core/BaseModel.js
+// Version: v3.2.0 - SIGNATURE COHÉRENTE
+// Date: 2025-10-31
 // ============================================================================
-// CORRECTIONS v3.1.0:
-// ✅ Accepte eventBus et logger comme paramètres
-// ✅ Fallback logger robuste avec toutes méthodes
-// ✅ Compatible avec anciens modèles (backward compatible)
+// CORRECTIONS v3.2.0:
+// ✅ CRITIQUE: Signature cohérente (eventBus, backend, logger, initialData, options)
+// ✅ Support backward compatible (initialData, options)
+// ✅ Fallbacks robustes pour tous les services
 // ============================================================================
 
 class BaseModel {
-    /**
-     * Constructeur du modèle de base
-     * @param {EventBus} eventBus - Bus d'événements
-     * @param {Logger} logger - Logger (optionnel)
-     * @param {Object} initialData - Données initiales (optionnel)
-     * @param {Object} options - Options de configuration
-     */
-    constructor(eventBus, logger, initialData = {}, options = {}) {
-        // Support ancien style (backward compatible)
-        // Si eventBus est un objet et pas une instance EventBus, c'est initialData
+    constructor(eventBus, backend, logger, initialData = {}, options = {}) {
+        // Support backward compatible
         if (eventBus && typeof eventBus === 'object' && !eventBus.emit) {
-            options = logger || {};
+            // Ancien style: BaseModel(initialData, options)
+            options = backend || {};
             initialData = eventBus;
             logger = null;
+            backend = null;
             eventBus = null;
         }
         
-        // EventBus
+        // Services avec fallbacks
         this.eventBus = eventBus || window.eventBus || null;
-        
-        // Logger avec fallback robuste
+        this.backend = backend || window.backendService || window.app?.services?.backend || null;
         this.logger = logger || this.createFallbackLogger();
         
         // Données du modèle
@@ -56,280 +50,251 @@ class BaseModel {
             ...options
         };
         
-        // Règles de validation (à définir dans les classes filles)
+        // Règles de validation
         this.validationRules = {};
         
-        // Historique des changements
+        // Historique
         this.history = {
             past: [],
             future: [],
             maxSize: options.historyMaxSize || 50
         };
         
-        // Timers pour debounce
+        // Timers
         this._persistTimer = null;
         this._validationTimer = null;
         
         this.log('debug', `${this.constructor.name}`, 'Model created');
     }
     
-    /**
-     * Crée un logger fallback robuste
-     */
     createFallbackLogger() {
-        // Si window.logger existe et a les bonnes méthodes
-        if (window.logger && typeof window.logger.info === 'function') {
+        if (window.logger && typeof window.logger.log === 'function') {
             return window.logger;
         }
         
-        // Fallback vers console avec interface complète
         return {
+            log: (level, ...args) => console.log(`[${level.toUpperCase()}]`, ...args),
             debug: (...args) => console.log('[DEBUG]', ...args),
-            info: (...args) => console.info('[INFO]', ...args),
+            info: (...args) => console.log('[INFO]', ...args),
             warn: (...args) => console.warn('[WARN]', ...args),
-            error: (...args) => console.error('[ERROR]', ...args),
-            log: (...args) => console.log(...args)
+            error: (...args) => console.error('[ERROR]', ...args)
         };
     }
     
-    /**
-     * Log sécurisé
-     */
-    log(level, ...args) {
-        if (this.logger && typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
-        } else {
-            console[level]?.(...args) || console.log(...args);
-        }
-    }
-
     // ========================================================================
-    // MÉTHODES D'ACCÈS AUX DONNÉES
+    // GESTION DES DONNÉES
     // ========================================================================
-
-    get(key, defaultValue = undefined) {
-        if (key.includes('.')) {
-            return this._getDeep(this.data, key.split('.'), defaultValue);
-        }
-        return this.data.hasOwnProperty(key) ? this.data[key] : defaultValue;
-    }
-
-    set(key, value, silent = false) {
-        const oldValue = this.get(key);
+    
+    get(path, defaultValue = null) {
+        if (!path) return this.data;
         
-        // Validation si activée
-        if (this.config.validateOnSet && this.validationRules[key]) {
-            if (!this.validateField(key, value)) {
-                this.log('warn', `${this.constructor.name}`, `Validation failed for ${key}`);
-                return false;
-            }
-        }
+        const keys = path.split('.');
+        let value = this.data;
         
-        // Sauvegarder dans historique
-        if (this.config.enableHistory !== false) {
-            this._addToHistory(key, oldValue);
-        }
-        
-        // Définir la valeur
-        if (key.includes('.')) {
-            this._setDeep(this.data, key.split('.'), value);
-        } else {
-            this.data[key] = value;
-        }
-        
-        // Mettre à jour métadonnées
-        this.meta.dirty = true;
-        this.meta.lastModified = Date.now();
-        
-        // Émettre événement
-        if (!silent && this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:changed`, {
-                key,
-                value,
-                oldValue,
-                model: this
-            });
-        }
-        
-        // Auto-persist si activé
-        if (this.config.autoPersist) {
-            this._debouncePersist();
-        }
-        
-        return true;
-    }
-
-    setMultiple(values, silent = false) {
-        Object.entries(values).forEach(([key, value]) => {
-            this.set(key, value, true);
-        });
-        
-        if (!silent && this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:changed`, {
-                keys: Object.keys(values),
-                model: this
-            });
-        }
-        
-        return true;
-    }
-
-    getAll() {
-        return { ...this.data };
-    }
-
-    reset() {
-        this.data = {};
-        this.meta.dirty = false;
-        this.history.past = [];
-        this.history.future = [];
-        
-        if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:reset`, { model: this });
-        }
-    }
-
-    // ========================================================================
-    // NAVIGATION PROFONDE
-    // ========================================================================
-
-    _getDeep(obj, path, defaultValue) {
-        let current = obj;
-        for (const key of path) {
-            if (current && typeof current === 'object' && key in current) {
-                current = current[key];
+        for (const key of keys) {
+            if (value && typeof value === 'object' && key in value) {
+                value = value[key];
             } else {
                 return defaultValue;
             }
         }
-        return current;
-    }
-
-    _setDeep(obj, path, value) {
-        const last = path.pop();
-        let current = obj;
         
-        for (const key of path) {
-            if (!(key in current)) {
-                current[key] = {};
-            }
-            current = current[key];
+        return value !== undefined ? value : defaultValue;
+    }
+    
+    set(path, value, options = {}) {
+        if (!path) {
+            this.log('warn', 'BaseModel.set', 'Path required');
+            return false;
         }
         
-        current[last] = value;
-    }
-
-    // ========================================================================
-    // VALIDATION
-    // ========================================================================
-
-    validateField(key, value) {
-        const rules = this.validationRules[key];
-        if (!rules) return true;
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        let target = this.data;
         
-        for (const [ruleName, ruleConfig] of Object.entries(rules)) {
-            const validator = this._getValidator(ruleName);
-            if (validator && !validator(value, ruleConfig)) {
-                this.meta.errors[key] = {
-                    rule: ruleName,
-                    message: ruleConfig.message || `Validation failed for ${key}`
-                };
+        for (const key of keys) {
+            if (!(key in target)) {
+                target[key] = {};
+            }
+            target = target[key];
+        }
+        
+        const oldValue = target[lastKey];
+        
+        if (this.config.validateOnSet && !options.skipValidation) {
+            const error = this.validateField(path, value);
+            if (error) {
+                this.log('warn', 'BaseModel.set', `Validation error for ${path}: ${error}`);
                 return false;
             }
         }
         
-        delete this.meta.errors[key];
-        return true;
-    }
-
-    validate() {
-        this.meta.errors = {};
-        let isValid = true;
+        target[lastKey] = value;
         
-        for (const key of Object.keys(this.validationRules)) {
-            if (!this.validateField(key, this.get(key))) {
-                isValid = false;
+        if (oldValue !== value) {
+            this.markDirty();
+            this.updateHistory('set', path, { oldValue, newValue: value });
+            this.emit('changed', { path, value, oldValue });
+            this.emit(`changed:${path}`, { value, oldValue });
+            
+            if (this.config.autoPersist) {
+                this.debouncePersist();
             }
         }
         
-        return isValid;
+        return true;
     }
-
-    _getValidator(ruleName) {
-        const validators = {
-            required: (value) => value !== null && value !== undefined && value !== '',
-            minLength: (value, { min }) => String(value).length >= min,
-            maxLength: (value, { max }) => String(value).length <= max,
-            min: (value, { min }) => Number(value) >= min,
-            max: (value, { max }) => Number(value) <= max,
-            pattern: (value, { regex }) => new RegExp(regex).test(String(value)),
-            email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))
-        };
+    
+    delete(path) {
+        if (!path) return false;
         
-        return validators[ruleName];
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        let target = this.data;
+        
+        for (const key of keys) {
+            if (!(key in target)) return false;
+            target = target[key];
+        }
+        
+        if (!(lastKey in target)) return false;
+        
+        const oldValue = target[lastKey];
+        delete target[lastKey];
+        
+        this.markDirty();
+        this.updateHistory('delete', path, { oldValue });
+        this.emit('changed', { path, deleted: true, oldValue });
+        this.emit(`deleted:${path}`, { oldValue });
+        
+        if (this.config.autoPersist) {
+            this.debouncePersist();
+        }
+        
+        return true;
     }
-
+    
+    reset(data = {}) {
+        const oldData = { ...this.data };
+        this.data = { ...data };
+        
+        this.markDirty();
+        this.emit('reset', { oldData, newData: this.data });
+        
+        if (this.config.autoPersist) {
+            this.debouncePersist();
+        }
+    }
+    
+    // ========================================================================
+    // VALIDATION
+    // ========================================================================
+    
+    validateField(field, value) {
+        const rule = this.validationRules[field];
+        if (!rule) return null;
+        
+        if (rule.required && (value === null || value === undefined || value === '')) {
+            return `${field} is required`;
+        }
+        
+        if (rule.type && typeof value !== rule.type) {
+            return `${field} must be of type ${rule.type}`;
+        }
+        
+        if (rule.min !== undefined && value < rule.min) {
+            return `${field} must be >= ${rule.min}`;
+        }
+        
+        if (rule.max !== undefined && value > rule.max) {
+            return `${field} must be <= ${rule.max}`;
+        }
+        
+        if (rule.pattern && !rule.pattern.test(value)) {
+            return `${field} format is invalid`;
+        }
+        
+        if (rule.custom && typeof rule.custom === 'function') {
+            const error = rule.custom(value);
+            if (error) return error;
+        }
+        
+        return null;
+    }
+    
+    validate() {
+        const errors = {};
+        
+        for (const field in this.validationRules) {
+            const value = this.get(field);
+            const error = this.validateField(field, value);
+            
+            if (error) {
+                errors[field] = error;
+            }
+        }
+        
+        this.meta.errors = errors;
+        
+        return Object.keys(errors).length === 0;
+    }
+    
     // ========================================================================
     // PERSISTENCE
     // ========================================================================
-
-    async persist() {
-        if (!this.meta.dirty) return;
+    
+    persist() {
+        if (!this.config.autoPersist) return;
         
         try {
+            const key = this.config.persistKey;
             const data = this.serialize();
             
             if (this.config.storageType === 'localStorage') {
-                localStorage.setItem(this.config.persistKey, JSON.stringify(data));
-            } else if (this.config.storageType === 'indexedDB') {
-                await this._persistToIndexedDB(data);
+                localStorage.setItem(key, JSON.stringify(data));
+            } else if (this.config.storageType === 'sessionStorage') {
+                sessionStorage.setItem(key, JSON.stringify(data));
             }
             
             this.meta.dirty = false;
-            this.log('debug', `${this.constructor.name}`, 'Persisted to storage');
+            this.log('debug', 'BaseModel.persist', `Persisted to ${key}`);
             
         } catch (error) {
-            this.log('error', `${this.constructor.name}`, 'Persist failed:', error);
+            this.log('error', 'BaseModel.persist', 'Failed to persist:', error);
         }
     }
-
-    async load() {
+    
+    load() {
         try {
-            let data;
+            const key = this.config.persistKey;
+            let data = null;
             
             if (this.config.storageType === 'localStorage') {
-                const stored = localStorage.getItem(this.config.persistKey);
-                if (stored) {
-                    data = JSON.parse(stored);
-                }
-            } else if (this.config.storageType === 'indexedDB') {
-                data = await this._loadFromIndexedDB();
+                data = localStorage.getItem(key);
+            } else if (this.config.storageType === 'sessionStorage') {
+                data = sessionStorage.getItem(key);
             }
             
             if (data) {
-                this.deserialize(data);
-                this.log('debug', `${this.constructor.name}`, 'Loaded from storage');
+                this.deserialize(JSON.parse(data));
+                this.log('debug', 'BaseModel.load', `Loaded from ${key}`);
                 return true;
             }
             
         } catch (error) {
-            this.log('error', `${this.constructor.name}`, 'Load failed:', error);
+            this.log('error', 'BaseModel.load', 'Failed to load:', error);
         }
         
         return false;
     }
-
-    _debouncePersist() {
+    
+    debouncePersist() {
         clearTimeout(this._persistTimer);
         this._persistTimer = setTimeout(() => {
             this.persist();
         }, this.config.debounceMs);
     }
-
-    // ========================================================================
-    // SERIALIZATION
-    // ========================================================================
-
+    
     serialize() {
         return {
             data: this.data,
@@ -339,24 +304,31 @@ class BaseModel {
             }
         };
     }
-
+    
     deserialize(serialized) {
         if (serialized.data) {
             this.data = serialized.data;
         }
+        
         if (serialized.meta) {
             this.meta.version = serialized.meta.version || 1;
             this.meta.lastModified = serialized.meta.lastModified;
         }
-        this.meta.dirty = false;
+        
+        this.meta.initialized = true;
     }
-
+    
     // ========================================================================
-    // HISTORIQUE (UNDO/REDO)
+    // HISTORIQUE
     // ========================================================================
-
-    _addToHistory(key, oldValue) {
-        this.history.past.push({ key, value: oldValue, timestamp: Date.now() });
+    
+    updateHistory(action, path, details) {
+        this.history.past.push({
+            action,
+            path,
+            details,
+            timestamp: Date.now()
+        });
         
         if (this.history.past.length > this.history.maxSize) {
             this.history.past.shift();
@@ -364,94 +336,91 @@ class BaseModel {
         
         this.history.future = [];
     }
-
+    
     undo() {
         if (this.history.past.length === 0) return false;
         
-        const lastChange = this.history.past.pop();
-        const currentValue = this.get(lastChange.key);
+        const entry = this.history.past.pop();
+        this.history.future.push(entry);
         
-        this.history.future.push({
-            key: lastChange.key,
-            value: currentValue,
-            timestamp: Date.now()
-        });
-        
-        this.set(lastChange.key, lastChange.value, true);
-        
-        if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:undo`, { 
-                key: lastChange.key,
-                model: this 
-            });
+        if (entry.action === 'set' && entry.details.oldValue !== undefined) {
+            this.set(entry.path, entry.details.oldValue, { skipHistory: true });
+        } else if (entry.action === 'delete' && entry.details.oldValue !== undefined) {
+            this.set(entry.path, entry.details.oldValue, { skipHistory: true });
         }
         
+        this.emit('undo', entry);
         return true;
     }
-
+    
     redo() {
         if (this.history.future.length === 0) return false;
         
-        const nextChange = this.history.future.pop();
-        const currentValue = this.get(nextChange.key);
+        const entry = this.history.future.pop();
+        this.history.past.push(entry);
         
-        this.history.past.push({
-            key: nextChange.key,
-            value: currentValue,
-            timestamp: Date.now()
-        });
-        
-        this.set(nextChange.key, nextChange.value, true);
-        
-        if (this.eventBus) {
-            this.eventBus.emit(`${this.config.eventPrefix}:redo`, { 
-                key: nextChange.key,
-                model: this 
-            });
+        if (entry.action === 'set') {
+            this.set(entry.path, entry.details.newValue, { skipHistory: true });
+        } else if (entry.action === 'delete') {
+            this.delete(entry.path);
         }
         
+        this.emit('redo', entry);
         return true;
     }
-
+    
     // ========================================================================
-    // ÉVÉNEMENTS
+    // UTILITAIRES
     // ========================================================================
-
+    
+    markDirty() {
+        this.meta.dirty = true;
+        this.meta.lastModified = Date.now();
+    }
+    
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        }
+    }
+    
     on(event, callback) {
         if (this.eventBus) {
             this.eventBus.on(`${this.config.eventPrefix}:${event}`, callback);
         }
     }
-
+    
+    once(event, callback) {
+        if (this.eventBus) {
+            this.eventBus.once(`${this.config.eventPrefix}:${event}`, callback);
+        }
+    }
+    
     off(event, callback) {
         if (this.eventBus) {
             this.eventBus.off(`${this.config.eventPrefix}:${event}`, callback);
         }
     }
-
+    
     emit(event, data) {
         if (this.eventBus) {
             this.eventBus.emit(`${this.config.eventPrefix}:${event}`, data);
         }
     }
-
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-
+    
     toJSON() {
         return this.serialize();
     }
-
+    
     toString() {
         return JSON.stringify(this.data, null, 2);
     }
-
+    
     clone() {
         const ModelClass = this.constructor;
-        return new ModelClass(this.eventBus, this.logger, { ...this.data }, { ...this.config });
+        return new ModelClass(this.eventBus, this.backend, this.logger, { ...this.data }, { ...this.config });
     }
-
+    
     destroy() {
         clearTimeout(this._persistTimer);
         clearTimeout(this._validationTimer);
