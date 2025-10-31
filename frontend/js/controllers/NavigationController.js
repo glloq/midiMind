@@ -1,41 +1,49 @@
-// ===== NAVIGATION CONTROLLER - ContrÃ´leur de navigation et gestion des pages =====
+// ===== NAVIGATION CONTROLLER - Contrôleur de navigation et gestion des pages =====
 // ================================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
-// Version: v3.7.1 - CORRECTION CHEMIN CONTROLLEUR
-// Date: 2025-10-24
+// Version: v3.7.2 - CORRECTION MAPPINGS VUES
+// Date: 2025-10-31
 // ================================================================================
-// CORRECTIONS v3.7.1:
-// âœ… Correction app.navigationController â†’ app.controllers.navigation
-// âœ… IDs de pages corrigÃ©s pour correspondre au HTML
-// âœ… Ajout gestion display:none/block pour affichage correct des pages
-// âœ… Correction getView() pour mapper correctement les vues
+// CORRECTIONS v3.7.2:
+// ✅ Ajout page "files" pour correspondre au HTML
+// ✅ Correction viewKeys: instrument (pas instruments)
+// ✅ Gestion vues sans buildTemplate
 // ================================================================================
 
 class NavigationController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Ã‰tat de navigation
+        // État de navigation
         this.currentPage = 'home';
         this.previousPage = null;
         this.navigationHistory = ['home'];
         this.historyIndex = 0;
         
-        // Configuration des pages - IDS CORRIGES
+        // Configuration des pages - IDS ET VIEWKEYS CORRIGES
         this.pages = {
             home: {
                 id: 'home',
-                title: 'ðŸ  Accueil',
-                icon: 'ðŸ ',
+                title: '🏠 Accueil',
+                icon: '🏠',
                 shortcut: 'h',
                 requiresData: true,
                 cacheable: false,
                 viewKey: 'home'
             },
+            files: {
+                id: 'files',
+                title: '📁 Fichiers',
+                icon: '📁',
+                shortcut: 'f',
+                requiresData: true,
+                cacheable: false,
+                viewKey: 'file'
+            },
             editor: {
                 id: 'editor',
-                title: 'âœï¸ Ã‰diteur',
-                icon: 'âœï¸',
+                title: '✏️ Éditeur',
+                icon: '✏️',
                 shortcut: 'e',
                 requiresData: true,
                 cacheable: false,
@@ -43,8 +51,8 @@ class NavigationController extends BaseController {
             },
             routing: {
                 id: 'routing',
-                title: 'ðŸ”€ Routage',
-                icon: 'ðŸ”€',
+                title: '🔀 Routage',
+                icon: '🔀',
                 shortcut: 'r',
                 requiresData: true,
                 cacheable: true,
@@ -52,8 +60,8 @@ class NavigationController extends BaseController {
             },
             keyboard: {
                 id: 'keyboard',
-                title: 'ðŸŽ¹ Clavier',
-                icon: 'ðŸŽ¹',
+                title: '🎹 Clavier',
+                icon: '🎹',
                 shortcut: 'k',
                 requiresData: true,
                 cacheable: false,
@@ -61,8 +69,8 @@ class NavigationController extends BaseController {
             },
             instruments: {
                 id: 'instruments',
-                title: 'ðŸŽ¸ Instruments',
-                icon: 'ðŸŽ¸',
+                title: '🎸 Instruments',
+                icon: '🎸',
                 shortcut: 'i',
                 requiresData: true,
                 cacheable: true,
@@ -70,8 +78,8 @@ class NavigationController extends BaseController {
             },
             system: {
                 id: 'system',
-                title: 'âš™ï¸ SystÃ¨me',
-                icon: 'âš™ï¸',
+                title: '⚙️ Système',
+                icon: '⚙️',
                 shortcut: 's',
                 requiresData: true,
                 cacheable: true,
@@ -79,7 +87,7 @@ class NavigationController extends BaseController {
             }
         };
         
-        // Ã‰tat des transitions
+        // État des transitions
         this.transitionState = {
             inProgress: false,
             duration: 300,
@@ -119,8 +127,8 @@ class NavigationController extends BaseController {
             this.goForward();
         });
         
-        this.eventBus.on('file:added', () => {
-            this.invalidatePageCache(['home', 'editor']);
+        this.eventBus.on('file:updated', () => {
+            this.invalidatePageCache(['home', 'files', 'editor']);
         });
         
         this.eventBus.on('instrument:updated', () => {
@@ -137,7 +145,7 @@ class NavigationController extends BaseController {
         this.setupBrowserHistory();
         this.setupNavigationLinks();
         this.showPage('home', { skipHistory: true });
-        this.logDebug('navigation', 'SystÃ¨me de navigation initialisÃ©');
+        this.logDebug('navigation', 'Système de navigation initialisé');
     }
 
     setupNavigationLinks() {
@@ -165,14 +173,6 @@ class NavigationController extends BaseController {
                         this.showPage(pageKey);
                     }
                 });
-                
-                if (event.key === 'ArrowLeft') {
-                    event.preventDefault();
-                    this.goBack();
-                } else if (event.key === 'ArrowRight') {
-                    event.preventDefault();
-                    this.goForward();
-                }
             }
         });
     }
@@ -180,34 +180,35 @@ class NavigationController extends BaseController {
     setupBrowserHistory() {
         window.addEventListener('popstate', (event) => {
             if (event.state && event.state.page) {
-                this.showPage(event.state.page, { skipHistory: true, skipPushState: true });
+                this.showPage(event.state.page, { 
+                    skipHistory: true, 
+                    skipPushState: true 
+                });
             }
         });
-        
-        history.replaceState({ page: this.currentPage }, '', `#${this.currentPage}`);
     }
 
     async showPage(pageKey, options = {}) {
         const {
+            forceRefresh = false,
             skipHistory = false,
             skipPushState = false,
-            forceRefresh = false,
-            animationDirection = null
+            animationDirection = 'forward'
         } = options;
         
         if (!this.pages[pageKey]) {
-            this.logDebug('navigation', `Page invalide: ${pageKey}`);
+            this.logDebug('navigation', `Page introuvable: ${pageKey}`);
             this.showNotification('Page introuvable', 'error');
             return false;
         }
         
         if (pageKey === this.currentPage && !forceRefresh) {
-            this.logDebug('navigation', `Page dÃ©jÃ  active: ${pageKey}`);
+            this.logDebug('navigation', `Page déjà active: ${pageKey}`);
             return true;
         }
         
         if (this.transitionState.inProgress) {
-            this.logDebug('navigation', 'Transition dÃ©jÃ  en cours, ignorÃ©e');
+            this.logDebug('navigation', 'Transition déjà en cours, ignorée');
             return false;
         }
         
@@ -243,21 +244,19 @@ class NavigationController extends BaseController {
                     page: pageKey
                 });
                 
-                this.logDebug('navigation', `Navigation rÃ©ussie: ${this.previousPage} â†’ ${pageKey}`);
+                this.logDebug('navigation', `Navigation réussie: ${this.previousPage} → ${pageKey}`);
                 return true;
             }
             
         } catch (error) {
             this.logDebug('navigation', `Erreur navigation: ${error.message}`);
             console.error('Navigation error:', error);
-            this.showNotification('Erreur de navigation', 'error');
+            this.showNotification('Erreur lors du chargement de la page', 'error');
             return false;
             
         } finally {
             this.transitionState.inProgress = false;
         }
-        
-        return false;
     }
 
     async performPageTransition(pageKey, animationDirection) {
@@ -266,7 +265,6 @@ class NavigationController extends BaseController {
         const targetPageElement = document.getElementById(pageConfig.id);
         
         if (!currentPageElement || !targetPageElement) {
-            this.logDebug('navigation', `Ã‰lÃ©ments de page manquants: ${pageKey}`);
             console.error('Missing page elements:', { 
                 currentId: this.pages[this.currentPage].id,
                 targetId: pageConfig.id,
@@ -328,7 +326,6 @@ class NavigationController extends BaseController {
             pageElement.style.display = 'block';
             pageElement.style.opacity = '0';
             pageElement.style.transform = 'translateX(20%)';
-            pageElement.classList.add('active');
             
             const animation = pageElement.animate([
                 { opacity: 0, transform: 'translateX(20%)' },
@@ -340,6 +337,7 @@ class NavigationController extends BaseController {
             });
             
             animation.onfinish = () => {
+                pageElement.classList.add('active');
                 pageElement.style.opacity = '';
                 pageElement.style.transform = '';
                 resolve();
@@ -352,14 +350,15 @@ class NavigationController extends BaseController {
         
         if (pageConfig.cacheable && this.pageCache.has(pageKey)) {
             const cachedContent = this.pageCache.get(pageKey);
-            this.logDebug('navigation', `Contenu rÃ©cupÃ©rÃ© du cache: ${pageKey}`);
+            this.logDebug('navigation', `Contenu en cache pour: ${pageKey}`);
             return cachedContent;
         }
         
         const content = await this.generatePageContent(pageKey);
         
-        if (pageConfig.cacheable) {
-            this.cachePageContent(pageKey, content);
+        if (pageConfig.cacheable && content) {
+            this.pageCache.set(pageKey, content);
+            this.scheduleCacheExpiry(pageKey);
         }
         
         return content;
@@ -435,6 +434,14 @@ class NavigationController extends BaseController {
                     systemStats: this.getSystemStats()
                 };
                 
+            case 'files':
+                return {
+                    ...commonData,
+                    files: fileModel?.getAll() || [],
+                    currentPath: fileModel?.getCurrentPath() || '/midi',
+                    selectedFile: fileModel?.getSelected()
+                };
+                
             case 'editor':
                 return {
                     ...commonData,
@@ -486,36 +493,95 @@ class NavigationController extends BaseController {
     }
 
     getErrorPageContent(pageKey, error = null) {
-        const pageConfig = this.pages[pageKey];
+        const errorMessage = error ? error.message : 'Page introuvable ou inaccessible';
         return `
-            <div class="error-page" style="text-align: center; padding: 60px 20px; color: #6c757d;">
-                <div style="font-size: 4rem; margin-bottom: 20px;">âš ï¸</div>
-                <h2 style="margin-bottom: 16px; color: #dc3545;">Erreur de chargement</h2>
-                <p style="margin-bottom: 20px;">
-                    La page "${pageConfig?.title || pageKey}" n'a pas pu Ãªtre chargÃ©e.
-                </p>
-                ${error ? `
-                    <details style="margin: 20px 0; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
-                        <summary style="cursor: pointer; color: #007bff;">DÃ©tails de l'erreur</summary>
-                        <pre style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-top: 10px; text-align: left; overflow-x: auto;">
-${error.message}
-${error.stack ? '\n' + error.stack : ''}
-                        </pre>
-                    </details>
-                ` : ''}
-                <button class="btn btn-primary" onclick="app.controllers.navigation.refreshCurrentPage()">
-                    ðŸ”„ RÃ©essayer
-                </button>
-                <button class="btn btn-secondary" onclick="app.controllers.navigation.showPage('home')" style="margin-left: 10px;">
-                    ðŸ  Retour Ã  l'accueil
-                </button>
+            <div class="error-page">
+                <div class="error-icon">⚠️</div>
+                <h2>Erreur de chargement</h2>
+                <p>La page "${pageKey}" n'a pas pu être chargée.</p>
+                ${error ? `<p class="error-detail">${errorMessage}</p>` : ''}
+                <button class="btn-primary" onclick="window.location.reload()">Recharger l'application</button>
             </div>
         `;
     }
 
-    cachePageContent(pageKey, content) {
-        this.pageCache.set(pageKey, content);
-        
+    getSystemStats() {
+        return {
+            uptime: Date.now() - (window.app?.startTime || Date.now()),
+            pageViews: this.navigationHistory.length,
+            cacheSize: this.pageCache.size
+        };
+    }
+
+    getSystemHealth() {
+        const backend = window.backendService || window.app?.services?.backend;
+        return {
+            backendConnected: backend?.isConnected() || false,
+            performanceGood: true,
+            memoryUsage: performance.memory ? 
+                (performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit * 100).toFixed(1) : 
+                'N/A'
+        };
+    }
+
+    updateNavigationUI() {
+        document.querySelectorAll('.nav-item').forEach(link => {
+            const linkPage = link.getAttribute('data-page');
+            if (linkPage === this.currentPage) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
+    }
+
+    addToHistory(pageKey) {
+        if (this.historyIndex < this.navigationHistory.length - 1) {
+            this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
+        }
+        this.navigationHistory.push(pageKey);
+        this.historyIndex = this.navigationHistory.length - 1;
+    }
+
+    goBack() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            const targetPage = this.navigationHistory[this.historyIndex];
+            this.showPage(targetPage, { 
+                skipHistory: true, 
+                animationDirection: 'backward' 
+            });
+        }
+    }
+
+    goForward() {
+        if (this.historyIndex < this.navigationHistory.length - 1) {
+            this.historyIndex++;
+            const targetPage = this.navigationHistory[this.historyIndex];
+            this.showPage(targetPage, { 
+                skipHistory: true, 
+                animationDirection: 'forward' 
+            });
+        }
+    }
+
+    invalidatePageCache(pageKeys = null) {
+        if (pageKeys) {
+            pageKeys.forEach(key => {
+                this.pageCache.delete(key);
+                if (this.cacheTimeouts.has(key)) {
+                    clearTimeout(this.cacheTimeouts.get(key));
+                    this.cacheTimeouts.delete(key);
+                }
+            });
+        } else {
+            this.pageCache.clear();
+            this.cacheTimeouts.forEach(timeout => clearTimeout(timeout));
+            this.cacheTimeouts.clear();
+        }
+    }
+
+    scheduleCacheExpiry(pageKey) {
         if (this.cacheTimeouts.has(pageKey)) {
             clearTimeout(this.cacheTimeouts.get(pageKey));
         }
@@ -523,166 +589,43 @@ ${error.stack ? '\n' + error.stack : ''}
         const timeout = setTimeout(() => {
             this.pageCache.delete(pageKey);
             this.cacheTimeouts.delete(pageKey);
-            this.logDebug('navigation', `Cache expirÃ©: ${pageKey}`);
+            this.logDebug('navigation', `Cache expiré pour: ${pageKey}`);
         }, this.defaultCacheDuration);
         
         this.cacheTimeouts.set(pageKey, timeout);
-        this.logDebug('navigation', `Contenu mis en cache: ${pageKey}`);
-    }
-
-    invalidatePageCache(pageKeys = []) {
-        pageKeys.forEach(pageKey => {
-            if (this.pageCache.has(pageKey)) {
-                this.pageCache.delete(pageKey);
-                
-                if (this.cacheTimeouts.has(pageKey)) {
-                    clearTimeout(this.cacheTimeouts.get(pageKey));
-                    this.cacheTimeouts.delete(pageKey);
-                }
-                
-                this.logDebug('navigation', `Cache invalidÃ©: ${pageKey}`);
-            }
-        });
-    }
-
-    clearAllCache() {
-        this.pageCache.clear();
-        this.cacheTimeouts.forEach(timeout => clearTimeout(timeout));
-        this.cacheTimeouts.clear();
-        this.logDebug('navigation', 'Tout le cache a Ã©tÃ© vidÃ©');
-    }
-
-    addToHistory(pageKey) {
-        this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
-        this.navigationHistory.push(pageKey);
-        this.historyIndex = this.navigationHistory.length - 1;
-        
-        const maxHistorySize = 50;
-        if (this.navigationHistory.length > maxHistorySize) {
-            this.navigationHistory = this.navigationHistory.slice(-maxHistorySize);
-            this.historyIndex = this.navigationHistory.length - 1;
-        }
-    }
-
-    goBack() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            const pageKey = this.navigationHistory[this.historyIndex];
-            this.showPage(pageKey, { skipHistory: true, animationDirection: 'back' });
-            this.logDebug('navigation', `Navigation arriÃ¨re vers: ${pageKey}`);
-        } else {
-            this.showNotification('Aucune page prÃ©cÃ©dente', 'info');
-        }
-    }
-
-    goForward() {
-        if (this.historyIndex < this.navigationHistory.length - 1) {
-            this.historyIndex++;
-            const pageKey = this.navigationHistory[this.historyIndex];
-            this.showPage(pageKey, { skipHistory: true, animationDirection: 'forward' });
-            this.logDebug('navigation', `Navigation avant vers: ${pageKey}`);
-        } else {
-            this.showNotification('Aucune page suivante', 'info');
-        }
-    }
-
-    refreshCurrentPage() {
-        this.invalidatePageCache([this.currentPage]);
-        this.showPage(this.currentPage, { forceRefresh: true });
-        this.logDebug('navigation', `Page rafraÃ®chie: ${this.currentPage}`);
-    }
-
-    refreshPageView(pageKey) {
-        this.invalidatePageCache([pageKey]);
-        
-        if (pageKey === this.currentPage) {
-            this.refreshCurrentPage();
-        }
-    }
-
-    getCurrentPage() {
-        return this.currentPage;
-    }
-
-    isPageCacheable(pageKey) {
-        return this.pages[pageKey]?.cacheable || false;
-    }
-
-    updateNavigationUI() {
-        document.querySelectorAll('.nav-item').forEach(link => {
-            link.classList.remove('active');
-        });
-        
-        const activeLink = document.querySelector(`.nav-item[data-page="${this.currentPage}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
-        
-        const pageConfig = this.pages[this.currentPage];
-        if (pageConfig) {
-            document.title = `${pageConfig.title} - MIDI Mind`;
-        }
     }
 
     handleModelChange(data) {
-        const cacheInvalidationMap = {
-            'FileModel': ['home', 'editor'],
-            'InstrumentModel': ['home', 'instruments', 'keyboard'],
-            'PlaylistModel': ['home', 'editor'],
-            'EditorModel': ['editor'],
-            'RoutingModel': ['routing'],
-            'SystemModel': ['system'],
-            'StateModel': [this.currentPage]
+        const { modelName } = data;
+        
+        const affectedPages = {
+            'file': ['home', 'files', 'editor'],
+            'instrument': ['home', 'instruments', 'keyboard'],
+            'playlist': ['home', 'editor'],
+            'routing': ['routing'],
+            'system': ['system']
         };
         
-        const pagesToInvalidate = cacheInvalidationMap[data.model] || [];
-        if (pagesToInvalidate.length > 0) {
-            this.invalidatePageCache(pagesToInvalidate);
+        if (affectedPages[modelName]) {
+            this.invalidatePageCache(affectedPages[modelName]);
             
-            if (pagesToInvalidate.includes(this.currentPage)) {
-                clearTimeout(this.refreshTimeout);
-                this.refreshTimeout = setTimeout(() => {
-                    this.refreshCurrentPage();
-                }, 100);
+            if (affectedPages[modelName].includes(this.currentPage)) {
+                this.showPage(this.currentPage, { forceRefresh: true });
             }
         }
     }
 
-    getSystemStats() {
-        return {
-            uptime: Math.floor((performance.now() - (window.app?.startTime || 0)) / 1000),
-            memoryUsage: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
-            pagesLoaded: this.navigationHistory.length,
-            cacheSize: this.pageCache.size
-        };
-    }
-
-    getSystemHealth() {
-        const fileModel = this.getModel('file');
-        const instrumentModel = this.getModel('instrument');
-        
-        const hasFiles = (fileModel?.get('files') || []).length > 0;
-        const hasInstruments = (instrumentModel?.get('instruments') || []).length > 0;
-        
-        if (hasFiles && hasInstruments) return 'good';
-        if (hasFiles || hasInstruments) return 'warning';
-        return 'error';
-    }
-
-    destroy() {
-        this.clearAllCache();
-        
-        if (this.refreshTimeout) {
-            clearTimeout(this.refreshTimeout);
+    logDebug(category, message, data = null) {
+        if (this.debugConsole && typeof this.debugConsole.log === 'function') {
+            this.debugConsole.log(category, message, data);
         }
-        
-        document.removeEventListener('keydown', this.keyboardHandler);
-        window.removeEventListener('popstate', this.popstateHandler);
     }
-}
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = NavigationController;
+    showNotification(message, type = 'info') {
+        if (this.notifications && typeof this.notifications.show === 'function') {
+            this.notifications.show(message, type);
+        }
+    }
 }
 
 if (typeof window !== 'undefined') {
