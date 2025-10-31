@@ -1,65 +1,50 @@
 // ============================================================================
 // Fichier: frontend/js/utils/DebugConsole.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
-// ============================================================================
-// Description:
-//   Console de debug visuelle intégrée à l'application.
-//   Affichage logs colorés, filtres, historique, export.
-//
-// Fonctionnalités:
-//   - Affichage logs en temps réel
-//   - Niveaux : Debug, Info, Warning, Error
-//   - Filtres par niveau et catégorie
-//   - Recherche dans logs
-//   - Copie vers presse-papiers
-//   - Export logs (TXT, JSON)
-//   - Clear logs
-//   - Historique persistant
-//
-// Architecture:
-//   DebugConsole (classe singleton)
-//   - Buffer circulaire pour logs (max 1000)
-//   - UI overlay toggle (F12)
-//   - Capture console.log natif
-//
-// Auteur: MidiMind Team
+// Chemin réel: frontend/js/utils/DebugConsole.js
+// Version: v3.2.0 - SAFE EVENTBUS USAGE
+// Date: 2025-10-31
 // ============================================================================
 
 class DebugConsole {
-    constructor(eventBus) {
-        this.eventBus = eventBus;
-        this.panel = document.getElementById('debugPanel');
-        this.content = document.getElementById('debugContent');
-        this.isVisible = false;
+    constructor(containerId, eventBus = null) {
+        this.containerId = containerId;
+        this.eventBus = eventBus || window.eventBus || null;
+        this.container = null;
+        this.contentEl = null;
         this.logs = [];
-        this.maxLogs = 1000;
+        this.maxLogs = 500;
+        this.isVisible = false;
         
-        // Filtres actifs
         this.filters = {
-            system: true,
-            midi: true,
-            files: true,
-            keyboard: true,
-            network: true,
             error: true,
-            warning: true,
+            warn: true,
             info: true,
-            success: true,
+            debug: true,
+            midi: true,
+            device: true,
+            routing: true,
+            playback: true,
+            file: true,
+            system: true,
             backend: true,
             sync: true,
             instruments: true,
             notification: true
         };
         
-        this.setupListeners();
+        // ✅ SAFE: Setup listeners only if eventBus is available
+        if (this.eventBus && typeof this.eventBus.on === 'function') {
+            this.setupListeners();
+        } else {
+            console.warn('[DebugConsole] EventBus not available, listeners not setup');
+        }
     }
 
-    /**
-     * Configuration des listeners
-     */
     setupListeners() {
+        if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+            return;
+        }
+        
         this.eventBus.on('debug:log', (data) => {
             this.log(data.category, data.message, data.data);
         });
@@ -69,16 +54,48 @@ class DebugConsole {
         });
     }
 
-    /**
-     * Logger un message
-     */
+    init() {
+        this.container = document.getElementById(this.containerId);
+        if (!this.container) {
+            console.warn(`[DebugConsole] Container ${this.containerId} not found`);
+            return;
+        }
+        
+        this.contentEl = this.container.querySelector('.debug-content');
+        if (!this.contentEl) {
+            console.warn('[DebugConsole] Content element not found');
+            return;
+        }
+        
+        this.setupUI();
+    }
+
+    setupUI() {
+        const closeBtn = document.getElementById('btnCloseDebug');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.hide());
+        }
+        
+        const clearBtn = document.getElementById('btnClearLogs');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clear());
+        }
+        
+        const levelSelect = document.getElementById('logLevelSelect');
+        if (levelSelect) {
+            levelSelect.addEventListener('change', (e) => {
+                this.setFilter(e.target.value);
+            });
+        }
+    }
+
     log(category, message, data = null) {
         const logEntry = {
+            timestamp: Date.now(),
             category,
             message,
             data,
-            timestamp: new Date().toISOString(),
-            id: Date.now() + Math.random()
+            level: this.getLogLevel(category)
         };
         
         this.logs.push(logEntry);
@@ -87,143 +104,116 @@ class DebugConsole {
             this.logs.shift();
         }
         
-        if (this.filters[category]) {
+        if (this.isVisible && this.contentEl) {
             this.appendLog(logEntry);
         }
-        
-        // Log dans la console navigateur aussi
-        const emoji = this.getCategoryEmoji(category);
-        console.log(`${emoji} [${category}]`, message, data || '');
     }
 
-    /**
-     * Ajouter un log au DOM
-     */
+    getLogLevel(category) {
+        if (category === 'error') return 'error';
+        if (category === 'warn') return 'warn';
+        if (category === 'info') return 'info';
+        return 'debug';
+    }
+
     appendLog(entry) {
-        if (!this.content) return;
+        if (!this.contentEl) return;
         
-        const logElement = document.createElement('div');
-        logElement.className = `debug-log debug-log-${entry.category}`;
+        const div = document.createElement('div');
+        div.className = `debug-log debug-log-${entry.level}`;
         
-        const time = new Date(entry.timestamp).toLocaleTimeString('fr-FR');
-        const emoji = this.getCategoryEmoji(entry.category);
-        
-        logElement.innerHTML = `
-            <span class="debug-time">${time}</span>
-            <span class="debug-category">${emoji} ${entry.category}</span>
+        const time = new Date(entry.timestamp).toLocaleTimeString();
+        div.innerHTML = `
+            <span class="debug-time">[${time}]</span>
+            <span class="debug-category">[${entry.category}]</span>
             <span class="debug-message">${this.escapeHtml(entry.message)}</span>
         `;
         
-        this.content.appendChild(logElement);
-        this.content.scrollTop = this.content.scrollHeight;
+        if (entry.data) {
+            const dataDiv = document.createElement('pre');
+            dataDiv.className = 'debug-data';
+            dataDiv.textContent = JSON.stringify(entry.data, null, 2);
+            div.appendChild(dataDiv);
+        }
+        
+        this.contentEl.appendChild(div);
+        this.contentEl.scrollTop = this.contentEl.scrollHeight;
     }
 
-    /**
-     * Obtenir l'emoji selon la catégorie
-     */
-    getCategoryEmoji(category) {
-        const emojis = {
-            system: '🔧',
-            midi: '🎵',
-            files: '📁',
-            keyboard: '🎹',
-            network: '🌐',
-            error: '❌',
-            warning: '⚠️',
-            info: 'ℹ️',
-            success: '✅',
-            backend: '🔌',
-            sync: '🔄',
-            instruments: '🎼',
-            notification: '📢'
-        };
-        return emojis[category] || '📝';
-    }
-
-    /**
-     * Échapper le HTML
-     */
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 
-    /**
-     * Toggle visibilité du panel
-     */
-    toggle() {
-        this.isVisible = !this.isVisible;
-        if (this.isVisible) {
-            this.show();
-        } else {
-            this.hide();
-        }
-    }
-
-    /**
-     * Afficher le panel
-     */
     show() {
-        this.isVisible = true;
-        if (this.panel) {
-            this.panel.classList.add('visible');
+        if (this.container) {
+            this.container.style.display = 'block';
+            this.isVisible = true;
+            this.render();
         }
-        this.refresh();
     }
 
-    /**
-     * Masquer le panel
-     */
     hide() {
-        this.isVisible = false;
-        if (this.panel) {
-            this.panel.classList.remove('visible');
+        if (this.container) {
+            this.container.style.display = 'none';
+            this.isVisible = false;
         }
     }
 
-    /**
-     * Rafraîchir l'affichage
-     */
-    refresh() {
-        if (!this.content) return;
-        
-        this.content.innerHTML = '';
-        this.logs.forEach(entry => {
-            if (this.filters[entry.category]) {
-                this.appendLog(entry);
-            }
-        });
+    toggle() {
+        if (this.isVisible) {
+            this.hide();
+        } else {
+            this.show();
+        }
     }
 
-    /**
-     * Vider les logs
-     */
     clear() {
         this.logs = [];
-        if (this.content) {
-            this.content.innerHTML = '';
+        if (this.contentEl) {
+            this.contentEl.innerHTML = '';
         }
-        this.log('system', 'Console vidée');
     }
 
-    /**
-     * Exporter les logs
-     */
-    export() {
-        const dataStr = JSON.stringify(this.logs, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
+    render() {
+        if (!this.contentEl) return;
         
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `debug-logs-${Date.now()}.json`;
-        link.click();
+        this.contentEl.innerHTML = '';
         
-        URL.revokeObjectURL(url);
+        const filteredLogs = this.logs.filter(log => {
+            return this.filters[log.level] !== false;
+        });
         
-        this.log('system', 'Logs exportés');
+        filteredLogs.forEach(log => this.appendLog(log));
+    }
+
+    setFilter(level) {
+        if (level === 'all') {
+            for (const key in this.filters) {
+                this.filters[key] = true;
+            }
+        } else {
+            for (const key in this.filters) {
+                this.filters[key] = false;
+            }
+            this.filters[level] = true;
+        }
+        
+        this.render();
+    }
+
+    destroy() {
+        this.clear();
+        this.container = null;
+        this.contentEl = null;
     }
 }
 
-window.DebugConsole = DebugConsole;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DebugConsole;
+}
+
+if (typeof window !== 'undefined') {
+    window.DebugConsole = DebugConsole;
+}
