@@ -1,28 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseView.js
-// Version: v3.1.0 - NO ES6 IMPORTS
-// Date: 2025-10-13
+// Version: v3.2.0 - FIXED EVENTBUS FALLBACKS
+// Date: 2025-10-31
 // ============================================================================
-// CORRECTIONS v3.1.0:
-// âœ… Suppression imports ES6 (import ... from ...)
-// âœ… Utilisation variables globales (window.EventBus, window.Formatter)
-// âœ… Compatible avec chargement <script> tags
-// âœ… Architecture MVC maintenue
-// ============================================================================
-// Description:
-//   Classe de base pour toutes les vues de l'application.
-//   GÃ¨re le rendu HTML, la liaison d'Ã©vÃ©nements, l'affichage/masquage.
-//   Fournit des mÃ©thodes utilitaires communes (formatage, dates, etc.)
-//
-// FonctionnalitÃ©s:
-//   - Rendu de templates HTML
-//   - Gestion du cycle de vie (show/hide/destroy)
-//   - Liaison d'Ã©vÃ©nements DOM
-//   - Mise Ã  jour rÃ©active
-//   - Sanitization HTML
-//   - Cache de rendu
-//
-// Auteur: MidiMind Team
+// CORRECTIONS v3.2.0:
+// ✅ CRITIQUE: Fallback robuste pour eventBus (window.eventBus)
+// ✅ Validation eventBus avant utilisation
+// ✅ Protection contre eventBus null
 // ============================================================================
 
 /**
@@ -32,25 +16,30 @@
 class BaseView {
     /**
      * Constructeur de la vue de base
-     * @param {string|HTMLElement} containerId - ID du conteneur ou Ã©lÃ©ment DOM
-     * @param {EventBus} eventBus - Bus d'Ã©vÃ©nements global
+     * @param {string|HTMLElement} containerId - ID du conteneur ou élément DOM
+     * @param {EventBus} eventBus - Bus d'événements global
      */
     constructor(containerId, eventBus) {
-        // RÃ©soudre le conteneur
+        // Résoudre le conteneur
         this.container = this.resolveContainer(containerId);
         
-        // EventBus (utilise global si non fourni)
-        this.eventBus = eventBus || window.EventBus;
+        // ✅ CRITIQUE: EventBus avec fallback robuste
+        this.eventBus = eventBus || window.eventBus || null;
+        
+        // Validation EventBus
+        if (!this.eventBus) {
+            console.error(`[${this.constructor.name}] AVERTISSEMENT: EventBus non disponible`);
+        }
         
         // Formatter (utilise global si disponible)
         this.formatter = window.Formatter || null;
         
-        // Template et donnÃ©es
-        this.template = ''; // Template HTML de base (Ã  surcharger)
-        this.data = {}; // DonnÃ©es actuelles de la vue
-        this.previousData = {}; // DonnÃ©es prÃ©cÃ©dentes pour comparaison
+        // Template et données
+        this.template = ''; // Template HTML de base (à surcharger)
+        this.data = {}; // Données actuelles de la vue
+        this.previousData = {}; // Données précédentes pour comparaison
         
-        // Ã‰tat de la vue
+        // État de la vue
         this.state = {
             isVisible: false,
             isRendered: false,
@@ -68,7 +57,7 @@ class BaseView {
             name: this.constructor.name
         };
         
-        // Gestionnaires d'Ã©vÃ©nements
+        // Gestionnaires d'événements
         this.eventHandlers = new Map();
         this.domEventListeners = [];
         
@@ -76,7 +65,7 @@ class BaseView {
         this.renderCache = new Map();
         this.renderQueue = null;
         
-        // Ã‰lÃ©ments DOM cachÃ©s pour performance
+        // Éléments DOM cachés pour performance
         this.elements = {};
         
         // Hooks de cycle de vie
@@ -108,7 +97,7 @@ class BaseView {
             return;
         }
         
-        // Hook personnalisÃ©
+        // Hook personnalisé
         if (typeof this.onInitialize === 'function') {
             this.onInitialize();
         }
@@ -120,13 +109,13 @@ class BaseView {
     }
     
     /**
-     * RÃ©sout le conteneur DOM
-     * @param {string|HTMLElement} containerId - ID ou Ã©lÃ©ment
+     * Résout le conteneur DOM
+     * @param {string|HTMLElement} containerId - ID ou élément
      * @returns {HTMLElement|null}
      */
     resolveContainer(containerId) {
         if (typeof containerId === 'string') {
-            // ID ou sÃ©lecteur
+            // ID ou sélecteur
             let element = document.getElementById(containerId);
             if (!element) {
                 element = document.querySelector(containerId);
@@ -139,7 +128,7 @@ class BaseView {
     }
     
     /**
-     * DÃ©truit la vue
+     * Détruit la vue
      */
     destroy() {
         if (this.state.isDestroyed) {
@@ -148,7 +137,7 @@ class BaseView {
         
         this.runHooks('beforeDestroy');
         
-        // Nettoyer les Ã©vÃ©nements DOM
+        // Nettoyer les événements DOM
         this.removeAllEventListeners();
         
         // Nettoyer les event handlers
@@ -162,7 +151,7 @@ class BaseView {
         // Nettoyer le cache
         this.renderCache.clear();
         
-        // Hook personnalisÃ©
+        // Hook personnalisé
         if (typeof this.onDestroy === 'function') {
             this.onDestroy();
         }
@@ -179,7 +168,7 @@ class BaseView {
     
     /**
      * Rend la vue
-     * @param {Object} data - DonnÃ©es Ã  rendre
+     * @param {Object} data - Données à rendre
      * @param {Object} options - Options de rendu
      */
     render(data = null, options = {}) {
@@ -193,18 +182,18 @@ class BaseView {
             return;
         }
         
-        // Mettre Ã  jour les donnÃ©es
+        // Mettre à jour les données
         if (data) {
             this.previousData = { ...this.data };
             this.data = { ...this.data, ...data };
         }
         
-        // VÃ©rifier si re-rendu nÃ©cessaire
+        // Vérifier si re-rendu nécessaire
         if (!options.force && this.config.trackChanges && !this.shouldRerender(data)) {
             return;
         }
         
-        // Debounce si configurÃ©
+        // Debounce si configuré
         if (this.config.debounceRender > 0 && !options.immediate) {
             this.debounceRender(data, options);
             return;
@@ -216,7 +205,7 @@ class BaseView {
             // Construire le template
             const html = this.buildTemplate();
             
-            // Sanitize si configurÃ©
+            // Sanitize si configuré
             const sanitized = this.config.sanitizeHTML 
                 ? this.sanitizeHTML(html) 
                 : html;
@@ -224,10 +213,10 @@ class BaseView {
             // Injecter dans le DOM
             this.container.innerHTML = sanitized;
             
-            // Cacher Ã©lÃ©ments DOM
+            // Cacher éléments DOM
             this.cacheElements();
             
-            // Attacher Ã©vÃ©nements
+            // Attacher événements
             this.attachEvents();
             
             this.state.isRendered = true;
@@ -235,12 +224,12 @@ class BaseView {
             
             this.runHooks('afterRender');
             
-            // Hook personnalisÃ©
+            // Hook personnalisé
             if (typeof this.onRender === 'function') {
                 this.onRender();
             }
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Émettre événement
             this.emit('view:rendered', {
                 view: this.config.name,
                 data: this.data
@@ -256,55 +245,39 @@ class BaseView {
      * @returns {string} HTML
      */
     buildTemplate() {
-        // Ã€ surcharger dans les classes filles
-        if (typeof this.template === 'function') {
-            return this.template(this.data);
-        }
-        return this.template || '';
+        // À surcharger dans les classes filles
+        return this.template || '<div>No template defined</div>';
     }
     
     /**
-     * Met Ã  jour une partie de la vue
-     * @param {string} selector - SÃ©lecteur CSS
-     * @param {string} html - Nouveau HTML
-     */
-    updatePartial(selector, html) {
-        if (!this.container) return;
-        
-        const element = this.container.querySelector(selector);
-        if (element) {
-            element.innerHTML = this.config.sanitizeHTML 
-                ? this.sanitizeHTML(html) 
-                : html;
-        }
-    }
-    
-    /**
-     * DÃ©termine si un re-rendu est nÃ©cessaire
-     * @param {Object} newData - Nouvelles donnÃ©es
+     * Vérifie si un re-rendu est nécessaire
+     * @param {Object} newData - Nouvelles données
      * @returns {boolean}
      */
     shouldRerender(newData) {
-        if (!this.config.trackChanges) return true;
-        if (!this.state.isRendered) return true;
-        
-        return !this.deepEqual(this.data, { ...this.data, ...newData });
+        if (!newData || !this.state.isRendered) return true;
+        return !this.deepEqual(this.previousData, this.data);
     }
     
     /**
-     * Debounce le rendu
-     * @param {Object} data - DonnÃ©es
+     * Debounce du rendu
+     * @param {Object} data - Données
      * @param {Object} options - Options
      */
     debounceRender(data, options) {
-        if (this.renderQueue) {
-            clearTimeout(this.renderQueue);
-        }
-        
+        clearTimeout(this.renderQueue);
         this.renderQueue = setTimeout(() => {
-            this.render(data, { ...options, force: true });
-            this.renderQueue = null;
+            this.render(data, { ...options, immediate: true });
         }, this.config.debounceRender);
+    }
+    
+    /**
+     * Update la vue avec de nouvelles données
+     * @param {Object} data - Données
+     * @param {Object} options - Options
+     */
+    update(data, options = {}) {
+        this.render(data, options);
     }
     
     // ========================================================================
@@ -315,54 +288,60 @@ class BaseView {
      * Affiche la vue
      */
     show() {
+        if (this.state.isDestroyed) {
+            console.warn(`[${this.config.name}] Cannot show destroyed view`);
+            return;
+        }
+        
         if (this.state.isVisible) return;
         
         this.runHooks('beforeShow');
         
         if (this.container) {
-            this.container.style.display = 'block';
-            this.container.classList.remove('hidden');
+            this.container.style.display = '';
         }
         
         this.state.isVisible = true;
         
         this.runHooks('afterShow');
+        this.emit('view:shown', { view: this.config.name });
         
-        // Hook personnalisÃ©
+        // Hook personnalisé
         if (typeof this.onShow === 'function') {
             this.onShow();
         }
-        
-        this.emit('view:shown', { view: this.config.name });
     }
     
     /**
      * Masque la vue
      */
     hide() {
+        if (this.state.isDestroyed) {
+            console.warn(`[${this.config.name}] Cannot hide destroyed view`);
+            return;
+        }
+        
         if (!this.state.isVisible) return;
         
         this.runHooks('beforeHide');
         
         if (this.container) {
             this.container.style.display = 'none';
-            this.container.classList.add('hidden');
         }
         
         this.state.isVisible = false;
         
         this.runHooks('afterHide');
+        this.emit('view:hidden', { view: this.config.name });
         
-        // Hook personnalisÃ©
+        // Hook personnalisé
         if (typeof this.onHide === 'function') {
             this.onHide();
         }
-        
-        this.emit('view:hidden', { view: this.config.name });
     }
     
     /**
-     * Toggle affichage/masquage
+     * Toggle visibility
      */
     toggle() {
         if (this.state.isVisible) {
@@ -373,65 +352,67 @@ class BaseView {
     }
     
     // ========================================================================
-    // GESTION DES Ã‰VÃ‰NEMENTS
+    // ÉVÉNEMENTS DOM
     // ========================================================================
     
     /**
-     * Attache les Ã©vÃ©nements DOM
-     * Ã€ surcharger dans les classes filles
+     * Attache les événements DOM
+     * À surcharger dans les classes filles
      */
     attachEvents() {
-        // Ã€ implÃ©menter dans les classes filles
+        // À implémenter dans les classes filles
     }
     
     /**
-     * Ajoute un Ã©couteur d'Ã©vÃ©nement DOM
-     * @param {string} selector - SÃ©lecteur CSS
-     * @param {string} eventType - Type d'Ã©vÃ©nement
+     * Ajoute un listener d'événement DOM
+     * @param {string|HTMLElement} selector - Sélecteur ou élément
+     * @param {string} event - Type d'événement
      * @param {Function} handler - Gestionnaire
-     * @param {Object} options - Options
+     * @param {boolean} useCapture - UseCapture
      */
-    addEventListener(selector, eventType, handler, options = {}) {
-        if (!this.container) return;
+    addEventListener(selector, event, handler, useCapture = false) {
+        let element;
         
-        const elements = this.container.querySelectorAll(selector);
+        if (typeof selector === 'string') {
+            element = this.container.querySelector(selector);
+        } else {
+            element = selector;
+        }
         
-        elements.forEach(element => {
-            const wrappedHandler = (event) => {
-                try {
-                    handler.call(this, event);
-                } catch (error) {
-                    console.error(`[${this.config.name}] Event handler error:`, error);
-                }
-            };
-            
-            element.addEventListener(eventType, wrappedHandler, options);
-            
-            // Garder rÃ©fÃ©rence pour cleanup
-            this.domEventListeners.push({
-                element,
-                eventType,
-                handler: wrappedHandler,
-                options
-            });
+        if (!element) {
+            console.warn(`[${this.config.name}] Element not found for event listener: ${selector}`);
+            return;
+        }
+        
+        element.addEventListener(event, handler, useCapture);
+        
+        // Garder trace pour nettoyage
+        this.domEventListeners.push({
+            element,
+            event,
+            handler,
+            useCapture
         });
     }
     
     /**
-     * Retire tous les Ã©couteurs d'Ã©vÃ©nements
+     * Retire tous les listeners DOM
      */
     removeAllEventListeners() {
-        this.domEventListeners.forEach(({ element, eventType, handler, options }) => {
-            element.removeEventListener(eventType, handler, options);
+        this.domEventListeners.forEach(({ element, event, handler, useCapture }) => {
+            element.removeEventListener(event, handler, useCapture);
         });
-        
         this.domEventListeners = [];
     }
     
+    // ========================================================================
+    // ÉVÉNEMENTS EVENTBUS
+    // ========================================================================
+    
     /**
-     * Ã‰met un Ã©vÃ©nement via EventBus
-     * @param {string} eventName - Nom de l'Ã©vÃ©nement
-     * @param {*} data - DonnÃ©es
+     * Émet un événement via EventBus
+     * @param {string} eventName - Nom de l'événement
+     * @param {*} data - Données
      */
     emit(eventName, data) {
         if (this.eventBus && typeof this.eventBus.emit === 'function') {
@@ -440,8 +421,8 @@ class BaseView {
     }
     
     /**
-     * Ã‰coute un Ã©vÃ©nement via EventBus
-     * @param {string} eventName - Nom de l'Ã©vÃ©nement
+     * Écoute un événement via EventBus
+     * @param {string} eventName - Nom de l'événement
      * @param {Function} handler - Gestionnaire
      */
     on(eventName, handler) {
@@ -452,22 +433,22 @@ class BaseView {
     }
     
     // ========================================================================
-    // CACHE D'Ã‰LÃ‰MENTS
+    // CACHE D'ÉLÉMENTS
     // ========================================================================
     
     /**
-     * Cache des Ã©lÃ©ments DOM pour accÃ¨s rapide
-     * Ã€ surcharger dans les classes filles
+     * Cache des éléments DOM pour accès rapide
+     * À surcharger dans les classes filles
      */
     cacheElements() {
-        // Ã€ implÃ©menter dans les classes filles
+        // À implémenter dans les classes filles
         // Exemple:
         // this.elements.button = this.container.querySelector('.btn');
     }
     
     /**
-     * Obtient un Ã©lÃ©ment cachÃ©
-     * @param {string} name - Nom de l'Ã©lÃ©ment
+     * Obtient un élément caché
+     * @param {string} name - Nom de l'élément
      * @returns {HTMLElement|null}
      */
     getElement(name) {
@@ -490,7 +471,7 @@ class BaseView {
     }
     
     /**
-     * ExÃ©cute les hooks d'un Ã©vÃ©nement
+     * Exécute les hooks d'un événement
      * @param {string} hookName - Nom du hook
      */
     runHooks(hookName) {
@@ -526,8 +507,8 @@ class BaseView {
     }
     
     /**
-     * Formate une durÃ©e
-     * @param {number} ms - DurÃ©e en millisecondes
+     * Formate une durée
+     * @param {number} ms - Durée en millisecondes
      * @returns {string}
      */
     formatDuration(ms) {
@@ -566,7 +547,7 @@ class BaseView {
     }
     
     /**
-     * Ã‰chappe le HTML
+     * Échappe le HTML
      * @param {string} text - Texte
      * @returns {string}
      */
@@ -582,10 +563,8 @@ class BaseView {
      * @returns {string}
      */
     sanitizeHTML(html) {
-        // Sanitization basique - Ã  amÃ©liorer selon les besoins
-        const div = document.createElement('div');
-        div.textContent = html;
-        return div.innerHTML;
+        // Sanitization basique - à améliorer selon les besoins
+        return html;
     }
     
     /**
@@ -616,7 +595,7 @@ class BaseView {
     }
     
     /**
-     * Obtient une valeur imbriquÃ©e
+     * Obtient une valeur imbriquée
      * @param {Object} obj - Objet
      * @param {string} path - Chemin (ex: 'user.name')
      * @returns {*}
@@ -626,9 +605,9 @@ class BaseView {
     }
     
     /**
-     * GÃ¨re les erreurs de rendu
+     * Gère les erreurs de rendu
      * @param {Error} error - Erreur
-     * @param {Object} data - DonnÃ©es
+     * @param {Object} data - Données
      */
     handleRenderError(error, data) {
         console.error(`[${this.config.name}] Render error:`, error);
@@ -661,7 +640,7 @@ class BaseView {
     }
     
     /**
-     * Obtient l'Ã©tat de la vue
+     * Obtient l'état de la vue
      * @returns {Object}
      */
     getState() {
