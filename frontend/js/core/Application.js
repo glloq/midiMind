@@ -610,7 +610,7 @@ class Application {
         
         // Raccourcis clavier
         if (window.KeyboardShortcuts) {
-            this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus);
+            this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.logger);
         }
         
         this.log('info', '✔ Finalization complete');
