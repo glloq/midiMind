@@ -217,18 +217,15 @@ const Constants = {
         PARSE_ERROR: 'PARSE_ERROR',
         INVALID_COMMAND: 'INVALID_COMMAND',
         INVALID_PARAMS: 'INVALID_PARAMS',
-        INVALID_MESSAGE: 'INVALID_MESSAGE',
         COMMAND_FAILED: 'COMMAND_FAILED',
-        UNKNOWN_COMMAND: 'UNKNOWN_COMMAND',
         DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
         DEVICE_BUSY: 'DEVICE_BUSY',
-        MIDI_ERROR: 'MIDI_ERROR',
         FILE_ERROR: 'FILE_ERROR',
-        SYSTEM_ERROR: 'SYSTEM_ERROR'
+        MIDI_ERROR: 'MIDI_ERROR'
     },
     
     // ========================================================================
-    // ÉTATS PLAYBACK
+    // PLAYBACK STATES
     // ========================================================================
     
     PLAYBACK_STATES: {
@@ -390,7 +387,7 @@ const Constants = {
     // ========================================================================
     
     NETWORK: {
-        WEBSOCKET_URL: 'ws://192.168.1.37:8080',
+        get WEBSOCKET_URL() { return (typeof AppConfig !== 'undefined' && AppConfig.backend) ? AppConfig.backend.url : 'ws://localhost:8080'; },
         RECONNECT_INTERVAL: 5000, // ms
         MAX_RECONNECT_ATTEMPTS: 10,
         PING_INTERVAL: 30000, // ms

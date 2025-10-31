@@ -181,102 +181,91 @@ class SystemView extends BaseView {
     }
 
     /**
-     * Construit la section de configuration audio/MIDI
-     * @param {Object} config - Configuration audio actuelle
-     * @returns {string} - HTML de la configuration audio
+     * Construit la configuration audio/MIDI
+     * @param {Object} config - Configuration audio
+     * @returns {string} - HTML de la configuration
      */
     buildAudioMidiConfig(config = {}) {
         return `
-            <div class="audio-config-grid">
-                <!-- Paramètres de base -->
-                <div class="config-group">
-                    <label class="config-label">Buffer Audio:</label>
-                    <select class="config-select" 
+            <div class="config-grid">
+                <div class="config-item">
+                    <label for="bufferSize">Taille buffer:</label>
+                    <select id="bufferSize" 
                             onchange="app.systemController.updateAudioConfig('bufferSize', parseInt(this.value))">
-                        <option value="128" ${config.bufferSize === 128 ? 'selected' : ''}>128 samples (2.9ms)</option>
-                        <option value="256" ${config.bufferSize === 256 ? 'selected' : ''}>256 samples (5.8ms)</option>
-                        <option value="512" ${config.bufferSize === 512 ? 'selected' : ''}>512 samples (11.6ms)</option>
-                        <option value="1024" ${config.bufferSize === 1024 ? 'selected' : ''}>1024 samples (23.2ms)</option>
+                        <option value="128" ${config.bufferSize === 128 ? 'selected' : ''}>128 samples</option>
+                        <option value="256" ${config.bufferSize === 256 ? 'selected' : ''}>256 samples</option>
+                        <option value="512" ${config.bufferSize === 512 ? 'selected' : ''}>512 samples</option>
+                        <option value="1024" ${config.bufferSize === 1024 ? 'selected' : ''}>1024 samples</option>
                     </select>
-                    <small class="config-hint">Plus petit = moins de latence, plus de CPU</small>
+                    <span class="config-help">⚡ Plus petit = moins de latence</span>
                 </div>
 
-                <div class="config-group">
-                    <label class="config-label">Fréquence d'échantillonnage:</label>
-                    <select class="config-select"
+                <div class="config-item">
+                    <label for="sampleRate">Sample rate:</label>
+                    <select id="sampleRate" 
                             onchange="app.systemController.updateAudioConfig('sampleRate', parseInt(this.value))">
-                        <option value="44100" ${config.sampleRate === 44100 ? 'selected' : ''}>44.1 kHz</option>
-                        <option value="48000" ${config.sampleRate === 48000 ? 'selected' : ''}>48 kHz</option>
-                        <option value="96000" ${config.sampleRate === 96000 ? 'selected' : ''}>96 kHz</option>
+                        <option value="44100" ${config.sampleRate === 44100 ? 'selected' : ''}>44100 Hz</option>
+                        <option value="48000" ${config.sampleRate === 48000 ? 'selected' : ''}>48000 Hz</option>
+                        <option value="96000" ${config.sampleRate === 96000 ? 'selected' : ''}>96000 Hz</option>
                     </select>
+                    <span class="config-help">🎵 Qualité audio</span>
                 </div>
 
-                <div class="config-group">
-                    <label class="config-label">Latence cible (ms):</label>
-                    <input type="range" 
-                           min="1" max="50" 
-                           value="${config.targetLatency || 10}"
-                           oninput="app.systemController.updateAudioConfig('targetLatency', parseInt(this.value)); this.nextElementSibling.textContent = this.value + 'ms'">
-                    <span class="config-value">${config.targetLatency || 10}ms</span>
+                <div class="config-item">
+                    <label for="targetLatency">Latence cible:</label>
+                    <input type="number" 
+                           id="targetLatency" 
+                           value="${config.targetLatency || 10}" 
+                           min="1" 
+                           max="100"
+                           onchange="app.systemController.updateAudioConfig('targetLatency', parseInt(this.value))">
+                    <span class="config-help">ms</span>
                 </div>
 
-                <div class="config-group">
-                    <label class="config-label">Compensation automatique:</label>
+                <div class="config-item">
+                    <label>Compensation auto:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
                                ${config.autoCompensation ? 'checked' : ''}
                                onchange="app.systemController.updateAudioConfig('autoCompensation', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">🎯 Ajuste automatiquement</span>
                 </div>
             </div>
         `;
     }
 
     /**
-     * Construit la liste des instruments avec leurs latences
-     * @param {Array} instruments - Liste des instruments connectés
-     * @returns {string} - HTML de la liste des instruments
+     * Construit la liste des instruments avec latences
+     * @param {Array} instruments - Liste des instruments
+     * @returns {string} - HTML de la liste
      */
     buildInstrumentLatencyList(instruments = []) {
-        if (instruments.length === 0) {
+        if (!instruments || instruments.length === 0) {
             return `
                 <div class="empty-state">
-                    <p>🎼 Aucun instrument détecté</p>
-                    <button class="btn btn-primary" onclick="app.instrumentController.detectInstruments()">
-                        🔍 Détecter Instruments
-                    </button>
+                    <p>Aucun instrument connecté</p>
                 </div>
             `;
         }
 
         return `
-            <div class="instrument-list">
-                ${instruments.map(instrument => `
-                    <div class="instrument-item ${instrument.connected ? 'connected' : 'disconnected'}">
+            <div class="instrument-latency-list">
+                ${instruments.map(inst => `
+                    <div class="instrument-latency-item">
                         <div class="instrument-info">
-                            <div class="instrument-name">${instrument.name}</div>
-                            <div class="instrument-type">${instrument.type}</div>
-                            <div class="instrument-status">
-                                <span class="status-dot ${instrument.connected ? 'online' : 'offline'}"></span>
-                                ${instrument.connected ? 'Connecté' : 'Déconnecté'}
-                            </div>
+                            <span class="instrument-name">${inst.name || 'Instrument'}</span>
+                            <span class="instrument-type">${inst.type || 'MIDI'}</span>
                         </div>
                         <div class="latency-info">
-                            <div class="latency-value ${instrument.latency > 20 ? 'high' : 'good'}">
-                                ${instrument.latency ? instrument.latency.toFixed(1) : '–'}ms
-                            </div>
-                            <div class="jitter-value">
-                                Jitter: ${instrument.jitter ? instrument.jitter.toFixed(1) : '–'}ms
-                            </div>
-                        </div>
-                        <div class="instrument-actions">
-                            ${instrument.connected ? `
-                                <button class="btn btn-small" 
-                                        onclick="app.systemController.calibrateInstrument('${instrument.id}')">
-                                    📊 Calibrer
-                                </button>
-                            ` : ''}
+                            <span class="latency-value ${inst.latency > 50 ? 'high' : 'good'}">
+                                ${inst.latency || 0}ms
+                            </span>
+                            <button class="btn btn-mini" 
+                                    onclick="app.systemController.calibrateInstrument('${inst.id}')">
+                                ⚡ Calibrer
+                            </button>
                         </div>
                     </div>
                 `).join('')}
@@ -287,33 +276,45 @@ class SystemView extends BaseView {
     /**
      * Construit la configuration du visualiseur
      * @param {Object} config - Configuration visualiseur
-     * @returns {string} - HTML de la configuration visualiseur
+     * @returns {string} - HTML de la configuration
      */
     buildVisualizerConfig(config = {}) {
         return `
-            <div class="visualizer-config">
-                <div class="config-row">
-                    <label>FPS Cible:</label>
-                    <input type="range" min="15" max="120" value="${config.targetFPS || 60}"
-                           oninput="app.systemController.updateVisualizerConfig('targetFPS', parseInt(this.value)); this.nextElementSibling.textContent = this.value">
-                    <span class="config-value">${config.targetFPS || 60}</span>
-                </div>
-                
-                <div class="config-row">
-                    <label>Fenêtre temps (s):</label>
-                    <input type="range" min="1" max="30" value="${config.timeWindow || 10}"
-                           oninput="app.systemController.updateVisualizerConfig('timeWindow', parseInt(this.value)); this.nextElementSibling.textContent = this.value">
-                    <span class="config-value">${config.timeWindow || 10}</span>
-                </div>
-                
-                <div class="config-row">
-                    <label>Hauteur touches piano:</label>
-                    <input type="range" min="10" max="50" value="${config.pianoKeyHeight || 20}"
-                           oninput="app.systemController.updateVisualizerConfig('pianoKeyHeight', parseInt(this.value)); this.nextElementSibling.textContent = this.value">
-                    <span class="config-value">${config.pianoKeyHeight || 20}</span>
+            <div class="config-grid">
+                <div class="config-item">
+                    <label for="targetFPS">FPS cible:</label>
+                    <input type="number" 
+                           id="targetFPS" 
+                           value="${config.targetFPS || 60}" 
+                           min="15" 
+                           max="120"
+                           onchange="app.systemController.updateVisualizerConfig('targetFPS', parseInt(this.value))">
+                    <span class="config-help">images/sec</span>
                 </div>
 
-                <div class="config-row">
+                <div class="config-item">
+                    <label for="timeWindow">Fenêtre temps:</label>
+                    <input type="number" 
+                           id="timeWindow" 
+                           value="${config.timeWindow || 10}" 
+                           min="1" 
+                           max="30"
+                           onchange="app.systemController.updateVisualizerConfig('timeWindow', parseInt(this.value))">
+                    <span class="config-help">secondes</span>
+                </div>
+
+                <div class="config-item">
+                    <label for="pianoKeyHeight">Hauteur touches:</label>
+                    <input type="number" 
+                           id="pianoKeyHeight" 
+                           value="${config.pianoKeyHeight || 20}" 
+                           min="10" 
+                           max="50"
+                           onchange="app.systemController.updateVisualizerConfig('pianoKeyHeight', parseInt(this.value))">
+                    <span class="config-help">pixels</span>
+                </div>
+
+                <div class="config-item">
                     <label>Anti-aliasing:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
@@ -321,9 +322,10 @@ class SystemView extends BaseView {
                                onchange="app.systemController.updateVisualizerConfig('antiAliasing', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">✨ Lissage</span>
                 </div>
 
-                <div class="config-row">
+                <div class="config-item">
                     <label>Effets visuels:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
@@ -331,6 +333,7 @@ class SystemView extends BaseView {
                                onchange="app.systemController.updateVisualizerConfig('visualEffects', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">🎨 Animations</span>
                 </div>
             </div>
         `;
@@ -339,22 +342,23 @@ class SystemView extends BaseView {
     /**
      * Construit la configuration de l'interface
      * @param {Object} config - Configuration interface
-     * @returns {string} - HTML de la configuration interface
+     * @returns {string} - HTML de la configuration
      */
     buildInterfaceConfig(config = {}) {
         return `
-            <div class="interface-config">
-                <div class="config-row">
-                    <label>Animations Interface:</label>
+            <div class="config-grid">
+                <div class="config-item">
+                    <label>Animations:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
                                ${config.animations ? 'checked' : ''}
                                onchange="app.systemController.updateInterfaceConfig('animations', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">🎬 Transitions</span>
                 </div>
 
-                <div class="config-row">
+                <div class="config-item">
                     <label>Notifications sonores:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
@@ -362,19 +366,21 @@ class SystemView extends BaseView {
                                onchange="app.systemController.updateInterfaceConfig('soundNotifications', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">🔔 Sons</span>
                 </div>
 
-                <div class="config-row">
-                    <label>Conseils d'aide:</label>
+                <div class="config-item">
+                    <label>Info-bulles:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
                                ${config.showTooltips ? 'checked' : ''}
                                onchange="app.systemController.updateInterfaceConfig('showTooltips', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">💬 Aide</span>
                 </div>
 
-                <div class="config-row">
+                <div class="config-item">
                     <label>Raccourcis clavier:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" 
@@ -382,13 +388,14 @@ class SystemView extends BaseView {
                                onchange="app.systemController.updateInterfaceConfig('keyboardShortcuts', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                    <span class="config-help">⌨️ Shortcuts</span>
                 </div>
             </div>
         `;
     }
 
     /**
-     * Construit les statistiques système
+     * Construit l'affichage des statistiques système
      * @param {Object} stats - Statistiques système
      * @returns {string} - HTML des statistiques
      */
@@ -396,40 +403,42 @@ class SystemView extends BaseView {
         return `
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-label">CPU Usage</div>
+                    <div class="stat-label">CPU</div>
                     <div class="stat-value">${stats.cpuUsage || 0}%</div>
                     <div class="stat-bar">
-                        <div class="stat-fill" style="width: ${stats.cpuUsage || 0}%"></div>
+                        <div class="stat-bar-fill" style="width: ${stats.cpuUsage || 0}%"></div>
                     </div>
                 </div>
 
                 <div class="stat-item">
                     <div class="stat-label">Mémoire</div>
-                    <div class="stat-value">${stats.memoryUsage || 0}MB</div>
+                    <div class="stat-value">${stats.memoryUsage || 0}%</div>
                     <div class="stat-bar">
-                        <div class="stat-fill" style="width: ${(stats.memoryUsage || 0) / 1024 * 100}%"></div>
+                        <div class="stat-bar-fill" style="width: ${stats.memoryUsage || 0}%"></div>
                     </div>
                 </div>
 
                 <div class="stat-item">
-                    <div class="stat-label">FPS Moyen</div>
-                    <div class="stat-value">${stats.avgFPS || 0}</div>
-                    <div class="stat-color ${stats.avgFPS > 30 ? 'good' : 'warning'}"></div>
+                    <div class="stat-label">FPS</div>
+                    <div class="stat-value">${stats.currentFPS || 0}</div>
+                    <div class="stat-info">Target: ${stats.targetFPS || 60}</div>
                 </div>
 
                 <div class="stat-item">
-                    <div class="stat-label">Messages MIDI/s</div>
-                    <div class="stat-value">${stats.midiMessagesPerSecond || 0}</div>
+                    <div class="stat-label">Latence moyenne</div>
+                    <div class="stat-value">${stats.avgLatency || 0}ms</div>
+                    <div class="stat-info">Max: ${stats.maxLatency || 0}ms</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Messages MIDI</div>
+                    <div class="stat-value">${stats.midiMessagesProcessed || 0}</div>
+                    <div class="stat-info">/sec</div>
                 </div>
 
                 <div class="stat-item">
                     <div class="stat-label">Uptime</div>
                     <div class="stat-value">${this.formatUptime(stats.uptime || 0)}</div>
-                </div>
-
-                <div class="stat-item">
-                    <div class="stat-label">Fichiers chargés</div>
-                    <div class="stat-value">${stats.filesLoaded || 0}</div>
                 </div>
             </div>
         `;
@@ -438,15 +447,15 @@ class SystemView extends BaseView {
     /**
      * Construit la configuration avancée
      * @param {Object} config - Configuration avancée
-     * @returns {string} - HTML de la configuration avancée
+     * @returns {string} - HTML de la configuration
      */
     buildAdvancedConfig(config = {}) {
         return `
             <div class="advanced-config">
                 <div class="config-group">
-                    <h4>🔧 Mode Debug</h4>
+                    <h4>🔍 Debug & Logs</h4>
                     <div class="config-row">
-                        <label>Logging détaillé:</label>
+                        <label>Logging verbeux:</label>
                         <label class="toggle-switch">
                             <input type="checkbox" 
                                    ${config.verboseLogging ? 'checked' : ''}
@@ -466,7 +475,7 @@ class SystemView extends BaseView {
                 </div>
 
                 <div class="config-group">
-                    <h4>⚡ Optimisations</h4>
+                    <h4>⚡ Performance</h4>
                     <div class="config-row">
                         <label>Prédiction cache:</label>
                         <label class="toggle-switch">
@@ -573,7 +582,7 @@ buildBackendStatus(backendData = {}) {
                 </p>
                 <ul class="help-list">
                     <li>Le serveur C++ est démarré sur le port 8080</li>
-                    <li>L'URL WebSocket est correcte (ws://localhost:8080)</li>
+                    <li>L'URL WebSocket est correcte (voir configuration)</li>
                     <li>Aucun pare-feu ne bloque la connexion</li>
                 </ul>
                 <button class="btn btn-primary" onclick="app.systemController.reconnectBackend()">

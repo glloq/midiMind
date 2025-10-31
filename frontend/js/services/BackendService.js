@@ -217,7 +217,7 @@ class BackendService {
         
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             this.logger.error('BackendService', 
-                `❌ Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
+                `✌ Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
             
             this.reconnectionStopped = true;
             
@@ -297,7 +297,7 @@ class BackendService {
         if (timeSinceActivity > this.config.heartbeatTimeout) {
             this.heartbeatFailures++;
             this.logger.error('BackendService', 
-                `❌ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+                `✌ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 2) {
                 // Après 2 échecs consécutifs, forcer reconnexion

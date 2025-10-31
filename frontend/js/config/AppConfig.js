@@ -1,43 +1,60 @@
 // ============================================================================
 // Fichier: frontend/js/config/AppConfig.js
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: 3.1.0
+// Date: 2025-10-31
 // ============================================================================
 // Description:
 //   Configuration globale de l'application.
 //   URLs, constantes, paramètres par défaut, feature flags.
 //
-// Configuration:
-//   - Backend : URLs WebSocket et REST API
-//   - MIDI : Latence, buffer size, canaux
-//   - Audio : Sample rate, buffer size
-//   - UI : Thèmes, animations, timeouts
-//   - Files : Extensions supportées, taille max
-//   - Network : Retry, timeout
-//   - Debug : Logs level, debug mode
-//   - Features : Feature flags (enable/disable)
+// CORRECTIONS v3.1.0:
+//   ✅ Détection automatique de l'hôte (window.location.hostname)
+//   ✅ Fallback sur localhost si window.location non disponible
+//   ✅ Support des URLs personnalisées via localStorage
 //
 // Architecture:
-//   Object freezé (immutable)
-//   - Chargement depuis config.json si disponible
+//   Object non-freezé pour permettre la configuration dynamique
+//   - Détection automatique de l'hôte
 //   - Merge avec localStorage (overrides)
 //   - Export/Import configuration
 //
 // Auteur: MidiMind Team
 // ============================================================================
+
+// Fonction pour obtenir l'URL WebSocket backend automatiquement
+const getBackendUrl = () => {
+    // 1. Vérifier si URL personnalisée dans localStorage
+    const customUrl = localStorage.getItem('midiMind_backend_url');
+    if (customUrl) {
+        return customUrl;
+    }
+    
+    // 2. Détecter l'hôte automatiquement depuis window.location
+    if (typeof window !== 'undefined' && window.location) {
+        const hostname = window.location.hostname;
+        // Si on est sur un domaine, utiliser ce domaine
+        // Sinon fallback sur localhost
+        const host = hostname || 'localhost';
+        return `ws://${host}:8080`;
+    }
+    
+    // 3. Fallback par défaut
+    return 'ws://localhost:8080';
+};
+
 const AppConfig = {
     // Informations de l'application
     app: {
         name: 'MIDI Mind',
-        version: '1.0.0',
+        version: '3.1.0',
         description: 'Système de contrôle MIDI avec backend C++',
         author: 'MIDI Orchestrion Team'
     },
     
     // Configuration du backend C++
     backend: {
-        url: 'ws://localhost:8080',
+        url: getBackendUrl(),  // ✅ Détection automatique
         reconnectInterval: 3000,      // Intervalle de reconnexion (ms)
         commandTimeout: 5000,          // Timeout pour les commandes (ms)
         maxReconnectAttempts: 10,      // Nombre max de tentatives de reconnexion
@@ -263,6 +280,40 @@ AppConfig.set = function(path, newValue) {
     
     obj[lastKey] = newValue;
 };
+
+// ✅ NOUVEAU: Fonction pour définir une URL backend personnalisée
+AppConfig.setBackendUrl = function(url) {
+    // Valider l'URL
+    if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+        console.error('Invalid WebSocket URL. Must start with ws:// or wss://');
+        return false;
+    }
+    
+    // Sauvegarder dans localStorage
+    localStorage.setItem('midiMind_backend_url', url);
+    
+    // Mettre à jour la config
+    this.backend.url = url;
+    
+    console.log(`Backend URL updated to: ${url}`);
+    return true;
+};
+
+// ✅ NOUVEAU: Fonction pour réinitialiser l'URL backend (auto-détection)
+AppConfig.resetBackendUrl = function() {
+    localStorage.removeItem('midiMind_backend_url');
+    this.backend.url = getBackendUrl();
+    console.log(`Backend URL reset to auto-detected: ${this.backend.url}`);
+    return this.backend.url;
+};
+
+// ✅ NOUVEAU: Fonction pour obtenir l'URL actuelle
+AppConfig.getBackendUrl = function() {
+    return this.backend.url;
+};
+
+// Log de l'URL détectée au chargement
+console.log(`🔧 [AppConfig] Backend URL auto-detected: ${AppConfig.backend.url}`);
 
 // Exporter pour usage global
 if (typeof module !== 'undefined' && module.exports) {
