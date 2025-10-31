@@ -76,7 +76,7 @@ class InstrumentModel extends BaseModel {
                 this.logger.info('InstrumentModel', 'Scanning for instruments...');
             }
             
-            const response = await this.backend.sendCommand('instruments.scan', {});
+            const response = await this.backend.sendCommand('devices.scan', {});
             
             if (response.success) {
                 const instruments = response.data.instruments || [];
@@ -137,8 +137,8 @@ class InstrumentModel extends BaseModel {
                 this.logger.info('InstrumentModel', `Connecting instrument: ${instrumentId}`);
             }
             
-            const response = await this.backend.sendCommand('instruments.connect', {
-                instrument_id: instrumentId
+            const response = await this.backend.sendCommand('devices.connect', {
+                device_id: instrumentId
             });
             
             if (response.success) {
@@ -183,8 +183,8 @@ class InstrumentModel extends BaseModel {
                 this.logger.info('InstrumentModel', `Disconnecting instrument: ${instrumentId}`);
             }
             
-            const response = await this.backend.sendCommand('instruments.disconnect', {
-                instrument_id: instrumentId
+            const response = await this.backend.sendCommand('devices.disconnect', {
+                device_id: instrumentId
             });
             
             if (response.success) {

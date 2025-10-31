@@ -110,8 +110,8 @@ class FileModel extends BaseModel {
                 this.logger.info('FileModel', `Loading file: ${fileId}`);
             }
             
-            const response = await this.backend.sendCommand('files.load', {
-                file_id: fileId
+            const response = await this.backend.sendCommand('files.read', {
+                filename: fileId
             });
             
             if (response.success) {
@@ -150,9 +150,9 @@ class FileModel extends BaseModel {
                 this.logger.info('FileModel', `Saving file: ${fileId}`);
             }
             
-            const response = await this.backend.sendCommand('files.save', {
-                file_id: fileId,
-                midi_data: midiData
+            const response = await this.backend.sendCommand('files.write', {
+                filename: fileId,
+                content: midiData
             });
             
             if (response.success) {
@@ -187,7 +187,7 @@ class FileModel extends BaseModel {
             }
             
             const response = await this.backend.sendCommand('files.delete', {
-                file_id: fileId
+                filename: fileId
             });
             
             if (response.success) {
@@ -216,6 +216,11 @@ class FileModel extends BaseModel {
     }
     
     async renameFile(fileId, newName) {
+        // ⚠️ WARNING: files.rename does not exist in backend API v4.2.1
+        // Workaround: read + write + delete
+        throw new Error('Rename operation not supported by backend API');
+        
+        /* Original code disabled:
         if (!this.backend) {
             throw new Error('Backend service not available');
         }
@@ -257,6 +262,7 @@ class FileModel extends BaseModel {
             }
             throw error;
         }
+        */
     }
     
     // ========================================================================
