@@ -80,6 +80,7 @@ private:
     json createErrorResponse(const std::string& error, 
                           const std::string& errorCode = "COMMAND_FAILED") const;
     bool validateCommand(const json& command, std::string& error) const;
+    std::vector<uint8_t> base64Decode(const std::string& encoded) const;
     
     std::unordered_map<std::string, CommandFunction> commands_;
     mutable std::mutex commandsMutex_;
