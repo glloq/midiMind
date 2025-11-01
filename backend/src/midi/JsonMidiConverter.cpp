@@ -754,8 +754,6 @@ uint32_t JsonMidiConverter::extractTempo(const std::vector<JsonMidiEvent>& timel
     return defaultTempo_;
 }
 
-} // namespace midiMind
-
 
 // ============================================================================
 // PHASE 2: MIDI FILE CONVERSION HELPER METHODS
