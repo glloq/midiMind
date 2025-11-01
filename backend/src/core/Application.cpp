@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.2.4 - FIX encoding and constructors
+// Version: 4.2.4 - FIX constructors and types
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -104,6 +104,11 @@ Application::~Application() {
     instrumentDatabase_.reset();
     fileManager_.reset();
     settings_.reset();
+    
+    if (database_) {
+        delete database_;
+        database_ = nullptr;
+    }
     
     Logger::info("Application", "Application destroyed successfully");
 }
@@ -221,9 +226,9 @@ bool Application::initializeDatabase() {
         Logger::info("Application", "  Creating database connection...");
         
         std::string dbPath = Config::instance().getString("database.path", "/var/lib/midimind/midimind.db");
-        database_ = std::make_shared<Database>(dbPath);
+        database_ = new Database();
         
-        if (!database_->connect()) {
+        if (!database_->connect(dbPath)) {
             Logger::error("Application", "Failed to connect to database");
             return false;
         }
@@ -252,7 +257,7 @@ bool Application::initializeStorage() {
     
     try {
         Logger::info("Application", "  Initializing Settings...");
-        settings_ = std::make_shared<Settings>(database_);
+        settings_ = std::make_shared<Settings>(*database_);
         if (!settings_->load()) {
             Logger::warning("Application", "  Settings not found, using defaults");
         } else {
@@ -260,15 +265,16 @@ bool Application::initializeStorage() {
         }
         
         Logger::info("Application", "  Initializing FileManager...");
-        fileManager_ = std::make_shared<FileManager>();
+        std::string rootPath = PathManager::instance().getDataPath();
+        fileManager_ = std::make_shared<FileManager>(rootPath);
         Logger::info("Application", "  [OK] FileManager initialized");
         
         Logger::info("Application", "  Initializing InstrumentDatabase...");
-        instrumentDatabase_ = std::make_shared<InstrumentDatabase>(database_);
+        instrumentDatabase_ = std::make_shared<InstrumentDatabase>(*database_);
         Logger::info("Application", "  [OK] InstrumentDatabase initialized");
         
         Logger::info("Application", "  Initializing PresetManager...");
-        presetManager_ = std::make_shared<PresetManager>(database_, fileManager_.get());
+        presetManager_ = std::make_shared<PresetManager>(*database_);
         Logger::info("Application", "  [OK] PresetManager initialized");
         
         Logger::info("Application", "");
@@ -349,7 +355,7 @@ bool Application::initializeApi() {
     try {
         Logger::info("Application", "  Creating CommandHandler...");
         commandHandler_ = std::make_shared<CommandHandler>(
-            database_.get(),
+            database_,
             settings_.get(),
             fileManager_.get(),
             deviceManager_.get(),
@@ -362,7 +368,7 @@ bool Application::initializeApi() {
         Logger::info("Application", "  [OK] CommandHandler initialized");
         
         Logger::info("Application", "  Creating ApiServer...");
-        apiServer_ = std::make_shared<ApiServer>(commandHandler_);
+        apiServer_ = std::make_shared<ApiServer>(eventBus_);
         Logger::info("Application", "  [OK] ApiServer initialized");
         
         Logger::info("Application", "");
