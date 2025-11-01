@@ -691,40 +691,22 @@ EOF
 # ÉTAPE 11: SERVICE SYSTEMD
 # ============================================================================
 
+
 configure_systemd_service() {
     log "🚀 ÉTAPE 11/11: Configuration du service systemd"
     
-    info "Création du service systemd..."
-    cat > /etc/systemd/system/midimind.service << EOF
-[Unit]
-Description=MidiMind - Professional MIDI Orchestration System
-After=network.target sound.target
-
-[Service]
-Type=simple
-User=$REAL_USER
-WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/bin/midimind --config /etc/midimind/config.json
-Restart=always
-RestartSec=3
-
-# Permissions
-SupplementaryGroups=audio dialout plugdev
-
-# Sécurité
-NoNewPrivileges=true
-PrivateTmp=true
-
-# Logging
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=midimind
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    # Chercher le fichier service dans le dossier script/
+    local SERVICE_FILE="$SCRIPT_DIR/midimind.service"
     
-    success "Service systemd créé"
+    if [ ! -f "$SERVICE_FILE" ]; then
+        error "Fichier midimind.service introuvable: $SERVICE_FILE"
+    fi
+    
+    info "Utilisation du service existant: $SERVICE_FILE"
+    
+    # Copier le fichier service
+    cp "$SERVICE_FILE" /etc/systemd/system/midimind.service || error "Échec copie service"
+    success "Service systemd copié depuis script/midimind.service"
     
     # Recharger systemd
     systemctl daemon-reload
@@ -733,6 +715,7 @@ EOF
     systemctl enable midimind.service 2>&1 | tee -a "$LOG_FILE" || error "Échec activation service"
     success "Service activé au démarrage"
 }
+
 
 # ============================================================================
 # TEST DÉMARRAGE BACKEND
