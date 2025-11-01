@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.2.4 - FIX constructors and types
+// Version: 4.2.4 - FIX singleton and CommandHandler
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -17,6 +17,7 @@
 #include "../storage/InstrumentDatabase.h"
 #include "../storage/PresetManager.h"
 #include "../storage/MidiDatabase.h"
+#include "../storage/PlaylistManager.h"
 #include "../timing/LatencyCompensator.h"
 #include "../midi/devices/MidiDeviceManager.h"
 #include "../midi/MidiRouter.h"
@@ -100,15 +101,14 @@ Application::~Application() {
     router_.reset();
     deviceManager_.reset();
     latencyCompensator_.reset();
+    playlistManager_.reset();
+    midiDatabase_.reset();
     presetManager_.reset();
     instrumentDatabase_.reset();
     fileManager_.reset();
     settings_.reset();
     
-    if (database_) {
-        delete database_;
-        database_ = nullptr;
-    }
+    database_ = nullptr;
     
     Logger::info("Application", "Application destroyed successfully");
 }
@@ -223,10 +223,11 @@ bool Application::initializeDatabase() {
     Logger::info("Application", "");
     
     try {
-        Logger::info("Application", "  Creating database connection...");
+        Logger::info("Application", "  Getting database instance...");
+        database_ = &Database::instance();
         
+        Logger::info("Application", "  Connecting to database...");
         std::string dbPath = Config::instance().getString("database.path", "/var/lib/midimind/midimind.db");
-        database_ = new Database();
         
         if (!database_->connect(dbPath)) {
             Logger::error("Application", "Failed to connect to database");
@@ -276,6 +277,14 @@ bool Application::initializeStorage() {
         Logger::info("Application", "  Initializing PresetManager...");
         presetManager_ = std::make_shared<PresetManager>(*database_);
         Logger::info("Application", "  [OK] PresetManager initialized");
+        
+        Logger::info("Application", "  Initializing MidiDatabase...");
+        midiDatabase_ = std::make_shared<MidiDatabase>(*database_);
+        Logger::info("Application", "  [OK] MidiDatabase initialized");
+        
+        Logger::info("Application", "  Initializing PlaylistManager...");
+        playlistManager_ = std::make_shared<PlaylistManager>(*database_);
+        Logger::info("Application", "  [OK] PlaylistManager initialized");
         
         Logger::info("Application", "");
         return true;
@@ -355,15 +364,16 @@ bool Application::initializeApi() {
     try {
         Logger::info("Application", "  Creating CommandHandler...");
         commandHandler_ = std::make_shared<CommandHandler>(
-            database_,
-            settings_.get(),
-            fileManager_.get(),
-            deviceManager_.get(),
-            router_.get(),
-            player_.get(),
-            latencyCompensator_.get(),
-            presetManager_.get(),
-            instrumentDatabase_.get()
+            deviceManager_,
+            router_,
+            player_,
+            fileManager_,
+            latencyCompensator_,
+            instrumentDatabase_,
+            presetManager_,
+            eventBus_,
+            midiDatabase_,
+            playlistManager_
         );
         Logger::info("Application", "  [OK] CommandHandler initialized");
         
