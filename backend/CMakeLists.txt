@@ -40,7 +40,7 @@ pkg_check_modules(GIO REQUIRED gio-2.0)
 # ============================================================================
 
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${ALSA_INCLUDE_DIR}
     ${SQLite3_INCLUDE_DIRS}
     ${GIO_INCLUDE_DIRS}
@@ -51,39 +51,37 @@ include_directories(
 # ============================================================================
 
 set(ALL_SOURCES
-    main.cpp
-    Application.cpp
-    EventBus.cpp
-    JsonValidator.cpp
-    Database.cpp
-    FileManager.cpp
-    PathManager.cpp
-    Settings.cpp
-    InstrumentDatabase.cpp
-    PresetManager.cpp
-    SessionManager.cpp
-    MidiDatabase.cpp
-    PlaylistManager.cpp
-    TimestampManager.cpp
-    LatencyCompensator.cpp
-    MidiMessage.cpp
-    MidiProcessor.h
-    ProcessorManager.cpp
-    ProcessorChain.h
-    MidiDeviceManager.cpp
-    UsbMidiDevice.cpp
-    BleMidiDevice.cpp
-    VirtualMidiDevice.cpp
-    MidiRouter.cpp
-    MidiFileReader.cpp
-    MidiFileWriter.cpp
-    JsonMidiConverter.cpp
-    MidiPlayer.cpp
-    SysExParser.cpp
-    SysExHandler.cpp
-    ApiServer.cpp
-    CommandHandler.cpp
-    MessageEnvelope.cpp
+    src/main.cpp
+    src/core/Application.cpp
+    src/core/EventBus.cpp
+    src/core/JsonValidator.cpp
+    src/storage/Database.cpp
+    src/storage/FileManager.cpp
+    src/storage/PathManager.cpp
+    src/storage/Settings.cpp
+    src/storage/InstrumentDatabase.cpp
+    src/storage/PresetManager.cpp
+    src/storage/SessionManager.cpp
+    src/storage/MidiDatabase.cpp
+    src/storage/PlaylistManager.cpp
+    src/timing/TimestampManager.cpp
+    src/timing/LatencyCompensator.cpp
+    src/midi/MidiMessage.cpp
+    src/midi/MidiRouter.cpp
+    src/midi/JsonMidiConverter.cpp
+    src/midi/devices/MidiDeviceManager.cpp
+    src/midi/devices/UsbMidiDevice.cpp
+    src/midi/devices/BleMidiDevice.cpp
+    src/midi/devices/VirtualMidiDevice.cpp
+    src/midi/file/MidiFileReader.cpp
+    src/midi/file/MidiFileWriter.cpp
+    src/midi/player/MidiPlayer.cpp
+    src/midi/processing/ProcessorManager.cpp
+    src/midi/sysex/SysExHandler.cpp
+    src/midi/sysex/SysExParser.cpp
+    src/api/ApiServer.cpp
+    src/api/CommandHandler.cpp
+    src/api/MessageEnvelope.cpp
 )
 
 # ============================================================================
@@ -93,9 +91,9 @@ set(ALL_SOURCES
 add_executable(midimind ${ALL_SOURCES})
 
 target_link_libraries(midimind
-    ${CMAKE_THREAD_LIBS_INIT}
-    ${SQLite3_LIBRARIES}
+    Threads::Threads
     ${ALSA_LIBRARY}
+    SQLite::SQLite3
     ${GIO_LIBRARIES}
     stdc++fs
 )
