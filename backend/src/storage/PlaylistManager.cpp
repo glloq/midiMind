@@ -1,10 +1,11 @@
 // ============================================================================
 // File: backend/src/storage/PlaylistManager.cpp
-// Version: 4.2.4 - FIX Database API usage
+// Version: 4.2.4 - FIX includes and types
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
 #include "PlaylistManager.h"
+#include "Database.h"
 #include "../core/Logger.h"
 #include "../core/TimeUtils.h"
 #include <algorithm>
@@ -23,14 +24,14 @@ PlaylistManager::~PlaylistManager() {
 
 int PlaylistManager::createPlaylist(const std::string& name, const std::string& description) {
     try {
-        auto now = TimeUtils::getTimestamp();
+        auto now = TimeUtils::systemNow();
         
         auto result = db_.execute(
             R"(
                 INSERT INTO playlists (name, description, loop, created_at, updated_at)
                 VALUES (?, ?, 0, ?, ?)
             )",
-            {name, description, now, now}
+            {name, description, std::to_string(now), std::to_string(now)}
         );
         
         if (!result.success) {
@@ -68,7 +69,7 @@ bool PlaylistManager::deletePlaylist(int playlistId) {
 
 bool PlaylistManager::updatePlaylist(int playlistId, const std::string& name, const std::string& description) {
     try {
-        auto now = TimeUtils::getTimestamp();
+        auto now = TimeUtils::systemNow();
         
         auto result = db_.execute(
             R"(
@@ -76,7 +77,7 @@ bool PlaylistManager::updatePlaylist(int playlistId, const std::string& name, co
                 SET name = ?, description = ?, updated_at = ?
                 WHERE id = ?
             )",
-            {name, description, now, std::to_string(playlistId)}
+            {name, description, std::to_string(now), std::to_string(playlistId)}
         );
         
         if (!result.success) {
@@ -116,12 +117,12 @@ std::vector<Playlist> PlaylistManager::listPlaylists() const {
             playlist.name = row.at("name");
             playlist.description = row.at("description");
             playlist.loop = (row.at("loop") == "1");
-            playlist.createdAt = row.at("created_at");
-            playlist.updatedAt = row.at("updated_at");
+            playlist.createdAt = std::stoll(row.at("created_at"));
+            playlist.updatedAt = std::stoll(row.at("updated_at"));
             
             auto itemsResult = db_.query(
                 R"(
-                    SELECT pi.id, pi.midi_id, pi.position, m.name as midi_name
+                    SELECT pi.id, pi.playlist_id, pi.midi_id as midi_file_id, pi.position, m.name as filename
                     FROM playlist_items pi
                     LEFT JOIN midi_files m ON pi.midi_id = m.id
                     WHERE pi.playlist_id = ?
@@ -134,9 +135,10 @@ std::vector<Playlist> PlaylistManager::listPlaylists() const {
                 for (const auto& itemRow : itemsResult.rows) {
                     PlaylistItem item;
                     item.id = std::stoi(itemRow.at("id"));
-                    item.midiId = std::stoi(itemRow.at("midi_id"));
+                    item.playlistId = std::stoi(itemRow.at("playlist_id"));
+                    item.midiFileId = std::stoi(itemRow.at("midi_file_id"));
                     item.position = std::stoi(itemRow.at("position"));
-                    item.midiName = itemRow.count("midi_name") ? itemRow.at("midi_name") : "";
+                    item.filename = itemRow.count("filename") ? itemRow.at("filename") : "";
                     playlist.items.push_back(item);
                 }
             }
@@ -177,12 +179,12 @@ Playlist PlaylistManager::getPlaylist(int playlistId) const {
         playlist.name = row.at("name");
         playlist.description = row.at("description");
         playlist.loop = (row.at("loop") == "1");
-        playlist.createdAt = row.at("created_at");
-        playlist.updatedAt = row.at("updated_at");
+        playlist.createdAt = std::stoll(row.at("created_at"));
+        playlist.updatedAt = std::stoll(row.at("updated_at"));
         
         auto itemsResult = db_.query(
             R"(
-                SELECT pi.id, pi.midi_id, pi.position, m.name as midi_name
+                SELECT pi.id, pi.playlist_id, pi.midi_id as midi_file_id, pi.position, m.name as filename
                 FROM playlist_items pi
                 LEFT JOIN midi_files m ON pi.midi_id = m.id
                 WHERE pi.playlist_id = ?
@@ -195,9 +197,10 @@ Playlist PlaylistManager::getPlaylist(int playlistId) const {
             for (const auto& itemRow : itemsResult.rows) {
                 PlaylistItem item;
                 item.id = std::stoi(itemRow.at("id"));
-                item.midiId = std::stoi(itemRow.at("midi_id"));
+                item.playlistId = std::stoi(itemRow.at("playlist_id"));
+                item.midiFileId = std::stoi(itemRow.at("midi_file_id"));
                 item.position = std::stoi(itemRow.at("position"));
-                item.midiName = itemRow.count("midi_name") ? itemRow.at("midi_name") : "";
+                item.filename = itemRow.count("filename") ? itemRow.at("filename") : "";
                 playlist.items.push_back(item);
             }
         }
@@ -356,10 +359,10 @@ bool PlaylistManager::setLoop(int playlistId, bool loop) {
 
 void PlaylistManager::updatePlaylistTimestamp(int playlistId) {
     try {
-        auto now = TimeUtils::getTimestamp();
+        auto now = TimeUtils::systemNow();
         auto result = db_.execute(
             "UPDATE playlists SET updated_at = ? WHERE id = ?",
-            {now, std::to_string(playlistId)}
+            {std::to_string(now), std::to_string(playlistId)}
         );
         
         if (!result.success) {
