@@ -1,796 +1,355 @@
 // ============================================================================
 // Fichier: frontend/js/views/PlaylistView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Version: v3.2.0 - SIGNATURE COHÉRENTE + API COMPLÈTE
+// Date: 2025-11-01
 // ============================================================================
-// Description:
-//   Vue dédiée à l'affichage et la gestion de l'interface des playlists.
-//   Interface complète avec liste de playlists, fichiers, contrôles
-//   (shuffle/repeat/auto-advance) et queue de lecture temporaire.
-//
-// Fonctionnalités:
-//   - Affichage liste playlists sauvegardées
-//   - Affichage fichiers de la playlist courante
-//   - Contrôles lecture (shuffle, repeat, auto-advance)
-//   - Queue de lecture temporaire avec drag & drop
-//   - Indicateurs visuels (fichier en cours, queue active)
-//   - Statistiques (durée totale, nombre fichiers)
-//   - Menu contextuel (édition, suppression)
-//   - Drag & Drop pour réorganisation
-//
-// Structure HTML:
-//   playlist-view-container
-//   ├── playlist-header (titre + contrôles)
-//   ├── playlist-layout
-//   │   ├── playlist-sidebar.left (liste playlists)
-//   │   ├── playlist-main (fichiers playlist)
-//   │   └── playlist-sidebar.right (queue)
-//   └── playlist-footer (statistiques)
-//
-// Auteur: MidiMind Team
+// CORRECTIONS v3.2.0:
+// ✅ Signature cohérente : constructor(containerId, eventBus, logger = null)
+// ✅ Appel super() correct
+// ✅ Affichage liste playlists
+// ✅ Affichage fichiers dans playlist
+// ✅ Contrôles playlist (play, shuffle, repeat)
 // ============================================================================
 
 class PlaylistView extends BaseView {
-    constructor(containerId, eventBus) {
+    constructor(containerId, eventBus, logger = null) {
         super(containerId, eventBus);
         
-        // État de la vue
+        this.logger = logger || window.logger || console;
+        
+        // État spécifique à la vue
         this.viewState = {
-            currentPlaylist: null,
-            currentFile: null,
             playlists: [],
-            queueVisible: true,
-            editMode: false,
-            selectedFiles: [],
-            draggedItem: null
+            selectedPlaylist: null,
+            currentFile: null,
+            isPlaying: false,
+            shuffle: false,
+            repeat: false
         };
         
-        // Configuration
-        this.config = {
-            autoRender: false,
-            showDurations: true,
-            showMetadata: true,
-            enableDragDrop: true,
-            queueCollapsible: true
-        };
-        
-        // Cache des éléments DOM pour performance
-        this.cachedElements = {
-            playlistsList: null,
-            currentPlaylistContent: null,
-            queuePanel: null,
-            controls: null,
-            stats: null
-        };
-        
-        this.logger = window.logger || console;
-        this.logger.info('PlaylistView', '🎵 PlaylistView v1.0.0 initialized');
+        this.log('info', 'PlaylistView', '✅ PlaylistView v3.2.0 initialized');
     }
     
     // ========================================================================
     // TEMPLATE PRINCIPAL
     // ========================================================================
     
-    /**
-     * Construit le template HTML complet
-     */
     buildTemplate(data = {}) {
-        // Fusionner data avec viewState
         const state = { ...this.viewState, ...data };
         
-        return `
+        return \`
             <div class="playlist-view-container">
-                
-                <!-- Header avec actions globales -->
-                <div class="playlist-header">
-                    ${this.renderHeader(state)}
+                <div class="page-header">
+                    <h1>🎵 Playlists</h1>
+                    <div class="header-actions">
+                        <button class="btn-primary" data-action="create-playlist">
+                            ➕ Nouvelle Playlist
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- Layout principal 3 colonnes -->
                 <div class="playlist-layout">
-                    
-                    <!-- Sidebar gauche: Liste des playlists -->
-                    <div class="playlist-sidebar left">
-                        ${this.renderPlaylistsList(state)}
+                    <!-- Sidebar: Liste playlists -->
+                    <div class="playlist-sidebar">
+                        <h2>Mes Playlists</h2>
+                        \${this.renderPlaylistsList(state)}
                     </div>
                     
-                    <!-- Centre: Contenu playlist courante -->
+                    <!-- Main: Contenu playlist -->
                     <div class="playlist-main">
-                        ${this.renderCurrentPlaylist(state)}
+                        \${this.renderPlaylistContent(state)}
                     </div>
-                    
-                    <!-- Sidebar droite: Queue (repliable) -->
-                    <div class="playlist-sidebar right ${state.queueVisible ? 'visible' : 'collapsed'}">
-                        ${this.renderQueuePanel(state)}
-                    </div>
-                    
-                </div>
-                
-                <!-- Footer avec statistiques -->
-                <div class="playlist-footer">
-                    ${this.renderStats(state)}
-                </div>
-                
-            </div>
-        `;
-    }
-    
-    // ========================================================================
-    // HEADER
-    // ========================================================================
-    
-    renderHeader(state) {
-        return `
-            <div class="playlist-header-content">
-                <div class="header-left">
-                    <h2 class="playlist-title">
-                        <span class="icon">🎵</span>
-                        Playlists
-                    </h2>
-                </div>
-                
-                <div class="header-center">
-                    ${this.renderControls(state)}
-                </div>
-                
-                <div class="header-right">
-                    <button class="btn btn-primary" 
-                            onclick="app.playlistController.openPlaylistEditor()"
-                            title="Créer une nouvelle playlist">
-                        <span class="icon">➕</span>
-                        Nouvelle Playlist
-                    </button>
-                    
-                    <button class="btn btn-secondary" 
-                            onclick="app.playlistController.toggleQueue()"
-                            title="Afficher/Masquer la queue">
-                        <span class="icon">📋</span>
-                        Queue
-                        ${state.queueVisible ? '▼' : '▶'}
-                    </button>
                 </div>
             </div>
-        `;
+        \`;
     }
     
     // ========================================================================
-    // CONTRÔLES (Shuffle / Repeat / Auto-advance)
-    // ========================================================================
-    
-    renderControls(state) {
-        const shuffleMode = state.shuffleMode || false;
-        const repeatMode = state.repeatMode || 'none';
-        const autoAdvance = state.autoAdvance !== false;
-        
-        return `
-            <div class="playlist-controls" data-controls>
-                
-                <!-- Shuffle -->
-                <button class="btn-control ${shuffleMode ? 'active' : ''}"
-                        data-control="shuffle"
-                        onclick="app.playlistController.toggleShuffle()"
-                        title="Mode aléatoire">
-                    <span class="icon">🔀</span>
-                    <span class="label">Shuffle</span>
-                </button>
-                
-                <!-- Repeat -->
-                <button class="btn-control ${repeatMode !== 'none' ? 'active' : ''}"
-                        data-control="repeat"
-                        onclick="app.playlistController.cycleRepeat()"
-                        title="Mode répétition: ${repeatMode}">
-                    <span class="icon">${this.getRepeatIcon(repeatMode)}</span>
-                    <span class="label">${this.getRepeatLabel(repeatMode)}</span>
-                </button>
-                
-                <!-- Auto-advance -->
-                <button class="btn-control ${autoAdvance ? 'active' : ''}"
-                        data-control="auto-advance"
-                        onclick="app.playlistController.toggleAutoAdvance()"
-                        title="Avance automatique">
-                    <span class="icon">⏭️</span>
-                    <span class="label">Auto</span>
-                </button>
-                
-            </div>
-        `;
-    }
-    
-    getRepeatIcon(mode) {
-        switch(mode) {
-            case 'one': return '🔂';
-            case 'all': return '🔁';
-            default: return '↻';
-        }
-    }
-    
-    getRepeatLabel(mode) {
-        switch(mode) {
-            case 'one': return 'Repeat One';
-            case 'all': return 'Repeat All';
-            default: return 'Repeat';
-        }
-    }
-    
-    // ========================================================================
-    // LISTE DES PLAYLISTS (Sidebar gauche)
+    // RENDERING PLAYLISTS
     // ========================================================================
     
     renderPlaylistsList(state) {
         const playlists = state.playlists || [];
-        const currentId = state.currentPlaylist?.id;
         
-        return `
-            <div class="playlists-list-container">
-                <div class="playlists-list-header">
-                    <h3>Mes Playlists</h3>
-                    <span class="count">${playlists.length}</span>
+        if (playlists.length === 0) {
+            return \`
+                <div class="playlists-empty">
+                    <p>Aucune playlist</p>
+                    <p class="text-muted">Créez votre première playlist</p>
                 </div>
-                
-                <div class="playlists-list" data-playlists-list>
-                    ${playlists.length === 0 
-                        ? this.renderEmptyPlaylists()
-                        : playlists.map(pl => this.renderPlaylistItem(pl, currentId)).join('')
-                    }
-                </div>
-            </div>
-        `;
-    }
-    
-    renderPlaylistItem(playlist, currentId) {
-        const isActive = playlist.id === currentId;
-        const fileCount = playlist.files?.length || 0;
-        const duration = this.formatDuration(playlist.duration || 0);
-        
-        return `
-            <div class="playlist-item ${isActive ? 'active' : ''}"
-                 data-playlist-id="${playlist.id}"
-                 onclick="app.playlistController.loadPlaylist('${playlist.id}')">
-                
-                <div class="playlist-item-icon">
-                    ${isActive ? '▶️' : '🎵'}
-                </div>
-                
-                <div class="playlist-item-info">
-                    <div class="playlist-item-name" title="${this.escapeHtml(playlist.name)}">
-                        ${this.escapeHtml(playlist.name)}
-                    </div>
-                    <div class="playlist-item-meta">
-                        <span class="file-count">${fileCount} fichier${fileCount > 1 ? 's' : ''}</span>
-                        ${duration ? `<span class="duration">• ${duration}</span>` : ''}
-                    </div>
-                </div>
-                
-                <div class="playlist-item-actions">
-                    <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.playlistController.editPlaylist('${playlist.id}')"
-                            title="Éditer">
-                        ✏️
-                    </button>
-                    <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.playlistController.deletePlaylist('${playlist.id}')"
-                            title="Supprimer">
-                        🗑️
-                    </button>
-                </div>
-                
-            </div>
-        `;
-    }
-    
-    renderEmptyPlaylists() {
-        return `
-            <div class="empty-state">
-                <div class="empty-icon">📁</div>
-                <p class="empty-message">Aucune playlist</p>
-                <button class="btn btn-sm btn-primary" 
-                        onclick="app.playlistController.openPlaylistEditor()">
-                    Créer une playlist
-                </button>
-            </div>
-        `;
-    }
-    
-    // ========================================================================
-    // PLAYLIST COURANTE (Centre)
-    // ========================================================================
-    
-    renderCurrentPlaylist(state) {
-        const playlist = state.currentPlaylist;
-        
-        if (!playlist) {
-            return this.renderNoPlaylist();
+            \`;
         }
         
-        const files = playlist.files || [];
-        const currentFileId = state.currentFile?.id;
+        return \`
+            <div class="playlists-list">
+                \${playlists.map(playlist => this.renderPlaylistItem(playlist, state.selectedPlaylist)).join('')}
+            </div>
+        \`;
+    }
+    
+    renderPlaylistItem(playlist, selectedPlaylist) {
+        const isSelected = selectedPlaylist && selectedPlaylist.id === playlist.id;
+        const selectedClass = isSelected ? 'selected' : '';
+        const fileCount = playlist.files?.length || 0;
         
-        return `
-            <div class="current-playlist-container">
-                
-                <!-- En-tête playlist -->
-                <div class="current-playlist-header">
-                    <h3 class="playlist-name">${this.escapeHtml(playlist.name)}</h3>
-                    <div class="playlist-actions">
-                        <button class="btn btn-sm" 
-                                onclick="app.playlistController.editPlaylist('${playlist.id}')"
-                                title="Éditer cette playlist">
-                            ✏️ Éditer
-                        </button>
-                        <button class="btn btn-sm" 
-                                onclick="app.playlistController.clearCurrentPlaylist()"
-                                title="Vider la playlist">
-                            🗑️ Vider
-                        </button>
+        return \`
+            <div class="playlist-item \${selectedClass}" 
+                 data-playlist-id="\${playlist.id}"
+                 data-action="select-playlist">
+                <div class="playlist-icon">📋</div>
+                <div class="playlist-info">
+                    <div class="playlist-name">\${playlist.name}</div>
+                    <div class="playlist-meta">\${fileCount} fichier(s)</div>
+                </div>
+                <button class="btn-icon btn-danger" 
+                        data-action="delete-playlist" 
+                        data-playlist-id="\${playlist.id}"
+                        title="Supprimer">
+                    🗑️
+                </button>
+            </div>
+        \`;
+    }
+    
+    // ========================================================================
+    // RENDERING PLAYLIST CONTENT
+    // ========================================================================
+    
+    renderPlaylistContent(state) {
+        if (!state.selectedPlaylist) {
+            return \`
+                <div class="playlist-empty-state">
+                    <div class="empty-icon">🎵</div>
+                    <p>Sélectionnez une playlist</p>
+                </div>
+            \`;
+        }
+        
+        const playlist = state.selectedPlaylist;
+        const files = playlist.files || [];
+        
+        return \`
+            <div class="playlist-content">
+                <div class="playlist-header">
+                    <h2>\${playlist.name}</h2>
+                    <div class="playlist-controls">
+                        \${this.renderPlaylistControls(state)}
                     </div>
                 </div>
                 
-                <!-- Liste des fichiers -->
-                <div class="playlist-files" 
-                     data-playlist-files
-                     data-playlist-id="${playlist.id}">
-                    ${files.length === 0 
-                        ? this.renderEmptyPlaylist()
-                        : files.map((file, index) => 
-                            this.renderFileItem(file, index, currentFileId)
-                          ).join('')
-                    }
+                <div class="playlist-files">
+                    \${files.length === 0 
+                        ? this.renderEmptyPlaylist() 
+                        : this.renderFilesList(files, state.currentFile)}
                 </div>
                 
+                <div class="playlist-footer">
+                    <button class="btn-secondary" data-action="add-files">
+                        ➕ Ajouter des fichiers
+                    </button>
+                </div>
             </div>
-        `;
+        \`;
     }
     
-    renderNoPlaylist() {
-        return `
-            <div class="no-playlist-state">
-                <div class="empty-icon">🎵</div>
-                <h3>Aucune playlist sélectionnée</h3>
-                <p>Créez ou sélectionnez une playlist pour commencer</p>
-                <button class="btn btn-primary" 
-                        onclick="app.playlistController.openPlaylistEditor()">
-                    ➕ Créer une playlist
+    renderPlaylistControls(state) {
+        const playIcon = state.isPlaying ? '⏸️' : '▶️';
+        const shuffleClass = state.shuffle ? 'active' : '';
+        const repeatClass = state.repeat ? 'active' : '';
+        
+        return \`
+            <div class="controls-group">
+                <button class="btn-control" data-action="play-playlist" title="Play/Pause">
+                    \${playIcon}
+                </button>
+                <button class="btn-control \${shuffleClass}" data-action="toggle-shuffle" title="Shuffle">
+                    🔀
+                </button>
+                <button class="btn-control \${repeatClass}" data-action="toggle-repeat" title="Repeat">
+                    🔁
                 </button>
             </div>
-        `;
+        \`;
     }
     
     renderEmptyPlaylist() {
-        return `
-            <div class="empty-playlist-state">
-                <div class="empty-icon">📭</div>
+        return \`
+            <div class="files-empty">
+                <div class="empty-icon">📂</div>
                 <p>Cette playlist est vide</p>
-                <button class="btn btn-sm btn-primary" 
-                        onclick="app.playlistController.editPlaylist('${this.viewState.currentPlaylist?.id}')">
-                    Ajouter des fichiers
-                </button>
+                <p class="text-muted">Ajoutez des fichiers MIDI</p>
             </div>
-        `;
+        \`;
     }
     
-    renderFileItem(file, index, currentFileId) {
-        const isPlaying = file.id === currentFileId;
-        const duration = this.formatDuration(file.duration || 0);
+    renderFilesList(files, currentFile) {
+        return \`
+            <div class="files-list">
+                \${files.map((file, index) => this.renderFileItem(file, index, currentFile)).join('')}
+            </div>
+        \`;
+    }
+    
+    renderFileItem(file, index, currentFile) {
+        const isCurrent = currentFile && (currentFile.id === file.id || currentFile.name === file.name);
+        const currentClass = isCurrent ? 'current' : '';
         
-        return `
-            <div class="playlist-file-item ${isPlaying ? 'playing' : ''}"
-                 data-file-id="${file.id}"
-                 data-index="${index}"
-                 draggable="${this.config.enableDragDrop}"
-                 ondragstart="app.playlistView?.onDragStart(event, ${index})"
-                 ondragover="app.playlistView?.onDragOver(event)"
-                 ondrop="app.playlistView?.onDrop(event, ${index})"
-                 ondblclick="app.playlistController.playFileAt(${index})">
-                
-                <!-- Handle drag -->
-                <div class="file-drag-handle" title="Glisser pour réorganiser">
-                    ⋮⋮
-                </div>
-                
-                <!-- Numéro -->
-                <div class="file-number">
-                    ${isPlaying ? '▶️' : (index + 1)}
-                </div>
-                
-                <!-- Infos -->
+        return \`
+            <div class="file-item \${currentClass}" 
+                 data-file-id="\${file.id || file.name}"
+                 data-file-index="\${index}">
+                <div class="file-number">\${index + 1}</div>
+                <div class="file-icon">\${isCurrent ? '🎵' : '🎼'}</div>
                 <div class="file-info">
-                    <div class="file-name" title="${this.escapeHtml(file.name || file.filename)}">
-                        ${this.escapeHtml(file.name || file.filename)}
+                    <div class="file-name">\${file.name || file.id}</div>
+                    <div class="file-meta">
+                        \${file.duration ? this.formatDuration(file.duration) : 'N/A'}
                     </div>
-                    ${this.config.showMetadata && file.metadata ? `
-                        <div class="file-metadata">
-                            ${file.metadata.trackCount ? `<span>🎹 ${file.metadata.trackCount} pistes</span>` : ''}
-                            ${file.metadata.bpm ? `<span>🥁 ${file.metadata.bpm} BPM</span>` : ''}
-                        </div>
-                    ` : ''}
                 </div>
-                
-                <!-- Durée -->
-                ${this.config.showDurations && duration ? `
-                    <div class="file-duration">${duration}</div>
-                ` : ''}
-                
-                <!-- Actions -->
                 <div class="file-actions">
                     <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.playlistController.playFileAt(${index})"
+                            data-action="play-file" 
+                            data-file-index="\${index}"
                             title="Lire">
                         ▶️
                     </button>
-                    <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.playlistController.addToQueue('${file.id}')"
-                            title="Ajouter à la queue">
-                        ➕
-                    </button>
-                    <button class="btn-icon" 
-                            onclick="event.stopPropagation(); app.playlistController.removeFileFromPlaylist('${this.viewState.currentPlaylist?.id}', '${file.id}')"
-                            title="Retirer de la playlist">
+                    <button class="btn-icon btn-danger" 
+                            data-action="remove-file" 
+                            data-file-index="\${index}"
+                            title="Retirer">
                         ✖️
                     </button>
                 </div>
-                
             </div>
-        `;
+        \`;
     }
     
     // ========================================================================
-    // QUEUE PANEL (Sidebar droite)
+    // FORMATTERS
     // ========================================================================
     
-    renderQueuePanel(state) {
-        const queue = state.queue || [];
-        const isPlayingQueue = state.isPlayingQueue || false;
+    formatDuration(duration) {
+        if (!duration) return '0:00';
         
-        return `
-            <div class="queue-panel-container">
-                
-                <!-- Header queue -->
-                <div class="queue-header">
-                    <h3>
-                        <span class="icon">📋</span>
-                        Queue
-                        ${isPlayingQueue ? '<span class="playing-badge">En cours</span>' : ''}
-                    </h3>
-                    <div class="queue-count">${queue.length}</div>
-                </div>
-                
-                <!-- Actions queue -->
-                ${queue.length > 0 ? `
-                    <div class="queue-actions">
-                        <button class="btn btn-sm btn-primary" 
-                                onclick="app.playlistController.playQueue()"
-                                ${isPlayingQueue ? 'disabled' : ''}>
-                            ▶️ Lire la queue
-                        </button>
-                        <button class="btn btn-sm btn-danger" 
-                                onclick="app.playlistController.clearQueue()">
-                            🗑️ Vider
-                        </button>
-                    </div>
-                ` : ''}
-                
-                <!-- Liste queue -->
-                <div class="queue-list" data-queue-list>
-                    ${queue.length === 0 
-                        ? this.renderEmptyQueue()
-                        : queue.map((file, index) => 
-                            this.renderQueueItem(file, index)
-                          ).join('')
-                    }
-                </div>
-                
-                <!-- Stats queue -->
-                ${queue.length > 0 ? `
-                    <div class="queue-stats">
-                        <span>Durée totale: ${this.formatDuration(this.calculateTotalDuration(queue))}</span>
-                    </div>
-                ` : ''}
-                
-            </div>
-        `;
-    }
-    
-    renderEmptyQueue() {
-        return `
-            <div class="empty-queue-state">
-                <div class="empty-icon">📭</div>
-                <p>La queue est vide</p>
-                <small>Ajoutez des fichiers depuis la playlist</small>
-            </div>
-        `;
-    }
-    
-    renderQueueItem(file, index) {
-        const duration = this.formatDuration(file.duration || 0);
+        const minutes = Math.floor(duration / 60);
+        const seconds = Math.floor(duration % 60);
         
-        return `
-            <div class="queue-item" 
-                 data-file-id="${file.id}"
-                 data-queue-index="${index}">
-                
-                <div class="queue-item-number">${index + 1}</div>
-                
-                <div class="queue-item-info">
-                    <div class="queue-item-name" title="${this.escapeHtml(file.name || file.filename)}">
-                        ${this.escapeHtml(file.name || file.filename)}
-                    </div>
-                    ${duration ? `<div class="queue-item-duration">${duration}</div>` : ''}
-                </div>
-                
-                <button class="btn-icon" 
-                        onclick="app.playlistController.removeFromQueue(${index})"
-                        title="Retirer de la queue">
-                    ✖️
-                </button>
-                
-            </div>
-        `;
+        return \`\${minutes}:\${seconds.toString().padStart(2, '0')}\`;
     }
     
     // ========================================================================
-    // STATISTIQUES (Footer)
+    // UPDATE MÉTHODES
     // ========================================================================
     
-    renderStats(state) {
-        const playlist = state.currentPlaylist;
-        const fileCount = playlist?.files?.length || 0;
-        const totalDuration = playlist?.duration || this.calculateTotalDuration(playlist?.files || []);
-        const queueCount = state.queue?.length || 0;
-        
-        return `
-            <div class="playlist-stats">
-                
-                <div class="stat-item">
-                    <span class="stat-label">Playlist courante</span>
-                    <span class="stat-value">${playlist?.name || 'Aucune'}</span>
-                </div>
-                
-                <div class="stat-item">
-                    <span class="stat-label">Fichiers</span>
-                    <span class="stat-value">${fileCount}</span>
-                </div>
-                
-                <div class="stat-item">
-                    <span class="stat-label">Durée totale</span>
-                    <span class="stat-value">${this.formatDuration(totalDuration)}</span>
-                </div>
-                
-                <div class="stat-item">
-                    <span class="stat-label">Queue</span>
-                    <span class="stat-value">${queueCount} fichier${queueCount > 1 ? 's' : ''}</span>
-                </div>
-                
-            </div>
-        `;
+    updatePlaylists(playlists) {
+        this.viewState.playlists = playlists;
+        this.render();
     }
     
-    // ========================================================================
-    // MÉTHODES DE MISE À JOUR DYNAMIQUE
-    // ========================================================================
+    updateSelectedPlaylist(playlist) {
+        this.viewState.selectedPlaylist = playlist;
+        this.render();
+    }
     
-    /**
-     * Met à jour le fichier en cours de lecture
-     */
-    updateCurrentFile(file, index) {
+    updateCurrentFile(file) {
         this.viewState.currentFile = file;
+        this.render();
+    }
+    
+    updatePlaybackState(isPlaying) {
+        this.viewState.isPlaying = isPlaying;
+        this.render();
+    }
+    
+    updateControls(controls) {
+        if (controls.shuffle !== undefined) {
+            this.viewState.shuffle = controls.shuffle;
+        }
+        if (controls.repeat !== undefined) {
+            this.viewState.repeat = controls.repeat;
+        }
+        this.render();
+    }
+    
+    // ========================================================================
+    // ÉVÉNEMENTS UI
+    // ========================================================================
+    
+    attachEventListeners() {
+        if (!this.container) return;
         
-        // Mettre à jour visuellement
-        const items = this.container?.querySelectorAll('.playlist-file-item');
-        items?.forEach((item, i) => {
-            if (i === index) {
-                item.classList.add('playing');
-                const number = item.querySelector('.file-number');
-                if (number) number.textContent = '▶️';
-            } else {
-                item.classList.remove('playing');
-                const number = item.querySelector('.file-number');
-                if (number) number.textContent = i + 1;
+        // Délégation événements
+        this.container.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+            
+            const action = target.dataset.action;
+            const playlistId = target.dataset.playlistId;
+            const fileIndex = target.dataset.fileIndex;
+            
+            e.stopPropagation();
+            
+            switch (action) {
+                case 'create-playlist':
+                    const name = prompt('Nom de la playlist:');
+                    if (name) {
+                        this.eventBus.emit('playlist:create', { name });
+                    }
+                    break;
+                    
+                case 'select-playlist':
+                    if (playlistId) {
+                        this.eventBus.emit('playlist:select', { playlistId });
+                    }
+                    break;
+                    
+                case 'delete-playlist':
+                    if (playlistId) {
+                        const confirmed = confirm('Supprimer cette playlist ?');
+                        if (confirmed) {
+                            this.eventBus.emit('playlist:delete', { playlistId });
+                        }
+                    }
+                    break;
+                    
+                case 'play-playlist':
+                    this.eventBus.emit('playlist:play');
+                    break;
+                    
+                case 'toggle-shuffle':
+                    this.eventBus.emit('playlist:toggle-shuffle');
+                    break;
+                    
+                case 'toggle-repeat':
+                    this.eventBus.emit('playlist:toggle-repeat');
+                    break;
+                    
+                case 'add-files':
+                    this.eventBus.emit('playlist:add-files');
+                    break;
+                    
+                case 'play-file':
+                    if (fileIndex !== undefined) {
+                        this.eventBus.emit('playlist:play-file', { index: parseInt(fileIndex) });
+                    }
+                    break;
+                    
+                case 'remove-file':
+                    if (fileIndex !== undefined) {
+                        this.eventBus.emit('playlist:remove-file', { index: parseInt(fileIndex) });
+                    }
+                    break;
             }
         });
-    }
-    
-    /**
-     * Met à jour l'état du bouton shuffle
-     */
-    updateShuffleButton(enabled) {
-        this.viewState.shuffleMode = enabled;
-        
-        const btn = this.container?.querySelector('[data-control="shuffle"]');
-        if (btn) {
-            if (enabled) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        }
-    }
-    
-    /**
-     * Met à jour l'état du bouton repeat
-     */
-    updateRepeatButton(mode) {
-        this.viewState.repeatMode = mode;
-        
-        const btn = this.container?.querySelector('[data-control="repeat"]');
-        if (btn) {
-            if (mode !== 'none') {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-            
-            const icon = btn.querySelector('.icon');
-            const label = btn.querySelector('.label');
-            if (icon) icon.textContent = this.getRepeatIcon(mode);
-            if (label) label.textContent = this.getRepeatLabel(mode);
-            
-            btn.title = `Mode répétition: ${mode}`;
-        }
-    }
-    
-    /**
-     * Met à jour l'état du bouton auto-advance
-     */
-    updateAutoAdvanceButton(enabled) {
-        this.viewState.autoAdvance = enabled;
-        
-        const btn = this.container?.querySelector('[data-control="auto-advance"]');
-        if (btn) {
-            if (enabled) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        }
-    }
-    
-    /**
-     * Met à jour le statut de la queue
-     */
-    updateQueueStatus(count) {
-        const badge = this.container?.querySelector('.queue-count');
-        if (badge) {
-            badge.textContent = count;
-        }
-        
-        // Re-render queue si visible
-        if (this.viewState.queueVisible) {
-            this.refreshQueuePanel();
-        }
-    }
-    
-    /**
-     * Affiche indicateur queue en cours de lecture
-     */
-    showQueuePlaying(isPlaying) {
-        this.viewState.isPlayingQueue = isPlaying;
-        
-        const header = this.container?.querySelector('.queue-header h3');
-        if (header) {
-            const badge = header.querySelector('.playing-badge');
-            if (isPlaying && !badge) {
-                header.innerHTML += '<span class="playing-badge">En cours</span>';
-            } else if (!isPlaying && badge) {
-                badge.remove();
-            }
-        }
-    }
-    
-    /**
-     * Notification fin de lecture
-     */
-    showPlaybackComplete() {
-        // Animation ou notification visuelle
-        this.logger.info('PlaylistView', '✅ Playback complete');
-    }
-    
-    // ========================================================================
-    // DRAG & DROP
-    // ========================================================================
-    
-    onDragStart(event, index) {
-        this.viewState.draggedItem = index;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', index);
-        
-        event.target.classList.add('dragging');
-    }
-    
-    onDragOver(event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-    }
-    
-    onDrop(event, targetIndex) {
-        event.preventDefault();
-        
-        const sourceIndex = this.viewState.draggedItem;
-        
-        if (sourceIndex !== null && sourceIndex !== targetIndex) {
-            // Appeler controller pour réorganiser
-            if (window.app?.playlistController) {
-                window.app.playlistController.reorderFiles(sourceIndex, targetIndex);
-            }
-        }
-        
-        // Cleanup
-        const dragging = this.container?.querySelector('.dragging');
-        if (dragging) {
-            dragging.classList.remove('dragging');
-        }
-        
-        this.viewState.draggedItem = null;
     }
     
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
     
-    /**
-     * Rafraîchit uniquement le panel queue
-     */
-    refreshQueuePanel() {
-        const queuePanel = this.container?.querySelector('.queue-panel-container');
-        if (queuePanel) {
-            queuePanel.innerHTML = this.renderQueuePanel(this.viewState).replace(
-                /<div class="queue-panel-container">([\s\S]*)<\/div>$/,
-                '$1'
-            );
-        }
-    }
-    
-    /**
-     * Calcule durée totale d'une liste de fichiers
-     */
-    calculateTotalDuration(files) {
-        return files.reduce((sum, file) => sum + (file.duration || 0), 0);
-    }
-    
-    /**
-     * Formate une durée en ms vers HH:MM:SS
-     */
-    formatDuration(ms) {
-        if (!ms || ms === 0) return '00:00';
-        
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        
-        const s = seconds % 60;
-        const m = minutes % 60;
-        
-        if (hours > 0) {
-            return `${hours}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-        
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    }
-    
-    /**
-     * Échappe HTML
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    /**
-     * Toggle visibilité queue
-     */
-    toggleQueueVisibility() {
-        this.viewState.queueVisible = !this.viewState.queueVisible;
-        
-        const sidebar = this.container?.querySelector('.playlist-sidebar.right');
-        if (sidebar) {
-            if (this.viewState.queueVisible) {
-                sidebar.classList.add('visible');
-                sidebar.classList.remove('collapsed');
-            } else {
-                sidebar.classList.remove('visible');
-                sidebar.classList.add('collapsed');
-            }
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
         }
     }
 }
@@ -798,11 +357,6 @@ class PlaylistView extends BaseView {
 // ============================================================================
 // EXPORT
 // ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlaylistView;
-}
-
 if (typeof window !== 'undefined') {
     window.PlaylistView = PlaylistView;
 }

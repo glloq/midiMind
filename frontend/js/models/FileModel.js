@@ -1,42 +1,33 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Version: v3.1.09 - MÉTHODES ROBUSTES
-// Date: 2025-10-31
+// Chemin réel: frontend/js/models/FileModel.js
+// Version: v3.3.0 - CONFORMITÉ API BACKEND
+// Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.1.09:
-// ✅ Méthodes getAll, getRecentFiles garanties fonctionnelles
-// ✅ Accès direct à this.data pour éviter problèmes BaseModel.get()
-// ✅ Compatibilité totale avec NavigationController
+// CORRECTIONS v3.3.0:
+// ✅ CRITIQUE: Commandes API conformes à API_DOCUMENTATION_FRONTEND.md
+// ✅ list_files (au lieu de files.list)
+// ✅ load_file (au lieu de files.read)
+// ✅ delete_file (au lieu de files.delete)
+// ✅ get_file_info pour obtenir les métadonnées
+// ✅ import_file, export_file pour gestion fichiers
 // ============================================================================
 
 class FileModel extends BaseModel {
-    constructor(eventBus, backend, logger) {
-        // Appel super() avec BaseModel(initialData, options)
-        super({
+    constructor(eventBus, backend, logger, initialData = {}, options = {}) {
+        super(eventBus, backend, logger, {
             files: [],
             currentPath: '/midi',
             selectedFile: null,
-            recentFiles: []
+            recentFiles: [],
+            ...initialData
         }, {
             persistKey: 'filemodel',
             eventPrefix: 'file',
-            autoPersist: true
+            autoPersist: true,
+            ...options
         });
         
-        // Assigner dépendances
-        this.eventBus = eventBus || window.EventBus || window.eventBus;
-        this.backend = backend || window.backendService || window.app?.services?.backend;
-        this.logger = logger || window.logger || console;
-        
-        // Validation
-        if (!this.eventBus) {
-            console.error('[FileModel] EventBus not available!');
-        }
-        if (!this.backend) {
-            console.warn('[FileModel] BackendService not available - file operations will fail');
-        }
-        
-        // ✅ CRITIQUE: S'assurer que this.data existe avec valeurs par défaut
         if (!this.data) {
             this.data = {};
         }
@@ -45,352 +36,400 @@ class FileModel extends BaseModel {
         this.data.selectedFile = this.data.selectedFile || null;
         this.data.recentFiles = this.data.recentFiles || [];
         
-        if (this.logger && typeof this.logger.info === 'function') {
-            this.logger.info('FileModel', '✓ FileModel v3.1.09 initialized');
-        }
+        this.log('debug', 'FileModel', '✓ FileModel v3.3.0 initialized (API compliant)');
     }
     
     // ========================================================================
     // GESTION FICHIERS - BASE
     // ========================================================================
     
+    /**
+     * Rafraîchit la liste des fichiers
+     * ✅ API: list_files
+     */
     async refreshFileList(path = null) {
         const targetPath = path || this.getCurrentPath();
         
         if (!this.backend) {
             const error = 'Backend service not available';
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', error);
-            }
+            this.log('error', 'FileModel', error);
             throw new Error(error);
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('FileModel', `Refreshing file list: ${targetPath}`);
-            }
+            this.log('info', 'FileModel', `Refreshing file list: ${targetPath}`);
             
-            const response = await this.backend.sendCommand('files.list', {
+            // ✅ CONFORME: list_files
+            const response = await this.backend.sendCommand('list_files', {
                 path: targetPath
             });
             
-            if (response.success) {
-                const files = response.data.files || [];
-                
-                this.set('files', files);
-                this.set('currentPath', targetPath);
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('file:list-refreshed', {
-                        files,
-                        path: targetPath
-                    });
-                }
-                
-                return files;
+            const files = response.files || [];
+            
+            this.set('files', files);
+            this.set('currentPath', targetPath);
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:list-refreshed', {
+                    files,
+                    path: targetPath
+                });
             }
             
-            throw new Error(response.error || 'Failed to refresh file list');
+            return files;
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', `Refresh failed: ${error.message}`);
-            }
+            this.log('error', 'FileModel', `Refresh failed: ${error.message}`);
             throw error;
         }
     }
     
-    async loadFile(fileId) {
+    /**
+     * Charge un fichier MIDI
+     * ✅ API: load_file
+     */
+    async loadFile(filePath) {
         if (!this.backend) {
             throw new Error('Backend service not available');
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('FileModel', `Loading file: ${fileId}`);
-            }
+            this.log('info', 'FileModel', `Loading file: ${filePath}`);
             
-            const response = await this.backend.sendCommand('files.read', {
-                filename: fileId
+            // ✅ CONFORME: load_file avec file_path
+            const response = await this.backend.sendCommand('load_file', {
+                file_path: filePath
             });
             
-            if (response.success) {
-                const fileData = response.data;
-                
-                this.set('selectedFile', fileData);
-                this.addToRecent(fileId);
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('file:loaded', {
-                        fileId,
-                        data: fileData
-                    });
-                }
-                
-                return fileData;
+            this.set('selectedFile', response);
+            this.addToRecent(filePath);
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:loaded', {
+                    filePath,
+                    data: response
+                });
             }
             
-            throw new Error(response.error || 'Failed to load file');
+            return response;
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', `Load failed: ${error.message}`);
-            }
+            this.log('error', 'FileModel', `Load failed: ${error.message}`);
             throw error;
         }
     }
     
-    async saveFile(fileId, midiData) {
+    /**
+     * Décharge le fichier actuel
+     * ✅ API: unload_file
+     */
+    async unloadFile() {
         if (!this.backend) {
             throw new Error('Backend service not available');
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('FileModel', `Saving file: ${fileId}`);
+            this.log('info', 'FileModel', 'Unloading current file');
+            
+            // ✅ CONFORME: unload_file
+            await this.backend.sendCommand('unload_file');
+            
+            this.set('selectedFile', null);
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:unloaded', {
+                    timestamp: Date.now()
+                });
             }
             
-            const response = await this.backend.sendCommand('files.write', {
-                filename: fileId,
-                content: midiData
-            });
-            
-            if (response.success) {
-                if (this.eventBus) {
-                    this.eventBus.emit('file:saved', {
-                        fileId,
-                        timestamp: Date.now()
-                    });
-                }
-                
-                return true;
-            }
-            
-            throw new Error(response.error || 'Failed to save file');
+            return true;
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', `Save failed: ${error.message}`);
-            }
+            this.log('error', 'FileModel', `Unload failed: ${error.message}`);
             throw error;
         }
     }
     
-    async deleteFile(fileId) {
+    /**
+     * Obtient les informations d'un fichier
+     * ✅ API: get_file_info
+     */
+    async getFileInfo(filePath) {
         if (!this.backend) {
             throw new Error('Backend service not available');
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('FileModel', `Deleting file: ${fileId}`);
-            }
+            this.log('info', 'FileModel', `Getting file info: ${filePath}`);
             
-            const response = await this.backend.sendCommand('files.delete', {
-                filename: fileId
+            // ✅ CONFORME: get_file_info
+            const response = await this.backend.sendCommand('get_file_info', {
+                file_path: filePath
             });
             
-            if (response.success) {
-                const files = this.getAll();
-                this.set('files', files.filter(f => f.id !== fileId));
-                this.removeFromRecent(fileId);
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('file:deleted', {
-                        fileId,
-                        timestamp: Date.now()
-                    });
-                }
-                
-                return true;
-            }
-            
-            throw new Error(response.error || 'Failed to delete file');
+            return response;
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', `Delete failed: ${error.message}`);
-            }
+            this.log('error', 'FileModel', `Get file info failed: ${error.message}`);
             throw error;
         }
     }
     
-    async renameFile(fileId, newName) {
-        // ⚠️ WARNING: files.rename does not exist in backend API v4.2.1
-        // Workaround: read + write + delete
-        throw new Error('Rename operation not supported by backend API');
-        
-        /* Original code disabled:
+    /**
+     * Supprime un fichier
+     * ✅ API: delete_file
+     */
+    async deleteFile(filePath) {
         if (!this.backend) {
             throw new Error('Backend service not available');
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('FileModel', `Renaming file: ${fileId} to ${newName}`);
-            }
+            this.log('info', 'FileModel', `Deleting file: ${filePath}`);
             
-            const response = await this.backend.sendCommand('files.rename', {
-                file_id: fileId,
-                new_name: newName
+            // ✅ CONFORME: delete_file
+            await this.backend.sendCommand('delete_file', {
+                file_path: filePath
             });
             
-            if (response.success) {
-                const files = this.getAll();
-                const fileIndex = files.findIndex(f => f.id === fileId);
-                if (fileIndex !== -1) {
-                    files[fileIndex].name = newName;
-                    this.set('files', [...files]);
-                }
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('file:renamed', {
-                        fileId,
-                        newName,
-                        timestamp: Date.now()
-                    });
-                }
-                
-                return true;
+            const files = this.get('files');
+            const updatedFiles = files.filter(f => f.path !== filePath);
+            this.set('files', updatedFiles);
+            
+            this.removeFromRecent(filePath);
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:deleted', {
+                    filePath,
+                    timestamp: Date.now()
+                });
             }
             
-            throw new Error(response.error || 'Failed to rename file');
+            return true;
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('FileModel', `Rename failed: ${error.message}`);
-            }
+            this.log('error', 'FileModel', `Delete failed: ${error.message}`);
             throw error;
         }
-        */
+    }
+    
+    /**
+     * Importe un fichier
+     * ✅ API: import_file
+     */
+    async importFile(fileName, fileData, size, type = 'audio/midi') {
+        if (!this.backend) {
+            throw new Error('Backend service not available');
+        }
+        
+        try {
+            this.log('info', 'FileModel', `Importing file: ${fileName}`);
+            
+            // ✅ CONFORME: import_file
+            const response = await this.backend.sendCommand('import_file', {
+                file_name: fileName,
+                file_data: fileData,
+                size: size,
+                type: type
+            });
+            
+            await this.refreshFileList();
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:imported', {
+                    fileName,
+                    timestamp: Date.now()
+                });
+            }
+            
+            return response;
+            
+        } catch (error) {
+            this.log('error', 'FileModel', `Import failed: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * Exporte un fichier
+     * ✅ API: export_file
+     */
+    async exportFile(filePath, format = 'midi') {
+        if (!this.backend) {
+            throw new Error('Backend service not available');
+        }
+        
+        try {
+            this.log('info', 'FileModel', `Exporting file: ${filePath}`);
+            
+            // ✅ CONFORME: export_file
+            const response = await this.backend.sendCommand('export_file', {
+                file_path: filePath,
+                format: format
+            });
+            
+            if (this.eventBus) {
+                this.eventBus.emit('file:exported', {
+                    filePath,
+                    format,
+                    timestamp: Date.now()
+                });
+            }
+            
+            return response;
+            
+        } catch (error) {
+            this.log('error', 'FileModel', `Export failed: ${error.message}`);
+            throw error;
+        }
     }
     
     // ========================================================================
-    // GESTION FICHIERS RÉCENTS
+    // GESTION RÉCENTS
     // ========================================================================
     
-    addToRecent(fileId) {
-        let recent = this.getRecentFiles();
-        
-        // Retirer si déjà présent
-        recent = recent.filter(id => id !== fileId);
-        
-        // Ajouter en premier
-        recent.unshift(fileId);
-        
-        // Limiter à 10
-        if (recent.length > 10) {
-            recent = recent.slice(0, 10);
-        }
-        
-        this.set('recentFiles', recent);
+    addToRecent(filePath) {
+        const recents = this.get('recentFiles') || [];
+        const filtered = recents.filter(f => f !== filePath);
+        filtered.unshift(filePath);
+        const limited = filtered.slice(0, 10);
+        this.set('recentFiles', limited);
+        this.log('debug', 'FileModel', `Added to recent: ${filePath}`);
     }
     
-    removeFromRecent(fileId) {
-        let recent = this.getRecentFiles();
-        recent = recent.filter(id => id !== fileId);
-        this.set('recentFiles', recent);
+    removeFromRecent(filePath) {
+        const recents = this.get('recentFiles') || [];
+        const filtered = recents.filter(f => f !== filePath);
+        this.set('recentFiles', filtered);
+        this.log('debug', 'FileModel', `Removed from recent: ${filePath}`);
     }
     
     clearRecent() {
         this.set('recentFiles', []);
-    }
-    
-    getRecentFiles() {
-        // ✅ ACCÈS DIRECT pour garantir fonctionnement
-        if (this.data && Array.isArray(this.data.recentFiles)) {
-            return this.data.recentFiles;
-        }
-        // Fallback via get()
-        const recent = this.get('recentFiles');
-        return Array.isArray(recent) ? recent : [];
+        this.log('info', 'FileModel', 'Recent files cleared');
     }
     
     // ========================================================================
-    // GETTERS / HELPERS
+    // ACCESSEURS
     // ========================================================================
     
     getAll() {
-        // ✅ ACCÈS DIRECT pour garantir fonctionnement
-        if (this.data && Array.isArray(this.data.files)) {
-            return this.data.files;
-        }
-        // Fallback via get()
-        const files = this.get('files');
-        return Array.isArray(files) ? files : [];
+        return this.data.files || [];
     }
     
-    getById(fileId) {
-        const files = this.getAll();
-        return files.find(f => f.id === fileId);
-    }
-    
-    getSelected() {
-        return this.get('selectedFile');
-    }
-    
-    setSelected(file) {
-        this.set('selectedFile', file);
-        
-        if (file && this.eventBus) {
-            this.eventBus.emit('file:selected', {
-                file,
-                timestamp: Date.now()
-            });
-        }
+    getRecentFiles() {
+        return this.data.recentFiles || [];
     }
     
     getCurrentPath() {
-        // ✅ ACCÈS DIRECT pour garantir fonctionnement
-        if (this.data && this.data.currentPath) {
-            return this.data.currentPath;
+        return this.data.currentPath || '/midi';
+    }
+    
+    getSelectedFile() {
+        return this.data.selectedFile;
+    }
+    
+    setSelectedFile(file) {
+        this.set('selectedFile', file);
+        if (file && file.path) {
+            this.addToRecent(file.path);
         }
-        // Fallback via get()
-        return this.get('currentPath') || '/midi';
     }
     
-    setCurrentPath(path) {
-        this.set('currentPath', path);
-    }
+    // ========================================================================
+    // RECHERCHE & FILTRAGE
+    // ========================================================================
     
-    filterByName(query) {
+    searchFiles(query) {
         const files = this.getAll();
+        if (!query || query.trim() === '') {
+            return files;
+        }
+        
         const lowerQuery = query.toLowerCase();
-        return files.filter(f => 
-            f.name.toLowerCase().includes(lowerQuery)
-        );
+        return files.filter(file => {
+            return (
+                file.name?.toLowerCase().includes(lowerQuery) ||
+                file.path?.toLowerCase().includes(lowerQuery) ||
+                file.artist?.toLowerCase().includes(lowerQuery) ||
+                file.title?.toLowerCase().includes(lowerQuery)
+            );
+        });
+    }
+    
+    filterByType(type) {
+        const files = this.getAll();
+        return files.filter(file => {
+            return file.type === type || file.extension === type;
+        });
     }
     
     sortFiles(sortBy = 'name', order = 'asc') {
-        const files = this.getAll();
-        const sorted = [...files].sort((a, b) => {
-            let comparison = 0;
+        const files = [...this.getAll()];
+        
+        files.sort((a, b) => {
+            let valA = a[sortBy];
+            let valB = b[sortBy];
             
-            switch (sortBy) {
-                case 'name':
-                    comparison = a.name.localeCompare(b.name);
-                    break;
-                case 'size':
-                    comparison = (a.size || 0) - (b.size || 0);
-                    break;
-                case 'date':
-                    comparison = (a.modified || 0) - (b.modified || 0);
-                    break;
-                default:
-                    comparison = 0;
+            if (typeof valA === 'string') {
+                valA = valA.toLowerCase();
+            }
+            if (typeof valB === 'string') {
+                valB = valB.toLowerCase();
             }
             
-            return order === 'desc' ? -comparison : comparison;
+            if (order === 'asc') {
+                return valA > valB ? 1 : valA < valB ? -1 : 0;
+            } else {
+                return valA < valB ? 1 : valA > valB ? -1 : 0;
+            }
         });
         
-        this.set('files', sorted);
-        return sorted;
+        return files;
+    }
+    
+    // ========================================================================
+    // VALIDATION
+    // ========================================================================
+    
+    validateFileName(fileName) {
+        if (!fileName || typeof fileName !== 'string') {
+            return { valid: false, error: 'Nom de fichier invalide' };
+        }
+        
+        if (fileName.length > 255) {
+            return { valid: false, error: 'Nom trop long (max 255 caractères)' };
+        }
+        
+        const invalidChars = /[<>:"/\\|?*]/;
+        if (invalidChars.test(fileName)) {
+            return { valid: false, error: 'Caractères non autorisés dans le nom' };
+        }
+        
+        return { valid: true };
+    }
+    
+    validateFilePath(filePath) {
+        if (!filePath || typeof filePath !== 'string') {
+            return { valid: false, error: 'Chemin invalide' };
+        }
+        
+        if (!filePath.startsWith('/')) {
+            return { valid: false, error: 'Le chemin doit commencer par /' };
+        }
+        
+        return { valid: true };
     }
 }
 
 // ============================================================================
-// EXPORT GLOBAL
+// EXPORT
 // ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = FileModel;
+}
+
 if (typeof window !== 'undefined') {
     window.FileModel = FileModel;
 }

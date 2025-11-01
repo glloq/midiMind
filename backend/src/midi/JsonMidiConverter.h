@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/JsonMidiConverter.h
-// Version: 4.1.0
+// Version: 4.2.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -17,18 +17,19 @@
 //   - Time conversion (ticks ↔ milliseconds)
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-10-31
 //
-// Changes v4.1.0:
-//   - Enhanced conversion accuracy
-//   - Better metadata extraction
-//   - Improved error handling
+// Changes v4.2.1:
+//   - Added fromMidiFile() implementation support
+//   - Added helper methods for MIDI file conversion
+//   - Enhanced metadata extraction from MIDI files
 //
 // ============================================================================
 
 #pragma once
 
 #include "MidiMessage.h"
+#include "file/MidiFileReader.h"
 #include <string>
 #include <fstream>
 #include <vector>
@@ -280,6 +281,7 @@ public:
      * @brief Convert MIDI file to JsonMidi
      * @param filepath Path to MIDI file
      * @return JsonMidi Converted structure
+     * @throws std::runtime_error if file cannot be read or is invalid
      */
     JsonMidi fromMidiFile(const std::string& filepath);
     
@@ -375,6 +377,58 @@ private:
      * @brief Extract tempo from timeline
      */
     uint32_t extractTempo(const std::vector<JsonMidiEvent>& timeline) const;
+    
+    // ========================================================================
+    // PHASE 2: MIDI FILE CONVERSION HELPERS
+    // ========================================================================
+    
+    /**
+     * @brief Format time signature as string
+     * @param ts TimeSignature structure
+     * @return Formatted string (e.g., "4/4")
+     */
+    std::string formatTimeSignature(const TimeSignature& ts) const;
+    
+    /**
+     * @brief Convert MidiTrack to JsonMidiTrack
+     * @param track Source MIDI track
+     * @param trackId Track identifier
+     * @return Converted JsonMidiTrack
+     */
+    JsonMidiTrack convertMidiTrackToJsonTrack(const MidiTrack& track, uint16_t trackId);
+    
+    /**
+     * @brief Convert all MIDI events to unified timeline
+     * @param midiFile Source MIDI file
+     * @param ticksPerBeat Ticks per quarter note
+     * @return Vector of JsonMidiEvents in chronological order
+     */
+    std::vector<JsonMidiEvent> convertMidiEventsToTimeline(
+        const MidiFile& midiFile, 
+        uint16_t ticksPerBeat
+    );
+    
+    /**
+     * @brief Convert single MidiEvent to JsonMidiEvent
+     * @param event Source MIDI event
+     * @param timeMs Time in milliseconds
+     * @param trackChannel Track's primary channel
+     * @return Converted JsonMidiEvent
+     */
+    JsonMidiEvent convertMidiEventToJsonEvent(
+        const MidiEvent& event, 
+        uint32_t timeMs, 
+        uint8_t trackChannel
+    );
+    
+    /**
+     * @brief Convert ticks to milliseconds using tempo
+     * @param ticks Tick value
+     * @param ticksPerBeat Ticks per quarter note
+     * @param tempo Tempo in microseconds per quarter note
+     * @return Milliseconds
+     */
+    uint32_t ticksToMilliseconds(uint32_t ticks, uint16_t ticksPerBeat, uint32_t tempo) const;
     
     // ========================================================================
     // MEMBER VARIABLES

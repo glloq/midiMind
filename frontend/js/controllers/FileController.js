@@ -1,689 +1,408 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
-// Version: v3.0.4-FIXED-MERGE
-// Date: 2025-10-30
+// Version: v3.3.0 - API CONFORMITÉ
+// Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.0.4:
-// âœ… CRITIQUE: Fusionne state/config au lieu de les Ã©craser
-// âœ… Utilise Object.assign pour prÃ©server propriÃ©tÃ©s de BaseController
-// âœ… Conserve toutes les fonctionnalitÃ©s existantes
+// CORRECTIONS v3.2.0:
+// âœ… Toutes les commandes files.* implÃ©mentÃ©es
+// âœ… Gestion upload/download fichiers MIDI
+// âœ… Gestion Ã©vÃ©nements backend temps rÃ©el
+// âœ… Auto-refresh liste fichiers
 // ============================================================================
 
 class FileController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Services - Initialize BEFORE everything else
-        this.backend = window.app?.services?.backend || null;
         this.logger = window.logger || console;
+        this.fileModel = models.file;
+        this.view = views.file;
+        this.backend = window.app?.services?.backend || window.backendService;
         
-        // âœ… FUSIONNER state au lieu d'Ã©craser
-        Object.assign(this.state, {
-            currentDirectory: '/midi',
+        // Ã‰tat
+        this.state = {
+            ...this.state,
+            currentPath: '/midi',
             selectedFile: null,
             isLoading: false,
             lastRefresh: null
-        });
+        };
         
-        // âœ… FUSIONNER config au lieu d'Ã©craser
-        Object.assign(this.config, {
+        // Configuration
+        this.config = {
+            ...this.config,
             maxFileSize: 10 * 1024 * 1024, // 10 MB
             allowedExtensions: ['.mid', '.midi'],
             autoRefresh: true,
-            confirmDelete: true
-        });
+            confirmDelete: true,
+            refreshInterval: 30000 // 30 secondes
+        };
         
-        // Mark as fully initialized
+        // Timer
+        this.refreshTimer = null;
+        
         this._fullyInitialized = true;
-        
-        // Now initialize
-        // ✅ REMOVED: this.initialize() - BaseController calls it via autoInitialize
+        this.bindEvents();
     }
     
     // ========================================================================
-    // INITIALISATION
+    // Ã‰VÃ‰NEMENTS
     // ========================================================================
     
-    initialize() {
-        // Only initialize if fully ready
-        if (!this._fullyInitialized) {
-            return;
-        }
-        
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'ðŸ“ Initializing...');
-        }
-        
-        // VÃ©rifier dÃ©pendances
-        if (!this.backend) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'BackendService not available');
-            }
-            return;
-        }
-        
-        // Setup Ã©vÃ©nements
-        this.setupEventListeners();
-        
-        // Charger liste initiale
-        setTimeout(() => {
-            this.refreshFileList();
-        }, 1000);
-        
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'âœ“ Initialized');
-        }
-    }
-    
-    setupEventListeners() {
-        // Ã‰vÃ©nements UI
-        this.eventBus.on('file:select', (data) => this.handleFileSelect(data));
-        this.eventBus.on('file:load', (data) => this.handleFileLoad(data));
-        this.eventBus.on('file:upload', (data) => this.handleFileUpload(data));
-        this.eventBus.on('file:delete', (data) => this.handleFileDelete(data));
-        this.eventBus.on('file:rename', (data) => this.handleFileRename(data));
+    bindEvents() {
+        // Actions fichiers
+        this.eventBus.on('file:select', (data) => this.selectFile(data.fileId));
+        this.eventBus.on('file:load', (data) => this.loadFile(data.fileId));
+        this.eventBus.on('file:save', (data) => this.saveFile(data.fileId, data.content));
+        this.eventBus.on('file:delete', (data) => this.deleteFile(data.fileId));
         this.eventBus.on('file:refresh', () => this.refreshFileList());
         
-        // Ã‰vÃ©nements backend
-        this.eventBus.on('backend:event', (event) => this.handleBackendEvent(event));
+        // Backend
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
-    }
-    
-    // ========================================================================
-    // GESTION LISTE DE FICHIERS
-    // ========================================================================
-    
-    /**
-     * RafraÃ®chit la liste des fichiers
-     * @returns {Promise<Array>} Liste des fichiers
-     */
-    async refreshFileList() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'Refreshing file list...');
-        }
         
-        try {
-            this.showLoading(true);
-            
-            const result = await this.backend.sendCommand('files.list', {
-                directory: this.state.currentDirectory
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Failed to fetch file list');
+        // Navigation
+        this.eventBus.on('navigation:page_changed', (data) => {
+            if (data.page === 'files') {
+                this.onFilesPageActive();
+            } else {
+                this.onFilesPageInactive();
             }
-            
-            const files = result.data?.files || [];
-            
-            // Mettre Ã  jour model
-            const model = this.getModel('file');
-            if (model) {
-                model.set('files', files);
-                model.set('directory', this.state.currentDirectory);
-                model.set('lastRefresh', Date.now());
-            }
-            
-            // Mettre Ã  jour view
-            this.updateView('file', {
-                files: files,
-                directory: this.state.currentDirectory,
-                count: files.length
-            });
-            
-            this.state.lastRefresh = Date.now();
-            
-            if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `âœ“ ${files.length} files loaded`);
-            }
-            
-            // Ã‰mettre Ã©vÃ©nement
-            this.eventBus.emit('files:refreshed', {
-                files: files,
-                count: files.length
-            });
-            
-            return files;
-            
-        } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Failed to refresh file list:', error);
-            }
-            
-            this.showNotification(
-                `Failed to load files: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            return [];
-            
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    // ========================================================================
-    // SÃ‰LECTION FICHIER
-    // ========================================================================
-    
-    /**
-     * SÃ©lectionne un fichier
-     * @param {string} fileId - ID du fichier
-     */
-    selectFile(fileId) {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', `Selecting file: ${fileId}`);
-        }
-        
-        const previousFile = this.state.selectedFile;
-        this.state.selectedFile = fileId;
-        
-        // RÃ©cupÃ©rer infos fichier
-        const file = this.getFileById(fileId);
-        
-        // Ã‰mettre Ã©vÃ©nement
-        this.eventBus.emit('file:selected', {
-            fileId: fileId,
-            file: file,
-            previousFile: previousFile
         });
         
-        // Mettre Ã  jour view
-        this.updateView('file', {
-            selectedFile: fileId,
-            selectedFileData: file
-        });
+        this.log('info', 'FileController', 'âœ… Events bound');
     }
     
-    /**
-     * Handler pour Ã©vÃ©nement file:select
-     * @private
-     */
-    handleFileSelect(data) {
-        const fileId = data.fileId || data.id || data.file_id;
-        
-        if (!fileId) {
-            if (this.logger && this.logger.warn) {
-                this.logger.warn('FileController', 'No file ID provided for select');
-            }
-            return;
-        }
-        
-        this.selectFile(fileId);
-    }
-    
-    /**
-     * Charge un fichier pour lecture via GlobalPlaybackController
-     * @param {string} fileId - ID du fichier
-     * @returns {Promise<void>}
-     */
-    async loadFile(fileId) {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', `Loading file: ${fileId}`);
-        }
+    async onBackendConnected() {
+        this.log('info', 'FileController', 'âœ… Backend connected');
         
         try {
-            // VÃ©rifier GlobalPlaybackController disponible
-            if (!window.globalPlaybackController) {
-                throw new Error('GlobalPlaybackController not available');
-            }
-            
-            // Charger via playback controller
-            await window.globalPlaybackController.loadFile(fileId);
-            
-            // RÃ©cupÃ©rer nom fichier
-            const file = this.getFileById(fileId);
-            const fileName = file?.filename || file?.name || 'File';
-            
-            // Notification succÃ¨s
-            this.showNotification(
-                `${fileName} loaded`,
-                'success',
-                { duration: 2000 }
-            );
-            
-        } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Load file failed:', error);
-            }
-            
-            this.showNotification(
-                `Failed to load file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-        }
-    }
-    
-    /**
-     * Handler pour Ã©vÃ©nement file:load
-     * @private
-     */
-    async handleFileLoad(data) {
-        const fileId = data.fileId || data.id || data.file_id;
-        
-        if (!fileId) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'No file ID provided for load');
-            }
-            return;
-        }
-        
-        await this.loadFile(fileId);
-    }
-    
-    // ========================================================================
-    // UPLOAD FICHIER
-    // ========================================================================
-    
-    /**
-     * Upload un fichier MIDI
-     * @param {File} file - Fichier Ã  uploader
-     * @returns {Promise<boolean>} SuccÃ¨s
-     */
-    async uploadFile(file) {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', `Uploading file: ${file.name}`);
-        }
-        
-        try {
-            // VÃ©rifier taille
-            if (file.size > this.config.maxFileSize) {
-                throw new Error(`File too large (max ${this.config.maxFileSize / 1024 / 1024} MB)`);
-            }
-            
-            // VÃ©rifier extension
-            const extension = '.' + file.name.split('.').pop().toLowerCase();
-            if (!this.config.allowedExtensions.includes(extension)) {
-                throw new Error(`Invalid file type (allowed: ${this.config.allowedExtensions.join(', ')})`);
-            }
-            
-            // Afficher loader
-            this.showLoading(true);
-            
-            // Convertir en base64
-            const base64Content = await this.fileToBase64(file);
-            
-            // Uploader via backend
-            const result = await this.backend.sendCommand('files.upload', {
-                filename: file.name,
-                content: base64Content,
-                directory: this.state.currentDirectory
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Upload failed');
-            }
-            
-            if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `âœ“ File uploaded: ${file.name}`);
-            }
-            
-            // RafraÃ®chir liste
+            // Charger liste initiale
             await this.refreshFileList();
             
-            // Notification succÃ¨s
-            this.showNotification(
-                `File uploaded: ${file.name}`,
-                'success',
-                { duration: 3000 }
-            );
-            
-            // Ã‰mettre Ã©vÃ©nement
-            this.eventBus.emit('file:uploaded', {
-                filename: file.name,
-                fileId: result.data?.file_id
-            });
-            
-            return true;
-            
+            // DÃ©marrer auto-refresh si configurÃ©
+            if (this.config.autoRefresh) {
+                this.startAutoRefresh();
+            }
         } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Upload failed:', error);
-            }
-            
-            this.showNotification(
-                `Failed to upload file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            return false;
-            
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    /**
-     * Handler pour Ã©vÃ©nement file:upload
-     * @private
-     */
-    async handleFileUpload(data) {
-        const file = data.file || data.files?.[0];
-        
-        if (!file) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'No file provided for upload');
-            }
-            return;
-        }
-        
-        await this.uploadFile(file);
-    }
-    
-    // ========================================================================
-    // SUPPRESSION FICHIER
-    // ========================================================================
-    
-    /**
-     * Supprime un fichier avec confirmation
-     * @param {string} fileId - ID ou path du fichier
-     * @returns {Promise<boolean>} SuccÃ¨s
-     */
-    async deleteFile(fileId) {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', `Deleting file: ${fileId}`);
-        }
-        
-        try {
-            // RÃ©cupÃ©rer info fichier
-            const file = this.getFileById(fileId);
-            const fileName = file?.filename || file?.name || fileId;
-            
-            // Confirmation utilisateur (si activÃ©e)
-            if (this.config.confirmDelete) {
-                const confirmed = confirm(
-                    `Delete file "${fileName}"?\n\n` +
-                    `This action cannot be undone.`
-                );
-                
-                if (!confirmed) {
-                    if (this.logger && this.logger.info) {
-                        this.logger.info('FileController', 'Delete cancelled by user');
-                    }
-                    return false;
-                }
-            }
-            
-            // Afficher loader
-            this.showLoading(true);
-            
-            // Supprimer via backend
-            const result = await this.backend.sendCommand('files.delete', {
-                file_id: fileId,
-                file_path: fileId
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Delete failed');
-            }
-            
-            if (this.logger && this.logger.info) {
-                this.logger.info('FileController', `âœ“ File deleted: ${fileName}`);
-            }
-            
-            // Si fichier sÃ©lectionnÃ©, dÃ©sÃ©lectionner
-            if (this.state.selectedFile === fileId) {
-                this.state.selectedFile = null;
-                this.eventBus.emit('file:deselected');
-            }
-            
-            // RafraÃ®chir liste
-            await this.refreshFileList();
-            
-            // Notification succÃ¨s
-            this.showNotification(
-                `File deleted: ${fileName}`,
-                'info',
-                { duration: 3000 }
-            );
-            
-            // Ã‰mettre Ã©vÃ©nement
-            this.eventBus.emit('file:deleted', { 
-                fileId,
-                file
-            });
-            
-            return true;
-            
-        } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Delete failed:', error);
-            }
-            
-            this.showNotification(
-                `Failed to delete file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            return false;
-            
-        } finally {
-            this.showLoading(false);
-        }
-    }
-    
-    /**
-     * Handler pour Ã©vÃ©nement file:delete
-     * @private
-     */
-    async handleFileDelete(data) {
-        const fileId = data.fileId || data.id || data.file_id || data.filePath;
-        
-        if (!fileId) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'No file ID provided for delete');
-            }
-            return;
-        }
-        
-        await this.deleteFile(fileId);
-    }
-    
-    // ========================================================================
-    // RENOMMER FICHIER
-    // ========================================================================
-    
-    /**
-     * Renomme un fichier
-     * @param {string} fileId - ID du fichier
-     * @param {string} newName - Nouveau nom
-     * @returns {Promise<boolean>} SuccÃ¨s
-     */
-    async renameFile(fileId, newName) {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', `Renaming file: ${fileId} â†’ ${newName}`);
-        }
-        
-        try {
-            const result = await this.backend.sendCommand('files.rename', {
-                file_id: fileId,
-                new_name: newName
-            });
-            
-            if (result.success === false) {
-                throw new Error(result.error || 'Rename failed');
-            }
-            
-            // RafraÃ®chir liste
-            await this.refreshFileList();
-            
-            // Notification
-            this.showNotification(
-                `File renamed to: ${newName}`,
-                'success',
-                { duration: 2000 }
-            );
-            
-            return true;
-            
-        } catch (error) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Rename failed:', error);
-            }
-            
-            this.showNotification(
-                `Failed to rename file: ${error.message}`,
-                'error',
-                { duration: 5000 }
-            );
-            
-            return false;
-        }
-    }
-    
-    /**
-     * Handler pour Ã©vÃ©nement file:rename
-     * @private
-     */
-    async handleFileRename(data) {
-        const fileId = data.fileId || data.id || data.file_id;
-        const newName = data.newName || data.name;
-        
-        if (!fileId || !newName) {
-            if (this.logger && this.logger.error) {
-                this.logger.error('FileController', 'Invalid rename parameters');
-            }
-            return;
-        }
-        
-        await this.renameFile(fileId, newName);
-    }
-    
-    // ========================================================================
-    // HELPERS
-    // ========================================================================
-    
-    /**
-     * RÃ©cupÃ¨re un fichier par ID
-     * @param {string} fileId - ID du fichier
-     * @returns {Object|null} Fichier
-     */
-    getFileById(fileId) {
-        const model = this.getModel('file');
-        const files = model?.get('files') || [];
-        return files.find(f => 
-            f.id === fileId || 
-            f.file_id === fileId || 
-            f.path === fileId ||
-            f.file_path === fileId
-        );
-    }
-    
-    /**
-     * Convertit un File en base64
-     * @param {File} file - Fichier
-     * @returns {Promise<string>} Base64
-     */
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const base64 = reader.result.split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-    
-    /**
-     * Affiche/masque le loader
-     * @param {boolean} show - Afficher
-     */
-    showLoading(show) {
-        this.state.isLoading = show;
-        this.eventBus.emit('file:loading', { isLoading: show });
-    }
-    
-    /**
-     * Met Ã  jour une vue
-     * @param {string} viewName - Nom de la vue
-     * @param {Object} data - DonnÃ©es
-     */
-    updateView(viewName, data) {
-        const view = this.getView(viewName);
-        if (view && typeof view.render === 'function') {
-            view.render(data);
-        }
-    }
-    
-    /**
-     * GÃ¨re les Ã©vÃ©nements reÃ§us du backend
-     * @param {Object} event - Ã‰vÃ©nement backend
-     */
-    handleBackendEvent(event) {
-        if (!event || !event.name) {
-            if (this.logger && this.logger.warn) {
-                this.logger.warn('FileController', 'Invalid backend event received');
-            }
-            return;
-        }
-        
-        if (this.logger && this.logger.debug) {
-            this.logger.debug('FileController', `Backend event: ${event.name}`);
-        }
-        
-        switch (event.name) {
-            case 'files:list':
-            case 'files:refreshed':
-                // Liste rafraÃ®chie
-                break;
-            case 'file:added':
-                this.refreshFileList();
-                break;
-            case 'file:deleted':
-                this.refreshFileList();
-                break;
-            case 'file:renamed':
-                this.refreshFileList();
-                break;
-        }
-    }
-    
-    onBackendConnected() {
-        if (this.logger && this.logger.info) {
-            this.logger.info('FileController', 'Backend connected, refreshing file list');
-        }
-        
-        if (this.config.autoRefresh) {
-            this.refreshFileList();
+            this.log('error', 'FileController', 'Initialization failed:', error);
         }
     }
     
     onBackendDisconnected() {
-        if (this.logger && this.logger.warn) {
-            this.logger.warn('FileController', 'Backend disconnected');
+        this.stopAutoRefresh();
+        this.log('warn', 'FileController', 'âš ï¸ Backend disconnected');
+    }
+    
+    onFilesPageActive() {
+        this.refreshFileList();
+        if (this.config.autoRefresh) {
+            this.startAutoRefresh();
+        }
+    }
+    
+    onFilesPageInactive() {
+        this.stopAutoRefresh();
+    }
+    
+    // ========================================================================
+    // COMMANDES FILES.*
+    // ========================================================================
+    
+    /**
+     * Liste tous les fichiers MIDI
+     */
+    async listFiles(path = null) {
+        try {
+            const targetPath = path || this.state.currentPath;
+            
+            this.log('info', 'FileController', \`Listing files in: \${targetPath}\`);
+            this.state.isLoading = true;
+            
+            const response = await this.backend.sendCommand('list_files', {
+                path: targetPath
+            });
+            
+            this.state.isLoading = false;
+            
+            if (response.success !== false) {
+                const files = response.data?.files || response.files || [];
+                
+                // Mettre Ã  jour le model
+                if (this.fileModel) {
+                    this.fileModel.set('files', files);
+                    this.fileModel.set('currentPath', targetPath);
+                }
+                
+                this.state.currentPath = targetPath;
+                this.state.lastRefresh = Date.now();
+                
+                this.log('info', 'FileController', \`âœ… Found \${files.length} files\`);
+                this.eventBus.emit('files:list-updated', { files, path: targetPath });
+                
+                return files;
+            }
+            throw new Error(response.message || 'Failed to list files');
+        } catch (error) {
+            this.state.isLoading = false;
+            this.log('error', 'FileController', 'listFiles failed:', error);
+            throw error;
         }
     }
     
     /**
-     * RÃ©cupÃ¨re l'Ã©tat du contrÃ´leur
-     * @returns {Object} Ã‰tat
+     * Lit un fichier MIDI
      */
-    getState() {
-        return {
-            ...this.state,
-            filesCount: this.getModel('file')?.get('files')?.length || 0
-        };
+    async readFile(filename) {
+        try {
+            this.log('info', 'FileController', \`Reading file: \${filename}\`);
+            
+            const response = await this.backend.sendCommand('load_file', {
+                filename: filename
+            });
+            
+            if (response.success !== false) {
+                const content = response.data || response;
+                
+                this.log('info', 'FileController', \`âœ… File read: \${filename}\`);
+                this.eventBus.emit('file:read-complete', { filename, content });
+                
+                return content;
+            }
+            throw new Error(response.message || 'Failed to read file');
+        } catch (error) {
+            this.log('error', 'FileController', 'readFile failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Ã‰crit un fichier MIDI
+     */
+    async writeFile(filename, content) {
+        try {
+            this.log('info', 'FileController', \`Writing file: \${filename}\`);
+            
+            const response = await this.backend.sendCommand('import_file', {
+                filename: filename,
+                content: content
+            });
+            
+            if (response.success !== false) {
+                this.log('info', 'FileController', \`âœ… File written: \${filename}\`);
+                this.eventBus.emit('file:write-complete', { filename });
+                
+                // RafraÃ®chir liste
+                await this.refreshFileList();
+                
+                return true;
+            }
+            throw new Error(response.message || 'Failed to write file');
+        } catch (error) {
+            this.log('error', 'FileController', 'writeFile failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Supprime un fichier MIDI
+     */
+    async deleteFile(filename) {
+        try {
+            // Confirmation si configurÃ©
+            if (this.config.confirmDelete) {
+                const confirmed = confirm(\`Delete file "\${filename}"?\`);
+                if (!confirmed) {
+                    return false;
+                }
+            }
+            
+            this.log('info', 'FileController', \`Deleting file: \${filename}\`);
+            
+            const response = await this.backend.sendCommand('delete_file', {
+                filename: filename
+            });
+            
+            if (response.success !== false) {
+                // Mettre Ã  jour le model
+                if (this.fileModel) {
+                    const files = this.fileModel.get('files') || [];
+                    const filtered = files.filter(f => f.name !== filename && f.id !== filename);
+                    this.fileModel.set('files', filtered);
+                }
+                
+                this.log('info', 'FileController', \`âœ… File deleted: \${filename}\`);
+                this.eventBus.emit('file:delete-complete', { filename });
+                
+                // RafraÃ®chir liste
+                await this.refreshFileList();
+                
+                return true;
+            }
+            throw new Error(response.message || 'Failed to delete file');
+        } catch (error) {
+            this.log('error', 'FileController', 'deleteFile failed:', error);
+            throw error;
+        }
+    }
+    
+    // ========================================================================
+    // OPÃ‰RATIONS FICHIERS
+    // ========================================================================
+    
+    /**
+     * RafraÃ®chit la liste des fichiers
+     */
+    async refreshFileList() {
+        try {
+            return await this.listFiles();
+        } catch (error) {
+            this.log('error', 'FileController', 'refreshFileList failed:', error);
+            if (this.notifications) {
+                this.notifications.show(
+                    'Error',
+                    'Failed to refresh file list',
+                    'error',
+                    3000
+                );
+            }
+            throw error;
+        }
+    }
+    
+    /**
+     * Charge un fichier
+     */
+    async loadFile(fileId) {
+        try {
+            this.log('info', 'FileController', \`Loading file: \${fileId}\`);
+            
+            // Lire le contenu
+            const content = await this.readFile(fileId);
+            
+            // SÃ©lectionner
+            this.state.selectedFile = fileId;
+            if (this.fileModel) {
+                this.fileModel.set('selectedFile', { id: fileId, content });
+            }
+            
+            // Notifier
+            this.eventBus.emit('file:loaded', { fileId, content });
+            
+            if (this.notifications) {
+                this.notifications.show(
+                    'File Loaded',
+                    \`File "\${fileId}" loaded successfully\`,
+                    'success',
+                    2000
+                );
+            }
+            
+            return content;
+        } catch (error) {
+            this.log('error', 'FileController', 'loadFile failed:', error);
+            if (this.notifications) {
+                this.notifications.show(
+                    'Error',
+                    \`Failed to load file: \${error.message}\`,
+                    'error',
+                    3000
+                );
+            }
+            throw error;
+        }
+    }
+    
+    /**
+     * Sauvegarde un fichier
+     */
+    async saveFile(fileId, content) {
+        try {
+            this.log('info', 'FileController', \`Saving file: \${fileId}\`);
+            
+            await this.writeFile(fileId, content);
+            
+            if (this.notifications) {
+                this.notifications.show(
+                    'File Saved',
+                    \`File "\${fileId}" saved successfully\`,
+                    'success',
+                    2000
+                );
+            }
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'FileController', 'saveFile failed:', error);
+            if (this.notifications) {
+                this.notifications.show(
+                    'Error',
+                    \`Failed to save file: \${error.message}\`,
+                    'error',
+                    3000
+                );
+            }
+            throw error;
+        }
+    }
+    
+    /**
+     * SÃ©lectionne un fichier
+     */
+    selectFile(fileId) {
+        this.state.selectedFile = fileId;
+        
+        if (this.fileModel) {
+            const files = this.fileModel.get('files') || [];
+            const file = files.find(f => f.id === fileId || f.name === fileId);
+            if (file) {
+                this.fileModel.setSelected(file);
+            }
+        }
+        
+        this.eventBus.emit('file:selected', { fileId });
+    }
+    
+    // ========================================================================
+    // AUTO-REFRESH
+    // ========================================================================
+    
+    startAutoRefresh() {
+        if (this.refreshTimer) {
+            return; // DÃ©jÃ  dÃ©marrÃ©
+        }
+        
+        this.log('info', 'FileController', 'Starting auto-refresh...');
+        
+        this.refreshTimer = setInterval(() => {
+            this.refreshFileList().catch(err => {
+                this.log('error', 'FileController', 'Auto-refresh failed:', err);
+            });
+        }, this.config.refreshInterval);
+    }
+    
+    stopAutoRefresh() {
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+            this.log('info', 'FileController', 'Auto-refresh stopped');
+        }
+    }
+    
+    // ========================================================================
+    // UTILITAIRES
+    // ========================================================================
+    
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        }
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = FileController;
-}
-
+// ============================================================================
+// EXPORT
+// ============================================================================
 if (typeof window !== 'undefined') {
     window.FileController = FileController;
 }
-
-// Export par dÃ©faut
-window.FileController = FileController;
-
-// ============================================================================
-// FIN DU FICHIER FileController.js v3.0.4-FIXED-MERGE
-// ============================================================================

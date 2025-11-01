@@ -1,22 +1,24 @@
 // ============================================================================
 // Fichier: frontend/js/views/RoutingView.js
-// Version: v3.1.0 - SIMPLIFIED
-// Date: 2025-10-16
+// Chemin réel: frontend/js/views/RoutingView.js
+// Version: v3.2.0 - SIGNATURE COHÉRENTE
+// Date: 2025-11-01
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
-// MODIFICATIONS v3.1.0:
-// ✓ Interface simplifiée (pas de matrice complexe)
-// ✓ Mode simple uniquement (1→1)
-// ✓ Stats visibles
-// ✓ Actions basiques
+// MODIFICATIONS v3.2.0:
+// ✅ Signature constructeur cohérente (containerId, eventBus, logger)
+// ✅ Interface simplifiée (pas de matrice complexe)
+// ✅ Mode simple uniquement (1→1)
+// ✅ Stats visibles
+// ✅ Actions basiques
 // ============================================================================
 
 class RoutingView extends BaseView {
-    constructor(container, eventBus, debugConsole) {
-        super(container, eventBus, debugConsole, {
-            name: 'RoutingView',
-            autoRender: false
-        });
+    constructor(containerId, eventBus, logger = null) {
+        super(containerId, eventBus, logger);
+        
+        // Logger initialization (from BaseView or fallback)
+        this.logger = logger || window.logger || console;
         
         // Composants
         this.routingMatrix = null;
@@ -27,15 +29,10 @@ class RoutingView extends BaseView {
         this.routes = [];
         this.presets = [];
         
-        // Logger initialization
-        this.logger = window.logger || console;
-        
         // Mark as fully initialized
         this._fullyInitialized = true;
         
-        if (this.logger && this.logger.info) {
-            this.logger.info('RoutingView', '✓ RoutingView initialized (simple mode)');
-        }
+        this.logDebug('routing', '✓ RoutingView initialized v3.2.0 (simple mode)');
         
         // Now that all properties are set, do initial render
         if (this.container) {
@@ -357,7 +354,7 @@ class RoutingView extends BaseView {
         const routes = this.routingMatrix.getRoutes();
         
         const data = {
-            version: '3.1.0',
+            version: '3.2.0',
             type: 'simple_routing',
             routes: routes,
             exported: new Date().toISOString()
@@ -574,6 +571,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.RoutingView = RoutingView;
 }
-
-// Export par défaut
-window.RoutingView = RoutingView;

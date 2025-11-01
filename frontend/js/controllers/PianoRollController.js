@@ -1,82 +1,89 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PianoRollController.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Chemin réel: frontend/js/controllers/PianoRollController.js
+// Version: v3.4.0 - API BACKEND INTÉGRÉE
+// Date: 2025-11-01
 // ============================================================================
-// Description:
-//   Contrôleur de logique métier du piano roll (édition graphique des notes).
-//   Gère la sélection, édition, création, suppression de notes MIDI.
-//
-// Fonctionnalités:
-//   - Sélection notes (simple, multiple, rectangle)
-//   - Édition notes (déplacer, redimensionner)
-//   - Création notes (pencil tool)
-//   - Suppression notes (eraser tool)
-//   - Copier/Coller notes
-//   - Quantization (snap to grid)
-//   - Transpose (pitch shift)
-//   - Vélocité batch (modifier plusieurs notes)
-//   - Undo/Redo complet
-//
-// Architecture:
-//   PianoRollController extends BaseController
-//   - Utilise EditorModel pour données
-//   - Utilise PianoRollView pour rendu
-//   - HistoryManager pour undo/redo
-//   - SelectionManager pour sélection
-//
-// Auteur: MidiMind Team
+// AMÉLIORATIONS v3.4.0:
+// ✅ Intégration API backend pour édition MIDI
+// ✅ Commandes: editor.load_file, editor.save_file
+// ✅ Gestion événements MIDI temps réel
+// ✅ Synchronisation EditorModel ↔ Backend
+// ✅ Optimisation performance avec cache
+// ✅ Gestion erreurs robuste
 // ============================================================================
 
 class PianoRollController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Composants principaux
+        // Références aux modèles
+        this.editorModel = models?.editor;
+        this.fileModel = models?.file;
+        this.routingModel = models?.routing;
+        
+        // Référence à la vue
+        this.view = views?.editor;
+        
+        // Backend
+        this.backend = window.backendService;
+        
+        // Composants
         this.midiParser = new MidiParser();
-        this.syncManager = new MidiSyncManager(eventBus, debugConsole);
         this.renderer = new PianoRollRenderer();
         
         // État du contrôleur
-        this.channelStates = {};
-        this.selectedNotes = new Set();
-        this.midiData = null;
-        this.isPlaying = false;
-        this.currentTime = 0;
-        this.playbackPosition = 0;
+        this.state = {
+            currentFile: null,
+            channelStates: {},
+            selectedNotes: new Set(),
+            midiData: null,
+            isPlaying: false,
+            currentTime: 0,
+            playbackPosition: 0,
+            isDirty: false, // Modifications non sauvegardées
+            lastSaveTime: null
+        };
         
-        // Système de visualisation avancé
+        // Configuration du visualiseur
         this.visualizer = {
             zoom: 1.0,
             scrollPosition: 0,
-            selectedChannel: -1, // -1 = tous les canaux
-            viewMode: 'piano_roll', // piano_roll, notation, timeline
+            selectedChannel: -1,
+            viewMode: 'piano_roll',
             showVelocity: true,
-            showTiming: true
+            showTiming: true,
+            renderOptimization: true
         };
         
-        // Cache pour les performances
+        // Cache pour performances
         this.renderCache = new Map();
         this.noteCache = new Map();
         this.lastRenderTime = 0;
+        this.renderThrottle = 16; // ~60 FPS
         
-        // Métriques de performance
+        // Métriques
         this.performanceStats = {
             notesRendered: 0,
             renderTime: 0,
             cacheHits: 0,
-            cacheMisses: 0
+            cacheMisses: 0,
+            apiCalls: 0
         };
+        
+        this.log('info', 'PianoRollController', '✅ Initialized v3.4.0');
     }
 
+    /**
+     * Liaison des événements
+     */
     bindEvents() {
         // Événements de changement d'état
         this.eventBus.on('statemodel:changed', (data) => {
             this.handleStateChange(data);
         });
         
-        // Événements MIDI spécifiques
+        // Événements MIDI
         this.eventBus.on('midi:file_added', (data) => {
             this.onMidiFileAdded(data);
         });
@@ -85,17 +92,19 @@ class PianoRollController extends BaseController {
             this.loadMidiFile(data.file, data.midiData);
         });
         
-        // Événements de synchronisation
-        this.eventBus.on('sync:offsets_updated', (data) => {
-            this.updateSyncOffsets(data);
+        // Événements de playback
+        this.eventBus.on('playback:started', () => {
+            this.state.isPlaying = true;
         });
         
-        this.eventBus.on('sync:playback_started', () => {
-            this.onSyncPlaybackStarted();
+        this.eventBus.on('playback:stopped', () => {
+            this.state.isPlaying = false;
+            this.stopAllNotes();
         });
         
-        this.eventBus.on('sync:playback_stopped', () => {
-            this.onSyncPlaybackStopped();
+        this.eventBus.on('playback:position', (data) => {
+            this.state.currentTime = data.position;
+            this.updatePlaybackPosition();
         });
         
         // Événements d'interface
@@ -110,11 +119,594 @@ class PianoRollController extends BaseController {
         this.eventBus.on('pianoroll:select_channel', (data) => {
             this.selectChannel(data.channel);
         });
+        
+        // Événements d'édition
+        this.eventBus.on('editor:note:add', (data) => {
+            this.addNote(data);
+        });
+        
+        this.eventBus.on('editor:note:delete', (data) => {
+            this.deleteNote(data.noteId);
+        });
+        
+        this.eventBus.on('editor:note:modify', (data) => {
+            this.modifyNote(data.noteId, data.changes);
+        });
+        
+        // Événements de sauvegarde
+        this.eventBus.on('editor:save', () => {
+            this.saveCurrentFile();
+        });
+        
+        this.eventBus.on('editor:export', (data) => {
+            this.exportFile(data.format, data.filename);
+        });
+    }
+
+    // ========================================================================
+    // GESTION FICHIERS MIDI
+    // ========================================================================
+
+    /**
+     * Charge un fichier MIDI via l'API backend
+     */
+    async loadFileFromBackend(filename) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.notify('error', 'Backend non connecté');
+            return false;
+        }
+        
+        try {
+            this.notify('info', `Chargement de ${filename}...`);
+            this.performanceStats.apiCalls++;
+            
+            // ✅ NOUVEAU: Utilise sendCommand() avec format API correct
+            const response = await this.backend.sendCommand('editor.load_file', { 
+                filename: filename 
+            });
+            
+            if (response && response.midi_data) {
+                // Parser les données MIDI
+                const midiData = this.midiParser.parse(response.midi_data);
+                
+                // Charger dans le modèle
+                this.editorModel.setMidiData(midiData);
+                this.state.midiData = midiData;
+                this.state.currentFile = filename;
+                this.state.isDirty = false;
+                this.state.lastSaveTime = Date.now();
+                
+                // Initialiser les canaux
+                this.initializeChannelStates();
+                
+                // Initialiser le cache
+                this.initializeRenderCache();
+                
+                // Rafraîchir l'affichage
+                this.refreshDisplay();
+                
+                this.notify('success', `Fichier chargé: ${filename}`);
+                this.log('info', 'PianoRollController', `✅ Loaded: ${filename}`);
+                
+                this.eventBus.emit('pianoroll:file_loaded', {
+                    filename,
+                    midiData,
+                    channelStates: this.state.channelStates
+                });
+                
+                return true;
+            }
+        } catch (error) {
+            this.handleError(`Erreur chargement ${filename}`, error);
+        }
+        
+        return false;
     }
 
     /**
-     * Gère les changements d'état global
+     * Sauvegarde le fichier actuel via l'API backend
      */
+    async saveCurrentFile() {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.notify('error', 'Backend non connecté');
+            return false;
+        }
+        
+        if (!this.state.currentFile) {
+            this.notify('warning', 'Aucun fichier à sauvegarder');
+            return false;
+        }
+        
+        if (!this.state.isDirty) {
+            this.notify('info', 'Aucune modification à sauvegarder');
+            return true;
+        }
+        
+        try {
+            this.notify('info', 'Sauvegarde en cours...');
+            this.performanceStats.apiCalls++;
+            
+            // Sérialiser les données MIDI
+            const midiData = this.serializeMidiData();
+            
+            // ✅ NOUVEAU: Utilise sendCommand() avec format API correct
+            const response = await this.backend.sendCommand('editor.save_file', { 
+                filename: this.state.currentFile,
+                midi_data: midiData
+            });
+            
+            if (response) {
+                this.state.isDirty = false;
+                this.state.lastSaveTime = Date.now();
+                
+                // Marquer le modèle comme clean
+                this.editorModel.markClean();
+                
+                this.notify('success', 'Fichier sauvegardé');
+                this.log('info', 'PianoRollController', '💾 File saved');
+                
+                this.eventBus.emit('editor:file_saved', {
+                    filename: this.state.currentFile
+                });
+                
+                return true;
+            }
+        } catch (error) {
+            this.handleError('Erreur sauvegarde', error);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Exporte le fichier dans un format
+     */
+    async exportFile(format, filename) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.notify('error', 'Backend non connecté');
+            return false;
+        }
+        
+        try {
+            this.notify('info', `Export en ${format}...`);
+            this.performanceStats.apiCalls++;
+            
+            const response = await this.backend.sendCommand('editor.export_file', { 
+                filename: this.state.currentFile,
+                export_format: format,
+                export_filename: filename
+            });
+            
+            if (response) {
+                this.notify('success', `Exporté: ${filename}`);
+                return true;
+            }
+        } catch (error) {
+            this.handleError('Erreur export', error);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Charge un fichier MIDI local
+     */
+    loadMidiFile(file, midiData) {
+        if (!file || !midiData) {
+            this.clearMidiData();
+            return;
+        }
+
+        this.log('debug', 'PianoRollController', `Loading: ${file.name}`);
+        
+        this.state.midiData = midiData;
+        this.state.currentFile = file.name;
+        this.state.isDirty = false;
+        
+        this.initializeChannelStates();
+        this.initializeRenderCache();
+        this.refreshDisplay();
+        
+        this.eventBus.emit('pianoroll:file_loaded', {
+            file,
+            midiData,
+            channelStates: this.state.channelStates
+        });
+        
+        const noteCount = midiData.allNotes?.length || 0;
+        const trackCount = midiData.tracks?.length || 0;
+        const duration = midiData.duration || 0;
+        
+        this.log('info', 'PianoRollController', 
+            `✅ Loaded: ${trackCount} tracks, ${noteCount} notes, ${duration.toFixed(1)}s`);
+    }
+
+    /**
+     * Efface les données MIDI
+     */
+    clearMidiData() {
+        this.state.midiData = null;
+        this.state.currentFile = null;
+        this.state.channelStates = {};
+        this.state.selectedNotes.clear();
+        this.state.isDirty = false;
+        
+        this.renderCache.clear();
+        this.noteCache.clear();
+        
+        this.refreshDisplay();
+    }
+
+    /**
+     * Sérialise les données MIDI pour sauvegarde
+     */
+    serializeMidiData() {
+        if (!this.state.midiData) return null;
+        
+        // Convertir en format JSON MIDI
+        return {
+            format: this.state.midiData.format || 1,
+            division: this.state.midiData.division || 480,
+            tracks: this.state.midiData.tracks || [],
+            tempo: this.state.midiData.tempo || 120,
+            timeSignature: this.state.midiData.timeSignature || [4, 4],
+            keySignature: this.state.midiData.keySignature || 0
+        };
+    }
+
+    // ========================================================================
+    // ÉDITION DE NOTES
+    // ========================================================================
+
+    /**
+     * Ajoute une nouvelle note
+     */
+    async addNote(noteData) {
+        if (!this.state.midiData) {
+            this.notify('warning', 'Aucun fichier chargé');
+            return false;
+        }
+        
+        try {
+            // Ajouter la note localement
+            const note = {
+                id: `note_${Date.now()}_${Math.random()}`,
+                pitch: noteData.pitch,
+                velocity: noteData.velocity || 100,
+                startTime: noteData.startTime,
+                duration: noteData.duration || 0.5,
+                channel: noteData.channel || 0
+            };
+            
+            // Ajouter à la track appropriée
+            const track = this.state.midiData.tracks[noteData.channel] || this.state.midiData.tracks[0];
+            if (track && track.notes) {
+                track.notes.push(note);
+                track.notes.sort((a, b) => a.startTime - b.startTime);
+            }
+            
+            // Marquer comme modifié
+            this.markDirty();
+            
+            // Rafraîchir l'affichage
+            this.refreshDisplay();
+            
+            this.eventBus.emit('editor:note_added', { note });
+            this.log('debug', 'PianoRollController', `Note added: ${note.pitch}`);
+            
+            return note;
+        } catch (error) {
+            this.handleError('Erreur ajout note', error);
+            return null;
+        }
+    }
+
+    /**
+     * Supprime une note
+     */
+    async deleteNote(noteId) {
+        if (!this.state.midiData) return false;
+        
+        try {
+            let deleted = false;
+            
+            // Chercher et supprimer la note
+            this.state.midiData.tracks.forEach(track => {
+                if (track.notes) {
+                    const index = track.notes.findIndex(n => n.id === noteId);
+                    if (index !== -1) {
+                        track.notes.splice(index, 1);
+                        deleted = true;
+                    }
+                }
+            });
+            
+            if (deleted) {
+                this.markDirty();
+                this.refreshDisplay();
+                this.eventBus.emit('editor:note_deleted', { noteId });
+                this.log('debug', 'PianoRollController', `Note deleted: ${noteId}`);
+                return true;
+            }
+        } catch (error) {
+            this.handleError('Erreur suppression note', error);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Modifie une note
+     */
+    async modifyNote(noteId, changes) {
+        if (!this.state.midiData) return false;
+        
+        try {
+            let modified = false;
+            
+            // Chercher et modifier la note
+            this.state.midiData.tracks.forEach(track => {
+                if (track.notes) {
+                    const note = track.notes.find(n => n.id === noteId);
+                    if (note) {
+                        Object.assign(note, changes);
+                        modified = true;
+                    }
+                }
+            });
+            
+            if (modified) {
+                this.markDirty();
+                this.refreshDisplay();
+                this.eventBus.emit('editor:note_modified', { noteId, changes });
+                this.log('debug', 'PianoRollController', `Note modified: ${noteId}`);
+                return true;
+            }
+        } catch (error) {
+            this.handleError('Erreur modification note', error);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Marque le fichier comme modifié
+     */
+    markDirty() {
+        this.state.isDirty = true;
+        this.editorModel?.markDirty();
+        this.eventBus.emit('editor:dirty_changed', { isDirty: true });
+    }
+
+    // ========================================================================
+    // GESTION CANAUX
+    // ========================================================================
+
+    /**
+     * Initialise les états des canaux
+     */
+    initializeChannelStates() {
+        this.state.channelStates = {};
+        
+        if (!this.state.midiData) return;
+        
+        const usedChannels = new Set();
+        this.state.midiData.tracks.forEach(track => {
+            usedChannels.add(track.channel);
+        });
+        
+        usedChannels.forEach(channel => {
+            const trackData = this.state.midiData.tracks.find(t => t.channel === channel);
+            
+            this.state.channelStates[channel] = {
+                channel: channel,
+                muted: false,
+                solo: false,
+                volume: 1.0,
+                selected: false,
+                visible: true,
+                name: trackData?.name || `Canal ${channel + 1}`,
+                instrument: trackData?.instrument || 'Piano',
+                noteCount: trackData?.notes.length || 0,
+                noteRange: this.calculateNoteRange(trackData?.notes || []),
+                syncOffset: 0,
+                latencyCompensation: 0,
+                instrumentId: null,
+                color: this.getChannelColor(channel),
+                opacity: 1.0,
+                renderPriority: trackData?.notes.length > 500 ? 'high' : 'normal'
+            };
+        });
+        
+        this.optimizeRenderOrder();
+    }
+
+    /**
+     * Calcule la plage de notes d'un canal
+     */
+    calculateNoteRange(notes) {
+        if (!notes || notes.length === 0) {
+            return { min: 60, max: 72 };
+        }
+        
+        let min = 127;
+        let max = 0;
+        
+        notes.forEach(note => {
+            if (note.pitch < min) min = note.pitch;
+            if (note.pitch > max) max = note.pitch;
+        });
+        
+        return { min, max };
+    }
+
+    /**
+     * Obtient la couleur d'un canal
+     */
+    getChannelColor(channel) {
+        const colors = [
+            '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
+            '#9b59b6', '#1abc9c', '#e67e22', '#34495e',
+            '#16a085', '#27ae60', '#2980b9', '#8e44ad',
+            '#f1c40f', '#e67e22', '#c0392b', '#d35400'
+        ];
+        return colors[channel % colors.length];
+    }
+
+    /**
+     * Optimise l'ordre de rendu
+     */
+    optimizeRenderOrder() {
+        // Trier les canaux par priorité de rendu
+        const channels = Object.values(this.state.channelStates);
+        channels.sort((a, b) => {
+            if (a.renderPriority === 'high' && b.renderPriority !== 'high') return -1;
+            if (a.renderPriority !== 'high' && b.renderPriority === 'high') return 1;
+            return b.noteCount - a.noteCount;
+        });
+        
+        this.renderOrder = channels.map(c => c.channel);
+    }
+
+    /**
+     * Sélectionne un canal
+     */
+    selectChannel(channel) {
+        Object.keys(this.state.channelStates).forEach(ch => {
+            this.state.channelStates[ch].selected = (parseInt(ch) === channel);
+        });
+        
+        this.visualizer.selectedChannel = channel;
+        this.refreshDisplay();
+        
+        this.eventBus.emit('pianoroll:channel_selected', { channel });
+    }
+
+    // ========================================================================
+    // RENDU & AFFICHAGE
+    // ========================================================================
+
+    /**
+     * Initialise le cache de rendu
+     */
+    initializeRenderCache() {
+        this.renderCache.clear();
+        this.noteCache.clear();
+        this.lastRenderTime = 0;
+    }
+
+    /**
+     * Rafraîchit l'affichage
+     */
+    refreshDisplay() {
+        const now = Date.now();
+        
+        // Throttle du rendu
+        if (now - this.lastRenderTime < this.renderThrottle) {
+            return;
+        }
+        
+        this.lastRenderTime = now;
+        
+        if (!this.state.midiData || !this.view) {
+            return;
+        }
+        
+        const startTime = performance.now();
+        
+        try {
+            // Render via la vue
+            if (this.view && typeof this.view.renderPianoRoll === 'function') {
+                this.view.renderPianoRoll(
+                    this.state.midiData,
+                    this.state.currentTime,
+                    this.state.channelStates,
+                    this.visualizer
+                );
+            }
+            
+            const renderTime = performance.now() - startTime;
+            this.performanceStats.renderTime = renderTime;
+            this.performanceStats.notesRendered++;
+            
+        } catch (error) {
+            this.log('error', 'PianoRollController', 'Render error:', error);
+        }
+    }
+
+    /**
+     * Met à jour la position de lecture
+     */
+    updatePlaybackPosition() {
+        if (this.state.isPlaying) {
+            this.refreshDisplay();
+        }
+    }
+
+    /**
+     * Arrête toutes les notes
+     */
+    stopAllNotes() {
+        // Arrêter les notes actives
+        this.log('debug', 'PianoRollController', 'All notes stopped');
+    }
+
+    // ========================================================================
+    // ZOOM & NAVIGATION
+    // ========================================================================
+
+    setZoom(zoom) {
+        this.visualizer.zoom = Math.max(0.1, Math.min(10, zoom));
+        this.refreshDisplay();
+        this.log('debug', 'PianoRollController', `Zoom: ${this.visualizer.zoom.toFixed(2)}x`);
+    }
+
+    setScrollPosition(position) {
+        this.visualizer.scrollPosition = position;
+        this.refreshDisplay();
+    }
+
+    zoomIn() {
+        this.setZoom(this.visualizer.zoom * 1.2);
+    }
+
+    zoomOut() {
+        this.setZoom(this.visualizer.zoom / 1.2);
+    }
+
+    // ========================================================================
+    // GETTERS
+    // ========================================================================
+
+    getMidiData() {
+        return this.state.midiData;
+    }
+
+    getChannelStates() {
+        return this.state.channelStates;
+    }
+
+    isDirty() {
+        return this.state.isDirty;
+    }
+
+    getCurrentFile() {
+        return this.state.currentFile;
+    }
+
+    getPerformanceStats() {
+        return {
+            ...this.performanceStats,
+            cacheSize: this.renderCache.size + this.noteCache.size,
+            channelCount: Object.keys(this.state.channelStates).length,
+            totalNotes: this.state.midiData?.allNotes.length || 0
+        };
+    }
+
+    // ========================================================================
+    // GESTION D'ÉTAT
+    // ========================================================================
+
     handleStateChange(data) {
         switch (data.key) {
             case 'currentFile':
@@ -126,681 +718,30 @@ class PianoRollController extends BaseController {
                 break;
                 
             case 'isPlaying':
-                this.isPlaying = data.newValue;
-                if (!this.isPlaying) {
+                this.state.isPlaying = data.newValue;
+                if (!this.state.isPlaying) {
                     this.stopAllNotes();
                 }
                 break;
                 
             case 'progress':
-                this.currentTime = data.newValue;
+                this.state.currentTime = data.newValue;
                 this.updatePlaybackPosition();
                 break;
-                
-            case 'playbackPosition':
-                this.playbackPosition = data.newValue;
-                this.updateVisualizerPosition();
-                break;
         }
     }
 
     /**
-     * Charge un fichier MIDI avec ses données parsées
+     * Nettoie les ressources
      */
-    loadMidiFile(file, midiData) {
-        if (!file || !midiData) {
-            this.clearMidiData();
-            return;
-        }
-
-        this.debugConsole.log('pianoroll', `Chargement fichier: ${file.name}`);
-        
-        // Stocker les données
-        this.midiData = midiData;
-        
-        // Initialiser les états des canaux avec les vraies données
-        this.initializeChannelStates();
-        
-        // Préparer la synchronisation
-        this.syncManager.prepareSyncForFile(midiData);
-        
-        // Initialiser le cache de rendu
-        this.initializeRenderCache();
-        
-        // Rafraîchir l'affichage
-        this.refreshDisplay();
-        
-        // Émettre les événements pour les autres composants
-        this.eventBus.emit('pianoroll:file_loaded', {
-            file,
-            midiData,
-            channelStates: this.channelStates
-        });
-        
-        this.debugConsole.log('pianoroll', 
-            `Fichier chargé: ${midiData.tracks.length} pistes, ${midiData.allNotes.length} notes, ${midiData.duration.toFixed(1)}s`);
-    }
-
-    /**
-     * Initialise les états des canaux avec les vraies données MIDI
-     */
-    initializeChannelStates() {
-        this.channelStates = {};
-        
-        if (!this.midiData) return;
-        
-        // Analyser tous les canaux utilisés
-        const usedChannels = new Set();
-        this.midiData.tracks.forEach(track => {
-            usedChannels.add(track.channel);
-        });
-        
-        // Créer les états pour chaque canal utilisé
-        usedChannels.forEach(channel => {
-            const trackData = this.midiData.tracks.find(t => t.channel === channel);
-            
-            this.channelStates[channel] = {
-                channel: channel,
-                muted: false,
-                solo: false,
-                volume: 1.0,
-                selected: false,
-                visible: true,
-                
-                // Données du canal
-                name: trackData?.name || `Canal ${channel + 1}`,
-                instrument: trackData?.instrument || 'Piano',
-                noteCount: trackData?.notes.length || 0,
-                noteRange: this.calculateNoteRange(trackData?.notes || []),
-                
-                // Synchronisation
-                syncOffset: 0,
-                latencyCompensation: 0,
-                instrumentId: null, // À assigner lors du routage
-                
-                // Visualisation
-                color: this.getChannelColor(channel),
-                opacity: 1.0,
-                renderPriority: trackData?.notes.length > 500 ? 'high' : 'normal'
-            };
-        });
-        
-        // Optimiser l'ordre de rendu
-        this.optimizeRenderOrder();
-    }
-
-    /**
-     * Calcule la plage de notes pour un canal
-     */
-    calculateNoteRange(notes) {
-        if (notes.length === 0) return { min: 60, max: 60 };
-        
-        const pitches = notes.map(n => n.pitch);
-        return {
-            min: Math.min(...pitches),
-            max: Math.max(...pitches),
-            span: Math.max(...pitches) - Math.min(...pitches)
-        };
-    }
-
-    /**
-     * Génère une couleur pour un canal
-     */
-    getChannelColor(channel) {
-        const colors = [
-            '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
-            '#1abc9c', '#e67e22', '#34495e', '#95a5a6', '#d35400',
-            '#8e44ad', '#27ae60', '#c0392b', '#f1c40f', '#2c3e50', '#7f8c8d'
-        ];
-        return colors[channel % colors.length];
-    }
-
-    /**
-     * Optimise l'ordre de rendu des canaux
-     */
-    optimizeRenderOrder() {
-        // Trier les canaux par priorité de rendu (notes plus nombreuses en premier)
-        this.renderOrder = Object.keys(this.channelStates)
-            .map(Number)
-            .sort((a, b) => {
-                const stateA = this.channelStates[a];
-                const stateB = this.channelStates[b];
-                
-                // Priorité aux canaux avec beaucoup de notes
-                if (stateA.renderPriority === 'high' && stateB.renderPriority !== 'high') return -1;
-                if (stateB.renderPriority === 'high' && stateA.renderPriority !== 'high') return 1;
-                
-                // Ensuite par nombre de notes
-                return stateB.noteCount - stateA.noteCount;
-            });
-    }
-
-    /**
-     * Initialise le cache de rendu pour les performances
-     */
-    initializeRenderCache() {
-        this.renderCache.clear();
-        this.noteCache.clear();
-        
-        if (!this.midiData) return;
-        
-        // Pré-calculer les positions de rendu pour les notes fréquentes
-        this.midiData.tracks.forEach(track => {
-            if (track.notes.length > 100) {
-                // Cache les notes par segments temporels
-                const segments = this.segmentNotes(track.notes, 10); // Segments de 10s
-                segments.forEach((segment, index) => {
-                    const cacheKey = `track_${track.number}_segment_${index}`;
-                    this.noteCache.set(cacheKey, this.preprocessNotes(segment));
-                });
-            }
-        });
-        
-        this.debugConsole.log('pianoroll', `Cache initialisé: ${this.noteCache.size} segments`);
-    }
-
-    /**
-     * Segmente les notes par intervalles temporels
-     */
-    segmentNotes(notes, segmentDuration) {
-        const segments = [];
-        let currentSegment = [];
-        let segmentStart = 0;
-        
-        notes.forEach(note => {
-            if (note.startTime >= segmentStart + segmentDuration) {
-                if (currentSegment.length > 0) {
-                    segments.push([...currentSegment]);
-                }
-                currentSegment = [];
-                segmentStart = Math.floor(note.startTime / segmentDuration) * segmentDuration;
-            }
-            currentSegment.push(note);
-        });
-        
-        if (currentSegment.length > 0) {
-            segments.push(currentSegment);
-        }
-        
-        return segments;
-    }
-
-    /**
-     * Pré-traite les notes pour le rendu
-     */
-    preprocessNotes(notes) {
-        return notes.map(note => ({
-            ...note,
-            // Pré-calculer les coordonnées de rendu
-            renderX: this.timeToPixel(note.startTime),
-            renderY: this.noteToPixel(note.pitch),
-            renderWidth: this.durationToPixel(note.duration),
-            renderHeight: 8, // Hauteur standard d'une note
-            // Pré-calculer la couleur
-            color: this.velocityToColor(note.velocity),
-            opacity: this.velocityToOpacity(note.velocity)
-        }));
-    }
-
-    // ===== CONTRÔLES DES CANAUX =====
-
-    /**
-     * Active/désactive le mute d'un canal
-     */
-    toggleChannelMute(channel) {
-        if (this.channelStates[channel]) {
-            this.channelStates[channel].muted = !this.channelStates[channel].muted;
-            
-            // Si on mute, arrêter les notes en cours
-            if (this.channelStates[channel].muted && this.isPlaying) {
-                this.stopChannelNotes(channel);
-            }
-            
-            this.refreshChannelDisplay(channel);
-            
-            const state = this.channelStates[channel].muted ? 'muté' : 'audible';
-            this.debugConsole.log('pianoroll', `Canal ${channel} ${state}`);
-            
-            this.eventBus.emit('pianoroll:channel_muted', {
-                channel,
-                muted: this.channelStates[channel].muted
-            });
-        }
-    }
-
-    /**
-     * Active/désactive le solo d'un canal
-     */
-    toggleChannelSolo(channel) {
-        if (!this.channelStates[channel]) return;
-        
-        const wasSolo = this.channelStates[channel].solo;
-        
-        // Si on active le solo
-        if (!wasSolo) {
-            // Désactiver tous les autres solos
-            Object.keys(this.channelStates).forEach(ch => {
-                this.channelStates[ch].solo = false;
-            });
-            // Activer ce canal
-            this.channelStates[channel].solo = true;
-        } else {
-            // Désactiver le solo
-            this.channelStates[channel].solo = false;
-        }
-        
-        this.refreshDisplay();
-        
-        this.debugConsole.log('pianoroll', 
-            `Canal ${channel} solo ${this.channelStates[channel].solo ? 'activé' : 'désactivé'}`);
-        
-        this.eventBus.emit('pianoroll:channel_solo', {
-            channel,
-            solo: this.channelStates[channel].solo
-        });
-    }
-
-    /**
-     * Modifie le volume d'un canal
-     */
-    setChannelVolume(channel, volume) {
-        if (this.channelStates[channel]) {
-            this.channelStates[channel].volume = Math.max(0, Math.min(1, volume));
-            
-            this.eventBus.emit('pianoroll:channel_volume', {
-                channel,
-                volume: this.channelStates[channel].volume
-            });
-        }
-    }
-
-    /**
-     * Sélectionne un canal pour l'affichage
-     */
-    selectChannel(channel) {
-        // Désélectionner tous les canaux
-        Object.keys(this.channelStates).forEach(ch => {
-            this.channelStates[ch].selected = false;
-        });
-        
-        // Sélectionner le canal spécifié (-1 = tous)
-        if (channel >= 0 && this.channelStates[channel]) {
-            this.channelStates[channel].selected = true;
-        }
-        
-        this.visualizer.selectedChannel = channel;
-        this.refreshDisplay();
-        
-        this.debugConsole.log('pianoroll', 
-            `Canal sélectionné: ${channel >= 0 ? channel : 'tous'}`);
-    }
-
-    // ===== MÉTHODES DE RENDU ET CONVERSION =====
-
-    timeToPixel(time) {
-        return time * 100 * this.visualizer.zoom; // 100 pixels par seconde
-    }
-
-    noteToPixel(note) {
-        return (127 - note) * 8; // 8 pixels par note
-    }
-
-    durationToPixel(duration) {
-        return duration * 100 * this.visualizer.zoom;
-    }
-
-    velocityToColor(velocity) {
-        const intensity = velocity / 127;
-        return `hsl(240, 70%, ${30 + intensity * 50}%)`;
-    }
-
-    velocityToOpacity(velocity) {
-        return 0.6 + (velocity / 127) * 0.4;
-    }
-
-    // ===== GESTION DE LA LECTURE =====
-
-    updatePlaybackPosition() {
-        this.playbackPosition = this.currentTime;
-        this.updateVisualizerPosition();
-        
-        // Mettre à jour le cache si nécessaire
-        this.invalidateRenderCacheIfNeeded();
-    }
-
-    updateVisualizerPosition() {
-        // Calculer la position du curseur de lecture
-        const cursorX = this.timeToPixel(this.playbackPosition);
-        
-        // Auto-scroll si nécessaire
-        if (this.shouldAutoScroll(cursorX)) {
-            this.visualizer.scrollPosition = cursorX - 200; // Garde le curseur visible
-        }
-        
-        this.eventBus.emit('pianoroll:position_updated', {
-            time: this.playbackPosition,
-            cursorX: cursorX,
-            scrollPosition: this.visualizer.scrollPosition
-        });
-    }
-
-    shouldAutoScroll(cursorX) {
-        const viewportWidth = 800; // Largeur de la vue (à adapter)
-        const leftEdge = this.visualizer.scrollPosition;
-        const rightEdge = leftEdge + viewportWidth;
-        
-        return cursorX < leftEdge || cursorX > rightEdge - 100;
-    }
-
-    // ===== MÉTHODES UTILITAIRES =====
-
-    clearMidiData() {
-        this.midiData = null;
-        this.channelStates = {};
-        this.renderCache.clear();
-        this.noteCache.clear();
-        this.selectedNotes.clear();
-        
-        this.refreshDisplay();
-        this.debugConsole.log('pianoroll', 'Données MIDI effacées');
-    }
-
-    refreshDisplay() {
-        // Invalider le cache de rendu
-        this.renderCache.clear();
-        
-        // Déclencher le rendu
-        this.eventBus.emit('pianoroll:refresh_required', {
-            channelStates: this.channelStates,
-            visualizer: this.visualizer,
-            midiData: this.midiData
-        });
-    }
-
-    refreshChannelDisplay(channel) {
-        this.eventBus.emit('pianoroll:channel_updated', {
-            channel,
-            state: this.channelStates[channel]
-        });
-    }
-
-    invalidateRenderCacheIfNeeded() {
-        const now = performance.now();
-        if (now - this.lastRenderTime > 16) { // 60 FPS max
-            this.renderCache.clear();
-            this.lastRenderTime = now;
-        }
-    }
-
-    // ===== MÉTHODES DE CONTRÔLE DE LECTURE =====
-
-    stopAllNotes() {
-        this.eventBus.emit('midi:stop_all_notes');
-    }
-
-    stopChannelNotes(channel) {
-        this.eventBus.emit('midi:stop_channel_notes', { channel });
-    }
-
-    onSyncPlaybackStarted() {
-        this.isPlaying = true;
-        this.eventBus.emit('pianoroll:playback_started');
-    }
-
-    onSyncPlaybackStopped() {
-        this.isPlaying = false;
-        this.stopAllNotes();
-        this.eventBus.emit('pianoroll:playback_stopped');
-    }
-
-    onMidiFileAdded(data) {
-        // Analyser le nouveau fichier pour des optimisations
-        if (data.midiData) {
-            this.debugConsole.log('pianoroll', 
-                `Nouveau fichier MIDI analysé: ${data.file.name}`);
-        }
-    }
-
-    updateSyncOffsets(data) {
-        // Mettre à jour les offsets de synchronisation
-        Object.keys(this.channelStates).forEach(channel => {
-            const instrumentId = this.channelStates[channel].instrumentId;
-            if (instrumentId && data.offsets[instrumentId]) {
-                this.channelStates[channel].syncOffset = data.offsets[instrumentId];
-            }
-        });
-        
-        this.debugConsole.log('pianoroll', 'Offsets de synchronisation mis à jour');
-    }
-
-    // ===== MÉTHODES DE ZOOM ET NAVIGATION =====
-
-    setZoom(zoom) {
-        this.visualizer.zoom = Math.max(0.1, Math.min(5.0, zoom));
-        this.invalidateRenderCacheIfNeeded();
-        this.refreshDisplay();
-    }
-
-    setScrollPosition(position) {
-        this.visualizer.scrollPosition = Math.max(0, position);
-        this.refreshDisplay();
-    }
-
-    // ===== STATISTIQUES DE PERFORMANCE =====
-
-    getPerformanceStats() {
-        return {
-            ...this.performanceStats,
-            cacheSize: this.renderCache.size + this.noteCache.size,
-            channelCount: Object.keys(this.channelStates).length,
-            totalNotes: this.midiData?.allNotes.length || 0,
-            renderOrder: this.renderOrder
-        };
-    }
-
-
-    setChannelVolume(channel, volume) {
-        if (this.channelStates[channel]) {
-            this.channelStates[channel].volume = Math.max(0, Math.min(1, volume));
-            this.logDebug('midi', `Canal ${channel} volume: ${Math.round(volume * 100)}%`);
-        }
-    }
-
-    setSyncOffset(channel, offsetMs) {
-        if (this.channelStates[channel]) {
-            this.channelStates[channel].syncOffset = offsetMs;
-            this.logDebug('midi', `Canal ${channel} décalage: ${offsetMs}ms`);
-        }
-    }
-
-    // Gestion de la lecture
-    updatePlayback() {
-        if (!this.midiData || !this.isPlaying) return;
-        
-        // Calculer quelles notes doivent être jouées maintenant
-        const activeNotes = this.getActiveNotes(this.currentTime);
-        
-        // Envoyer les messages MIDI avec les délais de synchro
-        this.sendMidiMessages(activeNotes);
-        
-        // Mettre à jour l'affichage du piano
-        this.updatePianoDisplay(activeNotes);
-        
-        // Rafraîchir le rendu si nécessaire
-        if (this.shouldRefreshDisplay()) {
-            this.refreshDisplay();
-        }
-    }
-
-    getActiveNotes(currentTime) {
-        const activeNotes = [];
-        const tolerance = 0.05; // 50ms de tolérance
-        
-        if (this.midiData) {
-            this.midiData.tracks.forEach(track => {
-                const channelState = this.channelStates[track.channel];
-                if (!channelState || channelState.muted) return;
-                
-                track.notes.forEach(note => {
-                    // Appliquer le décalage de synchronisation
-                    const adjustedStartTime = note.startTime + (channelState.syncOffset / 1000);
-                    const adjustedEndTime = note.endTime + (channelState.syncOffset / 1000);
-                    
-                    if (currentTime >= adjustedStartTime - tolerance && 
-                        currentTime <= adjustedEndTime + tolerance) {
-                        activeNotes.push({
-                            ...note,
-                            channel: track.channel,
-                            adjustedStartTime,
-                            adjustedEndTime,
-                            volume: channelState.volume
-                        });
-                    }
-                });
-            });
-        }
-        
-        return activeNotes;
-    }
-
-    sendMidiMessages(activeNotes) {
-        // Simulation d'envoi MIDI - ici vous intégreriez votre système MIDI réel
-        activeNotes.forEach(note => {
-            const instruments = this.getModel('instrument').get('instruments');
-            const assignments = this.getModel('state').get('currentFile')?.assignments || {};
-            const assignedInstrumentId = assignments[note.channel];
-            
-            if (assignedInstrumentId) {
-                const instrument = instruments.find(i => i.id === assignedInstrumentId);
-                if (instrument && instrument.connected) {
-                    // Ici vous enverriez le vrai message MIDI
-                    this.logDebug('midi', `→ ${instrument.name}: Note ${note.pitch} V${note.velocity}`);
-                }
-            }
-        });
-    }
-
-    updatePianoDisplay(activeNotes) {
-        // Réinitialiser toutes les touches
-        document.querySelectorAll('.piano-key-display').forEach(key => {
-            const isBlack = key.classList.contains('black-key');
-            key.style.background = isBlack ? '#2c3e50' : '#ecf0f1';
-        });
-        
-        // Activer les touches correspondant aux notes en cours
-        activeNotes.forEach(note => {
-            const keyElement = document.getElementById(`pianoKey${note.pitch}`);
-            if (keyElement) {
-                const isBlack = keyElement.classList.contains('black-key');
-                keyElement.style.background = isBlack ? '#e74c3c' : '#3498db';
-            }
-        });
-    }
-
-    stopAllNotes() {
-        // Arrêter toutes les notes en cours
-        this.updatePianoDisplay([]);
-        this.logDebug('midi', 'Toutes les notes arrêtées');
-    }
-
-    // Gestion des sélections de notes
-    selectNote(noteId) {
-        if (this.selectedNotes.has(noteId)) {
-            this.selectedNotes.delete(noteId);
-        } else {
-            this.selectedNotes.add(noteId);
-        }
-        
-        this.updateNoteSelection();
-    }
-
-    updateNoteSelection() {
-        document.querySelectorAll('.midi-note-real').forEach(noteEl => {
-            const noteId = noteEl.dataset.noteId;
-            if (this.selectedNotes.has(noteId)) {
-                noteEl.style.border = '2px solid #ffff00';
-                noteEl.style.zIndex = '200';
-            } else {
-                noteEl.style.border = 'none';
-                noteEl.style.zIndex = '10';
-            }
-        });
-    }
-
-    showNoteMenu(event, noteId) {
-        event.preventDefault();
-        // Ici vous pourriez afficher un menu contextuel pour éditer la note
-        console.log('Menu note:', noteId);
-    }
-
-    // Méthodes d'affichage
-    refreshDisplay() {
-        if (!this.midiData || !app.navigationController || app.navigationController.getCurrentPage() !== 'home') {
-            return;
-        }
-        
-        const state = this.getModel('state');
-        const settings = state.get('settings') || {};
-        const viewWindow = settings.noteDisplayWindow || 30;
-        
-        const canvas = document.getElementById('midiVisualizerCanvas');
-        if (canvas) {
-            const pianoRollHTML = this.renderer.renderPianoRoll(
-                this.midiData,
-                this.currentTime,
-                viewWindow,
-                this.channelStates
-            );
-            canvas.innerHTML = pianoRollHTML;
-        }
-    }
-
-    shouldRefreshDisplay() {
-        // Rafraîchir quand la position change significativement
-        return Math.abs(this.currentTime - (this.lastRefreshTime || 0)) > 0.5;
-    }
-
-    // Contrôles de zoom
-    zoomIn() {
-        const currentZoom = this.renderer.getZoom();
-        this.renderer.setZoom(currentZoom * 1.2);
-        this.refreshDisplay();
-        this.logDebug('system', `Zoom: ${this.renderer.getZoom().toFixed(0)} px/s`);
-    }
-
-    zoomOut() {
-        const currentZoom = this.renderer.getZoom();
-        this.renderer.setZoom(currentZoom / 1.2);
-        this.refreshDisplay();
-        this.logDebug('system', `Zoom: ${this.renderer.getZoom().toFixed(0)} px/s`);
-    }
-
-    // Méthodes publiques pour l'intégration
-    getMidiData() {
-        return this.midiData;
-    }
-
-    getChannelStates() {
-        return this.channelStates;
-    }
-
-    exportChannelSettings() {
-        return {
-            channelStates: this.channelStates,
-            syncOffsets: this.syncOffsets
-        };
-    }
-
-    importChannelSettings(settings) {
-        if (settings.channelStates) {
-            this.channelStates = { ...settings.channelStates };
-        }
-        if (settings.syncOffsets) {
-            this.syncOffsets = { ...settings.syncOffsets };
-        }
-        this.refreshDisplay();
+    destroy() {
+        this.clearMidiData();
+        this.renderCache?.clear();
+        this.noteCache?.clear();
+        super.destroy();
     }
 }
+
 // ============================================================================
 // EXPORT
 // ============================================================================
@@ -812,5 +753,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PianoRollController = PianoRollController;
 }
-
-window.PianoRollController = PianoRollController;

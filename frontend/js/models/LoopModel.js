@@ -1,55 +1,41 @@
 // ============================================================================
 // Fichier: frontend/js/models/LoopModel.js
-// Version: v3.0.2 - COHERENCE MAXIMALE
-// Date: 2025-10-29
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: v3.2.0 - SIGNATURE COHÃ‰RENTE
+// Date: 2025-11-01
+// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // Description:
-//   Modèle de gestion des boucles et enregistrement MIDI
+//   ModÃ¨le de gestion des boucles et enregistrement MIDI
 //   
+// CORRECTIONS v3.2.0:
+//   âœ… CRITIQUE: Signature cohÃ©rente avec BaseModel
+//   âœ… Appel super(eventBus, backend, logger, initialData, options)
+//   âœ… Protection contre paramÃ¨tres null/undefined
 // CORRECTIONS v3.0.2:
-//   ✅ CRITIQUE: Cohérence totale avec BaseModel(initialData, options)
-//   ✅ CRITIQUE: Logger utilise window.logger (instance) pas window.logger (classe)
-//   ✅ CRITIQUE: EventBus et backend acceptés en paramètres OU depuis window
-//   ✅ Protection contre paramètres null/undefined
-// CORRECTIONS v3.0.1:
-//   ✅ Héritage de BaseModel au lieu de EventEmitter
-//   ✅ Utilisation de EventBus global (this.eventBus.emit)
-//   ✅ Signature constructeur standardisée (eventBus, backend, logger)
-//   ✅ Intégration BackendService pour persistence
-//   ✅ Cohérence avec les autres modèles
+//   âœ… CRITIQUE: CohÃ©rence totale avec BaseModel(initialData, options)
+//   âœ… CRITIQUE: Logger utilise window.logger (instance) pas window.logger (classe)
+//   âœ… CRITIQUE: EventBus et backend acceptÃ©s en paramÃ¨tres OU depuis window
 //
 // Auteur: midiMind Team
 // ============================================================================
 
 class LoopModel extends BaseModel {
-    constructor(eventBus, backend, logger) {
-        // ✅ Appel super() CORRECT avec BaseModel(initialData, options)
-        super({}, {
+    constructor(eventBus, backend, logger, initialData = {}, options = {}) {
+        // âœ… NOUVEAU: Appel super() avec signature cohÃ©rente
+        super(eventBus, backend, logger, {
+            ...initialData
+        }, {
             persistKey: 'loopmodel',
             eventPrefix: 'loop',
-            autoPersist: false
+            autoPersist: false,
+            ...options
         });
         
-        // ✅ CRITIQUE: Assigner IMMÉDIATEMENT après super()
-        // Accepter paramètres OU utiliser globaux
-        this.eventBus = eventBus || window.EventBus || window.eventBus;
-        this.backend = backend || window.backendService || window.app?.services?.backend;
-        this.logger = logger || window.logger || console;
-        
-        // ✅ Validation des dépendances critiques
-        if (!this.eventBus) {
-            console.error('[LoopModel] EventBus not available!');
-        }
-        if (!this.backend) {
-            console.warn('[LoopModel] Backend service not available - persistence disabled');
-        }
-        
-        // Loops stockés
+        // Loops stockÃ©s
         this.loops = new Map();
         this.currentLoop = null;
         
-        // État enregistrement
+        // Ã‰tat enregistrement
         this.isRecording = false;
         this.recordBuffer = [];
         this.recordStartTime = 0;
@@ -69,7 +55,7 @@ class LoopModel extends BaseModel {
         this.lastEventTime = 0;
         this.playbackInterval = 10; // ms (100 Hz)
         
-        this.logger.info('LoopModel', '✅ Model initialized v3.0.2');
+        this.log('info', 'LoopModel', 'âœ… Model initialized v3.2.0');
     }
 
 
@@ -91,8 +77,8 @@ class LoopModel extends BaseModel {
         const duration = barDuration * bars;
 
         const loop = {
-            id: `loop_${Date.now()}`,
-            name: `Loop ${this.loops.size + 1}`,
+            id: \`loop_\${Date.now()}\`,
+            name: \`Loop \${this.loops.size + 1}\`,
             duration: duration,
             bars: bars,
             timeSignature: timeSignature,
@@ -105,10 +91,8 @@ class LoopModel extends BaseModel {
         this.loops.set(loop.id, loop);
         this.currentLoop = loop;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus au lieu de emit
         this.eventBus.emit('loop:created', loop);
-
-        this.logger.info('LoopModel', `Loop created: ${loop.name}`);
+        this.log('info', 'LoopModel', \`Loop created: \${loop.name}\`);
 
         return loop;
     }
@@ -135,7 +119,6 @@ class LoopModel extends BaseModel {
         this.recordBuffer = [];
         this.recordStartTime = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('recording:started', { 
             loopId: this.currentLoop.id,
             channel,
@@ -143,7 +126,7 @@ class LoopModel extends BaseModel {
             mode 
         });
 
-        this.logger.info('LoopModel', `Recording started: ${mode} mode on channel ${channel}`);
+        this.log('info', 'LoopModel', \`Recording started: \${mode} mode on channel \${channel}\`);
     }
 
     /**
@@ -160,7 +143,7 @@ class LoopModel extends BaseModel {
             ...event,
             time: loopTime,
             channel: this.recordChannel,
-            id: `event_${Date.now()}_${Math.random()}`
+            id: \`event_\${Date.now()}_\${Math.random()}\`
         };
 
         this.recordBuffer.push(recordedEvent);
@@ -202,7 +185,7 @@ class LoopModel extends BaseModel {
         } else {
             // Nouveau layer
             this.currentLoop.layers.push({
-                id: `layer_${Date.now()}`,
+                id: \`layer_\${Date.now()}\`,
                 channel: this.recordChannel,
                 instrument: this.recordInstrument,
                 events: [...this.recordBuffer],
@@ -216,13 +199,12 @@ class LoopModel extends BaseModel {
         this.recordBuffer = [];
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('recording:stopped', {
             loopId: this.currentLoop.id,
             eventCount: eventCount
         });
 
-        this.logger.info('LoopModel', `Recording stopped: ${eventCount} events recorded`);
+        this.log('info', 'LoopModel', \`Recording stopped: \${eventCount} events recorded\`);
     }
 
     /**
@@ -236,7 +218,7 @@ class LoopModel extends BaseModel {
         // Retrier
         this.recordBuffer.sort((a, b) => a.time - b.time);
         
-        this.logger.debug('LoopModel', `Buffer quantized to ${this.quantizeResolution}ms`);
+        this.log('debug', 'LoopModel', \`Buffer quantized to \${this.quantizeResolution}ms\`);
     }
 
     /**
@@ -279,7 +261,7 @@ class LoopModel extends BaseModel {
         const loop = loopId ? this.loops.get(loopId) : this.currentLoop;
 
         if (!loop) {
-            this.logger.warn('LoopModel', 'No loop to play');
+            this.log('warn', 'LoopModel', 'No loop to play');
             return;
         }
 
@@ -294,13 +276,12 @@ class LoopModel extends BaseModel {
             this.updatePlayback();
         }, this.playbackInterval);
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:playing', {
             loopId: loop.id,
             duration: loop.duration
         });
 
-        this.logger.info('LoopModel', `Playing loop: ${loop.name}`);
+        this.log('info', 'LoopModel', \`Playing loop: \${loop.name}\`);
     }
 
     /**
@@ -316,13 +297,12 @@ class LoopModel extends BaseModel {
             this.playbackTimer = null;
         }
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:paused', {
             loopId: this.currentLoop.id,
             position: this.loopPosition
         });
 
-        this.logger.info('LoopModel', 'Loop paused');
+        this.log('info', 'LoopModel', 'Loop paused');
     }
 
     /**
@@ -337,12 +317,11 @@ class LoopModel extends BaseModel {
             this.playbackTimer = null;
         }
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:stopped', {
             loopId: this.currentLoop?.id
         });
 
-        this.logger.info('LoopModel', 'Loop stopped');
+        this.log('info', 'LoopModel', 'Loop stopped');
     }
 
     /**
@@ -357,7 +336,6 @@ class LoopModel extends BaseModel {
 
         // VÃ©rifier si on a bouclÃ©
         if (elapsed > this.lastEventTime && this.loopPosition < this.playbackInterval) {
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:cycle', {
                 loopId: this.currentLoop.id
             });
@@ -376,7 +354,6 @@ class LoopModel extends BaseModel {
                 const timeDiff = Math.abs(this.loopPosition - eventTime);
 
                 if (timeDiff < this.playbackInterval) {
-                    // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
                     this.eventBus.emit('loop:event', {
                         ...event,
                         volume: layer.volume
@@ -412,13 +389,12 @@ class LoopModel extends BaseModel {
 
         layer.muted = muted !== undefined ? muted : !layer.muted;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:muted', {
             layerId,
             muted: layer.muted
         });
 
-        this.logger.debug('LoopModel', `Layer ${layerId} ${layer.muted ? 'muted' : 'unmuted'}`);
+        this.log('debug', 'LoopModel', \`Layer \${layerId} \${layer.muted ? 'muted' : 'unmuted'}\`);
     }
 
     /**
@@ -434,13 +410,12 @@ class LoopModel extends BaseModel {
 
         layer.solo = solo !== undefined ? solo : !layer.solo;
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:solo', {
             layerId,
             solo: layer.solo
         });
 
-        this.logger.debug('LoopModel', `Layer ${layerId} solo: ${layer.solo}`);
+        this.log('debug', 'LoopModel', \`Layer \${layerId} solo: \${layer.solo}\`);
     }
 
     /**
@@ -456,13 +431,12 @@ class LoopModel extends BaseModel {
 
         layer.volume = Math.max(0, Math.min(127, volume));
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:volume-changed', {
             layerId,
             volume: layer.volume
         });
 
-        this.logger.debug('LoopModel', `Layer ${layerId} volume: ${layer.volume}`);
+        this.log('debug', 'LoopModel', \`Layer \${layerId} volume: \${layer.volume}\`);
     }
 
     /**
@@ -478,10 +452,9 @@ class LoopModel extends BaseModel {
         this.currentLoop.layers.splice(index, 1);
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('layer:cleared', { layerId });
 
-        this.logger.info('LoopModel', `Layer ${layerId} cleared`);
+        this.log('info', 'LoopModel', \`Layer \${layerId} cleared\`);
     }
 
     /**
@@ -493,16 +466,15 @@ class LoopModel extends BaseModel {
         this.currentLoop.layers = [];
         this.currentLoop.lastModified = Date.now();
 
-        // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
         this.eventBus.emit('loop:cleared', {
             loopId: this.currentLoop.id
         });
 
-        this.logger.info('LoopModel', 'Loop cleared');
+        this.log('info', 'LoopModel', 'Loop cleared');
     }
 
     // ========================================================================
-    // PERSISTENCE - âœ… NOUVEAU v3.0.1 (IntÃ©gration BackendService)
+    // PERSISTENCE - IntÃ©gration BackendService
     // ========================================================================
 
     /**
@@ -516,10 +488,10 @@ class LoopModel extends BaseModel {
             throw new Error('No loop to save');
         }
 
-        this.logger.info('LoopModel', `Saving loop: ${loop.name}`);
+        this.log('info', 'LoopModel', \`Saving loop: \${loop.name}\`);
 
         try {
-            const response = await this.backend.sendCommand('loops.save', {
+            const response = await this.backend.sendCommand('save_loop', {
                 loop: loop
             });
 
@@ -527,17 +499,16 @@ class LoopModel extends BaseModel {
                 throw new Error(response.error || 'Failed to save loop');
             }
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:saved', {
                 loop: loop
             });
 
-            this.logger.info('LoopModel', `âœ“ Loop saved: ${loop.name}`);
+            this.log('info', 'LoopModel', \`âœ“ Loop saved: \${loop.name}\`);
 
             return response.data;
 
         } catch (error) {
-            this.logger.error('LoopModel', 'Failed to save loop:', error);
+            this.log('error', 'LoopModel', 'Failed to save loop:', error);
             throw error;
         }
     }
@@ -547,10 +518,10 @@ class LoopModel extends BaseModel {
      * @param {string} loopId - ID du loop
      */
     async loadLoop(loopId) {
-        this.logger.info('LoopModel', `Loading loop: ${loopId}`);
+        this.log('info', 'LoopModel', \`Loading loop: \${loopId}\`);
 
         try {
-            const response = await this.backend.sendCommand('loops.load', {
+            const response = await this.backend.sendCommand('load_loop', {
                 loop_id: loopId
             });
 
@@ -563,17 +534,16 @@ class LoopModel extends BaseModel {
             this.loops.set(loop.id, loop);
             this.currentLoop = loop;
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:loaded', {
                 loop: loop
             });
 
-            this.logger.info('LoopModel', `âœ“ Loop loaded: ${loop.name}`);
+            this.log('info', 'LoopModel', \`âœ“ Loop loaded: \${loop.name}\`);
 
             return loop;
 
         } catch (error) {
-            this.logger.error('LoopModel', 'Failed to load loop:', error);
+            this.log('error', 'LoopModel', 'Failed to load loop:', error);
             throw error;
         }
     }
@@ -585,7 +555,7 @@ class LoopModel extends BaseModel {
      */
     async listLoops(limit = 50, offset = 0) {
         try {
-            const response = await this.backend.sendCommand('loops.list', {
+            const response = await this.backend.sendCommand('list_loops', {
                 limit,
                 offset
             });
@@ -597,7 +567,7 @@ class LoopModel extends BaseModel {
             return response.data;
 
         } catch (error) {
-            this.logger.error('LoopModel', 'Failed to list loops:', error);
+            this.log('error', 'LoopModel', 'Failed to list loops:', error);
             throw error;
         }
     }
@@ -607,10 +577,10 @@ class LoopModel extends BaseModel {
      * @param {string} loopId - ID du loop
      */
     async deleteLoop(loopId) {
-        this.logger.info('LoopModel', `Deleting loop: ${loopId}`);
+        this.log('info', 'LoopModel', \`Deleting loop: \${loopId}\`);
 
         try {
-            const response = await this.backend.sendCommand('loops.delete', {
+            const response = await this.backend.sendCommand('delete_loop', {
                 loop_id: loopId
             });
 
@@ -624,15 +594,14 @@ class LoopModel extends BaseModel {
                 this.currentLoop = null;
             }
 
-            // âœ… CORRIGÃ‰ v3.0.1 - Utilise eventBus
             this.eventBus.emit('loop:deleted', { loopId });
 
-            this.logger.info('LoopModel', `âœ“ Loop deleted: ${loopId}`);
+            this.log('info', 'LoopModel', \`âœ“ Loop deleted: \${loopId}\`);
 
             return true;
 
         } catch (error) {
-            this.logger.error('LoopModel', 'Failed to delete loop:', error);
+            this.log('error', 'LoopModel', 'Failed to delete loop:', error);
             throw error;
         }
     }
@@ -679,7 +648,7 @@ class LoopModel extends BaseModel {
             tracks: tracks
         };
 
-        this.logger.info('LoopModel', `Loop exported to MidiJSON: ${loop.name}`);
+        this.log('info', 'LoopModel', \`Loop exported to MidiJSON: \${loop.name}\`);
 
         return midiJson;
     }
@@ -697,8 +666,8 @@ class LoopModel extends BaseModel {
         this.quantizeOnRecord = enabled;
         this.quantizeResolution = resolution;
 
-        this.logger.info('LoopModel', 
-            `Quantize: ${enabled ? 'ON' : 'OFF'} (${resolution}ms)`);
+        this.log('info', 'LoopModel', 
+            \`Quantize: \${enabled ? 'ON' : 'OFF'} (\${resolution}ms)\`);
     }
 
     // ========================================================================

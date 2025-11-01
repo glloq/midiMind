@@ -1,40 +1,31 @@
 // ============================================================================
 // Fichier: frontend/js/models/InstrumentModel.js
-// Version: v3.0.8 - CORRECTION INTERFACE
-// Date: 2025-10-31
+// Version: v3.2.0 - SIGNATURE COHÃ‰RENTE
+// Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.0.8:
-// ✅ Ajout méthode getConnectedInstruments() (alias pour getConnected)
-// ✅ Cohérence avec appels NavigationController
+// CORRECTIONS v3.2.0:
+// âœ… CRITIQUE: Signature cohÃ©rente avec BaseModel
+// âœ… Appel super(eventBus, backend, logger, initialData, options)
+// âœ… Ajout mÃ©thode getConnectedInstruments() (alias pour getConnected)
+// âœ… CohÃ©rence avec appels NavigationController
 // ============================================================================
 
 class InstrumentModel extends BaseModel {
-    constructor(eventBus, backend, logger) {
-        // ✅ Appel super() CORRECT avec BaseModel(initialData, options)
-        super({}, {
+    constructor(eventBus, backend, logger, initialData = {}, options = {}) {
+        // âœ… NOUVEAU: Appel super() avec signature cohÃ©rente
+        super(eventBus, backend, logger, {
+            ...initialData
+        }, {
             persistKey: 'instrumentmodel',
             eventPrefix: 'instrument',
-            autoPersist: false
+            autoPersist: false,
+            ...options
         });
-        
-        // ✅ CRITIQUE: Assigner IMMÉDIATEMENT après super()
-        // Accepter paramètres OU utiliser globaux
-        this.eventBus = eventBus || window.EventBus || window.eventBus;
-        this.backend = backend || window.backendService || window.app?.services?.backend;
-        this.logger = logger || window.logger || console;
-        
-        // ✅ Validation des dépendances critiques
-        if (!this.eventBus) {
-            console.error('[InstrumentModel] EventBus not available!');
-        }
-        if (!this.backend) {
-            console.warn('[InstrumentModel] BackendService not available - instrument operations will fail');
-        }
         
         // Cache des instruments
         this.instruments = new Map();
         
-        // État
+        // Ã‰tat
         this.state = {
             scanning: false,
             lastScan: null,
@@ -42,9 +33,7 @@ class InstrumentModel extends BaseModel {
             connectedCount: 0
         };
         
-        if (this.logger && typeof this.logger.info === 'function') {
-            this.logger.info('InstrumentModel', '✓ InstrumentModel v3.0.8 initialized');
-        }
+        this.log('info', 'InstrumentModel', 'âœ… InstrumentModel v3.2.0 initialized');
     }
     
     // ========================================================================
@@ -56,9 +45,7 @@ class InstrumentModel extends BaseModel {
      */
     async scan() {
         if (this.state.scanning) {
-            if (this.logger && typeof this.logger.warn === 'function') {
-                this.logger.warn('InstrumentModel', 'Scan already in progress');
-            }
+            this.log('warn', 'InstrumentModel', 'Scan already in progress');
             return Array.from(this.instruments.values());
         }
         
@@ -72,16 +59,14 @@ class InstrumentModel extends BaseModel {
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('InstrumentModel', 'Scanning for instruments...');
-            }
+            this.log('info', 'InstrumentModel', 'Scanning for instruments...');
             
-            const response = await this.backend.sendCommand('devices.scan', {});
+            const response = await this.backend.sendCommand('list_devices', {});
             
             if (response.success) {
                 const instruments = response.data.instruments || [];
                 
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 this.instruments.clear();
                 instruments.forEach(inst => {
                     this.instruments.set(inst.id, inst);
@@ -91,11 +76,9 @@ class InstrumentModel extends BaseModel {
                 this.state.connectedCount = instruments.filter(i => i.connected).length;
                 this.state.lastScan = Date.now();
                 
-                if (this.logger && typeof this.logger.info === 'function') {
-                    this.logger.info('InstrumentModel', 
-                        `Found ${instruments.length} instruments (${this.state.connectedCount} connected)`
-                    );
-                }
+                this.log('info', 'InstrumentModel', 
+                    \`Found \${instruments.length} instruments (\${this.state.connectedCount} connected)\`
+                );
                 
                 if (this.eventBus) {
                     this.eventBus.emit('instruments:scan:complete', {
@@ -111,9 +94,7 @@ class InstrumentModel extends BaseModel {
             throw new Error(response.error || 'Scan failed');
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('InstrumentModel', `Scan error: ${error.message}`);
-            }
+            this.log('error', 'InstrumentModel', \`Scan error: \${error.message}\`);
             if (this.eventBus) {
                 this.eventBus.emit('instruments:scan:error', { error: error.message });
             }
@@ -133,16 +114,14 @@ class InstrumentModel extends BaseModel {
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('InstrumentModel', `Connecting instrument: ${instrumentId}`);
-            }
+            this.log('info', 'InstrumentModel', \`Connecting instrument: \${instrumentId}\`);
             
-            const response = await this.backend.sendCommand('devices.connect', {
+            const response = await this.backend.sendCommand('connect_device', {
                 device_id: instrumentId
             });
             
             if (response.success) {
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 const instrument = this.instruments.get(instrumentId);
                 if (instrument) {
                     instrument.connected = true;
@@ -163,15 +142,13 @@ class InstrumentModel extends BaseModel {
             throw new Error(response.error || 'Connection failed');
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('InstrumentModel', `Connection error: ${error.message}`);
-            }
+            this.log('error', 'InstrumentModel', \`Connection error: \${error.message}\`);
             throw error;
         }
     }
     
     /**
-     * Déconnecte un instrument
+     * DÃ©connecte un instrument
      */
     async disconnect(instrumentId) {
         if (!this.backend) {
@@ -179,16 +156,14 @@ class InstrumentModel extends BaseModel {
         }
         
         try {
-            if (this.logger && typeof this.logger.info === 'function') {
-                this.logger.info('InstrumentModel', `Disconnecting instrument: ${instrumentId}`);
-            }
+            this.log('info', 'InstrumentModel', \`Disconnecting instrument: \${instrumentId}\`);
             
-            const response = await this.backend.sendCommand('devices.disconnect', {
+            const response = await this.backend.sendCommand('disconnect_device', {
                 device_id: instrumentId
             });
             
             if (response.success) {
-                // Mettre à jour le cache
+                // Mettre Ã  jour le cache
                 const instrument = this.instruments.get(instrumentId);
                 if (instrument) {
                     instrument.connected = false;
@@ -209,9 +184,7 @@ class InstrumentModel extends BaseModel {
             throw new Error(response.error || 'Disconnection failed');
             
         } catch (error) {
-            if (this.logger && typeof this.logger.error === 'function') {
-                this.logger.error('InstrumentModel', `Disconnection error: ${error.message}`);
-            }
+            this.log('error', 'InstrumentModel', \`Disconnection error: \${error.message}\`);
             throw error;
         }
     }
@@ -235,28 +208,28 @@ class InstrumentModel extends BaseModel {
     }
     
     /**
-     * Obtient les instruments connectés
+     * Obtient les instruments connectÃ©s
      */
     getConnected() {
         return this.getAll().filter(i => i.connected);
     }
     
     /**
-     * Alias pour getConnected() - compatibilité NavigationController
+     * Alias pour getConnected() - compatibilitÃ© NavigationController
      */
     getConnectedInstruments() {
         return this.getConnected();
     }
     
     /**
-     * Obtient les instruments déconnectés
+     * Obtient les instruments dÃ©connectÃ©s
      */
     getDisconnected() {
         return this.getAll().filter(i => !i.connected);
     }
     
     /**
-     * Vérifie si un instrument est connecté
+     * VÃ©rifie si un instrument est connectÃ©
      */
     isConnected(instrumentId) {
         const instrument = this.instruments.get(instrumentId);
@@ -271,7 +244,7 @@ class InstrumentModel extends BaseModel {
     }
     
     /**
-     * Obtient le nombre d'instruments connectés
+     * Obtient le nombre d'instruments connectÃ©s
      */
     getConnectedCount() {
         return this.state.connectedCount;

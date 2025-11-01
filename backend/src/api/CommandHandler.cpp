@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/api/CommandHandler.cpp
-// Version: 4.2.1
+// Version: 4.2.2
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -9,6 +9,7 @@
 #include "../timing/LatencyCompensator.h"
 #include "../storage/InstrumentDatabase.h"
 #include "../storage/PresetManager.h"
+#include "../storage/MidiDatabase.h"
 #include <chrono>
 #include <sys/utsname.h>
 #include <sys/statvfs.h>
@@ -17,12 +18,14 @@
 #include <sstream>
 #include <iomanip>
 #include <filesystem>
+#include "../midi/JsonMidiConverter.h"
 
 namespace midiMind {
 
 // ============================================================================
 // CONSTRUCTOR / DESTRUCTOR
 // ============================================================================
+
 
 CommandHandler::CommandHandler(
     std::shared_ptr<MidiDeviceManager> deviceManager,
@@ -32,7 +35,9 @@ CommandHandler::CommandHandler(
     std::shared_ptr<LatencyCompensator> compensator,
     std::shared_ptr<InstrumentDatabase> instrumentDb,
     std::shared_ptr<PresetManager> presetManager,
-    std::shared_ptr<EventBus> eventBus)
+    std::shared_ptr<EventBus> eventBus,
+    std::shared_ptr<MidiDatabase> midiDatabase,
+    std::shared_ptr<PlaylistManager> playlistManager)
     : deviceManager_(deviceManager)
     , router_(router)
     , player_(player)
@@ -41,13 +46,16 @@ CommandHandler::CommandHandler(
     , instrumentDb_(instrumentDb)
     , presetManager_(presetManager)
     , eventBus_(eventBus)
+    , midiDatabase_(midiDatabase)
+    , playlistManager_(playlistManager)
 {
-    Logger::info("CommandHandler", "Initializing CommandHandler v4.2.1...");
+    Logger::info("CommandHandler", "Initializing CommandHandler v4.2.2...");
     registerAllCommands();
     Logger::info("CommandHandler", 
-                "Ã¢Å“â€¦ CommandHandler initialized (" + 
+                "✓ CommandHandler initialized (" + 
                 std::to_string(commands_.size()) + " commands)");
 }
+
 
 CommandHandler::~CommandHandler() {
     Logger::info("CommandHandler", "CommandHandler destroyed");
@@ -64,7 +72,7 @@ json CommandHandler::processCommand(const json& command) {
             return createErrorResponse(error, "INVALID_COMMAND");
         }
         
-        // CORRECTION CRITIQUE 1: Validation sÃƒÂ©curisÃƒÂ©e avant accÃƒÂ¨s
+        // CORRECTION CRITIQUE 1: Validation sécurisée avant accès
         if (!command.contains("command") || !command["command"].is_string()) {
             return createErrorResponse("Missing or invalid 'command' field", "INVALID_COMMAND");
         }
@@ -201,6 +209,8 @@ void CommandHandler::registerAllCommands() {
     registerRoutingCommands();
     registerPlaybackCommands();
     registerFileCommands();
+    registerMidiCommands(); 
+	registerPlaylistCommands();	
     registerSystemCommands();
     registerNetworkCommands();
     registerLoggerCommands();
@@ -224,39 +234,58 @@ void CommandHandler::registerDeviceCommands() {
         auto devices = deviceManager_->getAvailableDevices();
         
         json devicesJson = json::array();
-        for (const auto& deviceInfo : devices) {
-            devicesJson.push_back({
-                {"id", deviceInfo.id},
-                {"name", deviceInfo.name},
-                {"type", static_cast<int>(deviceInfo.type)},
-                {"status", static_cast<int>(deviceInfo.status)},
-                {"available", deviceInfo.available}
-            });
-        }
-        
-        return json{{"devices", devicesJson}};
-    });
-    
-    // devices.scan
-    registerCommand("devices.scan", [this](const json& params) {
-        bool fullScan = params.value("full_scan", false);
-        auto devices = deviceManager_->discoverDevices(fullScan);
-        
-        json devicesJson = json::array();
-        for (const auto& deviceInfo : devices) {
-            devicesJson.push_back({
-                {"id", deviceInfo.id},
-                {"name", deviceInfo.name},
-                {"type", static_cast<int>(deviceInfo.type)},
-                {"status", static_cast<int>(deviceInfo.status)},
-                {"available", deviceInfo.available}
-            });
+        for (const auto& device : devices) {
+            devicesJson.push_back(device);
         }
         
         return json{
             {"devices", devicesJson},
-            {"count", devicesJson.size()}
+            {"count", devices.size()}
         };
+    });
+    
+    // devices.listDetailed
+    registerCommand("devices.listDetailed", [this](const json& params) {
+        auto devices = deviceManager_->getDetailedDeviceList();
+        
+        json devicesJson = json::array();
+        for (const auto& device : devices) {
+            devicesJson.push_back(device);
+        }
+        
+        return json{
+            {"devices", devicesJson},
+            {"count", devices.size()}
+        };
+    });
+    
+    // devices.refresh
+    registerCommand("devices.refresh", [this](const json& params) {
+        bool success = deviceManager_->refreshDevices();
+        auto devices = deviceManager_->getAvailableDevices();
+        
+        json devicesJson = json::array();
+        for (const auto& device : devices) {
+            devicesJson.push_back(device);
+        }
+        
+        return json{
+            {"success", success},
+            {"devices", devicesJson},
+            {"count", devices.size()}
+        };
+    });
+    
+    // devices.get
+    registerCommand("devices.get", [this](const json& params) {
+        if (!params.contains("device_id")) {
+            throw std::runtime_error("Missing device_id parameter");
+        }
+        
+        std::string deviceId = params["device_id"];
+        auto device = deviceManager_->getDeviceDetails(deviceId);
+        
+        return json{{"device", device}};
     });
     
     // devices.connect
@@ -266,11 +295,12 @@ void CommandHandler::registerDeviceCommands() {
         }
         
         std::string deviceId = params["device_id"];
-        bool success = deviceManager_->connect(deviceId);
+        bool success = deviceManager_->connectDevice(deviceId);
         
         return json{
-            {"connected", success},
-            {"device_id", deviceId}
+            {"success", success},
+            {"device_id", deviceId},
+            {"status", success ? "connected" : "failed"}
         };
     });
     
@@ -281,226 +311,119 @@ void CommandHandler::registerDeviceCommands() {
         }
         
         std::string deviceId = params["device_id"];
-        deviceManager_->disconnect(deviceId);
+        bool success = deviceManager_->disconnectDevice(deviceId);
         
         return json{
-            {"disconnected", true},
-            {"device_id", deviceId}
+            {"success", success},
+            {"device_id", deviceId},
+            {"status", success ? "disconnected" : "failed"}
         };
     });
     
-    // devices.disconnectAll
-    registerCommand("devices.disconnectAll", [this](const json& params) {
-        deviceManager_->disconnectAll();
-        return json{{"disconnected_all", true}};
-    });
-    
-    // devices.getInfo
-    registerCommand("devices.getInfo", [this](const json& params) {
+    // devices.status
+    registerCommand("devices.status", [this](const json& params) {
         if (!params.contains("device_id")) {
             throw std::runtime_error("Missing device_id parameter");
         }
         
         std::string deviceId = params["device_id"];
-        auto device = deviceManager_->getDevice(deviceId);
-        
-        if (!device) {
-            throw std::runtime_error("Device not found: " + deviceId);
-        }
-        
-        return json{
-            {"id", device->getId()},
-            {"name", device->getName()},
-            {"type", static_cast<int>(device->getType())},
-            {"status", static_cast<int>(device->getStatus())},
-            {"available", device->isConnected()}
-        };
-    });
-    
-    // devices.getConnected
-    registerCommand("devices.getConnected", [this](const json& params) {
-        auto devices = deviceManager_->getConnectedDevices();
-        
-        json devicesJson = json::array();
-        for (const auto& device : devices) {
-            devicesJson.push_back({
-                {"id", device->getId()},
-                {"name", device->getName()},
-                {"type", static_cast<int>(device->getType())},
-                {"status", static_cast<int>(device->getStatus())}
-            });
-        }
-        
-        return json{
-            {"devices", devicesJson},
-            {"count", devicesJson.size()}
-        };
-    });
-    
-    // devices.startHotPlug
-    registerCommand("devices.startHotPlug", [this](const json& params) {
-        int intervalMs = params.value("interval_ms", 2000);
-        deviceManager_->startHotPlugMonitoring(intervalMs);
-        
-        return json{
-            {"hot_plug_started", true},
-            {"interval_ms", intervalMs}
-        };
-    });
-    
-    // devices.stopHotPlug
-    registerCommand("devices.stopHotPlug", [this](const json& params) {
-        deviceManager_->stopHotPlugMonitoring();
-        return json{{"hot_plug_stopped", true}};
-    });
-    
-    // devices.getHotPlugStatus
-    registerCommand("devices.getHotPlugStatus", [this](const json& params) {
-        bool active = deviceManager_->isHotPlugMonitoringActive();
-        
-        return json{
-            {"active", active}
-        };
-    });
-    
-    // bluetooth.config
-    registerCommand("bluetooth.config", [this](const json& params) {
-        bool enabled = params.value("enabled", true);
-        int timeout = params.value("scan_timeout", 5);
-        
-        deviceManager_->setBluetoothEnabled(enabled);
-        deviceManager_->setBluetoothScanTimeout(timeout);
-        
-        return json{
-            {"enabled", enabled},
-            {"scan_timeout", timeout}
-        };
-    });
-    
-    // bluetooth.status
-    registerCommand("bluetooth.status", [this](const json& params) {
-        bool enabled = deviceManager_->isBluetoothEnabled();
-        
-        return json{
-            {"enabled", enabled}
-        };
-    });
-    
-    // bluetooth.scan
-    registerCommand("bluetooth.scan", [this](const json& params) {
-        int duration = params.value("duration", 5);
-        std::string filter = params.value("filter", "");
-        
-        auto devices = deviceManager_->scanBleDevices(duration, filter);
-        
-        json devicesJson = json::array();
-        for (const auto& deviceInfo : devices) {
-            devicesJson.push_back({
-                {"id", deviceInfo.id},
-                {"name", deviceInfo.name},
-                {"address", deviceInfo.bluetoothAddress},
-                {"paired", deviceInfo.paired},
-                {"signal", deviceInfo.signalStrength},
-                {"available", deviceInfo.available}
-            });
-        }
-        
-        return json{
-            {"devices", devicesJson},
-            {"count", devicesJson.size()},
-            {"duration", duration}
-        };
-    });
-    
-    // bluetooth.pair
-    registerCommand("bluetooth.pair", [this](const json& params) {
-        if (!params.contains("address")) {
-            throw std::runtime_error("Missing address parameter");
-        }
-        
-        std::string address = params["address"];
-        std::string pin = params.value("pin", "");
-        
-        bool success = deviceManager_->pairBleDevice(address, pin);
-        
-        return json{
-            {"paired", success},
-            {"address", address}
-        };
-    });
-    
-    // bluetooth.unpair
-    registerCommand("bluetooth.unpair", [this](const json& params) {
-        if (!params.contains("address")) {
-            throw std::runtime_error("Missing address parameter");
-        }
-        
-        std::string address = params["address"];
-        bool success = deviceManager_->unpairBleDevice(address);
-        
-        return json{
-            {"unpaired", success},
-            {"address", address}
-        };
-    });
-    
-    // bluetooth.paired
-    registerCommand("bluetooth.paired", [this](const json& params) {
-        auto devices = deviceManager_->getPairedBleDevices();
-        
-        json devicesJson = json::array();
-        for (const auto& deviceInfo : devices) {
-            devicesJson.push_back({
-                {"id", deviceInfo.id},
-                {"name", deviceInfo.name},
-                {"address", deviceInfo.bluetoothAddress},
-                {"signal", deviceInfo.signalStrength},
-                {"available", deviceInfo.available}
-            });
-        }
-        
-        return json{
-            {"devices", devicesJson},
-            {"count", devicesJson.size()}
-        };
-    });
-    
-    // bluetooth.forget
-    registerCommand("bluetooth.forget", [this](const json& params) {
-        if (!params.contains("address")) {
-            throw std::runtime_error("Missing address parameter");
-        }
-        
-        std::string address = params["address"];
-        bool success = deviceManager_->forgetBleDevice(address);
-        
-        return json{
-            {"forgotten", success},
-            {"address", address}
-        };
-    });
-    
-    // bluetooth.signal
-    registerCommand("bluetooth.signal", [this](const json& params) {
-        if (!params.contains("device_id")) {
-            throw std::runtime_error("Missing device_id parameter");
-        }
-        
-        std::string deviceId = params["device_id"];
-        int rssi = deviceManager_->getBleDeviceSignal(deviceId);
+        bool isConnected = deviceManager_->isDeviceConnected(deviceId);
         
         return json{
             {"device_id", deviceId},
-            {"rssi", rssi},
-            {"signal_quality", rssi > -70 ? "good" : rssi > -85 ? "fair" : "poor"}
+            {"connected", isConnected},
+            {"status", isConnected ? "connected" : "disconnected"}
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Device commands registered (18 commands)");  
+    // devices.testConnection
+    registerCommand("devices.testConnection", [this](const json& params) {
+        if (!params.contains("device_id")) {
+            throw std::runtime_error("Missing device_id parameter");
+        }
+        
+        std::string deviceId = params["device_id"];
+        bool success = deviceManager_->testDeviceConnection(deviceId);
+        
+        return json{
+            {"success", success},
+            {"device_id", deviceId},
+            {"test_result", success ? "passed" : "failed"}
+        };
+    });
+    
+    // devices.rename
+    registerCommand("devices.rename", [this](const json& params) {
+        if (!params.contains("device_id") || !params.contains("new_name")) {
+            throw std::runtime_error("Missing device_id or new_name parameter");
+        }
+        
+        std::string deviceId = params["device_id"];
+        std::string newName = params["new_name"];
+        
+        bool success = deviceManager_->renameDevice(deviceId, newName);
+        
+        return json{
+            {"success", success},
+            {"device_id", deviceId},
+            {"new_name", newName}
+        };
+    });
+    
+    // devices.setAlias
+    registerCommand("devices.setAlias", [this](const json& params) {
+        if (!params.contains("device_id") || !params.contains("alias")) {
+            throw std::runtime_error("Missing device_id or alias parameter");
+        }
+        
+        std::string deviceId = params["device_id"];
+        std::string alias = params["alias"];
+        
+        bool success = deviceManager_->setDeviceAlias(deviceId, alias);
+        
+        return json{
+            {"success", success},
+            {"device_id", deviceId},
+            {"alias", alias}
+        };
+    });
+    
+    // devices.getCapabilities
+    registerCommand("devices.getCapabilities", [this](const json& params) {
+        if (!params.contains("device_id")) {
+            throw std::runtime_error("Missing device_id parameter");
+        }
+        
+        std::string deviceId = params["device_id"];
+        auto capabilities = deviceManager_->getDeviceCapabilities(deviceId);
+        
+        return json{
+            {"device_id", deviceId},
+            {"capabilities", capabilities}
+        };
+    });
+    
+    // devices.scan
+    registerCommand("devices.scan", [this](const json& params) {
+        bool includeVirtual = params.value("include_virtual", true);
+        auto devices = deviceManager_->scanDevices(includeVirtual);
+        
+        json devicesJson = json::array();
+        for (const auto& device : devices) {
+            devicesJson.push_back(device);
+        }
+        
+        return json{
+            {"devices", devicesJson},
+            {"count", devices.size()}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ Device commands registered (12 commands)");
 }
 
 // ============================================================================
-// ROUTING COMMANDS (6 commands)
+// ROUTING COMMANDS (9 commands)
 // ============================================================================
 
 void CommandHandler::registerRoutingCommands() {
@@ -512,44 +435,55 @@ void CommandHandler::registerRoutingCommands() {
     
     // routing.addRoute
     registerCommand("routing.addRoute", [this](const json& params) {
-        if (!params.contains("source_id") || !params.contains("destination_id")) {
-            throw std::runtime_error("Missing source_id or destination_id");
+        if (!params.contains("source") || !params.contains("destination")) {
+            throw std::runtime_error("Missing source or destination parameter");
         }
         
-        std::string sourceId = params["source_id"];
-        std::string destId = params["destination_id"];
+        std::string source = params["source"];
+        std::string destination = params["destination"];
         
-        bool success = router_->addRoute(sourceId, destId);
+        bool success = router_->addRoute(source, destination);
         
         return json{
-            {"added", success},
-            {"source_id", sourceId},
-            {"destination_id", destId}
+            {"success", success},
+            {"source", source},
+            {"destination", destination}
         };
     });
     
     // routing.removeRoute
     registerCommand("routing.removeRoute", [this](const json& params) {
-        if (!params.contains("source_id") || !params.contains("destination_id")) {
-            throw std::runtime_error("Missing source_id or destination_id");
+        if (!params.contains("source") || !params.contains("destination")) {
+            throw std::runtime_error("Missing source or destination parameter");
         }
         
-        std::string sourceId = params["source_id"];
-        std::string destId = params["destination_id"];
+        std::string source = params["source"];
+        std::string destination = params["destination"];
         
-        bool success = router_->removeRoute(sourceId, destId);
+        bool success = router_->removeRoute(source, destination);
         
         return json{
-            {"removed", success},
-            {"source_id", sourceId},
-            {"destination_id", destId}
+            {"success", success},
+            {"source", source},
+            {"destination", destination}
         };
     });
     
     // routing.clearRoutes
     registerCommand("routing.clearRoutes", [this](const json& params) {
-        router_->clearRoutes();
-        return json{{"cleared", true}};
+        if (params.contains("source")) {
+            std::string source = params["source"];
+            router_->clearRoutes(source);
+            
+            return json{
+                {"success", true},
+                {"source", source}
+            };
+        } else {
+            router_->clearAllRoutes();
+            
+            return json{{"success", true}};
+        }
     });
     
     // routing.listRoutes
@@ -557,13 +491,13 @@ void CommandHandler::registerRoutingCommands() {
         auto routes = router_->getRoutes();
         
         json routesJson = json::array();
-        for (const auto& route : routes) {
-            json routeObj = {
-                {"source_id", route->sourceDeviceId},
-                {"destination_id", route->destinationDeviceId},
-                {"enabled", route->enabled}
-            };
-            routesJson.push_back(routeObj);
+        for (const auto& [source, destinations] : routes) {
+            for (const auto& dest : destinations) {
+                routesJson.push_back({
+                    {"source", source},
+                    {"destination", dest}
+                });
+            }
         }
         
         return json{
@@ -572,68 +506,120 @@ void CommandHandler::registerRoutingCommands() {
         };
     });
     
-    // routing.enableRoute
-    registerCommand("routing.enableRoute", [this](const json& params) {
-        if (!params.contains("source_id") || !params.contains("destination_id")) {
-            throw std::runtime_error("Missing source_id or destination_id");
+    // routing.getDestinations
+    registerCommand("routing.getDestinations", [this](const json& params) {
+        if (!params.contains("source")) {
+            throw std::runtime_error("Missing source parameter");
         }
         
-        std::string sourceId = params["source_id"];
-        std::string destId = params["destination_id"];
+        std::string source = params["source"];
+        auto destinations = router_->getDestinations(source);
         
-        bool success = router_->enableRoute(sourceId, destId);
+        json destsJson = json::array();
+        for (const auto& dest : destinations) {
+            destsJson.push_back(dest);
+        }
         
         return json{
-            {"enabled", success},
-            {"source_id", sourceId},
-            {"destination_id", destId}
+            {"source", source},
+            {"destinations", destsJson},
+            {"count", destinations.size()}
         };
     });
     
-    // routing.disableRoute
-    registerCommand("routing.disableRoute", [this](const json& params) {
-        if (!params.contains("source_id") || !params.contains("destination_id")) {
-            throw std::runtime_error("Missing source_id or destination_id");
+    // routing.setFilter
+    registerCommand("routing.setFilter", [this](const json& params) {
+        if (!params.contains("source") || 
+            !params.contains("destination") || 
+            !params.contains("filter")) {
+            throw std::runtime_error("Missing required parameters");
         }
         
-        std::string sourceId = params["source_id"];
-        std::string destId = params["destination_id"];
+        std::string source = params["source"];
+        std::string destination = params["destination"];
+        json filter = params["filter"];
         
-        bool success = router_->disableRoute(sourceId, destId);
+        bool success = router_->setRouteFilter(source, destination, filter);
         
         return json{
-            {"disabled", success},
-            {"source_id", sourceId},
-            {"destination_id", destId}
+            {"success", success},
+            {"source", source},
+            {"destination", destination}
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Routing commands registered (6 commands)");
+    // routing.removeFilter
+    registerCommand("routing.removeFilter", [this](const json& params) {
+        if (!params.contains("source") || !params.contains("destination")) {
+            throw std::runtime_error("Missing source or destination parameter");
+        }
+        
+        std::string source = params["source"];
+        std::string destination = params["destination"];
+        
+        bool success = router_->removeRouteFilter(source, destination);
+        
+        return json{
+            {"success", success},
+            {"source", source},
+            {"destination", destination}
+        };
+    });
+    
+    // routing.getFilter
+    registerCommand("routing.getFilter", [this](const json& params) {
+        if (!params.contains("source") || !params.contains("destination")) {
+            throw std::runtime_error("Missing source or destination parameter");
+        }
+        
+        std::string source = params["source"];
+        std::string destination = params["destination"];
+        
+        auto filter = router_->getRouteFilter(source, destination);
+        
+        return json{
+            {"source", source},
+            {"destination", destination},
+            {"filter", filter}
+        };
+    });
+    
+    // routing.enable
+    registerCommand("routing.enable", [this](const json& params) {
+        router_->enableRouting(true);
+        
+        return json{
+            {"success", true},
+            {"routing_enabled", true}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ Routing commands registered (9 commands)");
 }
 
 // ============================================================================
-// PLAYBACK COMMANDS (10 commands)
+// PLAYBACK COMMANDS (14 commands)
 // ============================================================================
 
 void CommandHandler::registerPlaybackCommands() {
     if (!player_) {
         Logger::warning("CommandHandler", 
-                    "Player not available, skipping playback commands");
+                    "MidiPlayer not available, skipping playback commands");
         return;
     }
     
     // playback.load
     registerCommand("playback.load", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
         }
         
-        std::string filename = params["filename"];
-        bool success = player_->load(filename);
+        std::string filePath = params["file_path"];
+        bool success = player_->loadFile(filePath);
         
         return json{
-            {"loaded", success},
-            {"filename", filename}
+            {"success", success},
+            {"file_path", filePath}
         };
     });
     
@@ -642,68 +628,51 @@ void CommandHandler::registerPlaybackCommands() {
         bool success = player_->play();
         
         return json{
-            {"playing", success}
+            {"success", success},
+            {"state", "playing"}
         };
     });
     
     // playback.pause
     registerCommand("playback.pause", [this](const json& params) {
-        player_->pause();
+        bool success = player_->pause();
         
         return json{
-            {"paused", true}
+            {"success", success},
+            {"state", "paused"}
         };
     });
     
     // playback.stop
     registerCommand("playback.stop", [this](const json& params) {
-        player_->stop();
+        bool success = player_->stop();
         
         return json{
-            {"stopped", true}
-        };
-    });
-    
-    // playback.getStatus
-    registerCommand("playback.getStatus", [this](const json& params) {
-        auto state = player_->getState();
-        
-        return json{
-            {"state", static_cast<int>(state)},
-            {"current_time", player_->getCurrentPosition()},
-            {"duration", player_->getDuration()},
-            {"tempo", player_->getTempo()},
-            {"filename", player_->getCurrentFile()}
+            {"success", success},
+            {"state", "stopped"}
         };
     });
     
     // playback.seek
     registerCommand("playback.seek", [this](const json& params) {
-        if (!params.contains("position")) {
-            throw std::runtime_error("Missing position parameter");
+        if (!params.contains("position_ms")) {
+            throw std::runtime_error("Missing position_ms parameter");
         }
         
-        double position = params["position"];
-        player_->seek(position);
+        uint64_t positionMs = params["position_ms"];
+        bool success = player_->seek(positionMs);
         
         return json{
-            {"seeked", true},
-            {"position", position}
+            {"success", success},
+            {"position_ms", positionMs}
         };
     });
     
-    // playback.setTempo
-    registerCommand("playback.setTempo", [this](const json& params) {
-        if (!params.contains("tempo")) {
-            throw std::runtime_error("Missing tempo parameter");
-        }
+    // playback.getStatus
+    registerCommand("playback.getStatus", [this](const json& params) {
+        auto status = player_->getStatus();
         
-        double tempo = params["tempo"];
-        player_->setTempo(tempo);
-        
-        return json{
-            {"tempo", tempo}
-        };
+        return json{{"status", status}};
     });
     
     // playback.setLoop
@@ -716,42 +685,113 @@ void CommandHandler::registerPlaybackCommands() {
         player_->setLoop(enabled);
         
         return json{
+            {"success", true},
             {"loop_enabled", enabled}
         };
     });
     
-    // playback.getInfo
-    registerCommand("playback.getInfo", [this](const json& params) {
-        json metadata = player_->getMetadata();
-        
-        return json{
-            {"filename", player_->getCurrentFile()},
-            {"duration", player_->getDuration()},
-            {"tempo", player_->getTempo()},
-            {"metadata", metadata}
-        };
-    });
-    
-    // playback.listFiles
-    registerCommand("playback.listFiles", [this](const json& params) {
-        auto fileInfos = fileManager_->listFiles();  // List all files
-        
-        json filesJson = json::array();
-        for (const auto& info : fileInfos) {
-            filesJson.push_back(info.toJson());
+    // playback.setTempo
+    registerCommand("playback.setTempo", [this](const json& params) {
+        if (!params.contains("tempo_factor")) {
+            throw std::runtime_error("Missing tempo_factor parameter");
         }
         
+        double tempoFactor = params["tempo_factor"];
+        bool success = player_->setTempoFactor(tempoFactor);
+        
         return json{
-            {"files", filesJson},
-            {"count", filesJson.size()}
+            {"success", success},
+            {"tempo_factor", tempoFactor}
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Playback commands registered (10 commands)");
+    // playback.getPosition
+    registerCommand("playback.getPosition", [this](const json& params) {
+        uint64_t position = player_->getCurrentPosition();
+        
+        return json{
+            {"position_ms", position}
+        };
+    });
+    
+    // playback.getDuration
+    registerCommand("playback.getDuration", [this](const json& params) {
+        uint64_t duration = player_->getDuration();
+        
+        return json{
+            {"duration_ms", duration}
+        };
+    });
+    
+    // playback.setVolume
+    registerCommand("playback.setVolume", [this](const json& params) {
+        if (!params.contains("volume")) {
+            throw std::runtime_error("Missing volume parameter");
+        }
+        
+        double volume = params["volume"];
+        if (volume < 0.0 || volume > 1.0) {
+            throw std::runtime_error("Volume must be between 0.0 and 1.0");
+        }
+        
+        player_->setVolume(volume);
+        
+        return json{
+            {"success", true},
+            {"volume", volume}
+        };
+    });
+    
+    // playback.mute
+    registerCommand("playback.mute", [this](const json& params) {
+        if (!params.contains("muted")) {
+            throw std::runtime_error("Missing muted parameter");
+        }
+        
+        bool muted = params["muted"];
+        player_->setMute(muted);
+        
+        return json{
+            {"success", true},
+            {"muted", muted}
+        };
+    });
+    
+    // playback.getTrackInfo
+    registerCommand("playback.getTrackInfo", [this](const json& params) {
+        auto trackInfo = player_->getTrackInfo();
+        
+        return json{{"track_info", trackInfo}};
+    });
+    
+    // playback.selectTracks
+    registerCommand("playback.selectTracks", [this](const json& params) {
+        if (!params.contains("track_ids")) {
+            throw std::runtime_error("Missing track_ids parameter");
+        }
+        
+        if (!params["track_ids"].is_array()) {
+            throw std::runtime_error("track_ids must be an array");
+        }
+        
+        std::vector<int> trackIds;
+        for (const auto& id : params["track_ids"]) {
+            trackIds.push_back(id.get<int>());
+        }
+        
+        bool success = player_->selectTracks(trackIds);
+        
+        return json{
+            {"success", success},
+            {"track_count", trackIds.size()}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ Playback commands registered (14 commands)");
 }
 
 // ============================================================================
-// FILE COMMANDS (6 commands)
+// FILE COMMANDS (11 commands)
 // ============================================================================
 
 void CommandHandler::registerFileCommands() {
@@ -763,107 +803,687 @@ void CommandHandler::registerFileCommands() {
     
     // files.list
     registerCommand("files.list", [this](const json& params) {
-        auto fileInfos = fileManager_->listFiles();  // List all files
+        std::string directory = params.value("directory", "");
+        std::string filter = params.value("filter", "*.mid");
+        
+        auto files = fileManager_->listFiles(directory, filter);
         
         json filesJson = json::array();
-        for (const auto& info : fileInfos) {
-            filesJson.push_back(info.toJson());
+        for (const auto& file : files) {
+            filesJson.push_back(file);
         }
         
         return json{
             {"files", filesJson},
-            {"count", filesJson.size()}
+            {"count", files.size()}
         };
     });
     
-    // files.read
-    registerCommand("files.read", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
+    // files.get
+    registerCommand("files.get", [this](const json& params) {
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
         }
         
-        std::string filename = params["filename"];
-        auto data = fileManager_->downloadFile(filename);
+        std::string filePath = params["file_path"];
+        auto fileInfo = fileManager_->getFileInfo(filePath);
         
-        // Convert binary data to base64 string for JSON
-        std::string content(data.begin(), data.end());
-        
-        return json{
-            {"filename", filename},
-            {"content", content},
-            {"size", data.size()}
-        };
-    });
-    
-    // files.write
-    registerCommand("files.write", [this](const json& params) {
-        if (!params.contains("filename") || !params.contains("content")) {
-            throw std::runtime_error("Missing filename or content parameter");
-        }
-        
-        std::string filename = params["filename"];
-        std::string content = params["content"];
-        
-        // Convert string to binary data
-        std::vector<uint8_t> data(content.begin(), content.end());
-        
-        std::string filepath = fileManager_->uploadFile(data, filename, DirectoryType::UPLOADS, true);
-        
-        return json{
-            {"success", !filepath.empty()},
-            {"filename", filename},
-            {"filepath", filepath}
-        };
+        return json{{"file_info", fileInfo}};
     });
     
     // files.delete
     registerCommand("files.delete", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
         }
         
-        std::string filename = params["filename"];
-        bool success = fileManager_->deleteFile(filename);
+        std::string filePath = params["file_path"];
+        bool success = fileManager_->deleteFile(filePath);
         
         return json{
-            {"deleted", success},
-            {"filename", filename}
+            {"success", success},
+            {"file_path", filePath}
+        };
+    });
+    
+    // files.rename
+    registerCommand("files.rename", [this](const json& params) {
+        if (!params.contains("old_path") || !params.contains("new_path")) {
+            throw std::runtime_error("Missing old_path or new_path parameter");
+        }
+        
+        std::string oldPath = params["old_path"];
+        std::string newPath = params["new_path"];
+        
+        bool success = fileManager_->renameFile(oldPath, newPath);
+        
+        return json{
+            {"success", success},
+            {"old_path", oldPath},
+            {"new_path", newPath}
+        };
+    });
+    
+    // files.copy
+    registerCommand("files.copy", [this](const json& params) {
+        if (!params.contains("source_path") || !params.contains("dest_path")) {
+            throw std::runtime_error("Missing source_path or dest_path parameter");
+        }
+        
+        std::string sourcePath = params["source_path"];
+        std::string destPath = params["dest_path"];
+        
+        bool success = fileManager_->copyFile(sourcePath, destPath);
+        
+        return json{
+            {"success", success},
+            {"source_path", sourcePath},
+            {"dest_path", destPath}
+        };
+    });
+    
+    // files.move
+    registerCommand("files.move", [this](const json& params) {
+        if (!params.contains("source_path") || !params.contains("dest_path")) {
+            throw std::runtime_error("Missing source_path or dest_path parameter");
+        }
+        
+        std::string sourcePath = params["source_path"];
+        std::string destPath = params["dest_path"];
+        
+        bool success = fileManager_->moveFile(sourcePath, destPath);
+        
+        return json{
+            {"success", success},
+            {"source_path", sourcePath},
+            {"dest_path", destPath}
+        };
+    });
+    
+    // files.createDirectory
+    registerCommand("files.createDirectory", [this](const json& params) {
+        if (!params.contains("directory_path")) {
+            throw std::runtime_error("Missing directory_path parameter");
+        }
+        
+        std::string dirPath = params["directory_path"];
+        bool success = fileManager_->createDirectory(dirPath);
+        
+        return json{
+            {"success", success},
+            {"directory_path", dirPath}
+        };
+    });
+    
+    // files.deleteDirectory
+    registerCommand("files.deleteDirectory", [this](const json& params) {
+        if (!params.contains("directory_path")) {
+            throw std::runtime_error("Missing directory_path parameter");
+        }
+        
+        std::string dirPath = params["directory_path"];
+        bool recursive = params.value("recursive", false);
+        
+        bool success = fileManager_->deleteDirectory(dirPath, recursive);
+        
+        return json{
+            {"success", success},
+            {"directory_path", dirPath}
         };
     });
     
     // files.exists
     registerCommand("files.exists", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
         }
         
-        std::string filename = params["filename"];
-        auto infoOpt = fileManager_->getFileInfo(filename);
-        bool exists = infoOpt.has_value();
+        std::string filePath = params["file_path"];
+        bool exists = fileManager_->fileExists(filePath);
         
         return json{
-            {"exists", exists},
-            {"filename", filename}
+            {"file_path", filePath},
+            {"exists", exists}
         };
     });
     
-    // files.getInfo
-    registerCommand("files.getInfo", [this](const json& params) {
-        if (!params.contains("filename")) {
-            throw std::runtime_error("Missing filename parameter");
+    // files.validate
+    registerCommand("files.validate", [this](const json& params) {
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
         }
         
-        std::string filename = params["filename"];
-        auto infoOpt = fileManager_->getFileInfo(filename);
+        std::string filePath = params["file_path"];
+        auto validation = fileManager_->validateMidiFile(filePath);
         
-        if (!infoOpt) {
-            throw std::runtime_error("File not found: " + filename);
-        }
-        
-        return infoOpt->toJson();
+        return json{
+            {"file_path", filePath},
+            {"validation", validation}
+        };
     });
     
-    Logger::debug("CommandHandler", "✓ File commands registered (6 commands)");
+    // files.getMetadata
+    registerCommand("files.getMetadata", [this](const json& params) {
+        if (!params.contains("file_path")) {
+            throw std::runtime_error("Missing file_path parameter");
+        }
+        
+        std::string filePath = params["file_path"];
+        auto metadata = fileManager_->getMetadata(filePath);
+        
+        return json{
+            {"file_path", filePath},
+            {"metadata", metadata}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ File commands registered (11 commands)");
+}
+
+// ============================================================================
+// MIDI COMMANDS (11 commands)
+// ============================================================================
+
+void CommandHandler::registerMidiCommands() {
+    // midi.toJson - Convert MIDI binary to JSON
+    registerCommand("midi.toJson", [this](const json& params) {
+        if (!params.contains("data") || !params["data"].is_array()) {
+            throw std::runtime_error("Missing or invalid 'data' parameter (must be byte array)");
+        }
+        
+        std::vector<uint8_t> midiData;
+        for (const auto& byte : params["data"]) {
+            if (!byte.is_number_integer() || byte.get<int>() < 0 || byte.get<int>() > 255) {
+                throw std::runtime_error("Invalid byte value in MIDI data");
+            }
+            midiData.push_back(static_cast<uint8_t>(byte.get<int>()));
+        }
+        
+        MidiMessage msg(midiData);
+        json result = JsonMidiConverter::midiToJson(msg);
+        
+        return json{
+            {"success", true},
+            {"midi_json", result}
+        };
+    });
+    
+    // midi.fromJson - Convert JSON to MIDI binary
+    registerCommand("midi.fromJson", [this](const json& params) {
+        if (!params.contains("midi_json")) {
+            throw std::runtime_error("Missing 'midi_json' parameter");
+        }
+        
+        MidiMessage msg = JsonMidiConverter::jsonToMidi(params["midi_json"]);
+        const auto& data = msg.getRawData();
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"success", true},
+            {"data", dataArray}
+        };
+    });
+    
+    // midi.validate - Validate MIDI message structure
+    registerCommand("midi.validate", [this](const json& params) {
+        if (!params.contains("data") || !params["data"].is_array()) {
+            throw std::runtime_error("Missing or invalid 'data' parameter");
+        }
+        
+        std::vector<uint8_t> midiData;
+        for (const auto& byte : params["data"]) {
+            midiData.push_back(static_cast<uint8_t>(byte.get<int>()));
+        }
+        
+        MidiMessage msg(midiData);
+        bool isValid = msg.isValid();
+        
+        return json{
+            {"valid", isValid},
+            {"message_type", msg.getTypeString()}
+        };
+    });
+    
+    // midi.parse - Parse and analyze MIDI message
+    registerCommand("midi.parse", [this](const json& params) {
+        if (!params.contains("data") || !params["data"].is_array()) {
+            throw std::runtime_error("Missing or invalid 'data' parameter");
+        }
+        
+        std::vector<uint8_t> midiData;
+        for (const auto& byte : params["data"]) {
+            midiData.push_back(static_cast<uint8_t>(byte.get<int>()));
+        }
+        
+        MidiMessage msg(midiData);
+        
+        return json{
+            {"type", msg.getTypeString()},
+            {"channel", msg.getChannel()},
+            {"data1", msg.getData1()},
+            {"data2", msg.getData2()},
+            {"raw_data", msg.getRawData()},
+            {"is_channel_message", msg.isChannelMessage()},
+            {"is_system_message", msg.isSystemMessage()}
+        };
+    });
+    
+    // midi.createNoteOn
+    registerCommand("midi.createNoteOn", [this](const json& params) {
+        if (!params.contains("note") || !params.contains("velocity")) {
+            throw std::runtime_error("Missing note or velocity parameter");
+        }
+        
+        uint8_t channel = params.value("channel", 0);
+        uint8_t note = params["note"];
+        uint8_t velocity = params["velocity"];
+        
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0x90 | (channel & 0x0F)),
+            static_cast<uint8_t>(note & 0x7F),
+            static_cast<uint8_t>(velocity & 0x7F)
+        };
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"data", dataArray},
+            {"type", "Note On"}
+        };
+    });
+    
+    // midi.createNoteOff
+    registerCommand("midi.createNoteOff", [this](const json& params) {
+        if (!params.contains("note")) {
+            throw std::runtime_error("Missing note parameter");
+        }
+        
+        uint8_t channel = params.value("channel", 0);
+        uint8_t note = params["note"];
+        uint8_t velocity = params.value("velocity", 0);
+        
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0x80 | (channel & 0x0F)),
+            static_cast<uint8_t>(note & 0x7F),
+            static_cast<uint8_t>(velocity & 0x7F)
+        };
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"data", dataArray},
+            {"type", "Note Off"}
+        };
+    });
+    
+    // midi.createControlChange
+    registerCommand("midi.createControlChange", [this](const json& params) {
+        if (!params.contains("controller") || !params.contains("value")) {
+            throw std::runtime_error("Missing controller or value parameter");
+        }
+        
+        uint8_t channel = params.value("channel", 0);
+        uint8_t controller = params["controller"];
+        uint8_t value = params["value"];
+        
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0xB0 | (channel & 0x0F)),
+            static_cast<uint8_t>(controller & 0x7F),
+            static_cast<uint8_t>(value & 0x7F)
+        };
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"data", dataArray},
+            {"type", "Control Change"}
+        };
+    });
+    
+    // midi.createProgramChange
+    registerCommand("midi.createProgramChange", [this](const json& params) {
+        if (!params.contains("program")) {
+            throw std::runtime_error("Missing program parameter");
+        }
+        
+        uint8_t channel = params.value("channel", 0);
+        uint8_t program = params["program"];
+        
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0xC0 | (channel & 0x0F)),
+            static_cast<uint8_t>(program & 0x7F)
+        };
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"data", dataArray},
+            {"type", "Program Change"}
+        };
+    });
+    
+    // midi.createPitchBend
+    registerCommand("midi.createPitchBend", [this](const json& params) {
+        if (!params.contains("value")) {
+            throw std::runtime_error("Missing value parameter");
+        }
+        
+        uint8_t channel = params.value("channel", 0);
+        int value = params["value"];  // -8192 to 8191
+        
+        // Convert to 14-bit unsigned value
+        uint16_t unsignedValue = static_cast<uint16_t>(value + 8192);
+        uint8_t lsb = unsignedValue & 0x7F;
+        uint8_t msb = (unsignedValue >> 7) & 0x7F;
+        
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0xE0 | (channel & 0x0F)),
+            lsb,
+            msb
+        };
+        
+        json dataArray = json::array();
+        for (uint8_t byte : data) {
+            dataArray.push_back(static_cast<int>(byte));
+        }
+        
+        return json{
+            {"data", dataArray},
+            {"type", "Pitch Bend"}
+        };
+    });
+    
+    // midi.sendNoteOn - Envoyer un Note On direct à un device
+    registerCommand("midi.sendNoteOn", [this](const json& params) {
+        if (!params.contains("device_id") || 
+            !params.contains("note") || 
+            !params.contains("velocity")) {
+            throw std::runtime_error("Missing required parameters: device_id, note, velocity");
+        }
+        
+        std::string deviceId = params["device_id"];
+        uint8_t note = params["note"];
+        uint8_t velocity = params["velocity"];
+        uint8_t channel = params.value("channel", 0);
+        
+        if (note > 127) {
+            throw std::runtime_error("Note must be 0-127");
+        }
+        if (velocity > 127) {
+            throw std::runtime_error("Velocity must be 0-127");
+        }
+        if (channel > 15) {
+            throw std::runtime_error("Channel must be 0-15");
+        }
+        
+        // Créer message MIDI Note On (0x90 + channel)
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0x90 | channel),
+            note,
+            velocity
+        };
+        
+        MidiMessage msg(data);
+        
+        // IMPORTANT: Envoyer directement au device spécifié avec routeTo()
+        if (!router_) {
+            throw std::runtime_error("Router not available");
+        }
+        
+        router_->routeTo(msg, deviceId);
+        
+        Logger::debug("CommandHandler", 
+            "Sent Note On: device=" + deviceId + 
+            ", note=" + std::to_string(note) + 
+            ", velocity=" + std::to_string(velocity) +
+            ", channel=" + std::to_string(channel));
+        
+        return json{
+            {"success", true},
+            {"device_id", deviceId},
+            {"note", note},
+            {"velocity", velocity},
+            {"channel", channel}
+        };
+    });
+    
+    // midi.sendNoteOff - Envoyer un Note Off direct à un device
+    registerCommand("midi.sendNoteOff", [this](const json& params) {
+        if (!params.contains("device_id") || !params.contains("note")) {
+            throw std::runtime_error("Missing required parameters: device_id, note");
+        }
+        
+        std::string deviceId = params["device_id"];
+        uint8_t note = params["note"];
+        uint8_t channel = params.value("channel", 0);
+        
+        if (note > 127) {
+            throw std::runtime_error("Note must be 0-127");
+        }
+        if (channel > 15) {
+            throw std::runtime_error("Channel must be 0-15");
+        }
+        
+        // Créer message MIDI Note Off (0x80 + channel)
+        std::vector<uint8_t> data = {
+            static_cast<uint8_t>(0x80 | channel),
+            note,
+            0  // velocity = 0 pour Note Off
+        };
+        
+        MidiMessage msg(data);
+        
+        // IMPORTANT: Envoyer directement au device spécifié avec routeTo()
+        if (!router_) {
+            throw std::runtime_error("Router not available");
+        }
+        
+        router_->routeTo(msg, deviceId);
+        
+        Logger::debug("CommandHandler", 
+            "Sent Note Off: device=" + deviceId + 
+            ", note=" + std::to_string(note) +
+            ", channel=" + std::to_string(channel));
+        
+        return json{
+            {"success", true},
+            {"device_id", deviceId},
+            {"note", note},
+            {"channel", channel}
+        };
+    });
+
+    Logger::debug("CommandHandler", "✓ MIDI commands registered (11 commands)");
+}
+
+// ============================================================================
+// PLAYLIST COMMANDS (8 commands)
+// ============================================================================
+
+void CommandHandler::registerPlaylistCommands() {
+    if (!playlistManager_) {
+        Logger::warning("CommandHandler", 
+                    "PlaylistManager not available, skipping playlist commands");
+        return;
+    }
+    
+    // playlist.create
+    registerCommand("playlist.create", [this](const json& params) {
+        if (!params.contains("name")) {
+            throw std::runtime_error("Missing name parameter");
+        }
+        
+        std::string name = params["name"];
+        std::string description = params.value("description", "");
+        
+        int id = playlistManager_->createPlaylist(name, description);
+        
+        return json{
+            {"success", true},
+            {"playlist_id", id},
+            {"name", name}
+        };
+    });
+    
+    // playlist.delete
+    registerCommand("playlist.delete", [this](const json& params) {
+        if (!params.contains("playlist_id")) {
+            throw std::runtime_error("Missing playlist_id parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        bool success = playlistManager_->deletePlaylist(playlistId);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId}
+        };
+    });
+    
+    // playlist.update
+    registerCommand("playlist.update", [this](const json& params) {
+        if (!params.contains("playlist_id") || !params.contains("name")) {
+            throw std::runtime_error("Missing playlist_id or name parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        std::string name = params["name"];
+        std::string description = params.value("description", "");
+        
+        bool success = playlistManager_->updatePlaylist(playlistId, name, description);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId}
+        };
+    });
+    
+    // playlist.list
+    registerCommand("playlist.list", [this](const json& params) {
+        auto playlists = playlistManager_->listPlaylists();
+        
+        json playlistsJson = json::array();
+        for (const auto& playlist : playlists) {
+            playlistsJson.push_back(playlist.toJson());
+        }
+        
+        return json{
+            {"playlists", playlistsJson},
+            {"count", playlists.size()}
+        };
+    });
+    
+    // playlist.get
+    registerCommand("playlist.get", [this](const json& params) {
+        if (!params.contains("playlist_id")) {
+            throw std::runtime_error("Missing playlist_id parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        auto playlist = playlistManager_->getPlaylist(playlistId);
+        
+        return json{
+            {"playlist", playlist.toJson()}
+        };
+    });
+    
+    // playlist.addItem
+    registerCommand("playlist.addItem", [this](const json& params) {
+        if (!params.contains("playlist_id") || !params.contains("midi_file_id")) {
+            throw std::runtime_error("Missing playlist_id or midi_file_id parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        int midiFileId = params["midi_file_id"];
+        
+        bool success = playlistManager_->addItem(playlistId, midiFileId);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId},
+            {"midi_file_id", midiFileId}
+        };
+    });
+    
+    // playlist.removeItem
+    registerCommand("playlist.removeItem", [this](const json& params) {
+        if (!params.contains("playlist_id") || !params.contains("item_id")) {
+            throw std::runtime_error("Missing playlist_id or item_id parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        int itemId = params["item_id"];
+        
+        bool success = playlistManager_->removeItem(playlistId, itemId);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId},
+            {"item_id", itemId}
+        };
+    });
+    
+    // playlist.reorder
+    registerCommand("playlist.reorder", [this](const json& params) {
+        if (!params.contains("playlist_id") || !params.contains("item_ids")) {
+            throw std::runtime_error("Missing playlist_id or item_ids parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        
+        if (!params["item_ids"].is_array()) {
+            throw std::runtime_error("item_ids must be an array");
+        }
+        
+        std::vector<int> itemIds;
+        for (const auto& id : params["item_ids"]) {
+            itemIds.push_back(id.get<int>());
+        }
+        
+        bool success = playlistManager_->reorderItems(playlistId, itemIds);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId},
+            {"item_count", itemIds.size()}
+        };
+    });
+    
+    // playlist.setLoop
+    registerCommand("playlist.setLoop", [this](const json& params) {
+        if (!params.contains("playlist_id") || !params.contains("enabled")) {
+            throw std::runtime_error("Missing playlist_id or enabled parameter");
+        }
+        
+        int playlistId = params["playlist_id"];
+        bool enabled = params["enabled"];
+        
+        bool success = playlistManager_->setLoop(playlistId, enabled);
+        
+        return json{
+            {"success", success},
+            {"playlist_id", playlistId},
+            {"loop", enabled}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ Playlist commands registered (8 commands)");
 }
 
 // ============================================================================
@@ -871,107 +1491,155 @@ void CommandHandler::registerFileCommands() {
 // ============================================================================
 
 void CommandHandler::registerSystemCommands() {
-    // system.ping
-    registerCommand("system.ping", [this](const json& params) {
-        return json{{"pong", true}};
-    });
-    
-    // system.version
-    registerCommand("system.version", [this](const json& params) {
-        return json{
-            {"version", "4.2.1"},
-            {"name", "MidiMind"}
-        };
-    });
-    
-    // system.info
-    registerCommand("system.info", [this](const json& params) {
-        struct utsname systemInfo;
-        uname(&systemInfo);
-        
-        return json{
-            {"system", systemInfo.sysname},
-            {"node", systemInfo.nodename},
-            {"release", systemInfo.release},
-            {"version", systemInfo.version},
-            {"machine", systemInfo.machine}
-        };
-    });
-    
-    // system.uptime
-    registerCommand("system.uptime", [this](const json& params) {
-        std::ifstream uptimeFile("/proc/uptime");
-        double uptime = 0.0;
-        
-        if (uptimeFile.is_open()) {
-            uptimeFile >> uptime;
-            uptimeFile.close();
+    // system.getInfo
+    registerCommand("system.getInfo", [this](const json& params) {
+        utsname sysInfo;
+        if (uname(&sysInfo) != 0) {
+            throw std::runtime_error("Failed to get system information");
         }
         
         return json{
-            {"uptime_seconds", uptime}
+            {"system", sysInfo.sysname},
+            {"node", sysInfo.nodename},
+            {"release", sysInfo.release},
+            {"version", sysInfo.version},
+            {"machine", sysInfo.machine}
         };
     });
     
-    // system.memory
-    registerCommand("system.memory", [this](const json& params) {
-        std::ifstream meminfoFile("/proc/meminfo");
-        std::string line;
-        long totalMem = 0;
-        long availMem = 0;
+    // system.getCpuInfo
+    registerCommand("system.getCpuInfo", [this](const json& params) {
+        std::ifstream cpuinfo("/proc/cpuinfo");
+        if (!cpuinfo.is_open()) {
+            throw std::runtime_error("Failed to open /proc/cpuinfo");
+        }
         
-        if (meminfoFile.is_open()) {
-            while (std::getline(meminfoFile, line)) {
-                if (line.find("MemTotal:") == 0) {
-                    std::istringstream iss(line);
-                    std::string label;
-                    iss >> label >> totalMem;
+        std::string line;
+        std::string model;
+        int cores = 0;
+        
+        while (std::getline(cpuinfo, line)) {
+            if (line.find("model name") != std::string::npos) {
+                size_t pos = line.find(':');
+                if (pos != std::string::npos) {
+                    model = line.substr(pos + 2);
                 }
-                else if (line.find("MemAvailable:") == 0) {
-                    std::istringstream iss(line);
-                    std::string label;
-                    iss >> label >> availMem;
-                }
+            } else if (line.find("processor") != std::string::npos) {
+                cores++;
             }
-            meminfoFile.close();
+        }
+        
+        return json{
+            {"model", model},
+            {"cores", cores}
+        };
+    });
+    
+    // system.getMemoryInfo
+    registerCommand("system.getMemoryInfo", [this](const json& params) {
+        std::ifstream meminfo("/proc/meminfo");
+        if (!meminfo.is_open()) {
+            throw std::runtime_error("Failed to open /proc/meminfo");
+        }
+        
+        std::string line;
+        uint64_t totalMem = 0;
+        uint64_t freeMem = 0;
+        uint64_t availMem = 0;
+        
+        while (std::getline(meminfo, line)) {
+            std::istringstream iss(line);
+            std::string key;
+            uint64_t value;
+            std::string unit;
+            
+            if (iss >> key >> value >> unit) {
+                if (key == "MemTotal:") totalMem = value;
+                else if (key == "MemFree:") freeMem = value;
+                else if (key == "MemAvailable:") availMem = value;
+            }
         }
         
         return json{
             {"total_kb", totalMem},
+            {"free_kb", freeMem},
             {"available_kb", availMem},
-            {"used_kb", totalMem - availMem}
+            {"used_kb", totalMem - freeMem}
         };
     });
     
-    // system.disk
-    registerCommand("system.disk", [this](const json& params) {
-        struct statvfs stat;
+    // system.getDiskInfo
+    registerCommand("system.getDiskInfo", [this](const json& params) {
+        std::string path = params.value("path", "/");
         
-        if (statvfs("/", &stat) != 0) {
+        struct statvfs stat;
+        if (statvfs(path.c_str(), &stat) != 0) {
             throw std::runtime_error("Failed to get disk information");
         }
         
-        unsigned long long totalSpace = stat.f_blocks * stat.f_frsize;
-        unsigned long long freeSpace = stat.f_bfree * stat.f_frsize;
-        unsigned long long availSpace = stat.f_bavail * stat.f_frsize;
+        uint64_t total = stat.f_blocks * stat.f_frsize;
+        uint64_t available = stat.f_bavail * stat.f_frsize;
+        uint64_t free = stat.f_bfree * stat.f_frsize;
+        uint64_t used = total - free;
         
         return json{
-            {"total_bytes", totalSpace},
-            {"free_bytes", freeSpace},
-            {"available_bytes", availSpace},
-            {"used_bytes", totalSpace - freeSpace}
+            {"path", path},
+            {"total_bytes", total},
+            {"available_bytes", available},
+            {"free_bytes", free},
+            {"used_bytes", used}
         };
     });
     
-    // system.commands
-    registerCommand("system.commands", [this](const json& params) {
-        auto commands = listCommands();
-        auto categories = listCommandsByCategory();
+    // system.getUptime
+    registerCommand("system.getUptime", [this](const json& params) {
+        std::ifstream uptime("/proc/uptime");
+        if (!uptime.is_open()) {
+            throw std::runtime_error("Failed to open /proc/uptime");
+        }
+        
+        double uptimeSeconds;
+        uptime >> uptimeSeconds;
         
         return json{
-            {"commands", commands},
-            {"count", commands.size()},
-            {"categories", categories}
+            {"uptime_seconds", static_cast<uint64_t>(uptimeSeconds)}
+        };
+    });
+    
+    // system.getLoadAverage
+    registerCommand("system.getLoadAverage", [this](const json& params) {
+        std::ifstream loadavg("/proc/loadavg");
+        if (!loadavg.is_open()) {
+            throw std::runtime_error("Failed to open /proc/loadavg");
+        }
+        
+        double load1, load5, load15;
+        loadavg >> load1 >> load5 >> load15;
+        
+        return json{
+            {"load_1min", load1},
+            {"load_5min", load5},
+            {"load_15min", load15}
+        };
+    });
+    
+    // system.getProcessInfo
+    registerCommand("system.getProcessInfo", [this](const json& params) {
+        pid_t pid = getpid();
+        
+        std::string statPath = "/proc/" + std::to_string(pid) + "/stat";
+        std::ifstream stat(statPath);
+        
+        if (!stat.is_open()) {
+            throw std::runtime_error("Failed to open process stat file");
+        }
+        
+        std::string line;
+        std::getline(stat, line);
+        
+        return json{
+            {"pid", pid},
+            {"stat", line}
         };
     });
     
@@ -979,56 +1647,38 @@ void CommandHandler::registerSystemCommands() {
 }
 
 // ============================================================================
-// NETWORK COMMANDS (3 commands)
+// NETWORK COMMANDS (2 commands)
 // ============================================================================
 
 void CommandHandler::registerNetworkCommands() {
-    // network.status
-    registerCommand("network.status", [this](const json& params) {
+    // network.getInterfaces
+    registerCommand("network.getInterfaces", [this](const json& params) {
+        // This would require platform-specific code
+        // Placeholder implementation
         return json{
-            {"connected", true},
-            {"type", "websocket"}
+            {"interfaces", json::array()}
         };
     });
     
-    // network.interfaces
-    registerCommand("network.interfaces", [this](const json& params) {
-        std::ifstream routeFile("/proc/net/route");
-        std::string line;
-        json interfaces = json::array();
-        
-        if (routeFile.is_open()) {
-            std::getline(routeFile, line); // Skip header
-            
-            while (std::getline(routeFile, line)) {
-                std::istringstream iss(line);
-                std::string iface;
-                iss >> iface;
-                
-                if (std::find_if(interfaces.begin(), interfaces.end(), 
-                    [&iface](const json& j) { return j["name"] == iface; }) == interfaces.end()) {
-                    interfaces.push_back({{"name", iface}});
-                }
-            }
-            routeFile.close();
+    // network.ping
+    registerCommand("network.ping", [this](const json& params) {
+        if (!params.contains("host")) {
+            throw std::runtime_error("Missing host parameter");
         }
         
+        std::string host = params["host"];
+        
+        // Simple implementation - would need enhancement for production
+        std::string command = "ping -c 1 -W 1 " + host + " > /dev/null 2>&1";
+        int result = system(command.c_str());
+        
         return json{
-            {"interfaces", interfaces},
-            {"count", interfaces.size()}
+            {"host", host},
+            {"reachable", result == 0}
         };
     });
     
-    // network.stats
-    registerCommand("network.stats", [this](const json& params) {
-        return json{
-            {"active_connections", 1},
-            {"messages_sent", 0},
-            {"messages_received", 0}
-        };
-    });
-    
-    Logger::debug("CommandHandler", "✓ Network commands registered (3 commands)");
+    Logger::debug("CommandHandler", "✓ Network commands registered (2 commands)");
 }
 
 // ============================================================================
@@ -1042,93 +1692,66 @@ void CommandHandler::registerLoggerCommands() {
             throw std::runtime_error("Missing level parameter");
         }
         
-        std::string levelStr = params["level"];
-        
-        // Convert string to Logger::Level
-        Logger::Level level;
-        if (levelStr == "DEBUG" || levelStr == "debug" || levelStr == "0") {
-            level = Logger::Level::DEBUG;
-        } else if (levelStr == "INFO" || levelStr == "info" || levelStr == "1") {
-            level = Logger::Level::INFO;
-        } else if (levelStr == "WARNING" || levelStr == "warning" || levelStr == "2") {
-            level = Logger::Level::WARNING;
-        } else if (levelStr == "ERROR" || levelStr == "error" || levelStr == "3") {
-            level = Logger::Level::ERROR;
-        } else if (levelStr == "CRITICAL" || levelStr == "critical" || levelStr == "4") {
-            level = Logger::Level::CRITICAL;
-        } else {
-            throw std::runtime_error("Invalid log level: " + levelStr);
-        }
-        
-        Logger::setLevel(level);
+        std::string level = params["level"];
+        Logger::setGlobalLevel(level);
         
         return json{
-            {"level", levelStr}
+            {"success", true},
+            {"level", level}
         };
     });
     
     // logger.getLevel
     registerCommand("logger.getLevel", [this](const json& params) {
-        auto level = Logger::getLevel();
+        std::string level = Logger::getGlobalLevel();
         
-        // Convert Logger::Level to string
-        std::string levelStr;
-        switch (level) {
-            case Logger::Level::DEBUG:
-                levelStr = "DEBUG";
-                break;
-            case Logger::Level::INFO:
-                levelStr = "INFO";
-                break;
-            case Logger::Level::WARNING:
-                levelStr = "WARNING";
-                break;
-            case Logger::Level::ERROR:
-                levelStr = "ERROR";
-                break;
-            case Logger::Level::CRITICAL:
-                levelStr = "CRITICAL";
-                break;
-            default:
-                levelStr = "UNKNOWN";
-                break;
+        return json{{"level", level}};
+    });
+    
+    // logger.setModuleLevel
+    registerCommand("logger.setModuleLevel", [this](const json& params) {
+        if (!params.contains("module") || !params.contains("level")) {
+            throw std::runtime_error("Missing module or level parameter");
         }
         
+        std::string module = params["module"];
+        std::string level = params["level"];
+        
+        Logger::setModuleLevel(module, level);
+        
         return json{
-            {"level", levelStr}
+            {"success", true},
+            {"module", module},
+            {"level", level}
         };
     });
     
-    // logger.getLogs - DISABLED (Logger::getRecentLogs() not available)
-    // registerCommand("logger.getLogs", [this](const json& params) {
-    //     int count = params.value("count", 100);
-    //     auto logs = Logger::getRecentLogs(count);
-    //     return json{
-    //         {"logs", logs},
-    //         {"count", logs.size()}
-    //     };
-    // });
+    // logger.getModuleLevels
+    registerCommand("logger.getModuleLevels", [this](const json& params) {
+        auto levels = Logger::getModuleLevels();
+        
+        return json{{"module_levels", levels}};
+    });
     
-    // logger.clear - DISABLED (Logger::clearLogs() not available)
-    // registerCommand("logger.clear", [this](const json& params) {
-    //     Logger::clearLogs();
-    //     return json{{"cleared", true}};
-    // });
+    // logger.getLogs
+    registerCommand("logger.getLogs", [this](const json& params) {
+        int count = params.value("count", 100);
+        std::string minLevel = params.value("min_level", "DEBUG");
+        
+        auto logs = Logger::getRecentLogs(count, minLevel);
+        
+        json logsJson = json::array();
+        for (const auto& log : logs) {
+            logsJson.push_back(log);
+        }
+        
+        return json{
+            {"logs", logsJson},
+            {"count", logs.size()}
+        };
+    });
     
-    // logger.export - DISABLED (Logger::exportLogs() not available)
-    // registerCommand("logger.export", [this](const json& params) {
-    //     if (!params.contains("filename")) {
-    //         throw std::runtime_error("Missing filename parameter");
-    //     }
-    //     std::string filename = params["filename"];
-    //     bool success = Logger::exportLogs(filename);
-    //     return json{
-    //         {"exported", success},
-    //         {"filename", filename}
-    //     };
-    // });
-    
-    Logger::debug("CommandHandler", "✓ Logger commands registered (2 commands)");
+    Logger::debug("CommandHandler", "✓ Logger commands registered (5 commands)");
 }
 
 // ============================================================================
@@ -1138,102 +1761,95 @@ void CommandHandler::registerLoggerCommands() {
 void CommandHandler::registerLatencyCommands() {
     if (!compensator_) {
         Logger::warning("CommandHandler", 
-                    "Compensator not available, skipping latency commands");
+                    "LatencyCompensator not available, skipping latency commands");
         return;
     }
     
-    // latency.setCompensation
-    registerCommand("latency.setCompensation", [this](const json& params) {
-        if (!params.contains("instrument_id") || !params.contains("offset_ms")) {
-            throw std::runtime_error("Missing instrument_id or offset_ms parameter");
+    // latency.setInstrumentLatency
+    registerCommand("latency.setInstrumentLatency", [this](const json& params) {
+        if (!params.contains("instrument_id") || !params.contains("latency_ms")) {
+            throw std::runtime_error("Missing instrument_id or latency_ms parameter");
         }
         
         std::string instrumentId = params["instrument_id"];
-        double offsetMs = params["offset_ms"];
-        int64_t offsetUs = static_cast<int64_t>(offsetMs * 1000.0);
+        int latencyMs = params["latency_ms"];
         
-        compensator_->setInstrumentCompensation(instrumentId, offsetUs);
+        compensator_->setInstrumentLatency(instrumentId, latencyMs);
         
         return json{
+            {"success", true},
             {"instrument_id", instrumentId},
-            {"offset_ms", offsetMs},
-            {"offset_us", offsetUs}
+            {"latency_ms", latencyMs}
         };
     });
     
-    // latency.getCompensation
-    registerCommand("latency.getCompensation", [this](const json& params) {
+    // latency.getInstrumentLatency
+    registerCommand("latency.getInstrumentLatency", [this](const json& params) {
         if (!params.contains("instrument_id")) {
             throw std::runtime_error("Missing instrument_id parameter");
         }
         
         std::string instrumentId = params["instrument_id"];
-        int64_t offsetUs = compensator_->getInstrumentCompensation(instrumentId);
-        double offsetMs = offsetUs / 1000.0;
+        int latencyMs = compensator_->getInstrumentLatency(instrumentId);
         
         return json{
             {"instrument_id", instrumentId},
-            {"offset_ms", offsetMs},
-            {"offset_us", offsetUs}
+            {"latency_ms", latencyMs}
         };
+    });
+    
+    // latency.getAllLatencies
+    registerCommand("latency.getAllLatencies", [this](const json& params) {
+        auto latencies = compensator_->getAllLatencies();
+        
+        return json{{"latencies", latencies}};
+    });
+    
+    // latency.clearInstrumentLatency
+    registerCommand("latency.clearInstrumentLatency", [this](const json& params) {
+        if (!params.contains("instrument_id")) {
+            throw std::runtime_error("Missing instrument_id parameter");
+        }
+        
+        std::string instrumentId = params["instrument_id"];
+        compensator_->clearInstrumentLatency(instrumentId);
+        
+        return json{
+            {"success", true},
+            {"instrument_id", instrumentId}
+        };
+    });
+    
+    // latency.clearAllLatencies
+    registerCommand("latency.clearAllLatencies", [this](const json& params) {
+        compensator_->clearAllLatencies();
+        
+        return json{{"success", true}};
     });
     
     // latency.enable
     registerCommand("latency.enable", [this](const json& params) {
-        compensator_->enable();
-        
-        return json{{"enabled", true}};
-    });
-    
-    // latency.disable
-    registerCommand("latency.disable", [this](const json& params) {
-        compensator_->disable();
-        
-        return json{{"enabled", false}};
-    });
-    
-    // latency.setGlobalOffset
-    registerCommand("latency.setGlobalOffset", [this](const json& params) {
-        if (!params.contains("offset_ms")) {
-            throw std::runtime_error("Missing offset_ms parameter");
+        if (!params.contains("enabled")) {
+            throw std::runtime_error("Missing enabled parameter");
         }
         
-        double offsetMs = params["offset_ms"];
-        compensator_->setGlobalOffset(offsetMs);
+        bool enabled = params["enabled"];
+        compensator_->setEnabled(enabled);
         
         return json{
-            {"offset_ms", offsetMs}
+            {"success", true},
+            {"enabled", enabled}
         };
     });
     
-    // latency.getGlobalOffset
-    registerCommand("latency.getGlobalOffset", [this](const json& params) {
-        double offsetMs = compensator_->getGlobalOffset();
+    // latency.getStatus
+    registerCommand("latency.getStatus", [this](const json& params) {
+        bool enabled = compensator_->isEnabled();
+        auto latencies = compensator_->getAllLatencies();
         
         return json{
-            {"offset_ms", offsetMs}
-        };
-    });
-    
-    // latency.listInstruments
-    registerCommand("latency.listInstruments", [this](const json& params) {
-        auto profiles = compensator_->getAllInstrumentProfiles();
-        
-        json instrumentsJson = json::array();
-        for (const auto& profile : profiles) {
-            json instrumentObj = {
-                {"instrument_id", profile.instrumentId},
-                {"avg_latency_us", profile.avgLatency},
-                {"compensation_offset_us", profile.totalCompensation},
-                {"measurement_count", profile.measurementCount},
-                {"auto_calibration", profile.autoCalibration}
-            };
-            instrumentsJson.push_back(instrumentObj);
-        }
-        
-        return json{
-            {"instruments", instrumentsJson},
-            {"count", instrumentsJson.size()}
+            {"enabled", enabled},
+            {"instrument_count", latencies.size()}
         };
     });
     
@@ -1241,7 +1857,7 @@ void CommandHandler::registerLatencyCommands() {
 }
 
 // ============================================================================
-// PRESET COMMANDS (5 commands)
+// PRESET COMMANDS (7 commands)
 // ============================================================================
 
 void CommandHandler::registerPresetCommands() {
@@ -1251,103 +1867,134 @@ void CommandHandler::registerPresetCommands() {
         return;
     }
     
-    // preset.list
-    registerCommand("preset.list", [this](const json& params) {
-        auto presets = presetManager_->list();
+    // presets.save
+    registerCommand("presets.save", [this](const json& params) {
+        if (!params.contains("name") || !params.contains("data")) {
+            throw std::runtime_error("Missing name or data parameter");
+        }
+        
+        std::string name = params["name"];
+        json data = params["data"];
+        std::string description = params.value("description", "");
+        
+        bool success = presetManager_->savePreset(name, data, description);
+        
+        return json{
+            {"success", success},
+            {"name", name}
+        };
+    });
+    
+    // presets.load
+    registerCommand("presets.load", [this](const json& params) {
+        if (!params.contains("name")) {
+            throw std::runtime_error("Missing name parameter");
+        }
+        
+        std::string name = params["name"];
+        auto preset = presetManager_->loadPreset(name);
+        
+        return json{
+            {"name", name},
+            {"data", preset}
+        };
+    });
+    
+    // presets.list
+    registerCommand("presets.list", [this](const json& params) {
+        auto presets = presetManager_->listPresets();
         
         json presetsJson = json::array();
         for (const auto& preset : presets) {
-            presetsJson.push_back(preset.toJson());
+            presetsJson.push_back(preset);
         }
         
         return json{
             {"presets", presetsJson},
-            {"count", presetsJson.size()}
+            {"count", presets.size()}
         };
     });
     
-    // preset.load
-    registerCommand("preset.load", [this](const json& params) {
-        if (!params.contains("id")) {
-            throw std::runtime_error("Missing id parameter");
+    // presets.delete
+    registerCommand("presets.delete", [this](const json& params) {
+        if (!params.contains("name")) {
+            throw std::runtime_error("Missing name parameter");
         }
         
-        int id = params["id"];
-        auto preset = presetManager_->load(id);
-        
-        if (!preset) {
-            throw std::runtime_error("Preset not found: " + std::to_string(id));
-        }
-        
-        return preset->toJson();
-    });
-    
-    // preset.save
-    registerCommand("preset.save", [this](const json& params) {
-        if (!params.contains("preset")) {
-            throw std::runtime_error("Missing preset parameter");
-        }
-        
-        json presetJson = params["preset"];
-        Preset preset = Preset::fromJson(presetJson);
-        
-        int id = presetManager_->create(preset);
+        std::string name = params["name"];
+        bool success = presetManager_->deletePreset(name);
         
         return json{
-            {"saved", true},
-            {"id", id},
-            {"name", preset.metadata.name}
+            {"success", success},
+            {"name", name}
         };
     });
     
-    // preset.delete
-    registerCommand("preset.delete", [this](const json& params) {
-        if (!params.contains("id")) {
-            throw std::runtime_error("Missing id parameter");
+    // presets.rename
+    registerCommand("presets.rename", [this](const json& params) {
+        if (!params.contains("old_name") || !params.contains("new_name")) {
+            throw std::runtime_error("Missing old_name or new_name parameter");
         }
         
-        int id = params["id"];
-        bool deleted = presetManager_->remove(id);
+        std::string oldName = params["old_name"];
+        std::string newName = params["new_name"];
+        
+        bool success = presetManager_->renamePreset(oldName, newName);
         
         return json{
-            {"deleted", deleted},
-            {"id", id}
+            {"success", success},
+            {"old_name", oldName},
+            {"new_name", newName}
         };
     });
     
-    // preset.export
-    registerCommand("preset.export", [this](const json& params) {
-        if (!params.contains("id")) {
-            throw std::runtime_error("Missing id parameter");
-        }
-        if (!params.contains("filepath")) {
-            throw std::runtime_error("Missing filepath parameter");
+    // presets.update
+    registerCommand("presets.update", [this](const json& params) {
+        if (!params.contains("name") || !params.contains("data")) {
+            throw std::runtime_error("Missing name or data parameter");
         }
         
-        int id = params["id"];
-        std::string filepath = params["filepath"];
+        std::string name = params["name"];
+        json data = params["data"];
+        std::string description = params.value("description", "");
         
-        bool exported = presetManager_->exportToFile(id, filepath);
+        bool success = presetManager_->updatePreset(name, data, description);
         
         return json{
-            {"exported", exported},
-            {"id", id},
-            {"filepath", filepath}
+            {"success", success},
+            {"name", name}
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Preset commands registered (5 commands)");
+    // presets.export
+    registerCommand("presets.export", [this](const json& params) {
+        if (!params.contains("name") || !params.contains("file_path")) {
+            throw std::runtime_error("Missing name or file_path parameter");
+        }
+        
+        std::string name = params["name"];
+        std::string filePath = params["file_path"];
+        
+        bool success = presetManager_->exportPreset(name, filePath);
+        
+        return json{
+            {"success", success},
+            {"name", name},
+            {"file_path", filePath}
+        };
+    });
+    
+    Logger::debug("CommandHandler", "✓ Preset commands registered (7 commands)");
 }
 
 // ============================================================================
-// HELPERS
+// HELPER METHODS
 // ============================================================================
 
 json CommandHandler::createSuccessResponse(const json& data) const {
     return json{
         {"success", true},
-        {"data", data},
-        {"timestamp", std::chrono::system_clock::now().time_since_epoch().count()}
+        {"data", data}
     };
 }
 
@@ -1356,13 +2003,11 @@ json CommandHandler::createErrorResponse(const std::string& error,
     return json{
         {"success", false},
         {"error", error},
-        {"error_code", errorCode},
-        {"timestamp", std::chrono::system_clock::now().time_since_epoch().count()}
+        {"error_code", errorCode}
     };
 }
 
-bool CommandHandler::validateCommand(const json& command, 
-                                     std::string& error) const {
+bool CommandHandler::validateCommand(const json& command, std::string& error) const {
     if (!command.is_object()) {
         error = "Command must be a JSON object";
         return false;
@@ -1374,15 +2019,20 @@ bool CommandHandler::validateCommand(const json& command,
     }
     
     if (!command["command"].is_string()) {
-        error = "'command' must be a string";
+        error = "'command' field must be a string";
+        return false;
+    }
+    
+    if (command.contains("params") && !command["params"].is_object()) {
+        error = "'params' field must be an object";
         return false;
     }
     
     return true;
 }
 
-} // namespace midiMind
 
+}
 // ============================================================================
 // END OF FILE CommandHandler.cpp
 // ============================================================================

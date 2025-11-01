@@ -1,14 +1,7 @@
 // ============================================================================
 // File: backend/src/core/Application.h
-// Version: 4.2.3 - CORRECTIONS CRITIQUES
+// Version: 4.2.5 - Add PlaylistManager support
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
-// ============================================================================
-//
-// Changes v4.2.3:
-//   🔧 FIXED: Ordre d'initialisation: EventSystem avant Timing/MIDI/API
-//   🔧 FIXED: Getters retournent const std::shared_ptr<T>& (immutable)
-//   🔧 FIXED: signalCount_ déplacé en private
-//
 // ============================================================================
 
 #pragma once
@@ -33,6 +26,8 @@ class Settings;
 class FileManager;
 class InstrumentDatabase;
 class PresetManager;
+class MidiDatabase;
+class PlaylistManager;
 class LatencyCompensator;
 class MidiDeviceManager;
 class MidiRouter;
@@ -50,7 +45,7 @@ class EventBus;
  * Initialization order:
  *   1. Configuration (PathManager, Config)
  *   2. Database (SQLite + migrations)
- *   3. Storage (Settings, FileManager, InstrumentDB, PresetManager)
+ *   3. Storage (Settings, FileManager, InstrumentDB, PresetManager, MidiDatabase, PlaylistManager)
  *   4. EventSystem (EventBus) - AVANT Timing/MIDI/API
  *   5. Timing (LatencyCompensator)
  *   6. MIDI (DeviceManager, Router, Player)
@@ -80,6 +75,8 @@ public:
     const std::shared_ptr<FileManager>& getFileManager() const { return fileManager_; }
     const std::shared_ptr<InstrumentDatabase>& getInstrumentDatabase() const { return instrumentDatabase_; }
     const std::shared_ptr<PresetManager>& getPresetManager() const { return presetManager_; }
+    const std::shared_ptr<MidiDatabase>& getMidiDatabase() const { return midiDatabase_; }
+    const std::shared_ptr<PlaylistManager>& getPlaylistManager() const { return playlistManager_; }
     const std::shared_ptr<LatencyCompensator>& getLatencyCompensator() const { return latencyCompensator_; }
     const std::shared_ptr<MidiDeviceManager>& getDeviceManager() const { return deviceManager_; }
     const std::shared_ptr<MidiRouter>& getRouter() const { return router_; }
@@ -132,6 +129,8 @@ private:
     std::shared_ptr<FileManager> fileManager_;
     std::shared_ptr<InstrumentDatabase> instrumentDatabase_;
     std::shared_ptr<PresetManager> presetManager_;
+    std::shared_ptr<MidiDatabase> midiDatabase_;
+    std::shared_ptr<PlaylistManager> playlistManager_;
     std::shared_ptr<EventBus> eventBus_;
     
     // Timing components

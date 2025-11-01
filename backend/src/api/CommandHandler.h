@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/api/CommandHandler.h
-// Version: 4.2.1
+// Version: 4.2.2
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -13,6 +13,8 @@
 #include "../timing/LatencyCompensator.h"
 #include "../storage/InstrumentDatabase.h"
 #include "../storage/PresetManager.h"
+#include "../storage/MidiDatabase.h"
+#include "../storage/PlaylistManager.h"
 #include "../core/EventBus.h"
 #include <string>
 #include <memory>
@@ -38,7 +40,9 @@ public:
         std::shared_ptr<LatencyCompensator> compensator,
         std::shared_ptr<InstrumentDatabase> instrumentDb,
         std::shared_ptr<PresetManager> presetManager,
-        std::shared_ptr<EventBus> eventBus
+        std::shared_ptr<EventBus> eventBus,
+        std::shared_ptr<MidiDatabase> midiDatabase = nullptr,
+        std::shared_ptr<PlaylistManager> playlistManager = nullptr
     );
     
     ~CommandHandler();
@@ -64,6 +68,8 @@ private:
     void registerRoutingCommands();
     void registerPlaybackCommands();
     void registerFileCommands();
+    void registerMidiCommands();
+    void registerPlaylistCommands();
     void registerSystemCommands();
     void registerNetworkCommands();
     void registerLoggerCommands();
@@ -72,13 +78,12 @@ private:
     
     json createSuccessResponse(const json& data) const;
     json createErrorResponse(const std::string& error, 
-                           const std::string& errorCode = "COMMAND_FAILED") const;
+                          const std::string& errorCode = "COMMAND_FAILED") const;
     bool validateCommand(const json& command, std::string& error) const;
     
     std::unordered_map<std::string, CommandFunction> commands_;
-    mutable std::mutex commandsMutex_;  // mutable allows locking in const methods
+    mutable std::mutex commandsMutex_;
     
-    // Member order matches constructor initialization list
     std::shared_ptr<MidiDeviceManager> deviceManager_;
     std::shared_ptr<MidiRouter> router_;
     std::shared_ptr<MidiPlayer> player_;
@@ -87,6 +92,8 @@ private:
     std::shared_ptr<InstrumentDatabase> instrumentDb_;
     std::shared_ptr<PresetManager> presetManager_;
     std::shared_ptr<EventBus> eventBus_;
+    std::shared_ptr<MidiDatabase> midiDatabase_;
+    std::shared_ptr<PlaylistManager> playlistManager_;
 };
 
 } // namespace midiMind

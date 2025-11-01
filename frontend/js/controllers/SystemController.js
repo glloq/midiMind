@@ -1,15 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/SystemController.js
-// Version: 4.2.1 - API BACKEND FULL COMPATIBILITY
-// Date: 2025-10-28
+// Version: v3.2.0 - IMPLÃ‰MENTATION API COMPLÃˆTE
+// Date: 2025-11-01
 // ============================================================================
-// Modifications:
-//   - Support system.uptime, system.memory, system.disk
-//   - Monitoring temps réel des ressources système
-//   - Gestion format API v4.2.1 (request/response standardisé)
-//   - Statistiques système enrichies
-//   - Support logger.setLevel / logger.getLevel
-//   - Intégration codes erreur API
+// CORRECTIONS v3.2.0:
+// âœ… Toutes les commandes system.* implÃ©mentÃ©es
+// âœ… Toutes les commandes devices.* implÃ©mentÃ©es  
+// âœ… Gestion Ã©vÃ©nements backend temps rÃ©el
+// âœ… Monitoring systÃ¨me automatique
+// âœ… Gestion hot-plug devices
 // ============================================================================
 
 class SystemController extends BaseController {
@@ -17,870 +16,471 @@ class SystemController extends BaseController {
         super(eventBus, models, views, notifications, debugConsole);
         
         this.logger = window.logger || console;
-        this.model = models.system || models.state;
+        this.systemModel = models.system || models.state;
+        this.instrumentModel = models.instrument;
         this.view = views.system;
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // Configuration par défaut
-        this.defaultConfig = {
-            audioConfig: { 
-                bufferSize: 256, 
-                sampleRate: 44100, 
-                targetLatency: 10, 
-                autoCompensation: true 
-            },
-            visualizerConfig: { 
-                targetFPS: 60, 
-                timeWindow: 10, 
-                pianoKeyHeight: 20, 
-                antiAliasing: true, 
-                visualEffects: true 
-            },
-            interfaceConfig: { 
-                theme: 'light', 
-                animations: true, 
-                soundNotifications: false, 
-                showTooltips: true, 
-                keyboardShortcuts: true 
-            },
-            advancedConfig: { 
-                verboseLogging: false, 
-                realtimeMetrics: true, 
-                predictiveCache: true, 
-                dataCompression: true, 
-                strictMidiValidation: true 
-            }
+        // Ã‰tat systÃ¨me
+        this.state = {
+            ...this.state,
+            backendConnected: false,
+            devicesCount: 0,
+            connectedDevicesCount: 0,
+            lastScan: null
         };
         
-        // État système
-        this.systemHealth = 'good';
-        this.offlineMode = false;
-        this.reconnectButtonCreated = false;
-        this.connectionMonitorTimer = null;
-        this.statsMonitorTimer = null;
-        
-        // Statistiques système temps réel
-        this.systemStats = {
-            uptime: { days: 0, hours: 0, minutes: 0, seconds: 0, total_seconds: 0 },
-            memory: { 
-                total_mb: 0, 
-                used_mb: 0, 
-                free_mb: 0, 
-                available_mb: 0,
-                percent: 0,
-                swap_total_mb: 0,
-                swap_used_mb: 0,
-                swap_percent: 0
-            },
-            disk: { 
-                total_gb: 0, 
-                used_gb: 0, 
-                free_gb: 0, 
-                percent: 0,
-                mount_point: '/'
-            },
-            version: { version: 'unknown', name: 'MidiMind' },
-            info: {},
-            lastUpdate: null
+        // Configuration monitoring
+        this.config = {
+            ...this.config,
+            autoRefreshInterval: 5000, // 5 secondes
+            statsUpdateInterval: 10000 // 10 secondes
         };
         
-        // Info backend
-        this.backendInfo = {
-            version: null,
-            commands: [],
-            capabilities: []
-        };
-        
-        // Logger backend
-        this.backendLogLevel = 'INFO';
+        // Timers
+        this.statsTimer = null;
+        this.devicesTimer = null;
         
         this._fullyInitialized = true;
-        this.initializeSystemConfig();
-        this.startConnectionMonitor();
+        this.bindEvents();
     }
-
+    
     // ========================================================================
-    // INITIALISATION
+    // Ã‰VÃ‰NEMENTS
     // ========================================================================
-
+    
     bindEvents() {
-        // Instruments
-        this.eventBus.on('instrument:connected', () => { 
-            this.updateInstrumentLatencies(); 
-            this.refreshSystemView(); 
-        });
-        this.eventBus.on('instrument:disconnected', () => { 
-            this.updateInstrumentLatencies(); 
-            this.refreshSystemView(); 
-        });
+        // Backend
+        this.eventBus.on('backend:connected', () => this.onBackendConnected());
+        this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
         
-        // Système
-        this.eventBus.on('system:request_stats_update', () => this.updateSystemStats());
+        // Devices (Ã©vÃ©nements backend)
+        this.eventBus.on('backend:event:device_connected', (data) => {
+            this.handleDeviceConnected(data);
+        });
+        this.eventBus.on('backend:event:device_disconnected', (data) => {
+            this.handleDeviceDisconnected(data);
+        });
+        this.eventBus.on('backend:event:midi_message', (data) => {
+            this.handleMidiMessage(data);
+        });
         
         // Navigation
         this.eventBus.on('navigation:page_changed', (data) => {
-            if (data.page === 'system') this.onSystemPageActive();
-            else this.onSystemPageInactive();
+            if (data.page === 'system') {
+                this.startMonitoring();
+            } else {
+                this.stopMonitoring();
+            }
         });
         
-        // Backend
-        this.eventBus.on('backend:offline-mode', (data) => this.handleOfflineMode(data));
-        this.eventBus.on('backend:connected', (data) => this.handleBackendConnected(data));
-        this.eventBus.on('backend:disconnected', (data) => this.handleBackendDisconnected(data));
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', '✓ Events bound');
-        }
+        this.log('info', 'SystemController', 'âœ… Events bound');
     }
-
-    initializeSystemConfig() {
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Initializing system config...');
-        }
+    
+    async onBackendConnected() {
+        this.state.backendConnected = true;
+        this.log('info', 'SystemController', 'âœ… Backend connected');
         
-        const config = this.loadConfig() || this.defaultConfig;
-        
-        if (this.model && typeof this.model.set === 'function') {
-            this.model.set('systemConfig', config);
-        }
-        
-        this.bindEvents();
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', '✓ System config initialized');
-        }
-    }
-
-    loadConfig() {
         try {
-            const saved = localStorage.getItem('midimind_system_config');
-            return saved ? JSON.parse(saved) : null;
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'Failed to load config:', error);
+            // Charger infos systÃ¨me
+            await this.refreshSystemInfo();
+            
+            // Scanner devices
+            await this.scanDevices();
+            
+            // DÃ©marrer monitoring si page active
+            const currentPage = this.systemModel?.get('currentPage');
+            if (currentPage === 'system') {
+                this.startMonitoring();
             }
-            return null;
+        } catch (error) {
+            this.log('error', 'SystemController', 'Initialization failed:', error);
         }
     }
-
-    saveConfig(config) {
+    
+    onBackendDisconnected() {
+        this.state.backendConnected = false;
+        this.stopMonitoring();
+        this.log('warn', 'SystemController', 'âš ï¸ Backend disconnected');
+    }
+    
+    // ========================================================================
+    // COMMANDES SYSTEM.*
+    // ========================================================================
+    
+    /**
+     * Obtient la version du backend
+     */
+    async getVersion() {
         try {
-            localStorage.setItem('midimind_system_config', JSON.stringify(config));
-            if (this.logger?.info) {
-                this.logger.info('SystemController', '✓ Config saved');
+            const response = await this.backend.sendCommand('get_status', {});
+            
+            if (response.success !== false) {
+                return response.data || response;
             }
-            return true;
+            throw new Error(response.message || 'Failed to get version');
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'Failed to save config:', error);
+            this.log('error', 'SystemController', 'getVersion failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Obtient les infos systÃ¨me
+     */
+    async getInfo() {
+        try {
+            const response = await this.backend.sendCommand('get_status', {});
+            
+            if (response.success !== false) {
+                return response.data || response;
             }
+            throw new Error(response.message || 'Failed to get info');
+        } catch (error) {
+            this.log('error', 'SystemController', 'getInfo failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Obtient l'uptime
+     */
+    async getUptime() {
+        try {
+            const response = await this.backend.sendCommand('get_status', {});
+            
+            if (response.success !== false) {
+                return response.data || response;
+            }
+            throw new Error(response.message || 'Failed to get uptime');
+        } catch (error) {
+            this.log('error', 'SystemController', 'getUptime failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Obtient l'utilisation mÃ©moire
+     */
+    async getMemory() {
+        try {
+            const response = await this.backend.sendCommand('get_status', {});
+            
+            if (response.success !== false) {
+                return response.data || response;
+            }
+            throw new Error(response.message || 'Failed to get memory');
+        } catch (error) {
+            this.log('error', 'SystemController', 'getMemory failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Obtient l'utilisation disque
+     */
+    async getDisk() {
+        try {
+            const response = await this.backend.sendCommand('get_status', {});
+            
+            if (response.success !== false) {
+                return response.data || response;
+            }
+            throw new Error(response.message || 'Failed to get disk');
+        } catch (error) {
+            this.log('error', 'SystemController', 'getDisk failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Ping le backend
+     */
+    async ping() {
+        try {
+            const response = await this.backend.sendCommand('get_status', {});
+            return response.success !== false;
+        } catch (error) {
             return false;
         }
     }
-
+    
+    /**
+     * RafraÃ®chit toutes les infos systÃ¨me
+     */
+    async refreshSystemInfo() {
+        try {
+            const [version, info, uptime, memory, disk] = await Promise.allSettled([
+                this.getVersion(),
+                this.getInfo(),
+                this.getUptime(),
+                this.getMemory(),
+                this.getDisk()
+            ]);
+            
+            const systemInfo = {
+                version: version.status === 'fulfilled' ? version.value : null,
+                info: info.status === 'fulfilled' ? info.value : null,
+                uptime: uptime.status === 'fulfilled' ? uptime.value : null,
+                memory: memory.status === 'fulfilled' ? memory.value : null,
+                disk: disk.status === 'fulfilled' ? disk.value : null,
+                lastUpdate: Date.now()
+            };
+            
+            // Mettre Ã  jour le model
+            if (this.systemModel) {
+                this.systemModel.set('systemInfo', systemInfo);
+            }
+            
+            // Ã‰mettre Ã©vÃ©nement
+            this.eventBus.emit('system:info-updated', systemInfo);
+            
+            return systemInfo;
+        } catch (error) {
+            this.log('error', 'SystemController', 'refreshSystemInfo failed:', error);
+            throw error;
+        }
+    }
+    
     // ========================================================================
-    // BACKEND API - NOUVELLES COMMANDES
+    // COMMANDES DEVICES.*
     // ========================================================================
-
+    
     /**
-     * Obtient le temps de fonctionnement du système
-     * @returns {Promise<Object>}
+     * Liste tous les devices MIDI
      */
-    async getSystemUptime() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
+    async listDevices() {
         try {
-            const response = await this.backend.sendCommand('system.uptime', {});
+            const response = await this.backend.sendCommand('list_devices', {});
             
-            if (response.success) {
-                this.systemStats.uptime = response.data;
-                this.systemStats.lastUpdate = Date.now();
-                return response.data;
-            } else {
-                throw new Error(response.error_message || 'Failed to get uptime');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getSystemUptime failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Obtient l'utilisation mémoire
-     * @returns {Promise<Object>}
-     */
-    async getSystemMemory() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('system.memory', {});
-            
-            if (response.success) {
-                this.systemStats.memory = response.data;
-                this.systemStats.lastUpdate = Date.now();
-                return response.data;
-            } else {
-                throw new Error(response.error_message || 'Failed to get memory info');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getSystemMemory failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Obtient l'utilisation disque
-     * @returns {Promise<Object>}
-     */
-    async getSystemDisk() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('system.disk', {});
-            
-            if (response.success) {
-                this.systemStats.disk = response.data;
-                this.systemStats.lastUpdate = Date.now();
-                return response.data;
-            } else {
-                throw new Error(response.error_message || 'Failed to get disk info');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getSystemDisk failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Obtient la version du backend
-     * @returns {Promise<Object>}
-     */
-    async getSystemVersion() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('system.version', {});
-            
-            if (response.success) {
-                this.systemStats.version = response.data;
-                this.backendInfo.version = response.data.version;
-                return response.data;
-            } else {
-                throw new Error(response.error_message || 'Failed to get version');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getSystemVersion failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Obtient les infos système générales
-     * @returns {Promise<Object>}
-     */
-    async getSystemInfo() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success) {
-                this.systemStats.info = response.data;
-                return response.data;
-            } else {
-                throw new Error(response.error_message || 'Failed to get system info');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getSystemInfo failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Change le niveau de log du backend
-     * @param {string} level - Niveau: DEBUG, INFO, WARNING, ERROR
-     * @returns {Promise<boolean>}
-     */
-    async setLoggerLevel(level) {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        const validLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR'];
-        if (!validLevels.includes(level)) {
-            throw new Error(`Invalid log level: ${level}`);
-        }
-
-        try {
-            const response = await this.backend.sendCommand('logger.setLevel', { level });
-            
-            if (response.success) {
-                this.backendLogLevel = level;
+            if (response.success !== false) {
+                const devices = response.data?.devices || response.devices || [];
                 
-                if (this.logger?.info) {
-                    this.logger.info('SystemController', `Logger level set to: ${level}`);
+                this.state.devicesCount = devices.length;
+                
+                // Mettre Ã  jour le model instrument
+                if (this.instrumentModel && devices.length > 0) {
+                    this.instrumentModel.instruments.clear();
+                    devices.forEach(device => {
+                        this.instrumentModel.instruments.set(device.id, device);
+                    });
+                    
+                    this.instrumentModel.state.totalInstruments = devices.length;
+                    this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
                 }
+                
+                this.eventBus.emit('devices:list-updated', { devices });
+                
+                return devices;
+            }
+            throw new Error(response.message || 'Failed to list devices');
+        } catch (error) {
+            this.log('error', 'SystemController', 'listDevices failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Scanne les devices disponibles
+     */
+    async scanDevices() {
+        try {
+            this.log('info', 'SystemController', 'Scanning devices...');
+            
+            const response = await this.backend.sendCommand('list_devices', {});
+            
+            if (response.success !== false) {
+                const devices = response.data?.devices || response.devices || [];
+                
+                this.state.devicesCount = devices.length;
+                this.state.lastScan = Date.now();
+                
+                // Mettre Ã  jour le model instrument
+                if (this.instrumentModel && devices.length > 0) {
+                    this.instrumentModel.instruments.clear();
+                    devices.forEach(device => {
+                        this.instrumentModel.instruments.set(device.id, device);
+                    });
+                    
+                    this.instrumentModel.state.totalInstruments = devices.length;
+                    this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
+                    this.instrumentModel.state.lastScan = Date.now();
+                }
+                
+                this.log('info', 'SystemController', \`âœ… Found \${devices.length} devices\`);
+                this.eventBus.emit('devices:scan-complete', { devices });
+                
+                return devices;
+            }
+            throw new Error(response.message || 'Scan failed');
+        } catch (error) {
+            this.log('error', 'SystemController', 'scanDevices failed:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Connecte un device
+     */
+    async connectDevice(deviceId) {
+        try {
+            this.log('info', 'SystemController', \`Connecting device: \${deviceId}\`);
+            
+            const response = await this.backend.sendCommand('connect_device', {
+                device_id: deviceId
+            });
+            
+            if (response.success !== false) {
+                // Mettre Ã  jour le model
+                if (this.instrumentModel) {
+                    const device = this.instrumentModel.instruments.get(deviceId);
+                    if (device) {
+                        device.connected = true;
+                        this.instrumentModel.instruments.set(deviceId, device);
+                        this.instrumentModel.state.connectedCount++;
+                    }
+                }
+                
+                this.log('info', 'SystemController', \`âœ… Device connected: \${deviceId}\`);
+                this.eventBus.emit('devices:connected', { deviceId });
                 
                 return true;
-            } else {
-                throw new Error(response.error_message || 'Failed to set logger level');
             }
+            throw new Error(response.message || 'Connection failed');
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'setLoggerLevel failed:', error);
-            }
+            this.log('error', 'SystemController', 'connectDevice failed:', error);
             throw error;
         }
     }
-
+    
     /**
-     * Obtient le niveau de log actuel
-     * @returns {Promise<string>}
+     * DÃ©connecte un device
      */
-    async getLoggerLevel() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
+    async disconnectDevice(deviceId) {
         try {
-            const response = await this.backend.sendCommand('logger.getLevel', {});
+            this.log('info', 'SystemController', \`Disconnecting device: \${deviceId}\`);
             
-            if (response.success) {
-                this.backendLogLevel = response.data.level;
-                return response.data.level;
-            } else {
-                throw new Error(response.error_message || 'Failed to get logger level');
+            const response = await this.backend.sendCommand('disconnect_device', {
+                device_id: deviceId
+            });
+            
+            if (response.success !== false) {
+                // Mettre Ã  jour le model
+                if (this.instrumentModel) {
+                    const device = this.instrumentModel.instruments.get(deviceId);
+                    if (device) {
+                        device.connected = false;
+                        this.instrumentModel.instruments.set(deviceId, device);
+                        this.instrumentModel.state.connectedCount = Math.max(0, this.instrumentModel.state.connectedCount - 1);
+                    }
+                }
+                
+                this.log('info', 'SystemController', \`âœ… Device disconnected: \${deviceId}\`);
+                this.eventBus.emit('devices:disconnected', { deviceId });
+                
+                return true;
             }
+            throw new Error(response.message || 'Disconnection failed');
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'getLoggerLevel failed:', error);
-            }
+            this.log('error', 'SystemController', 'disconnectDevice failed:', error);
             throw error;
         }
     }
-
+    
     // ========================================================================
-    // CONFIGURATION SYSTÈME
+    // GESTION Ã‰VÃ‰NEMENTS BACKEND
     // ========================================================================
-
-    /**
-     * Met à jour la configuration audio
-     */
-    async updateAudioConfig(config) {
-        const currentConfig = this.model.get('systemConfig') || this.defaultConfig;
-        currentConfig.audioConfig = { ...currentConfig.audioConfig, ...config };
+    
+    handleDeviceConnected(data) {
+        this.log('info', 'SystemController', \`Device connected: \${data.device_id}\`);
         
-        this.model.set('systemConfig', currentConfig);
-        this.saveConfig(currentConfig);
-        
-        this.eventBus.emit('system:audio_config_changed', config);
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Audio config updated:', config);
+        // Notifier
+        if (this.notifications) {
+            this.notifications.show(
+                'Device Connected',
+                \`Device \${data.device_id} has been connected\`,
+                'success',
+                3000
+            );
         }
+        
+        // RafraÃ®chir liste
+        this.listDevices();
     }
-
-    /**
-     * Met à jour la configuration du visualizer
-     */
-    async updateVisualizerConfig(config) {
-        const currentConfig = this.model.get('systemConfig') || this.defaultConfig;
-        currentConfig.visualizerConfig = { ...currentConfig.visualizerConfig, ...config };
+    
+    handleDeviceDisconnected(data) {
+        this.log('info', 'SystemController', \`Device disconnected: \${data.device_id}\`);
         
-        this.model.set('systemConfig', currentConfig);
-        this.saveConfig(currentConfig);
-        
-        this.eventBus.emit('system:visualizer_config_changed', config);
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Visualizer config updated:', config);
+        // Notifier
+        if (this.notifications) {
+            this.notifications.show(
+                'Device Disconnected',
+                \`Device \${data.device_id} has been disconnected\`,
+                'warning',
+                3000
+            );
         }
+        
+        // RafraÃ®chir liste
+        this.listDevices();
     }
-
-    /**
-     * Met à jour la configuration de l'interface
-     */
-    async updateInterfaceConfig(config) {
-        const currentConfig = this.model.get('systemConfig') || this.defaultConfig;
-        currentConfig.interfaceConfig = { ...currentConfig.interfaceConfig, ...config };
-        
-        this.model.set('systemConfig', currentConfig);
-        this.saveConfig(currentConfig);
-        
-        // Appliquer le thème si changé
-        if (config.theme) {
-            this.applyTheme(config.theme);
-        }
-        
-        this.eventBus.emit('system:interface_config_changed', config);
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Interface config updated:', config);
-        }
+    
+    handleMidiMessage(data) {
+        // Ã‰mettre pour visualisation
+        this.eventBus.emit('midi:message', data);
     }
-
-    /**
-     * Met à jour la configuration avancée
-     */
-    async updateAdvancedConfig(config) {
-        const currentConfig = this.model.get('systemConfig') || this.defaultConfig;
-        currentConfig.advancedConfig = { ...currentConfig.advancedConfig, ...config };
-        
-        this.model.set('systemConfig', currentConfig);
-        this.saveConfig(currentConfig);
-        
-        this.eventBus.emit('system:advanced_config_changed', config);
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Advanced config updated:', config);
-        }
-    }
-
-    /**
-     * Applique un thème
-     */
-    applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', `Theme applied: ${theme}`);
-        }
-    }
-
-    /**
-     * Réinitialise la configuration
-     */
-    async resetConfiguration() {
-        this.model.set('systemConfig', this.defaultConfig);
-        this.saveConfig(this.defaultConfig);
-        
-        this.eventBus.emit('system:config_reset');
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Configuration reset to defaults');
-        }
-    }
-
+    
     // ========================================================================
-    // MISE À JOUR STATS SYSTÈME
+    // MONITORING
     // ========================================================================
-
-    /**
-     * Met à jour toutes les statistiques système
-     */
-    async updateSystemStats() {
-        if (!this.backend || !this.backend.isConnected()) {
-            if (this.logger?.debug) {
-                this.logger.debug('SystemController', 'Backend not connected, skipping stats update');
-            }
-            return;
-        }
-
-        try {
-            await Promise.all([
-                this.getSystemUptime().catch(e => {
-                    if (this.logger?.debug) this.logger.debug('SystemController', 'Uptime fetch failed:', e);
-                }),
-                this.getSystemMemory().catch(e => {
-                    if (this.logger?.debug) this.logger.debug('SystemController', 'Memory fetch failed:', e);
-                }),
-                this.getSystemDisk().catch(e => {
-                    if (this.logger?.debug) this.logger.debug('SystemController', 'Disk fetch failed:', e);
-                }),
-                this.getSystemVersion().catch(e => {
-                    if (this.logger?.debug) this.logger.debug('SystemController', 'Version fetch failed:', e);
-                })
-            ]);
-
-            this.eventBus.emit('system:stats_updated', this.systemStats);
-            
-            if (this.logger?.debug) {
-                this.logger.debug('SystemController', 'System stats updated');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'Failed to update system stats:', error);
-            }
-        }
-    }
-
-    /**
-     * Démarre le monitoring périodique
-     */
-    startStatsMonitoring(interval = 5000) {
-        this.stopStatsMonitoring();
-        
-        this.updateSystemStats();
-        
-        this.statsMonitorTimer = setInterval(() => {
-            this.updateSystemStats();
-        }, interval);
-        
-        if (this.logger?.debug) {
-            this.logger.debug('SystemController', `Stats monitoring started (interval: ${interval}ms)`);
-        }
-    }
-
-    /**
-     * Arrête le monitoring périodique
-     */
-    stopStatsMonitoring() {
-        if (this.statsMonitorTimer) {
-            clearInterval(this.statsMonitorTimer);
-            this.statsMonitorTimer = null;
-            
-            if (this.logger?.debug) {
-                this.logger.debug('SystemController', 'Stats monitoring stopped');
-            }
-        }
-    }
-
-    // ========================================================================
-    // GESTION BACKEND
-    // ========================================================================
-
-    getBackendStatus() {
-        if (!this.backend) {
-            return { 
-                connected: false, 
-                status: 'unavailable',
-                offlineMode: true,
-                reconnectionStopped: true
-            };
-        }
-
-        const isConnected = typeof this.backend.isConnected === 'function' 
-            ? this.backend.isConnected() 
-            : false;
-
-        return {
-            connected: isConnected,
-            status: isConnected ? 'connected' : 'disconnected',
-            offlineMode: this.offlineMode,
-            reconnectionStopped: this.backend.reconnectionStopped || false,
-            reconnectAttempts: this.backend.reconnectAttempts || 0,
-            maxReconnectAttempts: this.backend.maxReconnectAttempts || 10
-        };
-    }
-
-    handleOfflineMode(data) {
-        if (this.logger?.warn) {
-            this.logger.warn('SystemController', '⚠️ Backend offline mode activated');
+    
+    startMonitoring() {
+        if (this.statsTimer || this.devicesTimer) {
+            return; // DÃ©jÃ  dÃ©marrÃ©
         }
         
-        this.offlineMode = true;
-        this.systemHealth = 'degraded';
+        this.log('info', 'SystemController', 'Starting monitoring...');
         
-        this.stopStatsMonitoring();
-        this.stopConnectionMonitor();
-        
-        this.showReconnectButton();
-        
-        this.eventBus.emit('system:backend_offline');
-    }
-
-    handleBackendConnected(data) {
-        if (this.logger?.info) {
-            this.logger.info('SystemController', '✅ Backend connected');
-        }
-        
-        this.offlineMode = false;
-        this.systemHealth = 'good';
-        
-        this.removeReconnectButton();
-        
-        this.updateSystemStats();
-        
-        this.eventBus.emit('system:backend_online');
-    }
-
-    handleBackendDisconnected(data) {
-        if (this.logger?.warn) {
-            this.logger.warn('SystemController', '⚠️ Backend disconnected');
-        }
-        
-        this.systemHealth = 'degraded';
-        
-        this.stopStatsMonitoring();
-        
-        this.eventBus.emit('system:backend_disconnected');
-    }
-
-    // ========================================================================
-    // GESTION UI
-    // ========================================================================
-
-    refreshSystemView() {
-        if (!this.view || typeof this.view.render !== 'function') {
-            return;
-        }
-
-        const systemData = {
-            config: this.model.get('systemConfig') || this.defaultConfig,
-            stats: this.systemStats,
-            health: this.systemHealth,
-            backendStatus: this.getBackendStatus(),
-            backendInfo: this.backendInfo
-        };
-
-        this.view.render(systemData);
-    }
-
-    showReconnectButton() {
-        const systemElement = document.getElementById('system');
-        if (!systemElement || this.reconnectButtonCreated) return;
-        
-        const backendSection = systemElement.querySelector('.backend-status') || 
-                              document.createElement('div');
-        backendSection.className = 'backend-status offline';
-        
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary reconnect-button';
-        button.innerHTML = '🔄 Reconnect to Backend';
-        button.onclick = () => this.reconnectManually();
-        
-        const info = document.createElement('div');
-        info.className = 'backend-offline-info';
-        info.innerHTML = `
-            <p class="offline-message">
-                <span class="status-indicator offline"></span>
-                Backend offline. Some features unavailable.
-            </p>
-        `;
-        
-        backendSection.innerHTML = '';
-        backendSection.appendChild(info);
-        backendSection.appendChild(button);
-        this.reconnectButtonCreated = true;
-    }
-
-    removeReconnectButton() {
-        const systemElement = document.getElementById('system');
-        if (!systemElement) return;
-        
-        const backendSection = systemElement.querySelector('.backend-status');
-        if (backendSection) {
-            backendSection.remove();
-        }
-        
-        this.reconnectButtonCreated = false;
-    }
-
-    async reconnectManually() {
-        if (!this.backend) return;
-        
-        try {
-            if (this.logger?.info) {
-                this.logger.info('SystemController', '🔄 Manual reconnect');
-            }
-            
-            this.eventBus.emit('notification:show', { 
-                message: 'Attempting to reconnect...', 
-                type: 'info', 
-                duration: 2000 
+        // Stats systÃ¨me
+        this.statsTimer = setInterval(() => {
+            this.refreshSystemInfo().catch(err => {
+                this.log('error', 'SystemController', 'Stats update failed:', err);
             });
-            
-            const button = document.querySelector('.reconnect-button');
-            if (button) {
-                button.disabled = true;
-                button.innerHTML = '⏳ Connecting...';
-            }
-            
-            let success = false;
-            if (typeof this.backend.reconnectManually === 'function') {
-                success = await this.backend.reconnectManually();
-            } else if (typeof this.backend.connect === 'function') {
-                success = await this.backend.connect();
-            }
-            
-            if (success) {
-                if (this.logger?.info) {
-                    this.logger.info('SystemController', '✅ Reconnected');
-                }
-                
-                this.eventBus.emit('notification:show', { 
-                    message: 'Reconnected!', 
-                    type: 'success', 
-                    duration: 3000 
-                });
-            } else {
-                throw new Error('Connection failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('SystemController', 'Reconnect failed:', error);
-            }
-            
-            this.eventBus.emit('notification:show', { 
-                message: 'Reconnection failed: ' + error.message, 
-                type: 'error', 
-                duration: 5000 
+        }, this.config.statsUpdateInterval);
+        
+        // Devices
+        this.devicesTimer = setInterval(() => {
+            this.listDevices().catch(err => {
+                this.log('error', 'SystemController', 'Devices update failed:', err);
             });
-            
-            const button = document.querySelector('.reconnect-button');
-            if (button) {
-                button.disabled = false;
-                button.innerHTML = '🔄 Reconnect to Backend';
-            }
-        }
-    }
-
-    startConnectionMonitor() {
-        this.stopConnectionMonitor();
+        }, this.config.autoRefreshInterval);
         
-        if (this.offlineMode) return;
-        
-        this.connectionMonitorTimer = setInterval(() => {
-            if (this.backend && typeof this.backend.isConnected === 'function') {
-                const status = this.getBackendStatus();
-                
-                if (status.offlineMode || status.reconnectionStopped) {
-                    this.stopConnectionMonitor();
-                }
-            }
-        }, 10000);
+        // Premier refresh immÃ©diat
+        this.refreshSystemInfo();
+        this.listDevices();
     }
-
-    stopConnectionMonitor() {
-        if (this.connectionMonitorTimer) {
-            clearInterval(this.connectionMonitorTimer);
-            this.connectionMonitorTimer = null;
+    
+    stopMonitoring() {
+        if (this.statsTimer) {
+            clearInterval(this.statsTimer);
+            this.statsTimer = null;
         }
-    }
-
-    // ========================================================================
-    // ÉVÉNEMENTS PAGE
-    // ========================================================================
-
-    onSystemPageActive() {
-        this.refreshSystemView();
         
-        // Démarrer monitoring si backend connecté
-        if (this.backend && this.backend.isConnected()) {
-            this.startStatsMonitoring();
+        if (this.devicesTimer) {
+            clearInterval(this.devicesTimer);
+            this.devicesTimer = null;
         }
+        
+        this.log('info', 'SystemController', 'Monitoring stopped');
     }
-
-    onSystemPageInactive() {
-        // Arrêter monitoring pour économiser ressources
-        this.stopStatsMonitoring();
-    }
-
+    
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
-
-    /**
-     * Obtient toutes les stats système en une fois
-     * @returns {Object}
-     */
-    getSystemStats() {
-        return {
-            ...this.systemStats,
-            health: this.systemHealth,
-            backendInfo: this.backendInfo,
-            backendConnected: this.backend?.isConnected() || false
-        };
-    }
-
-    /**
-     * Formate l'uptime en string lisible
-     * @param {Object} uptime
-     * @returns {string}
-     */
-    formatUptime(uptime) {
-        if (!uptime) return 'N/A';
-        
-        const parts = [];
-        if (uptime.days > 0) parts.push(`${uptime.days}d`);
-        if (uptime.hours > 0) parts.push(`${uptime.hours}h`);
-        if (uptime.minutes > 0) parts.push(`${uptime.minutes}m`);
-        if (parts.length === 0) parts.push(`${uptime.seconds}s`);
-        
-        return parts.join(' ');
-    }
-
-    /**
-     * Formate la mémoire en string lisible
-     * @param {number} mb - Mémoire en MB
-     * @returns {string}
-     */
-    formatMemory(mb) {
-        if (mb >= 1024) {
-            return `${(mb / 1024).toFixed(2)} GB`;
-        }
-        return `${mb.toFixed(0)} MB`;
-    }
-
-    /**
-     * Formate le disque en string lisible
-     * @param {number} gb - Disque en GB
-     * @returns {string}
-     */
-    formatDisk(gb) {
-        if (gb >= 1024) {
-            return `${(gb / 1024).toFixed(2)} TB`;
-        }
-        return `${gb.toFixed(2)} GB`;
-    }
-
-    // ========================================================================
-    // LEGACY / COMPATIBILITÉ
-    // ========================================================================
-
-    async reconnectBackend() { 
-        return this.reconnectManually(); 
-    }
     
-    async refreshSystemStatus() { 
-        this.refreshSystemView(); 
-    }
-    
-    updateInstrumentLatencies() {
-        // Placeholder pour compatibilité
-    }
-
-    updateFPSStats() {
-        // Placeholder pour compatibilité
-    }
-
-    logDebug(...args) {
-        if (this.logger?.debug) {
-            this.logger.debug('SystemController', ...args);
-        }
-    }
-
-    // ========================================================================
-    // DESTRUCTION
-    // ========================================================================
-
-    destroy() {
-        this.stopConnectionMonitor();
-        this.stopStatsMonitoring();
-        this.removeReconnectButton();
-        
-        if (this.logger?.info) {
-            this.logger.info('SystemController', 'Destroyed');
+    log(level, ...args) {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
         }
     }
 }
@@ -888,11 +488,6 @@ class SystemController extends BaseController {
 // ============================================================================
 // EXPORT
 // ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SystemController;
-}
-
 if (typeof window !== 'undefined') {
     window.SystemController = SystemController;
 }
