@@ -26,7 +26,16 @@ struct PlaylistItem {
     int position = 0;
     std::string filename;
     
-    json toJson() const;
+    inline json toJson() const {
+        return json{
+            {"id", id},
+            {"playlist_id", playlistId},
+            {"midi_file_id", midiFileId},
+            {"position", position},
+            {"filename", filename}
+        };
+    }
+    
     static PlaylistItem fromJson(const json& j);
 };
 
@@ -39,7 +48,23 @@ struct Playlist {
     int64_t updatedAt = 0;
     std::vector<PlaylistItem> items;
     
-    json toJson() const;
+    inline json toJson() const {
+        json itemsJson = json::array();
+        for (const auto& item : items) {
+            itemsJson.push_back(item.toJson());
+        }
+        
+        return json{
+            {"id", id},
+            {"name", name},
+            {"description", description},
+            {"loop", loop},
+            {"created_at", createdAt},
+            {"updated_at", updatedAt},
+            {"items", itemsJson}
+        };
+    }
+    
     static Playlist fromJson(const json& j);
 };
 
