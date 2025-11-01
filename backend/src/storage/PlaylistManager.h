@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/storage/PlaylistManager.h
-// Version: 4.2.1
+// Version: 4.2.4 - FIX ABI linking issue
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
@@ -36,7 +36,15 @@ struct PlaylistItem {
         };
     }
     
-    static PlaylistItem fromJson(const json& j);
+    static PlaylistItem fromJson(const json& j) {
+        PlaylistItem item;
+        item.id = j.value("id", 0);
+        item.playlistId = j.value("playlist_id", 0);
+        item.midiFileId = j.value("midi_file_id", 0);
+        item.position = j.value("position", 0);
+        item.filename = j.value("filename", "");
+        return item;
+    }
 };
 
 struct Playlist {
@@ -65,7 +73,23 @@ struct Playlist {
         };
     }
     
-    static Playlist fromJson(const json& j);
+    static Playlist fromJson(const json& j) {
+        Playlist playlist;
+        playlist.id = j.value("id", 0);
+        playlist.name = j.value("name", "");
+        playlist.description = j.value("description", "");
+        playlist.loop = j.value("loop", false);
+        playlist.createdAt = j.value("created_at", 0);
+        playlist.updatedAt = j.value("updated_at", 0);
+        
+        if (j.contains("items") && j["items"].is_array()) {
+            for (const auto& itemJson : j["items"]) {
+                playlist.items.push_back(PlaylistItem::fromJson(itemJson));
+            }
+        }
+        
+        return playlist;
+    }
 };
 
 class PlaylistManager {
@@ -92,11 +116,13 @@ public:
     bool setLoop(int playlistId, bool enabled);
     
 private:
-    void ensureTables();
     void updatePlaylistTimestamp(int playlistId);
     
     Database& db_;
-    mutable std::mutex mutex_;
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE PlaylistManager.h
+// ============================================================================
