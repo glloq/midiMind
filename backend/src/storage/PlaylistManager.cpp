@@ -1,374 +1,378 @@
 // ============================================================================
 // File: backend/src/storage/PlaylistManager.cpp
-// Version: 4.2.1
+// Version: 4.2.4 - FIX Database API usage
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
 #include "PlaylistManager.h"
-#include "Database.h"
 #include "../core/Logger.h"
 #include "../core/TimeUtils.h"
-#include <stdexcept>
+#include <algorithm>
 
 namespace midiMind {
-
-// ============================================================================
-// PLAYLIST ITEM
-// ============================================================================
-
-json PlaylistItem::toJson() const {
-    return json{
-        {"id", id},
-        {"playlist_id", playlistId},
-        {"midi_file_id", midiFileId},
-        {"position", position},
-        {"filename", filename}
-    };
-}
-
-PlaylistItem PlaylistItem::fromJson(const json& j) {
-    PlaylistItem item;
-    item.id = j.value("id", 0);
-    item.playlistId = j.value("playlist_id", 0);
-    item.midiFileId = j.value("midi_file_id", 0);
-    item.position = j.value("position", 0);
-    item.filename = j.value("filename", "");
-    return item;
-}
-
-// ============================================================================
-// PLAYLIST
-// ============================================================================
-
-json Playlist::toJson() const {
-    json itemsJson = json::array();
-    for (const auto& item : items) {
-        itemsJson.push_back(item.toJson());
-    }
-    
-    return json{
-        {"id", id},
-        {"name", name},
-        {"description", description},
-        {"loop", loop},
-        {"created_at", createdAt},
-        {"updated_at", updatedAt},
-        {"items", itemsJson}
-    };
-}
-
-Playlist Playlist::fromJson(const json& j) {
-    Playlist playlist;
-    playlist.id = j.value("id", 0);
-    playlist.name = j.value("name", "");
-    playlist.description = j.value("description", "");
-    playlist.loop = j.value("loop", false);
-    playlist.createdAt = j.value("created_at", 0);
-    playlist.updatedAt = j.value("updated_at", 0);
-    
-    if (j.contains("items") && j["items"].is_array()) {
-        for (const auto& itemJson : j["items"]) {
-            playlist.items.push_back(PlaylistItem::fromJson(itemJson));
-        }
-    }
-    
-    return playlist;
-}
-
-// ============================================================================
-// PLAYLIST MANAGER
-// ============================================================================
 
 PlaylistManager::PlaylistManager(Database& db)
     : db_(db)
 {
-    Logger::info("PlaylistManager", "PlaylistManager initialized");
+    Logger::debug("PlaylistManager", "PlaylistManager created");
 }
 
 PlaylistManager::~PlaylistManager() {
-    Logger::info("PlaylistManager", "PlaylistManager destroyed");
+    Logger::debug("PlaylistManager", "PlaylistManager destroyed");
 }
 
 int PlaylistManager::createPlaylist(const std::string& name, const std::string& description) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    int64_t now = TimeUtils::systemNow();
-    
-    auto stmt = db_.prepare(R"(
-        INSERT INTO playlists (name, description, loop, created_at, updated_at)
-        VALUES (?, ?, 0, ?, ?)
-    )");
-    
-    stmt.bind(1, name);
-    stmt.bind(2, description);
-    stmt.bind(3, now);
-    stmt.bind(4, now);
-    stmt.execute();
-    
-    int id = static_cast<int>(db_.getLastInsertRowId());
-    
-    Logger::info("PlaylistManager", "Created playlist: " + name + " (ID: " + std::to_string(id) + ")");
-    
-    return id;
+    try {
+        auto now = TimeUtils::getTimestamp();
+        
+        auto result = db_.execute(
+            R"(
+                INSERT INTO playlists (name, description, loop, created_at, updated_at)
+                VALUES (?, ?, 0, ?, ?)
+            )",
+            {name, description, now, now}
+        );
+        
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to create playlist: " + result.error);
+            return -1;
+        }
+        
+        int id = static_cast<int>(result.lastInsertId);
+        Logger::info("PlaylistManager", "Created playlist: " + name + " (id=" + std::to_string(id) + ")");
+        return id;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception creating playlist: " + std::string(e.what()));
+        return -1;
+    }
 }
 
 bool PlaylistManager::deletePlaylist(int playlistId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto stmt = db_.prepare("DELETE FROM playlists WHERE id = ?");
-    stmt.bind(1, playlistId);
-    stmt.execute();
-    
-    bool deleted = stmt.getChanges() > 0;
-    
-    if (deleted) {
-        Logger::info("PlaylistManager", "Deleted playlist ID: " + std::to_string(playlistId));
+    try {
+        auto result = db_.execute("DELETE FROM playlists WHERE id = ?", {std::to_string(playlistId)});
+        
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to delete playlist: " + result.error);
+            return false;
+        }
+        
+        Logger::info("PlaylistManager", "Deleted playlist id=" + std::to_string(playlistId));
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception deleting playlist: " + std::string(e.what()));
+        return false;
     }
-    
-    return deleted;
 }
 
 bool PlaylistManager::updatePlaylist(int playlistId, const std::string& name, const std::string& description) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto stmt = db_.prepare(R"(
-        UPDATE playlists 
-        SET name = ?, description = ?, updated_at = ?
-        WHERE id = ?
-    )");
-    
-    stmt.bind(1, name);
-    stmt.bind(2, description);
-    stmt.bind(3, TimeUtils::systemNow());
-    stmt.bind(4, playlistId);
-    stmt.execute();
-    
-    return stmt.getChanges() > 0;
+    try {
+        auto now = TimeUtils::getTimestamp();
+        
+        auto result = db_.execute(
+            R"(
+                UPDATE playlists
+                SET name = ?, description = ?, updated_at = ?
+                WHERE id = ?
+            )",
+            {name, description, now, std::to_string(playlistId)}
+        );
+        
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to update playlist: " + result.error);
+            return false;
+        }
+        
+        Logger::info("PlaylistManager", "Updated playlist id=" + std::to_string(playlistId));
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception updating playlist: " + std::string(e.what()));
+        return false;
+    }
 }
 
 std::vector<Playlist> PlaylistManager::listPlaylists() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
     std::vector<Playlist> playlists;
     
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, description, loop, created_at, updated_at 
-        FROM playlists 
-        ORDER BY updated_at DESC
-    )");
-    
-    while (stmt.step()) {
-        Playlist playlist;
-        playlist.id = stmt.getInt(0);
-        playlist.name = stmt.getText(1);
-        playlist.description = stmt.getText(2);
-        playlist.loop = stmt.getInt(3) != 0;
-        playlist.createdAt = stmt.getInt64(4);
-        playlist.updatedAt = stmt.getInt64(5);
+    try {
+        auto result = db_.query(
+            R"(
+                SELECT id, name, description, loop, created_at, updated_at
+                FROM playlists
+                ORDER BY created_at DESC
+            )"
+        );
         
-        // Load items for this playlist
-        auto itemStmt = db_.prepare(R"(
-            SELECT pi.id, pi.playlist_id, pi.midi_file_id, pi.position, mf.filename
-            FROM playlist_items pi
-            JOIN midi_files mf ON pi.midi_file_id = mf.id
-            WHERE pi.playlist_id = ?
-            ORDER BY pi.position
-        )");
-        
-        itemStmt.bind(1, playlist.id);
-        
-        while (itemStmt.step()) {
-            PlaylistItem item;
-            item.id = itemStmt.getInt(0);
-            item.playlistId = itemStmt.getInt(1);
-            item.midiFileId = itemStmt.getInt(2);
-            item.position = itemStmt.getInt(3);
-            item.filename = itemStmt.getText(4);
-            
-            playlist.items.push_back(item);
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to list playlists: " + result.error);
+            return playlists;
         }
         
-        playlists.push_back(playlist);
+        for (const auto& row : result.rows) {
+            Playlist playlist;
+            playlist.id = std::stoi(row.at("id"));
+            playlist.name = row.at("name");
+            playlist.description = row.at("description");
+            playlist.loop = (row.at("loop") == "1");
+            playlist.createdAt = row.at("created_at");
+            playlist.updatedAt = row.at("updated_at");
+            
+            auto itemsResult = db_.query(
+                R"(
+                    SELECT pi.id, pi.midi_id, pi.position, m.name as midi_name
+                    FROM playlist_items pi
+                    LEFT JOIN midi_files m ON pi.midi_id = m.id
+                    WHERE pi.playlist_id = ?
+                    ORDER BY pi.position
+                )",
+                {std::to_string(playlist.id)}
+            );
+            
+            if (itemsResult.success) {
+                for (const auto& itemRow : itemsResult.rows) {
+                    PlaylistItem item;
+                    item.id = std::stoi(itemRow.at("id"));
+                    item.midiId = std::stoi(itemRow.at("midi_id"));
+                    item.position = std::stoi(itemRow.at("position"));
+                    item.midiName = itemRow.count("midi_name") ? itemRow.at("midi_name") : "";
+                    playlist.items.push_back(item);
+                }
+            }
+            
+            playlists.push_back(playlist);
+        }
+        
+        Logger::debug("PlaylistManager", "Listed " + std::to_string(playlists.size()) + " playlists");
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception listing playlists: " + std::string(e.what()));
     }
     
     return playlists;
 }
 
 Playlist PlaylistManager::getPlaylist(int playlistId) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, description, loop, created_at, updated_at 
-        FROM playlists 
-        WHERE id = ?
-    )");
-    
-    stmt.bind(1, playlistId);
-    
-    if (!stmt.step()) {
-        throw std::runtime_error("Playlist not found: " + std::to_string(playlistId));
-    }
-    
     Playlist playlist;
-    playlist.id = stmt.getInt(0);
-    playlist.name = stmt.getText(1);
-    playlist.description = stmt.getText(2);
-    playlist.loop = stmt.getInt(3) != 0;
-    playlist.createdAt = stmt.getInt64(4);
-    playlist.updatedAt = stmt.getInt64(5);
+    playlist.id = -1;
     
-    // Load items
-    auto itemStmt = db_.prepare(R"(
-        SELECT pi.id, pi.playlist_id, pi.midi_file_id, pi.position, mf.filename
-        FROM playlist_items pi
-        JOIN midi_files mf ON pi.midi_file_id = mf.id
-        WHERE pi.playlist_id = ?
-        ORDER BY pi.position
-    )");
-    
-    itemStmt.bind(1, playlistId);
-    
-    while (itemStmt.step()) {
-        PlaylistItem item;
-        item.id = itemStmt.getInt(0);
-        item.playlistId = itemStmt.getInt(1);
-        item.midiFileId = itemStmt.getInt(2);
-        item.position = itemStmt.getInt(3);
-        item.filename = itemStmt.getText(4);
+    try {
+        auto result = db_.query(
+            R"(
+                SELECT id, name, description, loop, created_at, updated_at
+                FROM playlists
+                WHERE id = ?
+            )",
+            {std::to_string(playlistId)}
+        );
         
-        playlist.items.push_back(item);
+        if (!result.success || result.rows.empty()) {
+            Logger::warning("PlaylistManager", "Playlist not found: id=" + std::to_string(playlistId));
+            return playlist;
+        }
+        
+        const auto& row = result.rows[0];
+        playlist.id = std::stoi(row.at("id"));
+        playlist.name = row.at("name");
+        playlist.description = row.at("description");
+        playlist.loop = (row.at("loop") == "1");
+        playlist.createdAt = row.at("created_at");
+        playlist.updatedAt = row.at("updated_at");
+        
+        auto itemsResult = db_.query(
+            R"(
+                SELECT pi.id, pi.midi_id, pi.position, m.name as midi_name
+                FROM playlist_items pi
+                LEFT JOIN midi_files m ON pi.midi_id = m.id
+                WHERE pi.playlist_id = ?
+                ORDER BY pi.position
+            )",
+            {std::to_string(playlistId)}
+        );
+        
+        if (itemsResult.success) {
+            for (const auto& itemRow : itemsResult.rows) {
+                PlaylistItem item;
+                item.id = std::stoi(itemRow.at("id"));
+                item.midiId = std::stoi(itemRow.at("midi_id"));
+                item.position = std::stoi(itemRow.at("position"));
+                item.midiName = itemRow.count("midi_name") ? itemRow.at("midi_name") : "";
+                playlist.items.push_back(item);
+            }
+        }
+        
+        Logger::debug("PlaylistManager", "Got playlist: " + playlist.name + " with " + 
+                     std::to_string(playlist.items.size()) + " items");
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception getting playlist: " + std::string(e.what()));
+        playlist.id = -1;
     }
     
     return playlist;
 }
 
-bool PlaylistManager::addItem(int playlistId, int midiFileId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    // Get next position
-    auto posStmt = db_.prepare(R"(
-        SELECT COALESCE(MAX(position), -1) + 1 
-        FROM playlist_items 
-        WHERE playlist_id = ?
-    )");
-    
-    posStmt.bind(1, playlistId);
-    posStmt.step();
-    int position = posStmt.getInt(0);
-    
-    // Insert item
-    auto stmt = db_.prepare(R"(
-        INSERT INTO playlist_items (playlist_id, midi_file_id, position)
-        VALUES (?, ?, ?)
-    )");
-    
-    stmt.bind(1, playlistId);
-    stmt.bind(2, midiFileId);
-    stmt.bind(3, position);
-    stmt.execute();
-    
-    updatePlaylistTimestamp(playlistId);
-    
-    Logger::info("PlaylistManager", 
-        "Added item to playlist " + std::to_string(playlistId) + 
-        " at position " + std::to_string(position));
-    
-    return true;
-}
-
-bool PlaylistManager::removeItem(int playlistId, int itemId) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    // Get position of item to remove
-    auto posStmt = db_.prepare("SELECT position FROM playlist_items WHERE id = ?");
-    posStmt.bind(1, itemId);
-    
-    if (!posStmt.step()) {
-        return false;
-    }
-    
-    int removedPosition = posStmt.getInt(0);
-    
-    // Delete item
-    auto delStmt = db_.prepare("DELETE FROM playlist_items WHERE id = ?");
-    delStmt.bind(1, itemId);
-    delStmt.execute();
-    
-    if (delStmt.getChanges() == 0) {
-        return false;
-    }
-    
-    // Reorder remaining items
-    auto updateStmt = db_.prepare(R"(
-        UPDATE playlist_items 
-        SET position = position - 1 
-        WHERE playlist_id = ? AND position > ?
-    )");
-    
-    updateStmt.bind(1, playlistId);
-    updateStmt.bind(2, removedPosition);
-    updateStmt.execute();
-    
-    updatePlaylistTimestamp(playlistId);
-    
-    Logger::info("PlaylistManager", "Removed item " + std::to_string(itemId) + " from playlist");
-    
-    return true;
-}
-
-bool PlaylistManager::reorderItems(int playlistId, const std::vector<int>& itemIds) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
+bool PlaylistManager::addItem(int playlistId, int midiId) {
     try {
-        db_.execute("BEGIN TRANSACTION");
+        auto posResult = db_.query(
+            R"(
+                SELECT COALESCE(MAX(position), -1) + 1 as next_pos
+                FROM playlist_items
+                WHERE playlist_id = ?
+            )",
+            {std::to_string(playlistId)}
+        );
         
-        auto stmt = db_.prepare(R"(
-            UPDATE playlist_items 
-            SET position = ? 
-            WHERE id = ? AND playlist_id = ?
-        )");
-        
-        for (size_t i = 0; i < itemIds.size(); ++i) {
-            stmt.reset();
-            stmt.bind(1, static_cast<int>(i));
-            stmt.bind(2, itemIds[i]);
-            stmt.bind(3, playlistId);
-            stmt.execute();
+        if (!posResult.success || posResult.rows.empty()) {
+            Logger::error("PlaylistManager", "Failed to get next position");
+            return false;
         }
         
-        db_.execute("COMMIT");
+        int position = std::stoi(posResult.rows[0].at("next_pos"));
+        
+        auto result = db_.execute(
+            R"(
+                INSERT INTO playlist_items (playlist_id, midi_id, position)
+                VALUES (?, ?, ?)
+            )",
+            {std::to_string(playlistId), std::to_string(midiId), std::to_string(position)}
+        );
+        
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to add item: " + result.error);
+            return false;
+        }
         
         updatePlaylistTimestamp(playlistId);
         
-        Logger::info("PlaylistManager", 
-            "Reordered " + std::to_string(itemIds.size()) + " items in playlist " + 
-            std::to_string(playlistId));
-        
+        Logger::info("PlaylistManager", "Added item to playlist id=" + std::to_string(playlistId));
         return true;
         
     } catch (const std::exception& e) {
-        db_.execute("ROLLBACK");
-        Logger::error("PlaylistManager", "Failed to reorder items: " + std::string(e.what()));
+        Logger::error("PlaylistManager", "Exception adding item: " + std::string(e.what()));
         return false;
     }
 }
 
-bool PlaylistManager::setLoop(int playlistId, bool enabled) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto stmt = db_.prepare("UPDATE playlists SET loop = ? WHERE id = ?");
-    stmt.bind(1, enabled ? 1 : 0);
-    stmt.bind(2, playlistId);
-    stmt.execute();
-    
-    return stmt.getChanges() > 0;
+bool PlaylistManager::removeItem(int playlistId, int itemId) {
+    try {
+        auto posResult = db_.query(
+            "SELECT position FROM playlist_items WHERE id = ?",
+            {std::to_string(itemId)}
+        );
+        
+        if (!posResult.success || posResult.rows.empty()) {
+            Logger::error("PlaylistManager", "Item not found");
+            return false;
+        }
+        
+        int deletedPosition = std::stoi(posResult.rows[0].at("position"));
+        
+        auto delResult = db_.execute(
+            "DELETE FROM playlist_items WHERE id = ?",
+            {std::to_string(itemId)}
+        );
+        
+        if (!delResult.success) {
+            Logger::error("PlaylistManager", "Failed to delete item: " + delResult.error);
+            return false;
+        }
+        
+        auto updateResult = db_.execute(
+            R"(
+                UPDATE playlist_items
+                SET position = position - 1
+                WHERE playlist_id = ? AND position > ?
+            )",
+            {std::to_string(playlistId), std::to_string(deletedPosition)}
+        );
+        
+        if (!updateResult.success) {
+            Logger::warning("PlaylistManager", "Failed to reorder after delete: " + updateResult.error);
+        }
+        
+        updatePlaylistTimestamp(playlistId);
+        
+        Logger::info("PlaylistManager", "Removed item from playlist id=" + std::to_string(playlistId));
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception removing item: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool PlaylistManager::reorderItems(int playlistId, const std::vector<int>& itemIds) {
+    try {
+        for (size_t i = 0; i < itemIds.size(); ++i) {
+            auto result = db_.execute(
+                R"(
+                    UPDATE playlist_items
+                    SET position = ?
+                    WHERE id = ? AND playlist_id = ?
+                )",
+                {std::to_string(i), std::to_string(itemIds[i]), std::to_string(playlistId)}
+            );
+            
+            if (!result.success) {
+                Logger::error("PlaylistManager", "Failed to reorder item: " + result.error);
+                return false;
+            }
+        }
+        
+        updatePlaylistTimestamp(playlistId);
+        
+        Logger::info("PlaylistManager", "Reordered items in playlist id=" + std::to_string(playlistId));
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception reordering items: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool PlaylistManager::setLoop(int playlistId, bool loop) {
+    try {
+        auto result = db_.execute(
+            "UPDATE playlists SET loop = ? WHERE id = ?",
+            {loop ? "1" : "0", std::to_string(playlistId)}
+        );
+        
+        if (!result.success) {
+            Logger::error("PlaylistManager", "Failed to set loop: " + result.error);
+            return false;
+        }
+        
+        Logger::info("PlaylistManager", "Set loop=" + std::string(loop ? "true" : "false") + 
+                    " for playlist id=" + std::to_string(playlistId));
+        return true;
+        
+    } catch (const std::exception& e) {
+        Logger::error("PlaylistManager", "Exception setting loop: " + std::string(e.what()));
+        return false;
+    }
 }
 
 void PlaylistManager::updatePlaylistTimestamp(int playlistId) {
-    auto stmt = db_.prepare("UPDATE playlists SET updated_at = ? WHERE id = ?");
-    stmt.bind(1, TimeUtils::systemNow());
-    stmt.bind(2, playlistId);
-    stmt.execute();
+    try {
+        auto now = TimeUtils::getTimestamp();
+        auto result = db_.execute(
+            "UPDATE playlists SET updated_at = ? WHERE id = ?",
+            {now, std::to_string(playlistId)}
+        );
+        
+        if (!result.success) {
+            Logger::warning("PlaylistManager", "Failed to update timestamp: " + result.error);
+        }
+        
+    } catch (const std::exception& e) {
+        Logger::warning("PlaylistManager", "Exception updating timestamp: " + std::string(e.what()));
+    }
 }
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE PlaylistManager.cpp
+// ============================================================================
