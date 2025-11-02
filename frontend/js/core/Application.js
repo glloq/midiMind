@@ -1,18 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v3.9.2 - FIX ORDRE PARAMÈTRES CONTRÔLEURS
-// Date: 2025-10-30
+// Version: v3.9.3 - FIX ROUTER INITIALIZATION
+// Date: 2025-11-02
 // Projet: MidiMind v3.1
 // ============================================================================
-// CORRECTIONS v3.9.2:
-// ✅ CRITIQUE: Ordre correct des paramètres pour TOUS les contrôleurs
-// ✅ BaseController attend: (eventBus, models, views, notifications, debugConsole)
-// ✅ Correction: FileController, HomeController, InstrumentController, etc.
-// ============================================================================
-// CORRECTIONS v3.9.1:
-// ✅ Encodage UTF-8 correct (tous caractères spéciaux)
-// ✅ Logger avec fallback robuste
-// ✅ Vérification méthodes logger avant utilisation
+// CORRECTIONS v3.9.3:
+// ✅ CRITIQUE: Initialisation correcte du Router avec objet config
+// ✅ CRITIQUE: Enregistrement des routes avant initialisation
+// ✅ CRITIQUE: Connexion Router <-> NavigationController
+// ✅ Fix: Route not found errors
 // ============================================================================
 
 class Application {
@@ -160,7 +156,7 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('🔦 Initializing foundations...');
+        console.log('📦 Initializing foundations...');
         
         // EventBus
         this.eventBus = window.eventBus || new EventBus();
@@ -250,35 +246,52 @@ class Application {
         
         // BackendService
         if (window.BackendService) {
-            this.services.backend = new BackendService(
-                this.config.backendUrl,
-                this.eventBus,
-                this.logger
-            );
+            try {
+                this.services.backend = new BackendService(
+                    this.config.backendUrl,
+                    this.eventBus,
+                    this.logger
+                );
+                window.backendService = this.services.backend;
+            } catch (e) {
+                this.log('warn', 'BackendService initialization failed:', e);
+            }
         }
         
         // StorageService
         if (window.StorageService) {
-            this.services.storage = new StorageService(this.eventBus, this.logger);
+            try {
+                this.services.storage = new StorageService(this.logger);
+                window.storageService = this.services.storage;
+            } catch (e) {
+                this.log('warn', 'StorageService initialization failed:', e);
+            }
         }
         
         // MidiService
         if (window.MidiService) {
-            this.services.midi = new MidiService(this.eventBus, this.logger);
+            try {
+                this.services.midi = new MidiService(this.eventBus, this.logger);
+                window.midiService = this.services.midi;
+            } catch (e) {
+                this.log('warn', 'MidiService initialization failed:', e);
+            }
         }
         
         // FileService
         if (window.FileService) {
-            this.services.file = new FileService(
-                this.services.backend,
-                this.eventBus,
-                this.logger
-            );
+            try {
+                this.services.file = new FileService(
+                    this.services.backend,
+                    this.services.storage,
+                    this.eventBus,
+                    this.logger
+                );
+                window.fileService = this.services.file;
+            } catch (e) {
+                this.log('warn', 'FileService initialization failed:', e);
+            }
         }
-        
-        // Rendre services disponibles globalement
-        window.backendService = this.services.backend;
-        window.storageService = this.services.storage;
         
         this.log('info', '✔ Services initialized');
     }
@@ -292,55 +305,49 @@ class Application {
         // StateModel
         if (window.StateModel) {
             this.models.state = new StateModel(this.eventBus);
+            window.stateModel = this.models.state;
         }
         
         // FileModel
         if (window.FileModel) {
-            this.models.file = new FileModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.file = new FileModel(this.eventBus, this.services.backend);
+            window.fileModel = this.models.file;
         }
         
         // PlaylistModel
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(this.eventBus);
+            this.models.playlist = new PlaylistModel(this.eventBus, this.services.backend);
+            window.playlistModel = this.models.playlist;
         }
         
         // InstrumentModel
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(
-                this.eventBus,
-                this.services.backend,
-                this.logger
-            );
+            this.models.instrument = new InstrumentModel(this.eventBus, this.services.backend);
+            window.instrumentModel = this.models.instrument;
         }
         
         // SystemModel
         if (window.SystemModel) {
-            this.models.system = new SystemModel(
-                this.eventBus,
-                this.services.backend
-            );
+            this.models.system = new SystemModel(this.eventBus);
+            window.systemModel = this.models.system;
         }
         
         // PlaybackModel
         if (window.PlaybackModel) {
             this.models.playback = new PlaybackModel(this.eventBus);
+            window.playbackModel = this.models.playback;
         }
         
         // EditorModel
         if (window.EditorModel) {
             this.models.editor = new EditorModel(this.eventBus);
+            window.editorModel = this.models.editor;
         }
         
         // RoutingModel
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(
-                this.eventBus,
-                this.services.backend
-            );
+            this.models.routing = new RoutingModel(this.eventBus, this.services.backend);
+            window.routingModel = this.models.routing;
         }
         
         this.log('info', '✔ Models initialized');
@@ -354,47 +361,56 @@ class Application {
         
         // HomeView
         if (window.HomeView) {
-            this.views.home = new HomeView('home-view', this.eventBus);
+            this.views.home = new HomeView(this.eventBus, this.models);
+            window.homeView = this.views.home;
         }
         
         // FileView
         if (window.FileView) {
-            this.views.file = new FileView('file-view', this.eventBus);
+            this.views.file = new FileView(this.eventBus, this.models);
+            window.fileView = this.views.file;
         }
         
         // InstrumentView
         if (window.InstrumentView) {
-            this.views.instrument = new InstrumentView('instrument-view', this.eventBus);
+            this.views.instrument = new InstrumentView(this.eventBus, this.models);
+            window.instrumentView = this.views.instrument;
         }
         
         // KeyboardView
         if (window.KeyboardView) {
-            this.views.keyboard = new KeyboardView('keyboard-view', this.eventBus, this.debugConsole);
+            this.views.keyboard = new KeyboardView(this.eventBus, this.models);
+            window.keyboardView = this.views.keyboard;
         }
         
         // SystemView
         if (window.SystemView) {
-            this.views.system = new SystemView('system-view', this.eventBus);
+            this.views.system = new SystemView(this.eventBus, this.models);
+            window.systemView = this.views.system;
         }
         
         // RoutingView
         if (window.RoutingView) {
-            this.views.routing = new RoutingView('routing-view', this.eventBus);
+            this.views.routing = new RoutingView(this.eventBus, this.models);
+            window.routingView = this.views.routing;
         }
         
         // EditorView
         if (window.EditorView) {
-            this.views.editor = new EditorView('editor-view', this.eventBus);
+            this.views.editor = new EditorView(this.eventBus, this.models);
+            window.editorView = this.views.editor;
         }
         
         // PlaylistView
         if (window.PlaylistView) {
-            this.views.playlist = new PlaylistView('playlist-view', this.eventBus);
+            this.views.playlist = new PlaylistView(this.eventBus, this.models);
+            window.playlistView = this.views.playlist;
         }
         
         // VisualizerView
         if (window.VisualizerView) {
-            this.views.visualizer = new VisualizerView('visualizer-view', this.eventBus);
+            this.views.visualizer = new VisualizerView(this.eventBus, this.models);
+            window.visualizerView = this.views.visualizer;
         }
         
         this.log('info', '✔ Views initialized');
@@ -402,7 +418,6 @@ class Application {
     
     /**
      * Initialise les contrôleurs
-     * ✅ ORDRE PARAMÈTRES: (eventBus, models, views, notifications, debugConsole)
      */
     async initControllers() {
         console.log('🎮 Initializing controllers...');
@@ -467,9 +482,8 @@ class Application {
             this.controllers.globalPlayback = new GlobalPlaybackController(
                 this.eventBus,
                 this.models,
-                this.views,
-                this.notifications,
-                this.debugConsole
+                this.services.backend,
+                this.notifications
             );
         }
         
@@ -548,13 +562,98 @@ class Application {
             );
         }
         
-        // Router
+        // Router avec configuration correcte
         if (window.Router) {
-            this.router = new Router(this.eventBus, this.controllers.navigation);
-            this.router.init();
+            this.router = new Router({
+                mode: 'hash',
+                useTransitions: true,
+                transitionDuration: 300
+            });
+            
+            // Enregistrer les routes principales
+            this.registerRoutes();
+            
+            // Connecter le Router au NavigationController
+            if (this.controllers.navigation) {
+                this.router.on('route-changed', (data) => {
+                    const pageKey = data.path.replace('/', '') || 'home';
+                    this.controllers.navigation.showPage(pageKey);
+                });
+            }
         }
         
         this.log('info', '✔ Navigation initialized');
+    }
+    
+    /**
+     * Enregistre les routes de l'application
+     */
+    registerRoutes() {
+        if (!this.router) return;
+        
+        // Routes principales
+        this.router.route('/home', {
+            title: 'MidiMind - Accueil',
+            view: 'home'
+        });
+        
+        this.router.route('/files', {
+            title: 'MidiMind - Fichiers',
+            view: 'files'
+        });
+        
+        this.router.route('/editor', {
+            title: 'MidiMind - Éditeur',
+            view: 'editor'
+        });
+        
+        this.router.route('/routing', {
+            title: 'MidiMind - Routage',
+            view: 'routing'
+        });
+        
+        this.router.route('/instruments', {
+            title: 'MidiMind - Instruments',
+            view: 'instruments'
+        });
+        
+        this.router.route('/keyboard', {
+            title: 'MidiMind - Clavier',
+            view: 'keyboard'
+        });
+        
+        this.router.route('/playlist', {
+            title: 'MidiMind - Playlist',
+            view: 'playlist'
+        });
+        
+        this.router.route('/system', {
+            title: 'MidiMind - Système',
+            view: 'system'
+        });
+        
+        this.router.route('/visualizer', {
+            title: 'MidiMind - Visualiseur',
+            view: 'visualizer'
+        });
+        
+        // Route par défaut (redirige vers home)
+        this.router.route('/', {
+            title: 'MidiMind - Accueil',
+            view: 'home'
+        });
+        
+        // Route 404
+        this.router.notFound({
+            title: 'MidiMind - Page non trouvée',
+            view: 'home' // Rediriger vers home en cas de route inconnue
+        });
+        
+        this.log('info', '✔ Routes registered');
+        
+        // Démarrer le routing maintenant que les routes sont enregistrées
+        this.router.startRouting();
+        this.log('info', '✔ Routing started');
     }
     
     /**
@@ -755,7 +854,7 @@ class Application {
      */
     navigateTo(page) {
         if (this.controllers.navigation) {
-            this.controllers.navigation.navigateTo(page);
+            this.controllers.navigation.showPage(page);
         }
     }
     
