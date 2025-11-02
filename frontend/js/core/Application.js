@@ -5,15 +5,15 @@
 // Projet: MidiMind v3.1
 // ============================================================================
 // CORRECTIONS v3.9.3:
-// âœ… CRITIQUE: Initialisation correcte du Router avec objet config
-// âœ… CRITIQUE: Enregistrement des routes avant initialisation
-// âœ… CRITIQUE: Connexion Router <-> NavigationController
-// âœ… Fix: Route not found errors
+// Ã¢Å“â€¦ CRITIQUE: Initialisation correcte du Router avec objet config
+// Ã¢Å“â€¦ CRITIQUE: Enregistrement des routes avant initialisation
+// Ã¢Å“â€¦ CRITIQUE: Connexion Router <-> NavigationController
+// Ã¢Å“â€¦ Fix: Route not found errors
 // ============================================================================
 
 class Application {
     constructor() {
-        // Ã‰tat de l'application
+        // Ãƒâ€°tat de l'application
         this.state = {
             initialized: false,
             ready: false,
@@ -37,7 +37,7 @@ class Application {
             file: null
         };
         
-        // ModÃ¨les
+        // ModÃƒÂ¨les
         this.models = {
             state: null,
             file: null,
@@ -62,7 +62,7 @@ class Application {
             visualizer: null
         };
         
-        // ContrÃ´leurs
+        // ContrÃƒÂ´leurs
         this.controllers = {
             navigation: null,
             file: null,
@@ -93,7 +93,7 @@ class Application {
             }
         };
         
-        // RÃ©fÃ©rence globale
+        // RÃƒÂ©fÃƒÂ©rence globale
         window.app = this;
     }
     
@@ -102,51 +102,51 @@ class Application {
     // ========================================================================
     
     /**
-     * Initialise l'application complÃ¨te
+     * Initialise l'application complÃƒÂ¨te
      */
     async init() {
-        console.log('ðŸš€ Initializing MidiMind v3.1...');
+        console.log('Ã°Å¸Å¡â‚¬ Initializing MidiMind v3.1...');
         
         try {
-            // Ã‰tape 1: Fondations
+            // Ãƒâ€°tape 1: Fondations
             await this.initFoundations();
             
-            // Ã‰tape 2: Services
+            // Ãƒâ€°tape 2: Services
             await this.initServices();
             
-            // Ã‰tape 3: ModÃ¨les
+            // Ãƒâ€°tape 3: ModÃƒÂ¨les
             await this.initModels();
             
-            // Ã‰tape 4: Vues
+            // Ãƒâ€°tape 4: Vues
             await this.initViews();
             
-            // Ã‰tape 5: ContrÃ´leurs
+            // Ãƒâ€°tape 5: ContrÃƒÂ´leurs
             await this.initControllers();
             
-            // Ã‰tape 6: Navigation & Router
+            // Ãƒâ€°tape 6: Navigation & Router
             await this.initNavigation();
             
-            // Ã‰tape 7: Connexion backend (non-bloquant)
+            // Ãƒâ€°tape 7: Connexion backend (non-bloquant)
             this.connectBackend().catch(err => {
                 this.log('warn', 'Backend connection failed, continuing in offline mode', err);
             });
             
-            // Ã‰tape 8: Finalisation
+            // Ãƒâ€°tape 8: Finalisation
             await this.finalize();
             
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('âœ… MidiMind v3.1 initialized successfully');
-            this.log('info', 'âœ… Application ready');
+            console.log('Ã¢Å“â€¦ MidiMind v3.1 initialized successfully');
+            this.log('info', 'Ã¢Å“â€¦ Application ready');
             
-            // Ã‰mettre Ã©vÃ©nement ready
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement ready
             if (this.eventBus) {
                 this.eventBus.emit('app:ready');
             }
             
         } catch (error) {
-            console.error('âŒ Failed to initialize application:', error);
+            console.error('Ã¢ÂÅ’ Failed to initialize application:', error);
             this.log('error', 'Initialization failed', error);
             this.handleInitError(error);
         }
@@ -156,7 +156,7 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('ðŸ“¦ Initializing foundations...');
+        console.log('Ã°Å¸â€œÂ¦ Initializing foundations...');
         
         // EventBus
         this.eventBus = window.eventBus || new EventBus();
@@ -193,11 +193,11 @@ class Application {
             }
         }
         
-        this.log('info', 'âœ” Foundations initialized');
+        this.log('info', 'Ã¢Å“â€ Foundations initialized');
     }
     
     /**
-     * CrÃ©e un logger robuste avec fallback
+     * CrÃƒÂ©e un logger robuste avec fallback
      */
     createLogger() {
         // Si Logger est disponible comme classe
@@ -212,7 +212,7 @@ class Application {
             }
         }
         
-        // Si logger existe dÃ©jÃ 
+        // Si logger existe dÃƒÂ©jÃƒÂ 
         if (window.logger && typeof window.logger.info === 'function') {
             return window.logger;
         }
@@ -228,7 +228,7 @@ class Application {
     }
     
     /**
-     * MÃ©thode helper pour logger de faÃ§on sÃ©curisÃ©e
+     * MÃƒÂ©thode helper pour logger de faÃƒÂ§on sÃƒÂ©curisÃƒÂ©e
      */
     log(level, ...args) {
         if (this.logger && typeof this.logger[level] === 'function') {
@@ -242,7 +242,7 @@ class Application {
      * Initialise les services
      */
     async initServices() {
-        console.log('ðŸ”§ Initializing services...');
+        console.log('Ã°Å¸â€Â§ Initializing services...');
         
         // BackendService
         if (window.BackendService) {
@@ -292,14 +292,14 @@ class Application {
             }
         }
         
-        this.log('info', 'âœ” Services initialized');
+        this.log('info', 'Ã¢Å“â€ Services initialized');
     }
     
     /**
-     * Initialise les modÃ¨les
+     * Initialise les modÃƒÂ¨les
      */
     async initModels() {
-        console.log('ðŸ“Š Initializing models...');
+        console.log('Ã°Å¸â€œÅ  Initializing models...');
         
         // StateModel
         if (window.StateModel) {
@@ -349,14 +349,14 @@ class Application {
             window.routingModel = this.models.routing;
         }
         
-        this.log('info', 'âœ” Models initialized');
+        this.log('info', 'Ã¢Å“â€ Models initialized');
     }
     
     /**
      * Initialise les vues
      */
     async initViews() {
-        console.log('ðŸ–¨ Initializing views...');
+        console.log('Ã°Å¸â€“Â¨ Initializing views...');
         
         // HomeView
         if (window.HomeView) {
@@ -412,14 +412,14 @@ class Application {
             window.visualizerView = this.views.visualizer;
         }
         
-        this.log('info', 'âœ” Views initialized');
+        this.log('info', 'Ã¢Å“â€ Views initialized');
     }
     
     /**
-     * Initialise les contrÃ´leurs
+     * Initialise les contrÃƒÂ´leurs
      */
     async initControllers() {
-        console.log('ðŸŽ® Initializing controllers...');
+        console.log('Ã°Å¸Å½Â® Initializing controllers...');
         
         // FileController
         if (window.FileController) {
@@ -541,14 +541,14 @@ class Application {
             );
         }
         
-        this.log('info', 'âœ” Controllers initialized');
+        this.log('info', 'Ã¢Å“â€ Controllers initialized');
     }
     
     /**
      * Initialise la navigation
      */
     async initNavigation() {
-        console.log('ðŸ—º Initializing navigation...');
+        console.log('Ã°Å¸â€”Âº Initializing navigation...');
         
         // NavigationController
         if (window.NavigationController) {
@@ -581,7 +581,7 @@ class Application {
             }
         }
         
-        this.log('info', 'âœ” Navigation initialized');
+        this.log('info', 'Ã¢Å“â€ Navigation initialized');
     }
     
     /**
@@ -602,7 +602,7 @@ class Application {
         });
         
         this.router.route('/editor', {
-            title: 'MidiMind - Ã‰diteur',
+            title: 'MidiMind - Ãƒâ€°diteur',
             view: 'editor'
         });
         
@@ -627,7 +627,7 @@ class Application {
         });
         
         this.router.route('/system', {
-            title: 'MidiMind - SystÃ¨me',
+            title: 'MidiMind - SystÃƒÂ¨me',
             view: 'system'
         });
         
@@ -636,7 +636,7 @@ class Application {
             view: 'visualizer'
         });
         
-        // Route par dÃ©faut (redirige vers home)
+        // Route par dÃƒÂ©faut (redirige vers home)
         this.router.route('/', {
             title: 'MidiMind - Accueil',
             view: 'home'
@@ -644,15 +644,15 @@ class Application {
         
         // Route 404
         this.router.notFound({
-            title: 'MidiMind - Page non trouvÃ©e',
+            title: 'MidiMind - Page non trouvÃƒÂ©e',
             view: 'home' // Rediriger vers home en cas de route inconnue
         });
         
-        this.log('info', 'âœ” Routes registered');
+        this.log('info', 'Ã¢Å“â€ Routes registered');
         
-        // DÃ©marrer le routing maintenant que les routes sont enregistrÃ©es
+        // DÃƒÂ©marrer le routing maintenant que les routes sont enregistrÃƒÂ©es
         this.router.startRouting();
-        this.log('info', 'âœ” Routing started');
+        this.log('info', 'Ã¢Å“â€ Routing started');
     }
     
     /**
@@ -671,7 +671,7 @@ class Application {
             
             if (success) {
                 this.state.backendConnected = true;
-                this.log('info', 'âœ… Backend connected');
+                this.log('info', 'Ã¢Å“â€¦ Backend connected');
                 
                 if (this.eventBus) {
                     this.eventBus.emit('app:backend-connected');
@@ -698,12 +698,12 @@ class Application {
      * Finalisation de l'initialisation
      */
     async finalize() {
-        console.log('ðŸ Finalizing initialization...');
+        console.log('Ã°Å¸ÂÂ Finalizing initialization...');
         
-        // Ã‰vÃ©nements d'erreur globaux
+        // Ãƒâ€°vÃƒÂ©nements d'erreur globaux
         this.setupErrorHandlers();
         
-        // Ã‰vÃ©nements de connexion
+        // Ãƒâ€°vÃƒÂ©nements de connexion
         this.setupConnectionHandlers();
         
         // Raccourcis clavier
@@ -711,7 +711,7 @@ class Application {
             this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.logger);
         }
         
-        this.log('info', 'âœ” Finalization complete');
+        this.log('info', 'Ã¢Å“â€ Finalization complete');
     }
     
     /**
@@ -749,24 +749,24 @@ class Application {
     setupConnectionHandlers() {
         if (!this.eventBus) return;
         
-        // Backend connectÃ©
+        // Backend connectÃƒÂ©
         this.eventBus.on('backend:connected', (data) => {
             this.state.backendConnected = true;
             this.state.offlineMode = false;
             this.state.reconnectAttempts = 0;
             
-            this.log('info', 'âœ… Backend connected');
+            this.log('info', 'Ã¢Å“â€¦ Backend connected');
             
             if (this.notifications) {
                 this.notifications.show('Backend connected', 'success', 3000);
             }
         });
         
-        // Backend dÃ©connectÃ©
+        // Backend dÃƒÂ©connectÃƒÂ©
         this.eventBus.on('backend:disconnected', (data) => {
             this.state.backendConnected = false;
             
-            this.log('warn', 'âš ï¸ Backend disconnected');
+            this.log('warn', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
             
             if (this.notifications && !this.state.offlineMode) {
                 this.notifications.show('Backend disconnected', 'warning', 5000);
@@ -778,7 +778,7 @@ class Application {
             this.state.offlineMode = true;
             this.state.backendConnected = false;
             
-            this.log('warn', 'âš ï¸ Offline mode activated');
+            this.log('warn', 'Ã¢Å¡Â Ã¯Â¸Â Offline mode activated');
             
             if (this.notifications && this.config.offlineMode.showNotification) {
                 this.notifications.show(
@@ -798,10 +798,10 @@ class Application {
     }
     
     /**
-     * GÃ¨re les erreurs d'initialisation
+     * GÃƒÂ¨re les erreurs d'initialisation
      */
     handleInitError(error) {
-        console.error('âŒ Initialization error:', error);
+        console.error('Ã¢ÂÅ’ Initialization error:', error);
         
         if (this.notifications) {
             this.notifications.show(
@@ -827,7 +827,7 @@ class Application {
             max-width: 500px;
         `;
         errorDiv.innerHTML = `
-            <h3 style="margin: 0 0 10px 0;">âŒ Initialization Failed</h3>
+            <h3 style="margin: 0 0 10px 0;">Ã¢ÂÅ’ Initialization Failed</h3>
             <p style="margin: 0;">${error.message}</p>
             <button onclick="location.reload()" 
                     style="margin-top: 15px; padding: 8px 16px; border: none; background: white; color: #dc3545; cursor: pointer; border-radius: 4px;">
@@ -838,11 +838,11 @@ class Application {
     }
     
     // ========================================================================
-    // MÃ‰THODES PUBLIQUES
+    // MÃƒâ€°THODES PUBLIQUES
     // ========================================================================
     
     /**
-     * Obtient l'Ã©tat de l'application
+     * Obtient l'ÃƒÂ©tat de l'application
      */
     getState() {
         return { ...this.state };
@@ -875,26 +875,26 @@ class Application {
     }
     
     /**
-     * DÃ©truit l'application
+     * DÃƒÂ©truit l'application
      */
     destroy() {
         this.log('info', 'Destroying application...');
         
-        // DÃ©truire les contrÃ´leurs
+        // DÃƒÂ©truire les contrÃƒÂ´leurs
         Object.values(this.controllers).forEach(controller => {
             if (controller && typeof controller.destroy === 'function') {
                 controller.destroy();
             }
         });
         
-        // DÃ©truire les vues
+        // DÃƒÂ©truire les vues
         Object.values(this.views).forEach(view => {
             if (view && typeof view.destroy === 'function') {
                 view.destroy();
             }
         });
         
-        // DÃ©connecter le backend
+        // DÃƒÂ©connecter le backend
         if (this.services.backend && typeof this.services.backend.disconnect === 'function') {
             this.services.backend.disconnect();
         }
@@ -902,7 +902,7 @@ class Application {
         this.state.initialized = false;
         this.state.ready = false;
         
-        this.log('info', 'âœ” Application destroyed');
+        this.log('info', 'Ã¢Å“â€ Application destroyed');
     }
 }
 

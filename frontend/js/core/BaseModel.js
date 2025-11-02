@@ -1,13 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseModel.js
-// Chemin rÃ©el: frontend/js/core/BaseModel.js
-// Version: v3.2.0 - SIGNATURE COHÃ‰RENTE
+// Chemin rÃƒÂ©el: frontend/js/core/BaseModel.js
+// Version: v3.2.0 - SIGNATURE COHÃƒâ€°RENTE
 // Date: 2025-10-31
 // ============================================================================
 // CORRECTIONS v3.2.0:
-// âœ… CRITIQUE: Signature cohÃ©rente (eventBus, backend, logger, initialData, options)
-// âœ… Support backward compatible (initialData, options)
-// âœ… Fallbacks robustes pour tous les services
+// Ã¢Å“â€¦ CRITIQUE: Signature cohÃƒÂ©rente (eventBus, backend, logger, initialData, options)
+// Ã¢Å“â€¦ Support backward compatible (initialData, options)
+// Ã¢Å“â€¦ Fallbacks robustes pour tous les services
 // ============================================================================
 
 class BaseModel {
@@ -27,10 +27,10 @@ class BaseModel {
         this.backend = backend || window.backendService || window.app?.services?.backend || null;
         this.logger = logger || this.createFallbackLogger();
         
-        // DonnÃ©es du modÃ¨le
+        // DonnÃƒÂ©es du modÃƒÂ¨le
         this.data = { ...initialData };
         
-        // MÃ©tadonnÃ©es
+        // MÃƒÂ©tadonnÃƒÂ©es
         this.meta = {
             initialized: false,
             dirty: false,
@@ -50,7 +50,7 @@ class BaseModel {
             ...options
         };
         
-        // RÃ¨gles de validation
+        // RÃƒÂ¨gles de validation
         this.validationRules = {};
         
         // Historique
@@ -82,7 +82,7 @@ class BaseModel {
     }
     
     // ========================================================================
-    // GESTION DES DONNÃ‰ES
+    // GESTION DES DONNÃƒâ€°ES
     // ========================================================================
     
     get(path, defaultValue = null) {
