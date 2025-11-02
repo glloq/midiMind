@@ -304,9 +304,9 @@ class BackendService {
             const messageType = data.type || 'unknown';
             const payload = data.payload || {};
             
-            // Ã¢Å“â€¦ Si type="response" => Matcher sur request_id
+            // Ã¢Å“â€¦ Si type="response" => Utiliser data.id au lieu de payload.request_id. Matcher sur request_id
             if (messageType === 'response') {
-                const requestId = payload.request_id;
+                const requestId = data.id;
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
@@ -319,18 +319,8 @@ class BackendService {
                         // Ã¢Å“â€¦ Retourner payload.data (pas payload directement)
                         pending.resolve(payload.data || {});
                     } else {
-                        const errorMsg = payload.error_message || 'Command failed';
-                        const error = new Error(errorMsg);
+                        const error = new Error(payload.error_message || 'Command failed');
                         error.code = payload.error_code;
-                        error.command = payload.command;
-                        
-                        // Logger moins alarmant pour les commandes non configurées
-                        if (errorMsg.includes('No command handler configured')) {
-                            this.logger.debug('BackendService', `Command not available: ${payload.command}`);
-                        } else {
-                            this.logger.warn('BackendService', `Command failed: ${errorMsg}`);
-                        }
-                        
                         pending.reject(error);
                     }
                     return;
