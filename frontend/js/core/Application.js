@@ -261,7 +261,7 @@ class Application {
         // StorageService
         if (window.StorageService) {
             try {
-                this.services.storage = new StorageService(this.logger);
+                this.services.storage = new StorageService(this.eventBus, this.logger);
                 window.storageService = this.services.storage;
             } catch (e) {
                 this.log('warn', 'StorageService initialization failed:', e);
