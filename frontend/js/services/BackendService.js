@@ -37,7 +37,7 @@ class BackendService {
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        // ✅ Map: request_id → Promise
+        // âœ… Map: request_id â†’ Promise
         this.pendingRequests = new Map();
         
         this.logger.info('BackendService', 'Service initialized (v4.1.0 - API v4.2.2)');
@@ -120,7 +120,7 @@ class BackendService {
         this.lastActivityTime = Date.now();
         this.heartbeatFailures = 0;
         
-        this.logger.info('BackendService', '✓ Connected to backend');
+        this.logger.info('BackendService', 'âœ“ Connected to backend');
         
         this.eventBus.emit('backend:connected', {
             url: this.config.url,
@@ -182,7 +182,7 @@ class BackendService {
         
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             this.logger.error('BackendService', 
-                `✗ Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
+                `âœ— Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
             
             this.reconnectionStopped = true;
             
@@ -203,7 +203,7 @@ class BackendService {
         this.reconnectAttempts++;
         
         this.logger.info('BackendService', 
-            `↻ Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
+            `â†» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
         
         this.eventBus.emit('backend:reconnecting', {
             attempt: this.reconnectAttempts,
@@ -219,7 +219,7 @@ class BackendService {
     
     enterOfflineMode() {
         this.offlineMode = true;
-        this.logger.warn('BackendService', '⚠️ Entering offline mode');
+        this.logger.warn('BackendService', 'âš ï¸ Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
             timestamp: Date.now()
@@ -235,7 +235,7 @@ class BackendService {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', '💗 Heartbeat started');
+        this.logger.debug('BackendService', 'ðŸ’— Heartbeat started');
     }
     
     async checkHeartbeat() {
@@ -245,10 +245,10 @@ class BackendService {
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `✗ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+                `âœ— Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', '💀 Connection dead, forcing reconnect');
+                this.logger.error('BackendService', 'ðŸ’€ Connection dead, forcing reconnect');
                 this.forceReconnect('Heartbeat timeout - connection dead');
                 return;
             }
@@ -261,27 +261,27 @@ class BackendService {
         
         try {
             this.heartbeatPending = true;
-            this.logger.debug('BackendService', '💗 Sending heartbeat (system.ping)');
+            this.logger.debug('BackendService', 'ðŸ’— Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
-            // ✅ Utiliser system.ping comme dans la doc
+            // âœ… Utiliser system.ping comme dans la doc
             await this.sendCommand('system.ping');
             const latency = Date.now() - startTime;
             
             this.heartbeatPending = false;
             this.heartbeatFailures = 0;
             
-            this.logger.debug('BackendService', `✓ Heartbeat OK (latency: ${latency}ms)`);
+            this.logger.debug('BackendService', `âœ“ Heartbeat OK (latency: ${latency}ms)`);
             
         } catch (error) {
             this.heartbeatPending = false;
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `⚠️ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+                `âš ï¸ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', '💀 Multiple heartbeat failures, forcing reconnect');
+                this.logger.error('BackendService', 'ðŸ’€ Multiple heartbeat failures, forcing reconnect');
                 this.forceReconnect('Multiple heartbeat failures');
             }
         }
@@ -314,7 +314,7 @@ class BackendService {
     }
     
     /**
-     * ✅ v4.1.0: Match sur payload.request_id
+     * âœ… v4.1.0: Match sur payload.request_id
      */
     handleMessage(event) {
         try {
@@ -327,7 +327,7 @@ class BackendService {
             const messageType = data.type || 'unknown';
             const payload = data.payload || {};
             
-            // ✅ Si type="response" => Matcher sur request_id
+            // âœ… Si type="response" => Matcher sur request_id
             if (messageType === 'response') {
                 const requestId = payload.request_id;
                 
@@ -337,7 +337,7 @@ class BackendService {
                     
                     clearTimeout(pending.timeoutTimer);
                     
-                    // ✅ Vérifier payload.success selon la doc
+                    // âœ… VÃ©rifier payload.success selon la doc
                     if (payload.success) {
                         pending.resolve(payload.data || payload);
                     } else {
@@ -353,7 +353,7 @@ class BackendService {
                 }
             }
             
-            // Si type="event" => événement backend
+            // Si type="event" => Ã©vÃ©nement backend
             if (messageType === 'event') {
                 const eventName = payload.name;
                 if (eventName) {
@@ -405,7 +405,7 @@ class BackendService {
     }
     
     /**
-     * ✅ v4.1.0: Format conforme API v4.2.2
+     * âœ… v4.1.0: Format conforme API v4.2.2
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -434,14 +434,14 @@ class BackendService {
                 timeoutTimer: timeoutTimer
             });
             
-            // ✅ FORMAT API v4.2.2
+            // âœ… FORMAT API v4.2.2
             const message = {
                 id: requestId,
                 type: "request",
                 timestamp: this.generateTimestamp(),
                 version: "1.0",
                 payload: {
-                    id: requestId,           // ✅ Même UUID dans payload
+                    id: requestId,           // âœ… MÃªme UUID dans payload
                     command: command,
                     params: params,
                     timeout: timeoutMs
@@ -519,7 +519,7 @@ class BackendService {
     async listInstruments() { return this.sendCommand('latency.listInstruments'); }
     
     async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
-    async loadPlaybackFile(filepath) { return this.sendCommand('playback.load', { filepath }); }
+    async loadPlaybackFile(filepath) { return this.sendCommand('playback.load', { file_path: filepath }); }
     async play(fileId = null) { return this.sendCommand('playback.play', fileId ? { fileId } : {}); }
     async pause() { return this.sendCommand('playback.pause'); }
     async stop() { return this.sendCommand('playback.stop'); }
@@ -545,6 +545,30 @@ class BackendService {
     }
     async sendNoteOff(deviceId, channel, note) { 
         return this.sendCommand('midi.sendNoteOff', { deviceId, channel, note }); 
+    }
+    
+    // MIDI Routing (Editor)
+    async addMidiRoute(sourceTrack, destTrack, filters = {}) {
+        return this.sendCommand('midi.routing.add', { 
+            source_track: sourceTrack, 
+            dest_track: destTrack, 
+            filters 
+        });
+    }
+    async listMidiRoutes() { 
+        return this.sendCommand('midi.routing.list'); 
+    }
+    async updateMidiRoute(routeId, updates) { 
+        return this.sendCommand('midi.routing.update', { 
+            route_id: routeId, 
+            ...updates 
+        }); 
+    }
+    async removeMidiRoute(routeId) { 
+        return this.sendCommand('midi.routing.remove', { route_id: routeId }); 
+    }
+    async clearMidiRoutes() { 
+        return this.sendCommand('midi.routing.clear'); 
     }
     
     async listPresets() { return this.sendCommand('preset.list'); }
