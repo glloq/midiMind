@@ -283,7 +283,6 @@ class Application {
             try {
                 this.services.file = new FileService(
                     this.services.backend,
-                    this.services.storage,
                     this.eventBus,
                     this.logger
                 );
