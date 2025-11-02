@@ -360,55 +360,55 @@ class Application {
         
         // HomeView
         if (window.HomeView) {
-            this.views.home = new HomeView(this.eventBus, this.models);
+            this.views.home = new HomeView('home-view', this.eventBus);
             window.homeView = this.views.home;
         }
         
         // FileView
         if (window.FileView) {
-            this.views.file = new FileView(this.eventBus, this.models);
+            this.views.file = new FileView('file-view', this.eventBus);
             window.fileView = this.views.file;
         }
         
         // InstrumentView
         if (window.InstrumentView) {
-            this.views.instrument = new InstrumentView(this.eventBus, this.models);
+            this.views.instrument = new InstrumentView('instrument-view', this.eventBus);
             window.instrumentView = this.views.instrument;
         }
         
         // KeyboardView
         if (window.KeyboardView) {
-            this.views.keyboard = new KeyboardView(this.eventBus, this.models);
+            this.views.keyboard = new KeyboardView('keyboard-view', this.eventBus);
             window.keyboardView = this.views.keyboard;
         }
         
         // SystemView
         if (window.SystemView) {
-            this.views.system = new SystemView(this.eventBus, this.models);
+            this.views.system = new SystemView('system-view', this.eventBus);
             window.systemView = this.views.system;
         }
         
         // RoutingView
         if (window.RoutingView) {
-            this.views.routing = new RoutingView(this.eventBus, this.models);
+            this.views.routing = new RoutingView('routing-view', this.eventBus);
             window.routingView = this.views.routing;
         }
         
         // EditorView
         if (window.EditorView) {
-            this.views.editor = new EditorView(this.eventBus, this.models);
+            this.views.editor = new EditorView('editor-view', this.eventBus);
             window.editorView = this.views.editor;
         }
         
         // PlaylistView
         if (window.PlaylistView) {
-            this.views.playlist = new PlaylistView(this.eventBus, this.models);
+            this.views.playlist = new PlaylistView('playlist-view', this.eventBus);
             window.playlistView = this.views.playlist;
         }
         
         // VisualizerView
         if (window.VisualizerView) {
-            this.views.visualizer = new VisualizerView(this.eventBus, this.models);
+            this.views.visualizer = new VisualizerView('visualizer-view', this.eventBus);
             window.visualizerView = this.views.visualizer;
         }
         
