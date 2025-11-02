@@ -1,17 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/models/RoutingModel.js
 // Chemin réel: frontend/js/models/RoutingModel.js
-// Version: v4.2.0 - API CONFORME v4.2.2
+// Version: v4.2.2 - API CONFORME v4.2.2
 // Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.2.0:
+// CORRECTIONS v4.2.2:
 // ✅ get_routing → routing.listRoutes
 // ✅ add_route → routing.addRoute
 // ✅ remove_route → routing.removeRoute
 // ✅ clear_routes → routing.clearRoutes
 // ✅ enable_route → routing.enableRoute
 // ✅ disable_route → routing.disableRoute
-// ✅ Format API v4.2.2 complet
+// ✅ Format API v4.2.2 complet + response.data extraction
 // ============================================================================
 
 class RoutingModel extends BaseModel {
@@ -26,7 +26,7 @@ class RoutingModel extends BaseModel {
         // Initialiser les routes
         this.data.routes = initialData.routes || [];
         
-        this.log('debug', 'RoutingModel', '✓ RoutingModel v4.2.0 initialized (API v4.2.2)');
+        this.log('debug', 'RoutingModel', '✓ RoutingModel v4.2.2 initialized (API v4.2.2)');
     }
     
     // ========================================================================
@@ -45,7 +45,8 @@ class RoutingModel extends BaseModel {
         
         try {
             // ✅ Nouvelle commande API v4.2.2
-            const data = await this.backend.sendCommand('routing.listRoutes');
+            const response = await this.backend.sendCommand('routing.listRoutes');
+            const data = response.data || response;
             
             if (data && data.routes) {
                 this.data.routes = data.routes;
@@ -84,9 +85,10 @@ class RoutingModel extends BaseModel {
                 params.channel = channel;
             }
             
-            const data = await this.backend.sendCommand('routing.addRoute', params);
+            const response = await this.backend.sendCommand('routing.addRoute', params);
+            const data = response.data || response;
             
-            if (data) {
+            if (data && data.success) {
                 // Recharger la liste des routes
                 await this.listRoutes();
                 this.emit('route:added', { sourceId, destId, channel });
@@ -124,9 +126,10 @@ class RoutingModel extends BaseModel {
                 params.channel = channel;
             }
             
-            const data = await this.backend.sendCommand('routing.removeRoute', params);
+            const response = await this.backend.sendCommand('routing.removeRoute', params);
+            const data = response.data || response;
             
-            if (data) {
+            if (data && data.success) {
                 // Recharger la liste des routes
                 await this.listRoutes();
                 this.emit('route:removed', { sourceId, destId, channel });
@@ -152,9 +155,10 @@ class RoutingModel extends BaseModel {
         
         try {
             // ✅ Nouvelle commande API v4.2.2
-            const data = await this.backend.sendCommand('routing.clearRoutes');
+            const response = await this.backend.sendCommand('routing.clearRoutes');
+            const data = response.data || response;
             
-            if (data) {
+            if (data && data.success) {
                 this.data.routes = [];
                 this.emit('routes:cleared');
                 return true;
@@ -181,12 +185,13 @@ class RoutingModel extends BaseModel {
         
         try {
             // ✅ Nouvelle commande API v4.2.2
-            const data = await this.backend.sendCommand('routing.enableRoute', {
+            const response = await this.backend.sendCommand('routing.enableRoute', {
                 source_id: sourceId,
                 dest_id: destId
             });
+            const data = response.data || response;
             
-            if (data) {
+            if (data && data.success) {
                 await this.listRoutes();
                 this.emit('route:enabled', { sourceId, destId });
                 return true;
@@ -213,12 +218,13 @@ class RoutingModel extends BaseModel {
         
         try {
             // ✅ Nouvelle commande API v4.2.2
-            const data = await this.backend.sendCommand('routing.disableRoute', {
+            const response = await this.backend.sendCommand('routing.disableRoute', {
                 source_id: sourceId,
                 dest_id: destId
             });
+            const data = response.data || response;
             
-            if (data) {
+            if (data && data.success) {
                 await this.listRoutes();
                 this.emit('route:disabled', { sourceId, destId });
                 return true;

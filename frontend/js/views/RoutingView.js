@@ -1,12 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/RoutingView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
 // Date: 2025-11-02
 // ============================================================================
-// AMÉLIORATIONS v4.0.0:
-// ✅ API v4.2.2: routing.* (addRoute, removeRoute, clearRoutes, listRoutes, enableRoute, disableRoute)
-// ✅ Matrice de routage interactive
-// ✅ Gestion enable/disable routes
+// AMÃ‰LIORATIONS v4.0.0:
+// âœ… API v4.2.2: routing.* (addRoute, removeRoute, clearRoutes, listRoutes, enableRoute, disableRoute)
+// âœ… Matrice de routage interactive
+// âœ… Gestion enable/disable routes
 // ============================================================================
 
 class RoutingView {
@@ -26,7 +26,7 @@ class RoutingView {
         this.eventBus = eventBus;
         this.logger = window.logger || console;
         
-        // État
+        // Ã‰tat
         this.state = {
             routes: [],
             sources: [], // devices sources
@@ -62,13 +62,13 @@ class RoutingView {
         
         this.container.innerHTML = `
             <div class="page-header">
-                <h1>🔀 Routage MIDI</h1>
+                <h1>ðŸ”€ Routage MIDI</h1>
                 <div class="header-actions">
                     <button class="btn-clear-all" data-action="clear-all">
-                        🗑️ Tout effacer
+                        ðŸ—‘ï¸ Tout effacer
                     </button>
                     <button class="btn-refresh" data-action="refresh">
-                        🔄 Actualiser
+                        ðŸ”„ Actualiser
                     </button>
                 </div>
             </div>
@@ -84,12 +84,12 @@ class RoutingView {
                 
                 <!-- Nouvelle route -->
                 <div class="routing-create">
-                    <h2>Créer une route</h2>
+                    <h2>CrÃ©er une route</h2>
                     <div class="create-form">
                         <div class="form-group">
                             <label>Source:</label>
                             <select id="sourceSelect" data-action="select-source">
-                                <option value="">-- Sélectionner --</option>
+                                <option value="">-- SÃ©lectionner --</option>
                                 ${this.state.sources.map(src => `
                                     <option value="${src.id}">${src.name}</option>
                                 `).join('')}
@@ -99,7 +99,7 @@ class RoutingView {
                         <div class="form-group">
                             <label>Destination:</label>
                             <select id="destinationSelect" data-action="select-destination">
-                                <option value="">-- Sélectionner --</option>
+                                <option value="">-- SÃ©lectionner --</option>
                                 ${this.state.destinations.map(dst => `
                                     <option value="${dst.id}">${dst.name}</option>
                                 `).join('')}
@@ -107,7 +107,7 @@ class RoutingView {
                         </div>
                         
                         <button class="btn-create-route" data-action="create-route">
-                            ➕ Créer la route
+                            âž• CrÃ©er la route
                         </button>
                     </div>
                 </div>
@@ -255,7 +255,7 @@ class RoutingView {
                                 <div class="matrix-cell ${isConnected ? 'connected' : ''} ${!isEnabled ? 'disabled' : ''}"
                                      data-source="${src.id}" 
                                      data-destination="${dst.id}">
-                                    ${isConnected ? (isEnabled ? '✓' : '✕') : ''}
+                                    ${isConnected ? (isEnabled ? 'âœ“' : 'âœ•') : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -281,7 +281,7 @@ class RoutingView {
         if (routes.length === 0) {
             return `
                 <div class="routes-empty">
-                    <p>Aucune route configurée</p>
+                    <p>Aucune route configurÃ©e</p>
                 </div>
             `;
         }
@@ -303,16 +303,16 @@ class RoutingView {
                  data-enabled="${isEnabled}">
                 <div class="route-info">
                     <div class="route-source">${this.getDeviceName(route.source_id)}</div>
-                    <div class="route-arrow">→</div>
+                    <div class="route-arrow">â†’</div>
                     <div class="route-destination">${this.getDeviceName(route.destination_id)}</div>
                 </div>
                 <div class="route-actions">
                     <button class="btn-toggle" data-action="toggle-route" 
-                            title="${isEnabled ? 'Désactiver' : 'Activer'}">
-                        ${isEnabled ? '⏸️' : '▶️'}
+                            title="${isEnabled ? 'DÃ©sactiver' : 'Activer'}">
+                        ${isEnabled ? 'â¸ï¸' : 'â–¶ï¸'}
                     </button>
                     <button class="btn-delete" data-action="delete-route" title="Supprimer">
-                        🗑️
+                        ðŸ—‘ï¸
                     </button>
                 </div>
             </div>
@@ -334,7 +334,7 @@ class RoutingView {
         const destinationId = this.state.selectedDestination;
         
         if (!sourceId || !destinationId) {
-            alert('Sélectionnez une source et une destination');
+            alert('SÃ©lectionnez une source et une destination');
             return;
         }
         
@@ -348,7 +348,7 @@ class RoutingView {
     }
 
     async deleteRoute(routeId) {
-        // Parser routeId qui peut être "source_destination"
+        // Parser routeId qui peut Ãªtre "source_destination"
         const [sourceId, destinationId] = routeId.split('_');
         
         // API: routing.removeRoute

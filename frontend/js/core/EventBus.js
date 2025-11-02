@@ -1,13 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
-// Chemin réel: frontend/js/core/EventBus.js
+// Chemin rÃ©el: frontend/js/core/EventBus.js
 // Version: v3.2.0 - FIXED GLOBAL INITIALIZATION
 // Date: 2025-10-31
 // ============================================================================
 // CORRECTIONS v3.2.0:
-// ✅ CRITIQUE: Création automatique d'une instance globale
-// ✅ Exposition immédiate dans window.eventBus
-// ✅ Protection contre double initialisation
+// âœ… CRITIQUE: CrÃ©ation automatique d'une instance globale
+// âœ… Exposition immÃ©diate dans window.eventBus
+// âœ… Protection contre double initialisation
 // ============================================================================
 
 const EventPriority = {
@@ -18,10 +18,10 @@ const EventPriority = {
 
 class EventBus {
     constructor() {
-        // Listeners organisés par événement
+        // Listeners organisÃ©s par Ã©vÃ©nement
         this.listeners = new Map();
         
-        // Files d'attente par priorité
+        // Files d'attente par prioritÃ©
         this.queues = {
             [EventPriority.HIGH]: [],
             [EventPriority.NORMAL]: [],
@@ -37,7 +37,7 @@ class EventBus {
             processingInterval: 10
         };
         
-        // Métriques
+        // MÃ©triques
         this.metrics = {
             eventsEmitted: 0,
             eventsProcessed: 0,
@@ -56,24 +56,24 @@ class EventBus {
         this.processingTimer = null;
         this._lastCacheClean = null;
         
-        // Documentation des événements
+        // Documentation des Ã©vÃ©nements
         this.eventDocumentation = this.initEventDocumentation();
         
         this.init();
     }
     
     init() {
-        // Démarrer le traitement des queues
+        // DÃ©marrer le traitement des queues
         this.startProcessing();
         
-        // Nettoyer les caches périodiquement
+        // Nettoyer les caches pÃ©riodiquement
         setInterval(() => this.cleanCaches(), 60000);
         
-        console.log('✓ EventBus initialized');
+        console.log('âœ“ EventBus initialized');
     }
     
     // ========================================================================
-    // MÉTHODES PRINCIPALES
+    // MÃ‰THODES PRINCIPALES
     // ========================================================================
     
     on(event, callback, options = {}) {
@@ -99,7 +99,7 @@ class EventBus {
         
         this.listeners.get(event).push(listener);
         
-        // Retourner fonction de désabonnement
+        // Retourner fonction de dÃ©sabonnement
         return () => this.off(event, callback);
     }
     
@@ -111,7 +111,7 @@ class EventBus {
         if (!this.listeners.has(event)) return;
         
         if (!callback) {
-            // Retirer tous les listeners pour cet événement
+            // Retirer tous les listeners pour cet Ã©vÃ©nement
             this.listeners.delete(event);
             return;
         }
@@ -145,10 +145,10 @@ class EventBus {
         };
         
         if (this.config.enablePriorities && priority === EventPriority.HIGH) {
-            // Traiter immédiatement les événements HIGH priority
+            // Traiter immÃ©diatement les Ã©vÃ©nements HIGH priority
             this.processEvent(eventData);
         } else {
-            // Ajouter à la queue appropriée
+            // Ajouter Ã  la queue appropriÃ©e
             const queue = this.queues[priority] || this.queues[EventPriority.NORMAL];
             
             if (queue.length >= this.config.maxQueueSize) {
@@ -212,7 +212,7 @@ class EventBus {
                     continue;
                 }
                 
-                // Exécution normale
+                // ExÃ©cution normale
                 this.executeCallback(listener, data);
                 
                 // Marquer pour suppression si once
@@ -234,7 +234,7 @@ class EventBus {
             this.listeners.delete(event);
         }
         
-        // Métriques
+        // MÃ©triques
         this.metrics.eventsProcessed++;
         
         if (this.config.enableMetrics && priority) {
@@ -301,7 +301,7 @@ class EventBus {
     cleanCaches() {
         const now = Date.now();
         
-        // Nettoyer throttle cache (garder 5 dernières secondes)
+        // Nettoyer throttle cache (garder 5 derniÃ¨res secondes)
         for (const [key, timestamp] of this.throttleCache.entries()) {
             if (now - timestamp > 5000) {
                 this.throttleCache.delete(key);
@@ -386,9 +386,9 @@ if (typeof window !== 'undefined') {
     window.EventBus = EventBus;
     window.EventPriority = EventPriority;
     
-    // ✅ CRITIQUE: Créer immédiatement l'instance globale
+    // âœ… CRITIQUE: CrÃ©er immÃ©diatement l'instance globale
     if (!window.eventBus) {
         window.eventBus = new EventBus();
-        console.log('✓ Global EventBus instance created');
+        console.log('âœ“ Global EventBus instance created');
     }
 }

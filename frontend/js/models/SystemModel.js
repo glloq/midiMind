@@ -1,12 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/models/SystemModel.js
-// Chemin rÃ©el: frontend/js/models/SystemModel.js
-// Version: v4.0.0 - API COMPATIBLE v4.2.2
-// Date: 2025-11-01
+// Chemin réel: frontend/js/models/SystemModel.js
+// Version: v4.2.2 - API COMPATIBLE v4.2.2
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.0.0:
-// âœ… RemplacÃ© backend.send() par backend.sendCommand()
-// âœ… Compatible avec BackendService v4.0.0
+// CORRECTIONS v4.2.2:
+// ✅ Remplacé backend.send() par backend.sendCommand()
+// ✅ Compatible avec BackendService v4.0.0
+// ✅ Extraction response.data corrigée
 // ============================================================================
 
 class SystemModel extends BaseModel {
@@ -23,16 +24,17 @@ class SystemModel extends BaseModel {
         this.data.memory = null;
         this.data.disk = null;
         
-        this.log('debug', 'SystemModel', 'Initialized (v4.0.0)');
+        this.log('debug', 'SystemModel', 'Initialized (v4.2.2)');
     }
     
     async ping() {
         if (!this.backend || !this.backend.isConnected()) return false;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.ping', {});
-            return response.pong || false;
+            const data = response.data || response;
+            return data.pong || false;
         } catch (error) {
             return false;
         }
@@ -42,10 +44,11 @@ class SystemModel extends BaseModel {
         if (!this.backend || !this.backend.isConnected()) return null;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.version', {});
-            this.data.version = response;
-            return response;
+            const data = response.data || response;
+            this.data.version = data;
+            return data;
         } catch (error) {
             this.log('error', 'SystemModel.getVersion', error);
         }
@@ -57,10 +60,11 @@ class SystemModel extends BaseModel {
         if (!this.backend || !this.backend.isConnected()) return null;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.info', {});
-            this.data.info = response;
-            return response;
+            const data = response.data || response;
+            this.data.info = data;
+            return data;
         } catch (error) {
             this.log('error', 'SystemModel.getInfo', error);
         }
@@ -72,9 +76,10 @@ class SystemModel extends BaseModel {
         if (!this.backend || !this.backend.isConnected()) return 0;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.uptime', {});
-            this.data.uptime = response.uptime || response || 0;
+            const data = response.data || response;
+            this.data.uptime = data.uptime || data || 0;
             return this.data.uptime;
         } catch (error) {
             this.log('error', 'SystemModel.getUptime', error);
@@ -87,10 +92,11 @@ class SystemModel extends BaseModel {
         if (!this.backend || !this.backend.isConnected()) return null;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.memory', {});
-            this.data.memory = response;
-            return response;
+            const data = response.data || response;
+            this.data.memory = data;
+            return data;
         } catch (error) {
             this.log('error', 'SystemModel.getMemory', error);
         }
@@ -102,10 +108,11 @@ class SystemModel extends BaseModel {
         if (!this.backend || !this.backend.isConnected()) return null;
         
         try {
-            // âœ… Utilise sendCommand au lieu de send
+            // ✅ Utilise sendCommand au lieu de send
             const response = await this.backend.sendCommand('system.disk', {});
-            this.data.disk = response;
-            return response;
+            const data = response.data || response;
+            this.data.disk = data;
+            return data;
         } catch (error) {
             this.log('error', 'SystemModel.getDisk', error);
         }

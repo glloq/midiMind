@@ -1,5 +1,14 @@
 // ============================================================================
-// BackendService v4.1.0 - MATCHING SUR payload.request_id (API v4.2.2)
+// Fichier: frontend/js/services/BackendService.js
+// Chemin réel: frontend/js/services/BackendService.js
+// Version: v4.2.2 - API COMPATIBLE (CORRECTED)
+// Date: 2025-11-02
+// ============================================================================
+// CORRECTIONS v4.2.2:
+// ✅ Tous les paramètres en snake_case
+// ✅ midi.import: filename + content + base64
+// ✅ Réponse: payload.data extraite correctement
+// ✅ routing_id, device_id, midi_file_id, playlist_id
 // ============================================================================
 
 class BackendService {
@@ -37,10 +46,9 @@ class BackendService {
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        // âœ… Map: request_id â†’ Promise
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized (v4.1.0 - API v4.2.2)');
+        this.logger.info('BackendService', 'Service initialized (v4.2.2 - API CORRECTED)');
     }
     
     generateUUID() {
@@ -103,9 +111,8 @@ class BackendService {
                 };
                 
             } catch (error) {
-                this.logger.error('BackendService', 'Connection error:', error);
-                this.connecting = false;
-                this.handleConnectionError(error.message);
+                this.logger.error('BackendService', 'Connection failed:', error);
+                this.handleConnectionError(error);
                 resolve(false);
             }
         });
@@ -114,18 +121,11 @@ class BackendService {
     handleOpen() {
         this.connected = true;
         this.connecting = false;
-        this.reconnectAttempts = 0;
         this.offlineMode = false;
-        this.reconnectionStopped = false;
-        this.lastActivityTime = Date.now();
-        this.heartbeatFailures = 0;
+        this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', 'âœ“ Connected to backend');
-        
-        this.eventBus.emit('backend:connected', {
-            url: this.config.url,
-            timestamp: Date.now()
-        });
+        this.logger.info('BackendService', '✓ Connected successfully');
+        this.eventBus.emit('backend:connected');
         
         this.startHeartbeat();
         this.flushMessageQueue();
@@ -138,59 +138,37 @@ class BackendService {
         this.connecting = false;
         this.stopHeartbeat();
         
-        const reason = event.reason || 'Unknown reason';
-        const code = event.code;
+        this.logger.warn('BackendService', `Connection closed: code=${event.code}, reason=${event.reason}`);
         
-        this.logger.warn('BackendService', `Disconnected (code: ${code}, reason: ${reason})`);
+        if (wasConnected) {
+            this.eventBus.emit('backend:disconnected', {
+                code: event.code,
+                reason: event.reason
+            });
+        }
         
-        this.eventBus.emit('backend:disconnected', { 
-            code, 
-            reason,
-            wasConnected,
-            offlineMode: this.offlineMode
-        });
-        
-        if (!event.wasClean && !this.reconnectionStopped) {
-            this.scheduleReconnect();
-        } else if (this.reconnectionStopped) {
-            this.enterOfflineMode();
+        if (!this.reconnectionStopped) {
+            this.scheduleReconnection();
         }
     }
     
     handleError(error) {
         this.logger.error('BackendService', 'WebSocket error:', error);
-        this.eventBus.emit('backend:error', { error });
+        this.eventBus.emit('backend:error', error);
     }
     
-    handleConnectionError(message) {
-        this.connected = false;
+    handleConnectionError(error) {
         this.connecting = false;
-        
-        this.eventBus.emit('backend:connection-failed', { 
-            message,
-            attempt: this.reconnectAttempts + 1,
-            maxAttempts: this.config.maxReconnectAttempts
-        });
-        
-        this.scheduleReconnect();
+        this.logger.error('BackendService', 'Connection error:', error);
+        this.eventBus.emit('backend:connection-error', error);
     }
     
-    scheduleReconnect() {
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-        }
+    scheduleReconnection() {
+        if (this.reconnectionStopped) return;
         
         if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
             this.logger.error('BackendService', 
-                `âœ— Max reconnection attempts (${this.config.maxReconnectAttempts}) reached`);
-            
-            this.reconnectionStopped = true;
-            
-            this.eventBus.emit('backend:max-reconnect-attempts', {
-                attempts: this.reconnectAttempts,
-                maxAttempts: this.config.maxReconnectAttempts
-            });
-            
+                `Max reconnection attempts reached (${this.config.maxReconnectAttempts})`);
             this.enterOfflineMode();
             return;
         }
@@ -203,7 +181,7 @@ class BackendService {
         this.reconnectAttempts++;
         
         this.logger.info('BackendService', 
-            `â†» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
+            `↻ Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
         
         this.eventBus.emit('backend:reconnecting', {
             attempt: this.reconnectAttempts,
@@ -219,7 +197,7 @@ class BackendService {
     
     enterOfflineMode() {
         this.offlineMode = true;
-        this.logger.warn('BackendService', 'âš ï¸ Entering offline mode');
+        this.logger.warn('BackendService', '⚠️ Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
             timestamp: Date.now()
@@ -235,7 +213,7 @@ class BackendService {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', 'ðŸ’— Heartbeat started');
+        this.logger.debug('BackendService', '💗 Heartbeat started');
     }
     
     async checkHeartbeat() {
@@ -245,10 +223,10 @@ class BackendService {
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `âœ— Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+                `✗ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'ðŸ’€ Connection dead, forcing reconnect');
+                this.logger.error('BackendService', '💀 Connection dead, forcing reconnect');
                 this.forceReconnect('Heartbeat timeout - connection dead');
                 return;
             }
@@ -261,27 +239,26 @@ class BackendService {
         
         try {
             this.heartbeatPending = true;
-            this.logger.debug('BackendService', 'ðŸ’— Sending heartbeat (system.ping)');
+            this.logger.debug('BackendService', '💗 Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
-            // âœ… Utiliser system.ping comme dans la doc
             await this.sendCommand('system.ping');
             const latency = Date.now() - startTime;
             
             this.heartbeatPending = false;
             this.heartbeatFailures = 0;
             
-            this.logger.debug('BackendService', `âœ“ Heartbeat OK (latency: ${latency}ms)`);
+            this.logger.debug('BackendService', `✓ Heartbeat OK (latency: ${latency}ms)`);
             
         } catch (error) {
             this.heartbeatPending = false;
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `âš ï¸ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+                `⚠️ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'ðŸ’€ Multiple heartbeat failures, forcing reconnect');
+                this.logger.error('BackendService', '💀 Multiple heartbeat failures, forcing reconnect');
                 this.forceReconnect('Multiple heartbeat failures');
             }
         }
@@ -314,7 +291,7 @@ class BackendService {
     }
     
     /**
-     * âœ… v4.1.0: Match sur payload.request_id
+     * ✅ v4.2.2: Match sur payload.request_id
      */
     handleMessage(event) {
         try {
@@ -328,54 +305,41 @@ class BackendService {
             const payload = data.payload || {};
             
             // ✅ Si type="response" => Matcher sur request_id
-            if (messageType === "response") {
-                // Essayer payload.request_id, puis data.id (envelope), puis FIFO
-                let requestId = payload.request_id || data.id;
-                
-                if (!requestId || !this.pendingRequests.has(requestId)) {
-                    const pendingIds = Array.from(this.pendingRequests.keys());
-                    if (pendingIds.length > 0) {
-                        requestId = pendingIds[0];
-                        this.logger.debug("BackendService", `Using FIFO match: ${requestId}`);
-                    }
-                }
+            if (messageType === 'response') {
+                const requestId = payload.request_id;
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
                     this.pendingRequests.delete(requestId);
+                    
                     clearTimeout(pending.timeoutTimer);
                     
-                    if (payload.success === true) {
-                        pending.resolve(payload.data || payload);
-                    } else if (payload.success === false) {
-                        const error = new Error(payload.error_message || "Command failed");
+                    // ✅ Vérifier payload.success selon la doc
+                    if (payload.success) {
+                        // ✅ Retourner payload.data (pas payload directement)
+                        pending.resolve(payload.data || {});
+                    } else {
+                        const error = new Error(payload.error_message || 'Command failed');
                         error.code = payload.error_code;
                         pending.reject(error);
-                    } else {
-                        if (payload.error || payload.error_message) {
-                            const error = new Error(payload.error_message || payload.error || "Command failed");
-                            error.code = payload.error_code;
-                            pending.reject(error);
-                        } else {
-                            pending.resolve(payload.data || payload);
-                        }
                     }
                     return;
                 } else {
-                    this.logger.warn("BackendService", `No matching request for response: ${requestId || "unknown"}`);
+                    this.logger.warn('BackendService', 
+                        `Response without matching request: ${requestId}`);
                     return;
                 }
             }
             
-            // Si type="event" => Ã©vÃ©nement backend
+            // Si type="event" => événement backend
             if (messageType === 'event') {
                 const eventName = payload.name;
                 if (eventName) {
                     this.eventBus.emit(`backend:event:${eventName}`, payload);
                     
-                    const deviceId = payload.data?.deviceId;
-                    if (deviceId !== undefined) {
-                        this.eventBus.emit(`${eventName}:${deviceId}`, payload);
+                    const device_id = payload.data?.device_id;
+                    if (device_id !== undefined) {
+                        this.eventBus.emit(`${eventName}:${device_id}`, payload);
                     }
                     
                     this.logger.debug('BackendService', `Event received: ${eventName}`, payload);
@@ -409,7 +373,8 @@ class BackendService {
         }
         
         try {
-            const message = typeof data === 'string' ? data : JSON.stringify(data);
+            const message = typeof data === 'string' ? 
+                data : JSON.stringify(data);
             this.ws.send(message);
             return true;
         } catch (error) {
@@ -419,7 +384,7 @@ class BackendService {
     }
     
     /**
-     * âœ… v4.1.0: Format conforme API v4.2.2
+     * ✅ v4.2.2: Format conforme API v4.2.2
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -448,14 +413,14 @@ class BackendService {
                 timeoutTimer: timeoutTimer
             });
             
-            // âœ… FORMAT API v4.2.2
+            // ✅ FORMAT API v4.2.2
             const message = {
                 id: requestId,
                 type: "request",
                 timestamp: this.generateTimestamp(),
                 version: "1.0",
                 payload: {
-                    id: requestId,           // âœ… MÃªme UUID dans payload
+                    id: requestId,
                     command: command,
                     params: params,
                     timeout: timeoutMs
@@ -479,9 +444,11 @@ class BackendService {
                             .reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
                     
-                    const response = await this.sendCommand('files.write', {
-                        filepath: `/midi/${file.name}`,
-                        content: base64Data
+                    // ✅ midi.import avec content + base64
+                    const response = await this.sendCommand('midi.import', {
+                        filename: file.name,
+                        content: base64Data,
+                        base64: true
                     });
                     
                     resolve(response);
@@ -495,149 +462,378 @@ class BackendService {
         });
     }
     
-    // === COMMANDES API v4.2.2 ===
-    async listDevices() { return this.sendCommand('devices.list'); }
-    async scanDevices() { return this.sendCommand('devices.scan'); }
-    async getDevice(deviceId) { return this.sendCommand('devices.getInfo', { deviceId }); }
-    async connectDevice(deviceId) { return this.sendCommand('devices.connect', { deviceId }); }
-    async disconnectDevice(deviceId) { return this.sendCommand('devices.disconnect', { deviceId }); }
-    async disconnectAllDevices() { return this.sendCommand('devices.disconnectAll'); }
-    async getConnectedDevices() { return this.sendCommand('devices.getConnected'); }
-    async startHotPlug() { return this.sendCommand('devices.startHotPlug'); }
-    async stopHotPlug() { return this.sendCommand('devices.stopHotPlug'); }
-    async getHotPlugStatus() { return this.sendCommand('devices.getHotPlugStatus'); }
+    // ============================================================================
+    // SHORTCUTS API v4.2.2 - ✅ TOUS EN snake_case
+    // ============================================================================
     
-    async listRoutes() { return this.sendCommand('routing.listRoutes'); }
-    async addRoute(sourceId, destId, filters = {}) { 
-        return this.sendCommand('routing.addRoute', { sourceId, destId, filters }); 
-    }
-    async removeRoute(routeId) { return this.sendCommand('routing.removeRoute', { routeId }); }
-    async enableRoute(routeId) { return this.sendCommand('routing.enableRoute', { routeId }); }
-    async disableRoute(routeId) { return this.sendCommand('routing.disableRoute', { routeId }); }
-    async clearRoutes() { return this.sendCommand('routing.clearRoutes'); }
-    
-    async enableLatency() { return this.sendCommand('latency.enable'); }
-    async disableLatency() { return this.sendCommand('latency.disable'); }
-    async setLatencyCompensation(deviceId, latencyMs) { 
-        return this.sendCommand('latency.setCompensation', { deviceId, latencyMs }); 
-    }
-    async getLatencyCompensation(deviceId) { 
-        return this.sendCommand('latency.getCompensation', { deviceId }); 
-    }
-    async setGlobalOffset(offsetMs) { 
-        return this.sendCommand('latency.setGlobalOffset', { offsetMs }); 
-    }
-    async getGlobalOffset() { return this.sendCommand('latency.getGlobalOffset'); }
-    async listInstruments() { return this.sendCommand('latency.listInstruments'); }
-    
-    async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
-    async loadPlaybackFile(filepath) { return this.sendCommand('playback.load', { file_path: filepath }); }
-    async play(fileId = null) { return this.sendCommand('playback.play', fileId ? { fileId } : {}); }
-    async pause() { return this.sendCommand('playback.pause'); }
-    async stop() { return this.sendCommand('playback.stop'); }
-    async seek(position) { return this.sendCommand('playback.seek', { position }); }
-    async setTempo(tempo) { return this.sendCommand('playback.setTempo', { tempo }); }
-    async setLoop(enabled) { return this.sendCommand('playback.setLoop', { enabled }); }
-    async getStatus() { return this.sendCommand('playback.getStatus'); }
-    async getPlaybackInfo() { return this.sendCommand('playback.getInfo'); }
-    
-    async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
-    async readFile(filepath) { return this.sendCommand('files.read', { filepath }); }
-    async writeFile(filepath, content) { return this.sendCommand('files.write', { filepath, content }); }
-    async deleteFile(filepath) { return this.sendCommand('files.delete', { filepath }); }
-    async fileExists(filepath) { return this.sendCommand('files.exists', { filepath }); }
-    async getFileInfo(filepath) { return this.sendCommand('files.getInfo', { filepath }); }
-    
-    async loadMidi(filepath) { return this.sendCommand('midi.load', { filepath }); }
-    async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
-    async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
-    async convertMidi(jsonData) { return this.sendCommand('midi.convert', { jsonData }); }
-    async sendNoteOn(deviceId, channel, note, velocity) { 
-        return this.sendCommand('midi.sendNoteOn', { deviceId, channel, note, velocity }); 
-    }
-    async sendNoteOff(deviceId, channel, note) { 
-        return this.sendCommand('midi.sendNoteOff', { deviceId, channel, note }); 
+    // === DEVICES ===
+    async listDevices() { 
+        return this.sendCommand('devices.list'); 
     }
     
-    // MIDI Routing (Editor)
-    async addMidiRoute(sourceTrack, destTrack, filters = {}) {
+    async scanDevices(full_scan = false) { 
+        return this.sendCommand('devices.scan', { full_scan }); 
+    }
+    
+    async getDevice(device_id) { 
+        return this.sendCommand('devices.getInfo', { device_id }); 
+    }
+    
+    async connectDevice(device_id) { 
+        return this.sendCommand('devices.connect', { device_id }); 
+    }
+    
+    async disconnectDevice(device_id) { 
+        return this.sendCommand('devices.disconnect', { device_id }); 
+    }
+    
+    async disconnectAllDevices() { 
+        return this.sendCommand('devices.disconnectAll'); 
+    }
+    
+    async getConnectedDevices() { 
+        return this.sendCommand('devices.getConnected'); 
+    }
+    
+    async startHotPlug() { 
+        return this.sendCommand('devices.startHotPlug'); 
+    }
+    
+    async stopHotPlug() { 
+        return this.sendCommand('devices.stopHotPlug'); 
+    }
+    
+    async getHotPlugStatus() { 
+        return this.sendCommand('devices.getHotPlugStatus'); 
+    }
+    
+    // === ROUTING ===
+    async listRoutes() { 
+        return this.sendCommand('routing.listRoutes'); 
+    }
+    
+    async addRoute(source_id, dest_id, filters = {}) { 
+        return this.sendCommand('routing.addRoute', { source_id, dest_id, filters }); 
+    }
+    
+    async removeRoute(route_id) { 
+        return this.sendCommand('routing.removeRoute', { route_id }); 
+    }
+    
+    async enableRoute(route_id) { 
+        return this.sendCommand('routing.enableRoute', { route_id }); 
+    }
+    
+    async disableRoute(route_id) { 
+        return this.sendCommand('routing.disableRoute', { route_id }); 
+    }
+    
+    async clearRoutes() { 
+        return this.sendCommand('routing.clearRoutes'); 
+    }
+    
+    // === LATENCY ===
+    async enableLatency() { 
+        return this.sendCommand('latency.enable'); 
+    }
+    
+    async disableLatency() { 
+        return this.sendCommand('latency.disable'); 
+    }
+    
+    async setLatencyCompensation(device_id, latency_ms) { 
+        return this.sendCommand('latency.setCompensation', { device_id, latency_ms }); 
+    }
+    
+    async getLatencyCompensation(device_id) { 
+        return this.sendCommand('latency.getCompensation', { device_id }); 
+    }
+    
+    async setGlobalOffset(offset_ms) { 
+        return this.sendCommand('latency.setGlobalOffset', { offset_ms }); 
+    }
+    
+    async getGlobalOffset() { 
+        return this.sendCommand('latency.getGlobalOffset'); 
+    }
+    
+    async listInstruments() { 
+        return this.sendCommand('latency.listInstruments'); 
+    }
+    
+    // === PLAYBACK ===
+    async listPlaybackFiles() { 
+        return this.sendCommand('playback.listFiles'); 
+    }
+    
+    async loadPlaybackFile(filename) { 
+        return this.sendCommand('playback.load', { filename }); 
+    }
+    
+    async play(file_id = null) { 
+        return this.sendCommand('playback.play', file_id ? { file_id } : {}); 
+    }
+    
+    async pause() { 
+        return this.sendCommand('playback.pause'); 
+    }
+    
+    async stop() { 
+        return this.sendCommand('playback.stop'); 
+    }
+    
+    async seek(position) { 
+        return this.sendCommand('playback.seek', { position }); 
+    }
+    
+    async setTempo(tempo) { 
+        return this.sendCommand('playback.setTempo', { tempo }); 
+    }
+    
+    async setLoop(enabled) { 
+        return this.sendCommand('playback.setLoop', { enabled }); 
+    }
+    
+    async getStatus() { 
+        return this.sendCommand('playback.getStatus'); 
+    }
+    
+    async getPlaybackInfo() { 
+        return this.sendCommand('playback.getInfo'); 
+    }
+    
+    // === FILES ===
+    async listFiles(path = '/midi') { 
+        return this.sendCommand('files.list', { path }); 
+    }
+    
+    async readFile(filename) { 
+        return this.sendCommand('files.read', { filename }); 
+    }
+    
+    async writeFile(filename, content) { 
+        return this.sendCommand('files.write', { filename, content }); 
+    }
+    
+    async deleteFile(filename) { 
+        return this.sendCommand('files.delete', { filename }); 
+    }
+    
+    async fileExists(filename) { 
+        return this.sendCommand('files.exists', { filename }); 
+    }
+    
+    async getFileInfo(filename) { 
+        return this.sendCommand('files.getInfo', { filename }); 
+    }
+    
+    // === MIDI ===
+    async loadMidi(id) { 
+        return this.sendCommand('midi.load', { id }); 
+    }
+    
+    async saveMidi(filename, midi_json) { 
+        return this.sendCommand('midi.save', { filename, midi_json }); 
+    }
+    
+    // ✅ CORRECTION MAJEURE: midi.import avec content + base64
+    async importMidi(filename, content, base64 = true) { 
+        return this.sendCommand('midi.import', { filename, content, base64 }); 
+    }
+    
+    async convertMidi(json_data) { 
+        return this.sendCommand('midi.convert', { json_data }); 
+    }
+    
+    async sendNoteOn(device_id, note, velocity, channel = 0) { 
+        return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); 
+    }
+    
+    async sendNoteOff(device_id, note, channel = 0) { 
+        return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
+    }
+    
+    // ✅ MIDI ROUTING avec snake_case
+    async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
         return this.sendCommand('midi.routing.add', { 
-            source_track: sourceTrack, 
-            dest_track: destTrack, 
-            filters 
+            midi_file_id, 
+            track_id, 
+            device_id, 
+            instrument_name, 
+            channel, 
+            enabled 
         });
     }
-    async listMidiRoutes() { 
-        return this.sendCommand('midi.routing.list'); 
-    }
-    async updateMidiRoute(routeId, updates) { 
-        return this.sendCommand('midi.routing.update', { 
-            route_id: routeId, 
-            ...updates 
-        }); 
-    }
-    async removeMidiRoute(routeId) { 
-        return this.sendCommand('midi.routing.remove', { route_id: routeId }); 
-    }
-    async clearMidiRoutes() { 
-        return this.sendCommand('midi.routing.clear'); 
+    
+    async listMidiRouting(midi_file_id) {
+        return this.sendCommand('midi.routing.list', { midi_file_id });
     }
     
-    async listPresets() { return this.sendCommand('preset.list'); }
-    async loadPreset(name) { return this.sendCommand('preset.load', { name }); }
-    async savePreset(name, data) { return this.sendCommand('preset.save', { name, data }); }
-    async deletePreset(name) { return this.sendCommand('preset.delete', { name }); }
-    async exportPreset(name, filepath) { return this.sendCommand('preset.export', { name, filepath }); }
+    async updateMidiRouting(routing_id, updates) {
+        return this.sendCommand('midi.routing.update', { routing_id, ...updates });
+    }
     
-    async listPlaylists() { return this.sendCommand('playlist.list'); }
+    async removeMidiRouting(routing_id) {
+        return this.sendCommand('midi.routing.remove', { routing_id });
+    }
+    
+    async clearMidiRouting(midi_file_id) {
+        return this.sendCommand('midi.routing.clear', { midi_file_id });
+    }
+    
+    // === PRESETS ===
+    async listPresets() { 
+        return this.sendCommand('preset.list'); 
+    }
+    
+    async loadPreset(id) { 
+        return this.sendCommand('preset.load', { id }); 
+    }
+    
+    async savePreset(name, data) { 
+        return this.sendCommand('preset.save', { name, data }); 
+    }
+    
+    async deletePreset(id) { 
+        return this.sendCommand('preset.delete', { id }); 
+    }
+    
+    async exportPreset(id, filename) { 
+        return this.sendCommand('preset.export', { id, filename }); 
+    }
+    
+    // === PLAYLISTS ===
+    async listPlaylists() { 
+        return this.sendCommand('playlist.list'); 
+    }
+    
     async createPlaylist(name, description = '') { 
         return this.sendCommand('playlist.create', { name, description }); 
     }
-    async getPlaylist(playlistId) { return this.sendCommand('playlist.get', { playlistId }); }
-    async updatePlaylist(playlistId, data) { 
-        return this.sendCommand('playlist.update', { playlistId, data }); 
-    }
-    async deletePlaylist(playlistId) { return this.sendCommand('playlist.delete', { playlistId }); }
-    async addPlaylistItem(playlistId, filepath, order = null) { 
-        return this.sendCommand('playlist.addItem', { playlistId, filepath, order }); 
-    }
-    async removePlaylistItem(playlistId, itemId) { 
-        return this.sendCommand('playlist.removeItem', { playlistId, itemId }); 
-    }
-    async reorderPlaylist(playlistId, itemId, newOrder) { 
-        return this.sendCommand('playlist.reorder', { playlistId, itemId, newOrder }); 
-    }
-    async setPlaylistLoop(playlistId, enabled) { 
-        return this.sendCommand('playlist.setLoop', { playlistId, enabled }); 
+    
+    async getPlaylist(playlist_id) { 
+        return this.sendCommand('playlist.get', { playlist_id }); 
     }
     
-    async getVersion() { return this.sendCommand('system.version'); }
-    async getInfo() { return this.sendCommand('system.info'); }
-    async getUptime() { return this.sendCommand('system.uptime'); }
-    async getMemory() { return this.sendCommand('system.memory'); }
-    async getDisk() { return this.sendCommand('system.disk'); }
-    async getCommands() { return this.sendCommand('system.commands'); }
+    async updatePlaylist(playlist_id, data) { 
+        return this.sendCommand('playlist.update', { playlist_id, data }); 
+    }
     
-    async getNetworkStatus() { return this.sendCommand('network.status'); }
-    async getNetworkInterfaces() { return this.sendCommand('network.interfaces'); }
-    async getNetworkStats() { return this.sendCommand('network.stats'); }
+    async deletePlaylist(playlist_id) { 
+        return this.sendCommand('playlist.delete', { playlist_id }); 
+    }
     
-    async getBluetoothStatus() { return this.sendCommand('bluetooth.status'); }
-    async scanBluetooth() { return this.sendCommand('bluetooth.scan'); }
-    async pairBluetooth(address) { return this.sendCommand('bluetooth.pair', { address }); }
-    async unpairBluetooth(address) { return this.sendCommand('bluetooth.unpair', { address }); }
-    async getPairedBluetooth() { return this.sendCommand('bluetooth.paired'); }
-    async forgetBluetooth(address) { return this.sendCommand('bluetooth.forget', { address }); }
-    async getBluetoothSignal(address) { return this.sendCommand('bluetooth.signal', { address }); }
-    async setBluetoothConfig(settings) { return this.sendCommand('bluetooth.config', { settings }); }
+    async addPlaylistItem(playlist_id, filename, order = null) { 
+        return this.sendCommand('playlist.addItem', { playlist_id, filename, order }); 
+    }
     
+    async removePlaylistItem(playlist_id, item_id) { 
+        return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); 
+    }
+    
+    async reorderPlaylist(playlist_id, item_id, new_order) { 
+        return this.sendCommand('playlist.reorder', { playlist_id, item_id, new_order }); 
+    }
+    
+    async setPlaylistLoop(playlist_id, enabled) { 
+        return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); 
+    }
+    
+    // === SYSTEM ===
+    async getVersion() { 
+        return this.sendCommand('system.version'); 
+    }
+    
+    async getInfo() { 
+        return this.sendCommand('system.info'); 
+    }
+    
+    async getUptime() { 
+        return this.sendCommand('system.uptime'); 
+    }
+    
+    async getMemory() { 
+        return this.sendCommand('system.memory'); 
+    }
+    
+    async getDisk() { 
+        return this.sendCommand('system.disk'); 
+    }
+    
+    async getCommands() { 
+        return this.sendCommand('system.commands'); 
+    }
+    
+    // === NETWORK ===
+    async getNetworkStatus() { 
+        return this.sendCommand('network.status'); 
+    }
+    
+    async getNetworkInterfaces() { 
+        return this.sendCommand('network.interfaces'); 
+    }
+    
+    async getNetworkStats() { 
+        return this.sendCommand('network.stats'); 
+    }
+    
+    // === BLUETOOTH ===
+    async getBluetoothStatus() { 
+        return this.sendCommand('bluetooth.status'); 
+    }
+    
+    async scanBluetooth() { 
+        return this.sendCommand('bluetooth.scan'); 
+    }
+    
+    async pairBluetooth(address) { 
+        return this.sendCommand('bluetooth.pair', { address }); 
+    }
+    
+    async unpairBluetooth(address) { 
+        return this.sendCommand('bluetooth.unpair', { address }); 
+    }
+    
+    async getPairedBluetooth() { 
+        return this.sendCommand('bluetooth.paired'); 
+    }
+    
+    async forgetBluetooth(address) { 
+        return this.sendCommand('bluetooth.forget', { address }); 
+    }
+    
+    async getBluetoothSignal(address) { 
+        return this.sendCommand('bluetooth.signal', { address }); 
+    }
+    
+    async setBluetoothConfig(settings) { 
+        return this.sendCommand('bluetooth.config', { settings }); 
+    }
+    
+    // === LOGGER ===
     async getLogs(level = 'info', limit = 100) { 
         return this.sendCommand('logger.getLogs', { level, limit }); 
     }
-    async getLogLevel() { return this.sendCommand('logger.getLevel'); }
-    async setLogLevel(level) { return this.sendCommand('logger.setLevel', { level }); }
-    async clearLogs() { return this.sendCommand('logger.clear'); }
-    async exportLogs(filepath) { return this.sendCommand('logger.export', { filepath }); }
+    
+    async getLogLevel() { 
+        return this.sendCommand('logger.getLevel'); 
+    }
+    
+    async setLogLevel(level) { 
+        return this.sendCommand('logger.setLevel', { level }); 
+    }
+    
+    async clearLogs() { 
+        return this.sendCommand('logger.clear'); 
+    }
+    
+    async exportLogs(filename) { 
+        return this.sendCommand('logger.export', { filename }); 
+    }
+    
+    // ============================================================================
+    // UTILS
+    // ============================================================================
     
     flushMessageQueue() {
         if (this.messageQueue.length === 0) return;

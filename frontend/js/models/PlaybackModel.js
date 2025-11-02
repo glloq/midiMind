@@ -1,18 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaybackModel.js
-// Chemin rÃ©el: frontend/js/models/PlaybackModel.js
-// Version: v4.0.0 - API COMPATIBLE v4.2.2
-// Date: 2025-11-01
+// Chemin réel: frontend/js/models/PlaybackModel.js
+// Version: v4.2.2 - API CORRECTED
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.0.0:
-// âœ… load_file â†’ playback.load
-// âœ… play â†’ playback.play
-// âœ… pause â†’ playback.pause
-// âœ… stop â†’ playback.stop
-// âœ… seek â†’ playback.seek
-// âœ… get_status â†’ playback.getStatus
-// âœ… set_loop â†’ playback.setLoop
-// âœ… set_tempo â†’ playback.setTempo
+// CORRECTIONS v4.2.2:
+// ✅ playback.load avec param "filename" (pas "file_path")
+// ✅ Extraction correcte response.data
+// ✅ Gestion événements backend conformes
 // ============================================================================
 
 class PlaybackModel extends BaseModel {
@@ -24,7 +19,7 @@ class PlaybackModel extends BaseModel {
             ...options
         });
         
-        // Ã‰tat initial de la lecture
+        // État initial de la lecture
         this.data.state = initialData.state || 'stopped'; // 'stopped', 'playing', 'paused'
         this.data.currentFile = initialData.currentFile || null;
         this.data.currentTime = initialData.currentTime || 0;
@@ -32,12 +27,12 @@ class PlaybackModel extends BaseModel {
         this.data.tempo = initialData.tempo || 1.0;
         this.data.loop = initialData.loop || false;
         
-        this.log('debug', 'PlaybackModel', 'Initialized v4.0.0');
+        this.log('debug', 'PlaybackModel', '✓ Initialized v4.2.2');
     }
     
     /**
      * Charge un fichier MIDI pour la lecture
-     * @param {string} filename - Nom du fichier Ã  charger
+     * ✅ API v4.2.2: playback.load avec param "filename"
      */
     async load(filename) {
         if (!this.backend || !this.backend.isConnected()) {
@@ -46,10 +41,11 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.load', { 
-                file_path: filename 
+            // ✅ CORRECTION: param "filename" selon doc v4.2.2
+            const response = await this.backend.sendCommand('playback.load', { 
+                filename: filename 
             });
+            const data = response.data || response;
             
             if (data) {
                 this.data.currentFile = filename;
@@ -65,7 +61,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * DÃ©marre la lecture
+     * Démarre la lecture
+     * ✅ API v4.2.2: playback.play
      */
     async play() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -74,8 +71,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.play');
+            const response = await this.backend.sendCommand('playback.play');
+            const data = response.data || response;
             
             if (data) {
                 this.data.state = 'playing';
@@ -92,6 +89,7 @@ class PlaybackModel extends BaseModel {
     
     /**
      * Met la lecture en pause
+     * ✅ API v4.2.2: playback.pause
      */
     async pause() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -100,8 +98,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.pause');
+            const response = await this.backend.sendCommand('playback.pause');
+            const data = response.data || response;
             
             if (data) {
                 this.data.state = 'paused';
@@ -117,7 +115,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * ArrÃªte la lecture
+     * Arrête la lecture
+     * ✅ API v4.2.2: playback.stop
      */
     async stop() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -126,8 +125,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.stop');
+            const response = await this.backend.sendCommand('playback.stop');
+            const data = response.data || response;
             
             if (data) {
                 this.data.state = 'stopped';
@@ -144,8 +143,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * Se dÃ©place Ã  une position spÃ©cifique dans la lecture
-     * @param {number} position - Position en secondes
+     * Se déplace à une position spécifique
+     * ✅ API v4.2.2: playback.seek avec param "position"
      */
     async seek(position) {
         if (!this.backend || !this.backend.isConnected()) {
@@ -154,10 +153,10 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.seek', { 
-                position 
+            const response = await this.backend.sendCommand('playback.seek', { 
+                position: position 
             });
+            const data = response.data || response;
             
             if (data) {
                 this.data.currentTime = position;
@@ -172,7 +171,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re l'Ã©tat actuel de la lecture
+     * Récupère l'état actuel de la lecture
+     * ✅ API v4.2.2: playback.getStatus
      */
     async getStatus() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -181,17 +181,16 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.getStatus');
+            const response = await this.backend.sendCommand('playback.getStatus');
+            const data = response.data || response;
             
             if (data) {
-                // Mettre Ã  jour l'Ã©tat local
+                // Mettre à jour l'état local
                 this.data.state = data.state || 'stopped';
                 this.data.currentTime = data.current_time || data.position || 0;
                 this.data.duration = data.duration || 0;
-                this.data.currentFile = data.current_file || data.file || null;
+                this.data.currentFile = data.current_file || data.filename || null;
                 
-                this.emit('playback:status', data);
                 return data;
             }
         } catch (error) {
@@ -202,10 +201,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * Active/dÃ©sactive la boucle
-     * @param {boolean} enabled - True pour activer la boucle
-     * @param {number} startPos - Position de dÃ©but (optionnel)
-     * @param {number} endPos - Position de fin (optionnel)
+     * Définit le mode de boucle
+     * ✅ API v4.2.2: playback.setLoop avec params "enabled", "start_pos", "end_pos"
      */
     async setLoop(enabled, startPos = null, endPos = null) {
         if (!this.backend || !this.backend.isConnected()) {
@@ -214,16 +211,16 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const params = { enabled };
-            if (startPos !== null) params.start_position = startPos;
-            if (endPos !== null) params.end_position = endPos;
+            const params = { enabled: enabled };
+            if (startPos !== null) params.start_pos = startPos;
+            if (endPos !== null) params.end_pos = endPos;
             
-            const data = await this.backend.sendCommand('playback.setLoop', params);
+            const response = await this.backend.sendCommand('playback.setLoop', params);
+            const data = response.data || response;
             
             if (data) {
                 this.data.loop = enabled;
-                this.emit('playback:loop', { enabled, startPos, endPos });
+                this.emit('playback:loop_changed', { enabled, startPos, endPos });
                 return true;
             }
         } catch (error) {
@@ -234,8 +231,8 @@ class PlaybackModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit le tempo de lecture
-     * @param {number} tempo - Facteur de tempo (1.0 = normal, 0.5 = moitiÃ©, 2.0 = double)
+     * Définit le tempo de lecture
+     * ✅ API v4.2.2: playback.setTempo avec param "tempo"
      */
     async setTempo(tempo) {
         if (!this.backend || !this.backend.isConnected()) {
@@ -244,14 +241,14 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouvelle commande API v4.0.0
-            const data = await this.backend.sendCommand('playback.setTempo', { 
-                tempo 
+            const response = await this.backend.sendCommand('playback.setTempo', { 
+                tempo: tempo 
             });
+            const data = response.data || response;
             
             if (data) {
                 this.data.tempo = tempo;
-                this.emit('playback:tempo', { tempo });
+                this.emit('playback:tempo_changed', { tempo });
                 return true;
             }
         } catch (error) {
@@ -261,80 +258,90 @@ class PlaybackModel extends BaseModel {
         return false;
     }
     
-    // ========================================================================
-    // MÃ‰THODES LOCALES (GETTERS)
-    // ========================================================================
-    
     /**
-     * Retourne l'Ã©tat actuel de la lecture
+     * Obtient les informations détaillées du fichier en cours
+     * ✅ API v4.2.2: playback.getInfo
      */
-    getState() {
-        return this.data.state;
+    async getInfo() {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaybackModel.getInfo', 'Backend not connected');
+            return null;
+        }
+        
+        try {
+            const response = await this.backend.sendCommand('playback.getInfo');
+            const data = response.data || response;
+            return data;
+        } catch (error) {
+            this.log('error', 'PlaybackModel.getInfo', error.message);
+        }
+        
+        return null;
     }
     
     /**
-     * VÃ©rifie si la lecture est en cours
+     * Liste les fichiers disponibles pour la lecture
+     * ✅ API v4.2.2: playback.listFiles
+     */
+    async listFiles() {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaybackModel.listFiles', 'Backend not connected');
+            return [];
+        }
+        
+        try {
+            const response = await this.backend.sendCommand('playback.listFiles');
+            const data = response.data || response;
+            return data.files || [];
+        } catch (error) {
+            this.log('error', 'PlaybackModel.listFiles', error.message);
+        }
+        
+        return [];
+    }
+    
+    /**
+     * Met à jour la position actuelle (appelé par les événements backend)
+     */
+    updateProgress(position, duration) {
+        this.data.currentTime = position;
+        this.data.duration = duration;
+        this.emit('playback:progress', { position, duration });
+    }
+    
+    /**
+     * Getters pour l'état
      */
     isPlaying() {
         return this.data.state === 'playing';
     }
     
-    /**
-     * VÃ©rifie si la lecture est en pause
-     */
     isPaused() {
         return this.data.state === 'paused';
     }
     
-    /**
-     * VÃ©rifie si la lecture est arrÃªtÃ©e
-     */
     isStopped() {
         return this.data.state === 'stopped';
     }
     
-    /**
-     * Retourne le fichier actuellement chargÃ©
-     */
     getCurrentFile() {
         return this.data.currentFile;
     }
     
-    /**
-     * Retourne la position actuelle
-     */
     getCurrentTime() {
         return this.data.currentTime;
     }
     
-    /**
-     * Retourne la durÃ©e totale
-     */
     getDuration() {
         return this.data.duration;
     }
     
-    /**
-     * Retourne le tempo actuel
-     */
     getTempo() {
         return this.data.tempo;
     }
     
-    /**
-     * VÃ©rifie si la boucle est activÃ©e
-     */
     isLooping() {
         return this.data.loop;
-    }
-    
-    /**
-     * Met Ã  jour la position actuelle (depuis Ã©vÃ©nements backend)
-     * @param {number} time - Nouvelle position
-     */
-    updateCurrentTime(time) {
-        this.data.currentTime = time;
-        this.emit('time:updated', { time });
     }
 }
 

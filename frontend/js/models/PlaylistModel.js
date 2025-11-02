@@ -1,7 +1,7 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaylistModel.js
 // Chemin réel: frontend/js/models/PlaylistModel.js
-// Version: v4.2.0 - API CONFORME v4.2.2
+// Version: v4.2.2 - API CONFORME v4.2.2
 // Date: 2025-11-02
 // ============================================================================
 // API v4.2.2 - PLAYLISTS (9 commandes):
@@ -14,6 +14,7 @@
 // ✅ playlist.removeItem
 // ✅ playlist.reorder
 // ✅ playlist.setLoop
+// ✅ Extraction response.data corrigée
 // ============================================================================
 
 class PlaylistModel extends BaseModel {
@@ -38,7 +39,7 @@ class PlaylistModel extends BaseModel {
         this.data.currentPlaylist = this.data.currentPlaylist || null;
         this.data.currentPlaylistId = this.data.currentPlaylistId || null;
         
-        this.log('debug', 'PlaylistModel', '✓ PlaylistModel v4.2.0 initialized (API v4.2.2)');
+        this.log('debug', 'PlaylistModel', '✓ PlaylistModel v4.2.2 initialized (API v4.2.2)');
     }
     
     // ========================================================================
@@ -60,10 +61,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Creating playlist: ${name}`);
             
-            const data = await this.backend.sendCommand('playlist.create', {
+            const response = await this.backend.sendCommand('playlist.create', {
                 name,
                 items
             });
+            const data = response.data || response;
             
             if (data && data.playlist_id) {
                 // Recharger la liste des playlists
@@ -98,9 +100,10 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Deleting playlist: ${playlistId}`);
             
-            await this.backend.sendCommand('playlist.delete', {
+            const response = await this.backend.sendCommand('playlist.delete', {
                 playlist_id: playlistId
             });
+            const data = response.data || response;
             
             // Si c'était la playlist actuelle, la déselectionner
             if (this.data.currentPlaylistId === playlistId) {
@@ -135,10 +138,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Updating playlist: ${playlistId}`);
             
-            await this.backend.sendCommand('playlist.update', {
+            const response = await this.backend.sendCommand('playlist.update', {
                 playlist_id: playlistId,
                 config
             });
+            const data = response.data || response;
             
             // Recharger la liste
             await this.refreshPlaylists();
@@ -165,7 +169,8 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', 'Refreshing playlists');
             
-            const data = await this.backend.sendCommand('playlist.list');
+            const response = await this.backend.sendCommand('playlist.list');
+            const data = response.data || response;
             
             const playlists = data.playlists || [];
             this.set('playlists', playlists);
@@ -193,9 +198,10 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Getting playlist: ${playlistId}`);
             
-            const data = await this.backend.sendCommand('playlist.get', {
+            const response = await this.backend.sendCommand('playlist.get', {
                 playlist_id: playlistId
             });
+            const data = response.data || response;
             
             if (data) {
                 // Mettre à jour la playlist actuelle
@@ -232,10 +238,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Adding item to playlist: ${playlistId}`);
             
-            await this.backend.sendCommand('playlist.addItem', {
+            const response = await this.backend.sendCommand('playlist.addItem', {
                 playlist_id: playlistId,
                 item
             });
+            const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
             if (this.data.currentPlaylistId === playlistId) {
@@ -266,10 +273,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Removing item from playlist: ${playlistId}`);
             
-            await this.backend.sendCommand('playlist.removeItem', {
+            const response = await this.backend.sendCommand('playlist.removeItem', {
                 playlist_id: playlistId,
                 item_id: itemId
             });
+            const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
             if (this.data.currentPlaylistId === playlistId) {
@@ -300,10 +308,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Reordering playlist: ${playlistId}`);
             
-            await this.backend.sendCommand('playlist.reorder', {
+            const response = await this.backend.sendCommand('playlist.reorder', {
                 playlist_id: playlistId,
                 order
             });
+            const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
             if (this.data.currentPlaylistId === playlistId) {
@@ -334,10 +343,11 @@ class PlaylistModel extends BaseModel {
         try {
             this.log('info', 'PlaylistModel', `Setting loop for playlist: ${playlistId} = ${enabled}`);
             
-            await this.backend.sendCommand('playlist.setLoop', {
+            const response = await this.backend.sendCommand('playlist.setLoop', {
                 playlist_id: playlistId,
                 enabled
             });
+            const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
             if (this.data.currentPlaylistId === playlistId) {

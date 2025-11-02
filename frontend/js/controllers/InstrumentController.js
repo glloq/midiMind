@@ -1,17 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/InstrumentController.js
-// Version: 4.3.0 - API CONFORMITÃ‰ DOCUMENTATION_FRONTEND
-// Date: 2025-11-01
+// Chemin réel: frontend/js/controllers/InstrumentController.js
+// Version: v4.2.2 - API CORRECTED
+// Date: 2025-11-02
 // ============================================================================
-// Modifications:
-//   - Support devices.getInfo, devices.getConnected, devices.disconnectAll
-//   - Gestion hot-plug (startHotPlug, stopHotPlug, getHotPlugStatus)
-//   - Gestion format API v4.2.1 (request/response standardisé)
-//   - Détection automatique périphériques (hot-plug monitoring)
-// âœ” CORRECTIONS v4.0.0: Compatibilité API v4.0.0
-//   - Informations détaillées par périphérique
-//   - Gestion codes erreur API
-//   - Filtrage périphériques connectés/disponibles
+// CORRECTIONS v4.2.2:
+// ✅ devices.scan pour count (pas devices.list)
+// ✅ response.data.devices extraction
+// ✅ device_id en snake_case
 // ============================================================================
 
 class InstrumentController extends BaseController {
@@ -23,44 +19,30 @@ class InstrumentController extends BaseController {
         this.view = views.instrument;
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // Ã‰tat des périphériques
-        this.devices = new Map(); // device_id -> device info
+        this.devices = new Map();
         this.connectedDevices = new Set();
         
-        // Hot-plug monitoring
         this.hotPlugEnabled = false;
-        this.hotPlugInterval = 2000; // ms
+        this.hotPlugInterval = 2000;
         this.hotPlugTimer = null;
         
-        // Cache des infos périphériques
         this.deviceInfoCache = new Map();
-        this.deviceInfoCacheTTL = 30000; // 30 secondes
+        this.deviceInfoCacheTTL = 30000;
         
-        // Ã‰tat de scan
         this.isScanning = false;
         this.lastScanTime = null;
         
         this._fullyInitialized = true;
         this.bindEvents();
-        // âœ” REMOVED: this.initialize() - BaseController calls it via autoInitialize
     }
 
-    // ========================================================================
-    // INITIALISATION
-    // ========================================================================
-
     bindEvents() {
-        // Backend
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
-        
-        // Périphériques (événements du backend)
         this.eventBus.on('backend:device:connected', (data) => this.handleDeviceConnected(data));
         this.eventBus.on('backend:device:disconnected', (data) => this.handleDeviceDisconnected(data));
         this.eventBus.on('backend:device:discovered', (data) => this.handleDeviceDiscovered(data));
         this.eventBus.on('backend:device:error', (data) => this.handleDeviceError(data));
-        
-        // Navigation
         this.eventBus.on('navigation:page_changed', (data) => {
             if (data.page === 'instruments') {
                 this.onInstrumentsPageActive();
@@ -68,33 +50,22 @@ class InstrumentController extends BaseController {
                 this.onInstrumentsPageInactive();
             }
         });
-        
-        // Demandes de refresh
         this.eventBus.on('instruments:request_refresh', () => this.refreshDeviceList());
         
-        if (this.logger?.info) {
-            this.logger.info('InstrumentController', 'âœ”ï¸ Events bound');
-        }
+        this.logger?.info?.('InstrumentController', '✓ Events bound');
     }
 
     async initialize() {
-        if (this.logger?.info) {
-            this.logger.info('InstrumentController', 'Initializing...');
-        }
+        this.logger?.info?.('InstrumentController', 'Initializing...');
 
-        // Si backend connecté, charger périphériques
         if (this.backend?.isConnected()) {
             await this.onBackendConnected();
         }
     }
 
-
     async onBackendConnected() {
-        if (this.logger?.info) {
-            this.logger.info('InstrumentController', '✅ Backend connected');
-        }
+        this.logger?.info?.('InstrumentController', '✅ Backend connected');
 
-        // Non-bloquant - continuer même si timeout
         this.scanDevices().catch(err => {
             this.log('warn', 'InstrumentController', 'Initial scan failed:', err.message);
         });
@@ -106,9 +77,7 @@ class InstrumentController extends BaseController {
         this.getHotPlugStatus().then(status => {
             if (status?.enabled) {
                 this.hotPlugEnabled = true;
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', '✅ Hot-plug enabled');
-                }
+                this.logger?.info?.('InstrumentController', '✅ Hot-plug enabled');
             }
         }).catch(err => {
             this.log('warn', 'InstrumentController', 'Hot-plug status failed:', err.message);
@@ -116,866 +85,304 @@ class InstrumentController extends BaseController {
     }
 
     onBackendDisconnected() {
-        if (this.logger?.warn) {
-            this.logger.warn('InstrumentController', 'âš ï¸ Backend disconnected');
-        }
-        
-        // Arrêter hot-plug local (backend gérera le sien)
+        this.logger?.warn?.('InstrumentController', '⚠️ Backend disconnected');
         this.stopHotPlugMonitoring();
-        
-        // Marquer tous comme déconnectés
         this.connectedDevices.clear();
-        
         this.refreshView();
     }
 
-    // ========================================================================
-    // SCAN ET LISTE PÃ‰RIPHÃ‰RIQUES
-    // ========================================================================
-
     /**
-     * Scan tous les périphériques MIDI disponibles
-     * @param {boolean} fullScan - Scan complet ou rapide
-     * @returns {Promise<Array>}
+     * ✅ CORRECTION: Utiliser devices.scan pour obtenir count
      */
-    async scanDevices(fullScan = false) {
+    async scanDevices(full_scan = false) {
         if (!this.backend) {
             throw new Error('Backend not available');
         }
 
         if (this.isScanning) {
-            if (this.logger?.debug) {
-                this.logger.debug('InstrumentController', 'Scan already in progress');
-            }
+            this.logger?.debug?.('InstrumentController', 'Scan already in progress');
             return [];
         }
 
         this.isScanning = true;
         
         try {
-            const response = await this.backend.sendCommand('devices.list', {
-                full_scan: fullScan
+            // ✅ CORRECTION: devices.scan retourne count
+            const response = await this.backend.scanDevices(full_scan);
+            
+            // ✅ Extraction via response (déjà data dans BackendService)
+            const devices = response.devices || [];
+            const count = response.count || devices.length;
+            
+            devices.forEach(device => {
+                this.devices.set(device.id, device);
             });
             
-            if (response.success) {
-                const devices = response.data?.devices || [];
-                
-                // Mettre Ã  jour le cache
-                devices.forEach(device => {
-                    this.devices.set(device.id, device);
-                });
-                
-                this.lastScanTime = Date.now();
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', 
-                        `âœ”ï¸ Scan complete: ${devices.length} devices found`);
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instruments:scan_complete', { 
-                    devices, 
-                    count: devices.length 
-                });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return devices;
-            } else {
-                throw new Error(response.error_message || 'Scan failed');
-            }
+            this.lastScanTime = Date.now();
+            
+            this.logger?.info?.('InstrumentController', 
+                `✓ Scan complete: ${count} devices found`);
+            
+            this.eventBus.emit('instruments:scan_complete', { 
+                devices, 
+                count 
+            });
+            
+            this.refreshView();
+            
+            return devices;
+            
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'scanDevices failed:', error);
-            }
+            this.logger?.error?.('InstrumentController', 'scanDevices failed:', error);
             throw error;
         } finally {
             this.isScanning = false;
         }
     }
 
-    /**
-     * Liste tous les périphériques disponibles
-     * @returns {Promise<Array>}
-     */
-    async listDevices() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
+    async refreshDeviceList() {
         try {
-            const response = await this.backend.sendCommand('devices.list', {});
+            // ✅ devices.list n'a pas de count
+            const response = await this.backend.listDevices();
+            const devices = response.devices || [];
             
-            if (response.success) {
-                const devices = response.data?.devices || [];
-                
-                // Mettre Ã  jour le cache
-                devices.forEach(device => {
-                    this.devices.set(device.id, device);
-                });
-                
-                if (this.logger?.debug) {
-                    this.logger.debug('InstrumentController', 
-                        `âœ”ï¸ Listed ${devices.length} devices`);
-                }
-                
-                return devices;
-            } else {
-                throw new Error(response.error_message || 'List devices failed');
-            }
+            devices.forEach(device => {
+                this.devices.set(device.id, device);
+            });
+            
+            this.refreshView();
+            return devices;
+            
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'listDevices failed:', error);
-            }
+            this.logger?.error?.('InstrumentController', 'refreshDeviceList failed:', error);
             throw error;
         }
     }
 
-    /**
-     * Obtient uniquement les périphériques connectés
-     * @returns {Promise<Array>}
-     */
-    async getConnectedDevices() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
+    async loadConnectedDevices() {
+        if (!this.backend) return [];
+        
         try {
-            const response = await this.backend.sendCommand('devices.list', {});
+            const response = await this.backend.getConnectedDevices();
+            const devices = response.devices || [];
             
-            if (response.success) {
-                const devices = response.data?.devices || [];
-                
-                // Mettre Ã  jour la liste des connectés
-                this.connectedDevices.clear();
-                devices.forEach(device => {
-                    this.connectedDevices.add(device.id);
-                    this.devices.set(device.id, device);
-                });
-                
-                if (this.logger?.debug) {
-                    this.logger.debug('InstrumentController', 
-                        `âœ”ï¸ ${devices.length} devices connected`);
-                }
-                
-                return devices;
-            } else {
-                throw new Error(response.error_message || 'Get connected devices failed');
-            }
+            this.connectedDevices.clear();
+            devices.forEach(device => {
+                this.connectedDevices.add(device.id);
+            });
+            
+            this.refreshView();
+            return devices;
+            
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'getConnectedDevices failed:', error);
-            }
-            throw error;
+            this.logger?.error?.('InstrumentController', 'loadConnectedDevices failed:', error);
+            return [];
         }
     }
 
     /**
-     * Obtient les informations détaillées d'un périphérique
-     * @param {string} deviceId
-     * @param {boolean} useCache - Utiliser cache si disponible
-     * @returns {Promise<Object>}
+     * ✅ CORRECTION: device_id en snake_case
      */
-    async getDeviceInfo(deviceId, useCache = true) {
+    async connectDevice(device_id) {
         if (!this.backend) {
             throw new Error('Backend not available');
         }
-
-        // Vérifier cache
-        if (useCache) {
-            const cached = this.deviceInfoCache.get(deviceId);
-            if (cached && (Date.now() - cached.timestamp < this.deviceInfoCacheTTL)) {
-                return cached.info;
-            }
-        }
-
+        
         try {
-            const response = await this.backend.sendCommand('devices.getInfo', {
-                device_id: deviceId
-            });
+            this.logger?.info?.('InstrumentController', `Connecting device: ${device_id}`);
             
-            if (response.success) {
-                const info = response.data;
-                
-                // Mettre en cache
-                this.deviceInfoCache.set(deviceId, {
-                    info: info,
-                    timestamp: Date.now()
-                });
-                
-                // Mettre Ã  jour le device dans la map
-                if (this.devices.has(deviceId)) {
-                    this.devices.set(deviceId, { ...this.devices.get(deviceId), ...info });
-                }
-                
-                return info;
-            } else {
-                throw new Error(response.error_message || 'Get device info failed');
-            }
+            await this.backend.connectDevice(device_id);
+            
+            this.connectedDevices.add(device_id);
+            
+            this.eventBus.emit('instruments:device_connected', { device_id });
+            
+            this.notifications?.success('Device connected', `Device ${device_id} connected successfully`);
+            
+            this.refreshView();
+            
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 
-                    `getDeviceInfo failed for ${deviceId}:`, error);
-            }
+            this.logger?.error?.('InstrumentController', `Failed to connect device ${device_id}:`, error);
+            this.notifications?.error('Connection failed', error.message);
             throw error;
         }
     }
 
-    // ========================================================================
-    // CONNEXION / DÃ‰CONNEXION
-    // ========================================================================
-
-    /**
-     * Connecte un périphérique MIDI
-     * @param {string} deviceId
-     * @returns {Promise<boolean>}
-     */
-    async connectDevice(deviceId) {
+    async disconnectDevice(device_id) {
         if (!this.backend) {
             throw new Error('Backend not available');
         }
-
+        
         try {
-            const response = await this.backend.sendCommand('devices.connect', {
-                device_id: deviceId
-            });
+            this.logger?.info?.('InstrumentController', `Disconnecting device: ${device_id}`);
             
-            if (response.success) {
-                this.connectedDevices.add(deviceId);
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', `âœ”ï¸ Device connected: ${deviceId}`);
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instrument:connected', { deviceId });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return true;
-            } else {
-                throw new Error(response.error_message || 'Connection failed');
-            }
+            await this.backend.disconnectDevice(device_id);
+            
+            this.connectedDevices.delete(device_id);
+            
+            this.eventBus.emit('instruments:device_disconnected', { device_id });
+            
+            this.notifications?.success('Device disconnected', `Device ${device_id} disconnected`);
+            
+            this.refreshView();
+            
         } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 
-                    `connectDevice failed for ${deviceId}:`, error);
-            }
-            
-            // Notification d'erreur
-            this.eventBus.emit('notification:show', {
-                message: `Failed to connect device: ${error.message}`,
-                type: 'error',
-                duration: 5000
-            });
-            
+            this.logger?.error?.('InstrumentController', `Failed to disconnect device ${device_id}:`, error);
+            this.notifications?.error('Disconnection failed', error.message);
             throw error;
         }
     }
 
-    /**
-     * Déconnecte un périphérique MIDI
-     * @param {string} deviceId
-     * @returns {Promise<boolean>}
-     */
-    async disconnectDevice(deviceId) {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('devices.disconnect', {
-                device_id: deviceId
-            });
-            
-            if (response.success) {
-                this.connectedDevices.delete(deviceId);
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', 
-                        `âœ”ï¸ Device disconnected: ${deviceId}`);
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instrument:disconnected', { deviceId });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return true;
-            } else {
-                throw new Error(response.error_message || 'Disconnection failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 
-                    `disconnectDevice failed for ${deviceId}:`, error);
-            }
-            
-            // Notification d'erreur
-            this.eventBus.emit('notification:show', {
-                message: `Failed to disconnect device: ${error.message}`,
-                type: 'error',
-                duration: 5000
-            });
-            
-            throw error;
-        }
-    }
-
-    /**
-     * Déconnecte tous les périphériques
-     * @returns {Promise<boolean>}
-     */
     async disconnectAllDevices() {
         if (!this.backend) {
             throw new Error('Backend not available');
         }
-
-        try {
-            const response = await this.backend.sendCommand('devices.disconnectAll', {});
-            
-            if (response.success) {
-                this.connectedDevices.clear();
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', 'âœ”ï¸ All devices disconnected');
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instruments:all_disconnected');
-                
-                // Notification
-                this.eventBus.emit('notification:show', {
-                    message: 'All devices disconnected',
-                    type: 'success',
-                    duration: 3000
-                });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return true;
-            } else {
-                throw new Error(response.error_message || 'Disconnect all failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'disconnectAllDevices failed:', error);
-            }
-            
-            // Notification d'erreur
-            this.eventBus.emit('notification:show', {
-                message: `Failed to disconnect all devices: ${error.message}`,
-                type: 'error',
-                duration: 5000
-            });
-            
-            throw error;
-        }
-    }
-
-    // ========================================================================
-    // HOT-PLUG (DÃ‰TECTION AUTOMATIQUE)
-    // ========================================================================
-
-    /**
-     * Démarre la surveillance hot-plug
-     * @param {number} intervalMs - Intervalle de scan en ms (défaut: 2000)
-     * @returns {Promise<boolean>}
-     */
-    async startHotPlug(intervalMs = 2000) {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('devices.startHotPlug', {
-                interval_ms: intervalMs
-            });
-            
-            if (response.success) {
-                this.hotPlugEnabled = true;
-                this.hotPlugInterval = intervalMs;
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', 
-                        `âœ”ï¸ Hot-plug started (interval: ${intervalMs}ms)`);
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instruments:hotplug_started', { intervalMs });
-                
-                // Notification
-                this.eventBus.emit('notification:show', {
-                    message: 'Auto-detection of devices enabled',
-                    type: 'success',
-                    duration: 3000
-                });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return true;
-            } else {
-                throw new Error(response.error_message || 'Start hot-plug failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'startHotPlug failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Arrête la surveillance hot-plug
-     * @returns {Promise<boolean>}
-     */
-    async stopHotPlug() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('devices.stopHotPlug', {});
-            
-            if (response.success) {
-                this.hotPlugEnabled = false;
-                
-                if (this.logger?.info) {
-                    this.logger.info('InstrumentController', 'âœ”ï¸ Hot-plug stopped');
-                }
-                
-                // Ã‰mettre événement
-                this.eventBus.emit('instruments:hotplug_stopped');
-                
-                // Notification
-                this.eventBus.emit('notification:show', {
-                    message: 'Auto-detection of devices disabled',
-                    type: 'info',
-                    duration: 3000
-                });
-                
-                // Rafraîchir la vue
-                this.refreshView();
-                
-                return true;
-            } else {
-                throw new Error(response.error_message || 'Stop hot-plug failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'stopHotPlug failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Obtient le statut du hot-plug
-     * @returns {Promise<Object>}
-     */
-    async getHotPlugStatus() {
-        if (!this.backend) {
-            throw new Error('Backend not available');
-        }
-
-        try {
-            const response = await this.backend.sendCommand('devices.getHotPlugStatus', {});
-            
-            if (response.success) {
-                const status = response.data;
-                this.hotPlugEnabled = status.enabled || false;
-                this.hotPlugInterval = status.interval_ms || 2000;
-                
-                return status;
-            } else {
-                throw new Error(response.error_message || 'Get hot-plug status failed');
-            }
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'getHotPlugStatus failed:', error);
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Toggle hot-plug on/off
-     * @returns {Promise<boolean>}
-     */
-    async toggleHotPlug() {
-        if (this.hotPlugEnabled) {
-            return await this.stopHotPlug();
-        } else {
-            return await this.startHotPlug(this.hotPlugInterval);
-        }
-    }
-
-    /**
-     * Monitoring hot-plug local (fallback si backend ne supporte pas)
-     */
-    startHotPlugMonitoring() {
-        this.stopHotPlugMonitoring();
         
-        this.hotPlugTimer = setInterval(async () => {
-            try {
-                await this.scanDevices(false);
-            } catch (error) {
-                if (this.logger?.debug) {
-                    this.logger.debug('InstrumentController', 
-                        'Hot-plug scan failed:', error);
-                }
-            }
-        }, this.hotPlugInterval);
-        
-        if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', 'âœ”ï¸ Local hot-plug monitoring started');
-        }
-    }
-
-    stopHotPlugMonitoring() {
-        if (this.hotPlugTimer) {
-            clearInterval(this.hotPlugTimer);
-            this.hotPlugTimer = null;
-        }
-    }
-
-    // ========================================================================
-    // Ã‰VÃ‰NEMENTS BACKEND
-    // ========================================================================
-
-    handleDeviceConnected(data) {
-        const deviceId = data.device_id || data.deviceId;
-        
-        if (deviceId) {
-            this.connectedDevices.add(deviceId);
+        try {
+            this.logger?.info?.('InstrumentController', 'Disconnecting all devices');
             
-            if (this.logger?.info) {
-                this.logger.info('InstrumentController', 
-                    `ðŸ”Œâœ“ Device connected: ${deviceId}`);
-            }
+            await this.backend.disconnectAllDevices();
             
-            // Invalider cache info
-            this.deviceInfoCache.delete(deviceId);
+            this.connectedDevices.clear();
             
-            // Rafraîchir la vue
+            this.eventBus.emit('instruments:all_devices_disconnected');
+            
+            this.notifications?.success('All disconnected', 'All devices disconnected');
+            
             this.refreshView();
             
-            // Notification
-            this.eventBus.emit('notification:show', {
-                message: `Device connected: ${data.name || deviceId}`,
-                type: 'success',
-                duration: 3000
-            });
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'Failed to disconnect all devices:', error);
+            this.notifications?.error('Disconnection failed', error.message);
+            throw error;
         }
+    }
+
+    async getDeviceInfo(device_id) {
+        const cached = this.deviceInfoCache.get(device_id);
+        if (cached && (Date.now() - cached.timestamp) < this.deviceInfoCacheTTL) {
+            return cached.info;
+        }
+        
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+        
+        try {
+            const info = await this.backend.getDevice(device_id);
+            
+            this.deviceInfoCache.set(device_id, {
+                info,
+                timestamp: Date.now()
+            });
+            
+            return info;
+            
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', `getDeviceInfo(${device_id}) failed:`, error);
+            throw error;
+        }
+    }
+
+    async startHotPlugMonitoring() {
+        if (!this.backend) {
+            throw new Error('Backend not available');
+        }
+        
+        try {
+            await this.backend.startHotPlug();
+            this.hotPlugEnabled = true;
+            this.logger?.info?.('InstrumentController', 'Hot-plug monitoring started');
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'Failed to start hot-plug:', error);
+            throw error;
+        }
+    }
+
+    async stopHotPlugMonitoring() {
+        if (!this.backend) return;
+        
+        try {
+            await this.backend.stopHotPlug();
+            this.hotPlugEnabled = false;
+            this.logger?.info?.('InstrumentController', 'Hot-plug monitoring stopped');
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'Failed to stop hot-plug:', error);
+        }
+    }
+
+    async getHotPlugStatus() {
+        if (!this.backend) return null;
+        
+        try {
+            return await this.backend.getHotPlugStatus();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'getHotPlugStatus failed:', error);
+            return null;
+        }
+    }
+
+    handleDeviceConnected(data) {
+        const device_id = data.device_id || data.id;
+        this.logger?.info?.('InstrumentController', `Device connected: ${device_id}`);
+        this.connectedDevices.add(device_id);
+        this.refreshView();
     }
 
     handleDeviceDisconnected(data) {
-        const deviceId = data.device_id || data.deviceId;
-        
-        if (deviceId) {
-            this.connectedDevices.delete(deviceId);
-            
-            if (this.logger?.info) {
-                this.logger.info('InstrumentController', 
-                    `ðŸ”Œâœ— Device disconnected: ${deviceId}`);
-            }
-            
-            // Rafraîchir la vue
-            this.refreshView();
-            
-            // Notification
-            this.eventBus.emit('notification:show', {
-                message: `Device disconnected: ${data.name || deviceId}`,
-                type: 'warning',
-                duration: 3000
-            });
-        }
+        const device_id = data.device_id || data.id;
+        this.logger?.info?.('InstrumentController', `Device disconnected: ${device_id}`);
+        this.connectedDevices.delete(device_id);
+        this.refreshView();
     }
 
     handleDeviceDiscovered(data) {
-        const device = data.device || data;
-        
-        if (device.id) {
+        const device = data.device;
+        if (device) {
             this.devices.set(device.id, device);
-            
-            if (this.logger?.debug) {
-                this.logger.debug('InstrumentController', 
-                    `ðŸ” Device discovered: ${device.id}`);
-            }
-            
-            // Rafraîchir la vue
             this.refreshView();
         }
     }
 
     handleDeviceError(data) {
-        if (this.logger?.error) {
-            this.logger.error('InstrumentController', 
-                'Device error:', data.error || data.message);
-        }
-        
-        // Notification
-        this.eventBus.emit('notification:show', {
-            message: `Device error: ${data.error || data.message}`,
-            type: 'error',
-            duration: 5000
-        });
+        const device_id = data.device_id;
+        const error = data.error;
+        this.logger?.error?.('InstrumentController', `Device error (${device_id}):`, error);
+        this.notifications?.error('Device error', `Device ${device_id}: ${error}`);
     }
-
-    // ========================================================================
-    // GESTION VUE
-    // ========================================================================
-
-    refreshView() {
-        if (!this.view || typeof this.view.render !== 'function') {
-            return;
-        }
-
-        const data = {
-            devices: Array.from(this.devices.values()),
-            connectedDevices: Array.from(this.connectedDevices),
-            hotPlugEnabled: this.hotPlugEnabled,
-            hotPlugInterval: this.hotPlugInterval,
-            isScanning: this.isScanning,
-            lastScanTime: this.lastScanTime,
-            backendConnected: this.backend?.isConnected() || false
-        };
-
-        this.view.render(data);
-    }
-
-    async refreshDeviceList() {
-        try {
-            await this.scanDevices(false);
-        } catch (error) {
-            if (this.logger?.error) {
-                this.logger.error('InstrumentController', 'Refresh failed:', error);
-            }
-        }
-    }
-
-    // ========================================================================
-    // HELPERS / UTILITAIRES
-    // ========================================================================
-
-    /**
-     * Charge la liste des périphériques connectés
-     */
-    async loadConnectedDevices() {
-        try {
-            await this.getConnectedDevices();
-        } catch (error) {
-            if (this.logger?.debug) {
-                this.logger.debug('InstrumentController', 
-                    'loadConnectedDevices failed:', error);
-            }
-        }
-    }
-
-    /**
-     * Vérifie si un périphérique est connecté
-     * @param {string} deviceId
-     * @returns {boolean}
-     */
-    isDeviceConnected(deviceId) {
-        return this.connectedDevices.has(deviceId);
-    }
-
-    /**
-     * Obtient un périphérique du cache
-     * @param {string} deviceId
-     * @returns {Object|null}
-     */
-    getDevice(deviceId) {
-        return this.devices.get(deviceId) || null;
-    }
-
-    /**
-     * Obtient tous les périphériques disponibles
-     * @returns {Array}
-     */
-    getAllDevices() {
-        return Array.from(this.devices.values());
-    }
-
-    /**
-     * Obtient tous les périphériques connectés (du cache local)
-     * @returns {Array}
-     */
-    getConnectedDevicesFromCache() {
-        return Array.from(this.devices.values()).filter(device => 
-            this.connectedDevices.has(device.id)
-        );
-    }
-
-    /**
-     * Obtient tous les périphériques disponibles mais non connectés
-     * @returns {Array}
-     */
-    getAvailableDevices() {
-        return Array.from(this.devices.values()).filter(device => 
-            !this.connectedDevices.has(device.id) && device.available !== false
-        );
-    }
-
-    /**
-     * Filtre les périphériques par type
-     * @param {number} type - Type de périphérique
-     * @returns {Array}
-     */
-    getDevicesByType(type) {
-        return Array.from(this.devices.values()).filter(device => 
-            device.type === type
-        );
-    }
-
-    /**
-     * Recherche un périphérique par nom
-     * @param {string} query - Terme de recherche
-     * @returns {Array}
-     */
-    searchDevices(query) {
-        const lowerQuery = query.toLowerCase();
-        return Array.from(this.devices.values()).filter(device => 
-            device.name?.toLowerCase().includes(lowerQuery) ||
-            device.id?.toLowerCase().includes(lowerQuery)
-        );
-    }
-
-    /**
-     * Nettoie le cache des infos périphériques
-     */
-    clearDeviceInfoCache() {
-        this.deviceInfoCache.clear();
-        
-        if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', 'âœ”ï¸ Device info cache cleared');
-        }
-    }
-
-    /**
-     * Nettoie les périphériques obsolètes du cache
-     * @param {number} maxAge - Age max en ms (défaut: 5 minutes)
-     */
-    cleanupDeviceCache(maxAge = 300000) {
-        const now = Date.now();
-        let cleaned = 0;
-
-        for (const [deviceId, cachedInfo] of this.deviceInfoCache.entries()) {
-            if (now - cachedInfo.timestamp > maxAge) {
-                this.deviceInfoCache.delete(deviceId);
-                cleaned++;
-            }
-        }
-
-        if (cleaned > 0 && this.logger?.debug) {
-            this.logger.debug('InstrumentController', 
-                `âœ”ï¸ Cleaned ${cleaned} expired cache entries`);
-        }
-    }
-
-    // ========================================================================
-    // Ã‰VÃ‰NEMENTS PAGE
-    // ========================================================================
 
     onInstrumentsPageActive() {
-        if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', 'Instruments page active');
-        }
-
-        // Rafraîchir la liste
         this.refreshDeviceList();
-        
-        // Vérifier statut hot-plug
-        if (this.backend?.isConnected()) {
-            this.getHotPlugStatus().catch(() => {});
-        }
     }
 
     onInstrumentsPageInactive() {
-        if (this.logger?.debug) {
-            this.logger.debug('InstrumentController', 'Instruments page inactive');
-        }
+        // Rien pour l'instant
     }
 
-    // ========================================================================
-    // LEGACY / COMPATIBILITÃ‰
-    // ========================================================================
-
-    /**
-     * Scan périphériques (alias pour compatibilité)
-     */
-    async scan() {
-        return await this.scanDevices(false);
-    }
-
-    /**
-     * Connecte un instrument (alias pour compatibilité)
-     */
-    async connect(deviceId) {
-        return await this.connectDevice(deviceId);
-    }
-
-    /**
-     * Déconnecte un instrument (alias pour compatibilité)
-     */
-    async disconnect(deviceId) {
-        return await this.disconnectDevice(deviceId);
-    }
-
-    // ========================================================================
-    // STATISTIQUES
-    // ========================================================================
-
-    /**
-     * Obtient les statistiques des périphériques
-     * @returns {Object}
-     */
-    getStats() {
-        return {
-            totalDevices: this.devices.size,
-            connectedDevices: this.connectedDevices.size,
-            availableDevices: this.getAvailableDevices().length,
-            hotPlugEnabled: this.hotPlugEnabled,
-            hotPlugInterval: this.hotPlugInterval,
-            lastScanTime: this.lastScanTime,
-            cacheSize: this.deviceInfoCache.size
-        };
-    }
-
-    // ========================================================================
-    // DESTRUCTION
-    // ========================================================================
-
-    destroy() {
-        // Arrêter hot-plug
-        this.stopHotPlugMonitoring();
+    refreshView() {
+        if (!this.view) return;
         
-        // Nettoyer caches
-        this.devices.clear();
-        this.connectedDevices.clear();
-        this.deviceInfoCache.clear();
+        const devicesArray = Array.from(this.devices.values());
         
-        if (this.logger?.info) {
-            this.logger.info('InstrumentController', 'Destroyed');
-        }
+        this.view.render({
+            devices: devicesArray,
+            connectedDevices: Array.from(this.connectedDevices),
+            hotPlugEnabled: this.hotPlugEnabled
+        });
     }
-    
-    log(level, ...args) {
-        if (this.logger && typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
-        }
+
+    getDevices() {
+        return Array.from(this.devices.values());
+    }
+
+    getConnectedDevices() {
+        return Array.from(this.connectedDevices);
+    }
+
+    isDeviceConnected(device_id) {
+        return this.connectedDevices.has(device_id);
     }
 }
-
-// ============================================================================
-// EXPORT
-// ============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = InstrumentController;

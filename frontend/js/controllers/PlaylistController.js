@@ -1,69 +1,32 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaylistController.js
-// Version: v3.0.4 - FIXED LOGGER INITIALIZATION
-// Date: 2025-10-24
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Chemin réel: frontend/js/controllers/PlaylistController.js
+// Version: v4.2.2 - API CORRECTED
+// Date: 2025-11-02
 // ============================================================================
-// Description:
-//   Contrôleur principal de gestion des playlists
-//   Coordonne PlaylistModel, PlaylistView et gère les interactions
-//
-// Fonctionnalités:
-//   ✓ Gestion CRUD playlists (Create, Read, Update, Delete)
-//   ✓ Navigation (next, previous, jump)
-//   ✓ Queue temporaire
-//   ✓ Modes lecture (shuffle, repeat, auto-advance)
-//   ✓ Import/Export playlists (M3U, PLS, XSPF, JSON)
-//   ✓ Drag & Drop
-//   ✓ Historique de lecture
-//
-// Architecture:
-//   Hérite de BaseController
-//   Utilise PlaylistModel pour la logique métier
-//   Coordonne avec PlaylistView pour l'affichage
-//
-// Auteur: midiMind Team
+// CORRECTIONS v4.2.2:
+// ✅ playlist_id, item_id, new_order (snake_case)
+// ✅ Utiliser helpers BackendService
 // ============================================================================
 
-/**
- * PlaylistController - Contrôleur de gestion des playlists
- * @extends BaseController
- */
 class PlaylistController extends BaseController {
-    
-    // ========================================================================
-    // CONSTRUCTEUR
-    // ========================================================================
-    
-    /**
-     * Construit le contrôleur de playlist
-     * @param {EventBus} eventBus - Bus d'événements global
-     * @param {Object} models - Objet contenant tous les modèles
-     * @param {Object} views - Objet contenant toutes les vues
-     * @param {NotificationManager} notifications - Gestionnaire de notifications
-     * @param {DebugConsole} debugConsole - Console de debug
-     */
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // Nom du contrôleur
         this.name = 'PlaylistController';
-        
-        // Références aux modèles
         this.playlistModel = models?.playlist || null;
         this.fileModel = models?.file || null;
-        
-        // Référence à la vue
         this.view = views?.playlist || null;
+        this.backend = window.app?.services?.backend || window.backendService;
+        this.logger = window.logger || console;
         
-        // État du contrôleur
         this.state = {
             currentPlaylist: null,
             currentFile: null,
             currentIndex: 0,
             isPlaying: false,
             shuffleMode: false,
-            repeatMode: 'none',  // 'none', 'one', 'all'
+            repeatMode: 'none',
             autoAdvance: true,
             queue: [],
             queueIndex: 0,
@@ -73,7 +36,6 @@ class PlaylistController extends BaseController {
             errors: []
         };
         
-        // Configuration
         this.config = {
             maxHistorySize: 50,
             autoSaveState: true,
@@ -89,7 +51,6 @@ class PlaylistController extends BaseController {
             debugMode: false
         };
         
-        // Cache
         this.cache = {
             playlists: new Map(),
             files: new Map(),
@@ -97,7 +58,6 @@ class PlaylistController extends BaseController {
             dirty: false
         };
         
-        // Statistiques
         this.stats = {
             playlistsCreated: 0,
             playlistsDeleted: 0,
@@ -108,1155 +68,313 @@ class PlaylistController extends BaseController {
             errors: 0
         };
         
-        // Import/Export handler (sera ajouté par mixin)
-        this.importExport = null;
-        
-        // Logger - Créer une INSTANCE, pas référence à la classe
-        if (typeof window !== 'undefined' && window.logger) {
-            try {
-                this.logger = new window.logger({
-                    level: 'info',
-                    enableConsole: true
-                });
-            } catch (e) {
-                console.warn('[PlaylistController] Failed to create Logger instance, using console fallback');
-                this.logger = console;
-            }
-        } else {
-            // Fallback vers console
-            this.logger = console;
-        }
-        
-        // Logger safely
-        if (this.logger && typeof this.logger.info === 'function') {
-            this.logger.info('PlaylistController', '🎵 PlaylistController v3.0.4 initialized');
-        } else {
-            console.log('[PlaylistController] 🎵 PlaylistController v3.0.4 initialized');
-        }
+        this.logDebug('playlist', '🎵 PlaylistController v4.2.2 initialized');
     }
-    
-
-    // ========================================================================
-    // INITIALISATION
-    // ========================================================================
     
     initialize() {
-        this.logDebug('playlist', '🎵 Initializing PlaylistController v3.0.2');
-        
         this.bindEvents();
         this.loadSavedState();
-        
         this.state.isInitialized = true;
-        
-        this.logDebug('playlist', '✓ PlaylistController initialized with auto-advance & queue');
     }
-    
-    /**
-     * Injection du PlaybackController (appelée par Application)
-     */
-    setPlaybackController(playbackController) {
-        this.playbackController = playbackController;
-        this.logDebug('playlist', '✓ PlaybackController linked');
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS
-    // ========================================================================
     
     bindEvents() {
-        // Événements PlaylistModel
-        this.eventBus.on('playlist:created', (data) => this.onPlaylistCreated(data));
-        this.eventBus.on('playlist:loaded', (data) => this.onPlaylistLoaded(data));
-        this.eventBus.on('playlist:updated', (data) => this.onPlaylistUpdated(data));
-        this.eventBus.on('playlist:deleted', (data) => this.onPlaylistDeleted(data));
-        
-        // Navigation playlist
-        this.eventBus.on('playlist:next', (data) => this.onNext(data));
-        this.eventBus.on('playlist:previous', (data) => this.onPrevious(data));
-        this.eventBus.on('playlist:jump', (data) => this.onJump(data));
-        this.eventBus.on('playlist:ended', () => this.onPlaylistEnded());
-        
-        // Auto-advance ✅ NOUVEAU
-        this.eventBus.on('playlist:auto-advance', (data) => this.onAutoAdvance(data));
-        
-        // Queue management ✅ NOUVEAU
-        this.eventBus.on('playlist:queue-added', (data) => this.onQueueAdded(data));
-        this.eventBus.on('playlist:queue-removed', (data) => this.onQueueRemoved(data));
-        this.eventBus.on('playlist:queue-cleared', () => this.onQueueCleared());
-        this.eventBus.on('playlist:queue-started', (data) => this.onQueueStarted(data));
-        this.eventBus.on('playlist:queue-ended', () => this.onQueueEnded());
-        
-        // Modes de lecture
-        this.eventBus.on('playlist:shuffle-changed', (data) => this.onShuffleChanged(data));
-        this.eventBus.on('playlist:repeat-changed', (data) => this.onRepeatChanged(data));
-        this.eventBus.on('playlist:auto-advance-changed', (data) => this.onAutoAdvanceChanged(data));
-        
-        // Événements Playback (pour coordination)
-        this.eventBus.on('playback:started', () => this.onPlaybackStarted());
-        this.eventBus.on('playback:stopped', () => this.onPlaybackStopped());
-        this.eventBus.on('playback:finished', () => this.onPlaybackFinished());
-        
-        this.logDebug('playlist', '✓ Events bound');
+        this.eventBus.on('playlist:create', (data) => this.createPlaylist(data));
+        this.eventBus.on('playlist:load', (data) => this.loadPlaylist(data.playlist_id));
+        this.eventBus.on('playlist:update', (data) => this.updatePlaylist(data.playlist_id, data.updates));
+        this.eventBus.on('playlist:delete', (data) => this.deletePlaylist(data.playlist_id));
+        this.eventBus.on('playlist:add-file', (data) => this.addFileToPlaylist(data.playlist_id, data.filename));
+        this.eventBus.on('playlist:remove-file', (data) => this.removeFileFromPlaylist(data.playlist_id, data.item_id));
+        this.eventBus.on('playlist:reorder', (data) => this.reorderPlaylist(data.playlist_id, data.item_id, data.new_order));
+        this.eventBus.on('playlist:play', (data) => this.play(data.index));
+        this.eventBus.on('playlist:next', () => this.next());
+        this.eventBus.on('playlist:previous', () => this.previous());
+        this.eventBus.on('playlist:toggle-shuffle', () => this.toggleShuffle());
+        this.eventBus.on('playlist:toggle-repeat', () => this.toggleRepeat());
     }
     
-    // ========================================================================
-    // GESTION PLAYLISTS
-    // ========================================================================
-    
-    /**
-     * Crée une nouvelle playlist
-     */
-    async createPlaylist(name, files = []) {
-        if (!name || !name.trim()) {
-            this.showError('Playlist name is required');
-            return null;
-        }
-        
+    async createPlaylist(data) {
         try {
+            const { name, description = '' } = data;
+            
+            if (!this.backend?.isConnected()) {
+                throw new Error('Backend not connected');
+            }
+            
             this.logDebug('playlist', `Creating playlist: ${name}`);
             
-            const playlist = await this.playlistModel.createPlaylist(name.trim(), files);
+            const response = await this.backend.createPlaylist(name, description);
             
-            if (this.config.autoNotifications) {
-                this.showSuccess(`Playlist "${name}" created`);
+            this.stats.playlistsCreated++;
+            
+            if (this.playlistModel) {
+                await this.playlistModel.loadPlaylists();
             }
             
-            this.refreshView();
+            this.eventBus.emit('playlist:created', { playlist_id: response.playlist_id, name });
             
-            return playlist;
+            if (this.notifications) {
+                this.notifications.show('Playlist Created', name, 'success', 2000);
+            }
+            
+            return response;
             
         } catch (error) {
-            this.logDebug('error', `Failed to create playlist: ${error.message}`);
-            this.showError(`Failed to create playlist: ${error.message}`);
-            return null;
+            this.handleError(error, 'Failed to create playlist');
+            throw error;
         }
     }
     
     /**
-     * Charge une playlist
+     * ✅ CORRECTION: playlist_id
      */
-    async loadPlaylist(playlistId) {
-        if (!playlistId) {
-            this.showError('Invalid playlist ID');
-            return null;
+    async loadPlaylist(playlist_id) {
+        if (!playlist_id) {
+            throw new Error('Playlist ID required');
         }
         
         try {
-            this.logDebug('playlist', `Loading playlist: ${playlistId}`);
+            this.logDebug('playlist', `Loading playlist: ${playlist_id}`);
             
-            const playlist = await this.playlistModel.loadPlaylist(playlistId);
+            const playlist = await this.backend.getPlaylist(playlist_id);
             
             this.state.currentPlaylist = playlist;
+            this.state.currentIndex = 0;
             
-            if (this.config.autoNotifications) {
-                this.showSuccess(`Playlist "${playlist.name}" loaded`);
+            if (this.playlistModel) {
+                this.playlistModel.setCurrentPlaylist(playlist);
             }
+            
+            this.eventBus.emit('playlist:loaded', { playlist_id, playlist });
             
             this.refreshView();
             
             return playlist;
             
         } catch (error) {
-            this.logDebug('error', `Failed to load playlist: ${error.message}`);
-            this.showError(`Failed to load playlist: ${error.message}`);
-            return null;
+            this.handleError(error, `Failed to load playlist ${playlist_id}`);
+            throw error;
         }
     }
     
-    /**
-     * Met à jour une playlist
-     */
-    async updatePlaylist(playlistId, updates) {
+    async updatePlaylist(playlist_id, updates) {
         try {
-            this.logDebug('playlist', `Updating playlist: ${playlistId}`);
+            this.logDebug('playlist', `Updating playlist: ${playlist_id}`);
             
-            const playlist = await this.playlistModel.updatePlaylist(playlistId, updates);
+            const response = await this.backend.updatePlaylist(playlist_id, updates);
             
-            if (this.config.autoNotifications) {
-                this.showSuccess('Playlist updated');
+            if (this.state.currentPlaylist?.id === playlist_id) {
+                this.state.currentPlaylist = { ...this.state.currentPlaylist, ...updates };
             }
+            
+            this.eventBus.emit('playlist:updated', { playlist_id, updates });
             
             this.refreshView();
             
-            return playlist;
+            return response;
             
         } catch (error) {
-            this.logDebug('error', `Failed to update playlist: ${error.message}`);
-            this.showError(`Failed to update playlist: ${error.message}`);
-            return null;
+            this.handleError(error, `Failed to update playlist ${playlist_id}`);
+            throw error;
         }
     }
     
-    /**
-     * Supprime une playlist
-     */
-    async deletePlaylist(playlistId) {
-        if (this.config.confirmDelete) {
-            const playlist = this.playlistModel.getPlaylist(playlistId);
-            if (!playlist) return false;
-            
-            const confirmed = confirm(`Delete playlist "${playlist.name}"?`);
-            if (!confirmed) return false;
-        }
-        
+    async deletePlaylist(playlist_id) {
         try {
-            this.logDebug('playlist', `Deleting playlist: ${playlistId}`);
+            this.logDebug('playlist', `Deleting playlist: ${playlist_id}`);
             
-            await this.playlistModel.deletePlaylist(playlistId);
+            await this.backend.deletePlaylist(playlist_id);
             
-            if (this.config.autoNotifications) {
-                this.showSuccess('Playlist deleted');
-            }
+            this.stats.playlistsDeleted++;
             
-            // Si c'était la playlist courante, la décharger
-            if (this.state.currentPlaylist?.id === playlistId) {
+            if (this.state.currentPlaylist?.id === playlist_id) {
                 this.state.currentPlaylist = null;
             }
             
+            this.eventBus.emit('playlist:deleted', { playlist_id });
+            
+            if (this.notifications) {
+                this.notifications.show('Playlist Deleted', '', 'success', 2000);
+            }
+            
             this.refreshView();
             
-            return true;
-            
         } catch (error) {
-            this.logDebug('error', `Failed to delete playlist: ${error.message}`);
-            this.showError(`Failed to delete playlist: ${error.message}`);
-            return false;
+            this.handleError(error, `Failed to delete playlist ${playlist_id}`);
+            throw error;
         }
     }
     
     /**
-     * Ajoute un fichier à une playlist
+     * ✅ CORRECTION: playlist_id, filename, order
      */
-    async addFileToPlaylist(playlistId, fileId) {
+    async addFileToPlaylist(playlist_id, filename, order = null) {
         try {
-            this.logDebug('playlist', `Adding file ${fileId} to playlist ${playlistId}`);
+            this.logDebug('playlist', `Adding file ${filename} to playlist ${playlist_id}`);
             
-            await this.playlistModel.addFile(playlistId, fileId);
+            await this.backend.addPlaylistItem(playlist_id, filename, order);
             
-            if (this.config.autoNotifications) {
-                this.showSuccess('File added to playlist');
+            await this.loadPlaylist(playlist_id);
+            
+            this.eventBus.emit('playlist:file-added', { playlist_id, filename });
+            
+            if (this.notifications) {
+                this.notifications.show('File Added', filename, 'success', 2000);
             }
             
-            this.refreshView();
-            
-            return true;
-            
         } catch (error) {
-            this.logDebug('error', `Failed to add file: ${error.message}`);
-            this.showError(`Failed to add file: ${error.message}`);
-            return false;
+            this.handleError(error, 'Failed to add file to playlist');
+            throw error;
         }
     }
     
-    /**
-     * Retire un fichier d'une playlist
-     */
-    async removeFileFromPlaylist(playlistId, fileId) {
+    async removeFileFromPlaylist(playlist_id, item_id) {
         try {
-            this.logDebug('playlist', `Removing file ${fileId} from playlist ${playlistId}`);
+            this.logDebug('playlist', `Removing item ${item_id} from playlist ${playlist_id}`);
             
-            await this.playlistModel.removeFile(playlistId, fileId);
+            await this.backend.removePlaylistItem(playlist_id, item_id);
             
-            if (this.config.autoNotifications) {
-                this.showSuccess('File removed from playlist');
+            await this.loadPlaylist(playlist_id);
+            
+            this.eventBus.emit('playlist:file-removed', { playlist_id, item_id });
+            
+            if (this.notifications) {
+                this.notifications.show('File Removed', '', 'success', 2000);
             }
             
-            this.refreshView();
-            
-            return true;
-            
         } catch (error) {
-            this.logDebug('error', `Failed to remove file: ${error.message}`);
-            this.showError(`Failed to remove file: ${error.message}`);
-            return false;
+            this.handleError(error, 'Failed to remove file from playlist');
+            throw error;
         }
     }
     
-    // ========================================================================
-    // NAVIGATION PLAYLIST
-    // ========================================================================
-    
     /**
-     * Fichier suivant
+     * ✅ CORRECTION: new_order (snake_case)
      */
-    async next() {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return null;
-        }
-        
+    async reorderPlaylist(playlist_id, item_id, new_order) {
         try {
-            const nextFile = this.playlistModel.next();
+            this.logDebug('playlist', `Reordering playlist ${playlist_id}: item ${item_id} to position ${new_order}`);
             
-            if (nextFile) {
-                this.state.currentFile = nextFile;
-                
-                // Charger dans le playback si en cours de lecture
-                if (this.state.isPlaying && this.playbackController) {
-                    await this.playbackController.loadFile(nextFile.id);
-                    await this.playbackController.play();
-                }
-                
-                return nextFile;
-            }
+            await this.backend.reorderPlaylist(playlist_id, item_id, new_order);
             
-            return null;
+            await this.loadPlaylist(playlist_id);
+            
+            this.eventBus.emit('playlist:reordered', { playlist_id, item_id, new_order });
             
         } catch (error) {
-            this.logDebug('error', `Failed to go to next: ${error.message}`);
-            this.showError('Failed to go to next file');
-            return null;
+            this.handleError(error, 'Failed to reorder playlist');
+            throw error;
         }
     }
     
-    /**
-     * Fichier précédent
-     */
-    async previous() {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return null;
+    async play(index = 0) {
+        if (!this.state.currentPlaylist) {
+            throw new Error('No playlist loaded');
         }
         
-        try {
-            const prevFile = this.playlistModel.previous();
-            
-            if (prevFile) {
-                this.state.currentFile = prevFile;
-                
-                // Charger dans le playback si en cours de lecture
-                if (this.state.isPlaying && this.playbackController) {
-                    await this.playbackController.loadFile(prevFile.id);
-                    await this.playbackController.play();
-                }
-                
-                return prevFile;
-            }
-            
-            return null;
-            
-        } catch (error) {
-            this.logDebug('error', `Failed to go to previous: ${error.message}`);
-            this.showError('Failed to go to previous file');
-            return null;
-        }
-    }
-    
-    /**
-     * Sauter à un index
-     */
-    async jumpTo(index) {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return null;
-        }
-        
-        try {
-            const file = this.playlistModel.jumpTo(index);
-            
-            if (file) {
-                this.state.currentFile = file;
-                
-                // Charger dans le playback si en cours de lecture
-                if (this.state.isPlaying && this.playbackController) {
-                    await this.playbackController.loadFile(file.id);
-                    await this.playbackController.play();
-                }
-                
-                return file;
-            }
-            
-            return null;
-            
-        } catch (error) {
-            this.logDebug('error', `Failed to jump to index: ${error.message}`);
-            this.showError('Failed to jump to file');
-            return null;
-        }
-    }
-    
-    // ========================================================================
-    // QUEUE MANAGEMENT - ✅ NOUVEAU
-    // ========================================================================
-    
-    /**
-     * Ajoute un fichier à la queue
-     */
-    addToQueue(fileId) {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return false;
-        }
-        
-        const success = this.playlistModel.addToQueue(fileId);
-        
-        if (success) {
-            this.logDebug('playlist', `File ${fileId} added to queue`);
-            
-            if (this.config.autoNotifications) {
-                this.showSuccess('Added to queue');
-            }
-            
-            this.refreshQueueView();
-        } else {
-            this.showError('Failed to add to queue (queue full?)');
-        }
-        
-        return success;
-    }
-    
-    /**
-     * Ajoute plusieurs fichiers à la queue
-     */
-    addMultipleToQueue(fileIds) {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return [];
-        }
-        
-        const added = this.playlistModel.addMultipleToQueue(fileIds);
-        
-        if (added.length > 0) {
-            this.logDebug('playlist', `${added.length} files added to queue`);
-            
-            if (this.config.autoNotifications) {
-                this.showSuccess(`${added.length} files added to queue`);
-            }
-            
-            this.refreshQueueView();
-        }
-        
-        return added;
-    }
-    
-    /**
-     * Retire un fichier de la queue
-     */
-    removeFromQueue(index) {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return false;
-        }
-        
-        const success = this.playlistModel.removeFromQueue(index);
-        
-        if (success) {
-            this.logDebug('playlist', `File removed from queue at index ${index}`);
-            this.refreshQueueView();
-        }
-        
-        return success;
-    }
-    
-    /**
-     * Vide la queue
-     */
-    clearQueue() {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return false;
-        }
-        
-        this.playlistModel.clearQueue();
-        
-        this.logDebug('playlist', 'Queue cleared');
-        
-        if (this.config.autoNotifications) {
-            this.showSuccess('Queue cleared');
-        }
-        
-        this.refreshQueueView();
-        
-        return true;
-    }
-    
-    /**
-     * Joue la queue
-     */
-    async playQueue() {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return false;
-        }
-        
-        try {
-            const firstFile = this.playlistModel.playQueue();
-            
-            if (!firstFile) {
-                this.showError('Queue is empty');
-                return false;
-            }
-            
-            this.state.currentFile = firstFile;
-            
-            // Charger et jouer
-            if (this.playbackController) {
-                await this.playbackController.loadFile(firstFile.id);
-                await this.playbackController.play();
-            }
-            
-            this.logDebug('playlist', 'Playing queue');
-            
-            if (this.config.autoNotifications) {
-                this.showSuccess('Playing queue');
-            }
-            
-            return true;
-            
-        } catch (error) {
-            this.logDebug('error', `Failed to play queue: ${error.message}`);
-            this.showError('Failed to play queue');
-            return false;
-        }
-    }
-    
-    /**
-     * Réordonne la queue (drag & drop)
-     */
-    reorderQueue(fromIndex, toIndex) {
-        if (!this.playlistModel) {
-            this.showError('Playlist model not available');
-            return false;
-        }
-        
-        const success = this.playlistModel.reorderQueue(fromIndex, toIndex);
-        
-        if (success) {
-            this.logDebug('playlist', `Queue reordered: ${fromIndex} → ${toIndex}`);
-            this.refreshQueueView();
-        }
-        
-        return success;
-    }
-    
-    /**
-     * Affiche/masque la queue
-     */
-    toggleQueueVisibility() {
-        this.state.queueVisible = !this.state.queueVisible;
-        
-        if (this.view && this.view.toggleQueue) {
-            this.view.toggleQueue(this.state.queueVisible);
-        }
-        
-        this.logDebug('playlist', `Queue ${this.state.queueVisible ? 'shown' : 'hidden'}`);
-    }
-    
-    // ========================================================================
-    // MODES DE LECTURE
-    // ========================================================================
-    
-    /**
-     * Active/désactive le shuffle
-     */
-    toggleShuffle() {
-        if (!this.playlistModel) return false;
-        
-        const currentState = this.playlistModel.get('shuffleMode');
-        this.playlistModel.setShuffle(!currentState);
-        
-        this.logDebug('playlist', `Shuffle ${!currentState ? 'ON' : 'OFF'}`);
-        
-        if (this.config.autoNotifications) {
-            this.showSuccess(`Shuffle ${!currentState ? 'enabled' : 'disabled'}`);
-        }
-        
-        return !currentState;
-    }
-    
-    /**
-     * Change le mode repeat
-     */
-    setRepeatMode(mode) {
-        if (!this.playlistModel) return false;
-        
-        const validModes = ['none', 'one', 'all'];
-        
-        if (!validModes.includes(mode)) {
-            this.showError(`Invalid repeat mode: ${mode}`);
-            return false;
-        }
-        
-        this.playlistModel.setRepeat(mode);
-        
-        this.logDebug('playlist', `Repeat mode: ${mode}`);
-        
-        if (this.config.autoNotifications) {
-            const labels = { none: 'OFF', one: 'ONE', all: 'ALL' };
-            this.showSuccess(`Repeat: ${labels[mode]}`);
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Cycle entre les modes repeat (none → one → all → none)
-     */
-    cycleRepeatMode() {
-        if (!this.playlistModel) return;
-        
-        const current = this.playlistModel.get('repeatMode');
-        const cycle = { none: 'one', one: 'all', all: 'none' };
-        
-        this.setRepeatMode(cycle[current]);
-    }
-    
-    /**
-     * Active/désactive l'auto-advance
-     */
-    toggleAutoAdvance() {
-        if (!this.playlistModel) return false;
-        
-        const currentState = this.playlistModel.get('autoAdvance');
-        this.playlistModel.setAutoAdvance(!currentState);
-        
-        this.logDebug('playlist', `Auto-advance ${!currentState ? 'ON' : 'OFF'}`);
-        
-        if (this.config.autoNotifications) {
-            this.showSuccess(`Auto-advance ${!currentState ? 'enabled' : 'disabled'}`);
-        }
-        
-        return !currentState;
-    }
-    
-    // ========================================================================
-    // CALLBACKS ÉVÉNEMENTS PLAYLISTMODEL
-    // ========================================================================
-    
-    onPlaylistCreated(data) {
-        this.logDebug('playlist', `Playlist created: ${data.playlist.name}`);
-        
-        if (this.config.autoRefreshView) {
-            this.refreshView();
-        }
-    }
-    
-    onPlaylistLoaded(data) {
-        this.logDebug('playlist', `Playlist loaded: ${data.playlist.name}`);
-        this.state.currentPlaylist = data.playlist;
-        
-        if (this.config.autoRefreshView) {
-            this.refreshView();
-        }
-    }
-    
-    onPlaylistUpdated(data) {
-        this.logDebug('playlist', `Playlist updated: ${data.playlist.id}`);
-        
-        if (this.config.autoRefreshView) {
-            this.refreshView();
-        }
-    }
-    
-    onPlaylistDeleted(data) {
-        this.logDebug('playlist', `Playlist deleted: ${data.playlistId}`);
-        
-        if (this.config.autoRefreshView) {
-            this.refreshView();
-        }
-    }
-    
-    onNext(data) {
-        this.logDebug('playlist', `Next: ${data.file?.name || data.file?.id}`);
-        this.state.currentFile = data.file;
-        
-        if (this.view && this.view.updateCurrentFile) {
-            this.view.updateCurrentFile(data.file, data.index);
-        }
-    }
-    
-    onPrevious(data) {
-        this.logDebug('playlist', `Previous: ${data.file?.name || data.file?.id}`);
-        this.state.currentFile = data.file;
-        
-        if (this.view && this.view.updateCurrentFile) {
-            this.view.updateCurrentFile(data.file, data.index);
-        }
-    }
-    
-    onJump(data) {
-        this.logDebug('playlist', `Jump to: ${data.file?.name || data.file?.id}`);
-        this.state.currentFile = data.file;
-        
-        if (this.view && this.view.updateCurrentFile) {
-            this.view.updateCurrentFile(data.file, data.index);
-        }
-    }
-    
-    onPlaylistEnded() {
-        this.logDebug('playlist', 'Playlist ended');
-        
-        if (this.config.autoNotifications) {
-            this.showInfo('Playlist ended');
-        }
-    }
-    
-    /**
-     * Auto-advance ✅ NOUVEAU
-     */
-    async onAutoAdvance(data) {
-        this.logDebug('playlist', `Auto-advance to: ${data.file?.name || data.file?.id}`);
-        
-        this.state.currentFile = data.file;
-        
-        // Charger et jouer automatiquement
-        if (this.playbackController) {
-            try {
-                await this.playbackController.loadFile(data.file.id);
-                await this.playbackController.play();
-                
-                this.logDebug('playlist', '✓ Auto-advance completed');
-                
-            } catch (error) {
-                this.logDebug('error', `Auto-advance failed: ${error.message}`);
-                this.showError('Failed to auto-advance');
-            }
-        }
-        
-        if (this.view && this.view.updateCurrentFile) {
-            this.view.updateCurrentFile(data.file, data.index);
-        }
-    }
-  
-  
-    // ========================================================================
-    // CALLBACKS QUEUE ✅ NOUVEAU
-    // ========================================================================
-    
-    onQueueAdded(data) {
-        this.logDebug('playlist', `Queue: +1 (total: ${data.queueSize})`);
-        
-        if (this.config.showQueueStatus && this.view && this.view.updateQueueStatus) {
-            this.view.updateQueueStatus(data.queueSize);
-        }
-    }
-    
-    onQueueRemoved(data) {
-        this.logDebug('playlist', `Queue: -1 (total: ${data.queueSize})`);
-        
-        if (this.config.showQueueStatus && this.view && this.view.updateQueueStatus) {
-            this.view.updateQueueStatus(data.queueSize);
-        }
-    }
-    
-    onQueueCleared() {
-        this.logDebug('playlist', 'Queue cleared');
-        
-        if (this.config.showQueueStatus && this.view && this.view.updateQueueStatus) {
-            this.view.updateQueueStatus(0);
-        }
-    }
-    
-    onQueueStarted(data) {
-        this.logDebug('playlist', `Queue started: ${data.file?.name || data.file?.id}`);
-        
-        if (this.view && this.view.showQueuePlaying) {
-            this.view.showQueuePlaying(true);
-        }
-    }
-    
-    onQueueEnded() {
-        this.logDebug('playlist', 'Queue ended');
-        
-        if (this.view && this.view.showQueuePlaying) {
-            this.view.showQueuePlaying(false);
-        }
-        
-        if (this.config.autoNotifications) {
-            this.showInfo('Queue finished');
-        }
-    }
-    
-    // ========================================================================
-    // CALLBACKS MODES
-    // ========================================================================
-    
-    onShuffleChanged(data) {
-        this.logDebug('playlist', `Shuffle: ${data.enabled ? 'ON' : 'OFF'}`);
-        
-        if (this.view && this.view.updateShuffleButton) {
-            this.view.updateShuffleButton(data.enabled);
-        }
-    }
-    
-    onRepeatChanged(data) {
-        this.logDebug('playlist', `Repeat: ${data.mode}`);
-        
-        if (this.view && this.view.updateRepeatButton) {
-            this.view.updateRepeatButton(data.mode);
-        }
-    }
-    
-    onAutoAdvanceChanged(data) {
-        this.logDebug('playlist', `Auto-advance: ${data.enabled ? 'ON' : 'OFF'}`);
-        
-        if (this.view && this.view.updateAutoAdvanceButton) {
-            this.view.updateAutoAdvanceButton(data.enabled);
-        }
-    }
-    
-    // ========================================================================
-    // CALLBACKS PLAYBACK (Coordination)
-    // ========================================================================
-    
-    onPlaybackStarted() {
+        this.state.currentIndex = index;
         this.state.isPlaying = true;
-        this.logDebug('playlist', 'Playback started');
-    }
-    
-    onPlaybackStopped() {
-        this.state.isPlaying = false;
-        this.logDebug('playlist', 'Playback stopped');
-    }
-    
-    /**
-     * Fin de lecture d'un fichier - déclenche auto-advance
-     */
-    onPlaybackFinished() {
-        this.logDebug('playlist', 'Playback finished - triggering auto-advance check');
         
-        // Le PlaylistModel écoute déjà 'playback:finished' et gère l'auto-advance
-        // Ici on peut juste mettre à jour l'UI si nécessaire
-        
-        if (this.view && this.view.showPlaybackComplete) {
-            this.view.showPlaybackComplete();
+        const file = this.state.currentPlaylist.items[index];
+        if (file) {
+            this.state.currentFile = file;
+            this.eventBus.emit('playlist:play', { file, index });
         }
     }
     
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
+    async next() {
+        if (!this.state.currentPlaylist) return;
+        
+        let nextIndex = this.state.currentIndex + 1;
+        
+        if (nextIndex >= this.state.currentPlaylist.items.length) {
+            if (this.state.repeatMode === 'all') {
+                nextIndex = 0;
+            } else {
+                return;
+            }
+        }
+        
+        await this.play(nextIndex);
+    }
     
-    /**
-     * Rafraîchit la vue complète
-     */
+    async previous() {
+        if (!this.state.currentPlaylist) return;
+        
+        let prevIndex = this.state.currentIndex - 1;
+        
+        if (prevIndex < 0) {
+            if (this.state.repeatMode === 'all') {
+                prevIndex = this.state.currentPlaylist.items.length - 1;
+            } else {
+                return;
+            }
+        }
+        
+        await this.play(prevIndex);
+    }
+    
+    toggleShuffle() {
+        this.state.shuffleMode = !this.state.shuffleMode;
+        this.stats.shuffleToggles++;
+        this.eventBus.emit('playlist:shuffle-toggled', { enabled: this.state.shuffleMode });
+    }
+    
+    toggleRepeat() {
+        const modes = ['none', 'one', 'all'];
+        const currentIndex = modes.indexOf(this.state.repeatMode);
+        this.state.repeatMode = modes[(currentIndex + 1) % modes.length];
+        this.eventBus.emit('playlist:repeat-toggled', { mode: this.state.repeatMode });
+    }
+    
     refreshView() {
-        if (!this.view) return;
-        
-        const data = {
-            playlists: this.playlistModel.get('playlists'),
-            currentPlaylist: this.state.currentPlaylist,
-            currentFile: this.state.currentFile,
-            shuffleMode: this.playlistModel.get('shuffleMode'),
-            repeatMode: this.playlistModel.get('repeatMode'),
-            autoAdvance: this.playlistModel.get('autoAdvance'),
-            queueSize: this.playlistModel.get('queue').length,
-            isPlaying: this.state.isPlaying
-        };
-        
-        if (this.view.render) {
-            this.view.render(data);
-        }
-        
-        this.logDebug('playlist', '✓ View refreshed');
-    }
-    
-    /**
-     * Rafraîchit uniquement la vue de la queue
-     */
-    refreshQueueView() {
-        if (!this.view || !this.view.renderQueue) return;
-        
-        const queue = this.playlistModel.get('queue');
-        const queueIndex = this.playlistModel.get('queueIndex');
-        const isPlayingQueue = this.playlistModel.get('isPlayingQueue');
-        
-        this.view.renderQueue({
-            queue,
-            queueIndex,
-            isPlayingQueue
-        });
-    }
-    
-    /**
-     * Sauvegarde l'état
-     */
-    saveState() {
-        if (!this.playlistModel) return;
-        
-        const state = {
-            currentPlaylistId: this.state.currentPlaylist?.id || null,
-            shuffleMode: this.playlistModel.get('shuffleMode'),
-            repeatMode: this.playlistModel.get('repeatMode'),
-            autoAdvance: this.playlistModel.get('autoAdvance')
-        };
-        
-        try {
-            localStorage.setItem('midiMind_playlistState', JSON.stringify(state));
-            this.logDebug('playlist', '✓ State saved');
-        } catch (error) {
-            this.logDebug('error', `Failed to save state: ${error.message}`);
+        if (this.view && typeof this.view.render === 'function') {
+            this.view.render(this.state);
         }
     }
     
-    /**
-     * Charge l'état sauvegardé
-     */
     loadSavedState() {
+        if (!this.config.persistState) return;
+        
         try {
-            const saved = localStorage.getItem('midiMind_playlistState');
-            if (!saved) return;
-            
-            const state = JSON.parse(saved);
-            
-            // Restaurer les modes
-            if (this.playlistModel) {
-                if (state.shuffleMode !== undefined) {
-                    this.playlistModel.setShuffle(state.shuffleMode);
-                }
-                if (state.repeatMode) {
-                    this.playlistModel.setRepeat(state.repeatMode);
-                }
-                if (state.autoAdvance !== undefined) {
-                    this.playlistModel.setAutoAdvance(state.autoAdvance);
-                }
-                
-                // Charger la playlist si nécessaire
-                if (state.currentPlaylistId) {
-                    this.loadPlaylist(state.currentPlaylistId).catch(() => {});
-                }
+            const saved = localStorage.getItem('playlist_state');
+            if (saved) {
+                const state = JSON.parse(saved);
+                this.state = { ...this.state, ...state };
             }
-            
-            this.logDebug('playlist', '✓ State restored');
-            
         } catch (error) {
-            this.logDebug('error', `Failed to load state: ${error.message}`);
+            this.logDebug('playlist', 'Failed to load saved state', 'warn');
         }
     }
     
-    /**
-     * Retourne les statistiques de la playlist
-     */
-    getStats() {
-        if (!this.playlistModel) return null;
+    saveState() {
+        if (!this.config.persistState) return;
         
-        const stats = this.playlistModel.getQueueStats();
-        
-        return {
-            ...stats,
-            currentPlaylist: this.state.currentPlaylist?.name || null,
-            currentFile: this.state.currentFile?.name || null,
-            isPlaying: this.state.isPlaying
-        };
-    }
-    
-    /**
-     * Retourne l'état complet
-     */
-    getState() {
-        return {
-            ...this.state,
-            shuffleMode: this.playlistModel?.get('shuffleMode') || false,
-            repeatMode: this.playlistModel?.get('repeatMode') || 'none',
-            autoAdvance: this.playlistModel?.get('autoAdvance') || true,
-            queueSize: this.playlistModel?.get('queue').length || 0,
-            isPlayingQueue: this.playlistModel?.get('isPlayingQueue') || false
-        };
-    }
-    
-    // =============================================
-    // EXPORT
-    // =============================================
-    
-    /**
-     * Exporte une playlist
-     * @param {string} playlistId - ID playlist
-     * @param {string} format - 'json'|'m3u'|'m3u8'|'pls'|'xspf'
-     * @returns {string} Contenu exporté
-     */
-    export(playlistId, format = 'json') {
-        const playlist = this.controller.playlistModel.getPlaylistById(playlistId);
-        
-        if (!playlist) {
-            throw new Error('Playlist not found');
-        }
-        
-        switch (format.toLowerCase()) {
-            case 'json':
-                return this.exportJSON(playlist);
-            case 'm3u':
-                return this.exportM3U(playlist, false);
-            case 'm3u8':
-                return this.exportM3U(playlist, true);
-            case 'pls':
-                return this.exportPLS(playlist);
-            case 'xspf':
-                return this.exportXSPF(playlist);
-            default:
-                throw new Error(`Unsupported format: ${format}`);
+        try {
+            localStorage.setItem('playlist_state', JSON.stringify(this.state));
+        } catch (error) {
+            this.logDebug('playlist', 'Failed to save state', 'warn');
         }
     }
     
-    /**
-     * Export JSON
-     */
-    exportJSON(playlist) {
-        const data = {
-            name: playlist.name,
-            description: playlist.description || '',
-            created: playlist.created,
-            modified: playlist.modified || Date.now(),
-            files: playlist.files.map(f => ({
-                path: f.path,
-                title: f.title || f.name,
-                duration: f.duration || 0
-            }))
-        };
+    handleError(error, context) {
+        this.stats.errors++;
+        this.state.errors.push({ error, context, timestamp: Date.now() });
+        this.logDebug('playlist', `${context}: ${error.message}`, 'error');
         
-        return JSON.stringify(data, null, 2);
-    }
-    
-    /**
-     * Export M3U/M3U8
-     */
-    exportM3U(playlist, extended = false) {
-        let content = extended ? '#EXTM3U\n' : '';
-        
-        for (const file of playlist.files) {
-            if (extended) {
-                const duration = Math.round((file.duration || 0) / 1000);
-                const title = file.title || file.name;
-                content += `#EXTINF:${duration},${title}\n`;
-            }
-            content += `${file.path}\n`;
+        if (this.notifications) {
+            this.notifications.show('Error', error.message, 'error', 3000);
         }
-        
-        return content;
     }
     
-    /**
-     * Export PLS
-     */
-    exportPLS(playlist) {
-        let content = '[playlist]\n';
-        content += `NumberOfEntries=${playlist.files.length}\n\n`;
-        
-        playlist.files.forEach((file, index) => {
-            const num = index + 1;
-            content += `File${num}=${file.path}\n`;
-            content += `Title${num}=${file.title || file.name}\n`;
-            content += `Length${num}=${Math.round((file.duration || 0) / 1000)}\n\n`;
-        });
-        
-        content += 'Version=2\n';
-        return content;
-    }
-    
-    /**
-     * Export XSPF
-     */
-    exportXSPF(playlist) {
-        const xml = [];
-        xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-        xml.push('<playlist version="1" xmlns="http://xspf.org/ns/0/">');
-        xml.push(`  <title>${this.escapeXml(playlist.name)}</title>`);
-        xml.push('  <trackList>');
-        
-        for (const file of playlist.files) {
-            xml.push('    <track>');
-            xml.push(`      <location>${this.escapeXml(file.path)}</location>`);
-            xml.push(`      <title>${this.escapeXml(file.title || file.name)}</title>`);
-            xml.push(`      <duration>${file.duration || 0}</duration>`);
-            xml.push('    </track>');
+    logDebug(category, message, level = 'info') {
+        if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](category, message);
+        } else {
+            console.log(`[${category}] ${message}`);
         }
-        
-        xml.push('  </trackList>');
-        xml.push('</playlist>');
-        
-        return xml.join('\n');
     }
-    
-    // =============================================
-    // DOWNLOAD
-    // =============================================
-    
-    /**
-     * Télécharge une playlist
-     * @param {string} playlistId - ID playlist
-     * @param {string} format - Format d'export
-     */
-    download(playlistId, format = 'json') {
-        const content = this.export(playlistId, format);
-        const playlist = this.controller.playlistModel.getPlaylistById(playlistId);
-        
-        // Créer blob
-        const blob = new Blob([content], { type: this.getMimeType(format) });
-        const url = URL.createObjectURL(blob);
-        
-        // Créer lien download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${playlist.name}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        // Libérer URL
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        
-        this.logger.info('PlaylistExport', `Downloaded: ${playlist.name}.${format}`);
-    }
-    
-    // =============================================
-    // HELPERS
-    // =============================================
-    
-    getMimeType(format) {
-        const types = {
-            'json': 'application/json',
-            'm3u': 'audio/x-mpegurl',
-            'm3u8': 'application/vnd.apple.mpegurl',
-            'pls': 'audio/x-scpls',
-            'xspf': 'application/xspf+xml'
-        };
-        return types[format] || 'text/plain';
-    }
-    
-    escapeXml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&apos;');
-    }
-
-
-
-
-// ========================================================================
-// NETTOYAGE
-// ========================================================================
-
-    /**
-     * Nettoie les ressources
-     */
-    destroy() {
-        this.logDebug('playlist', 'Destroying PlaylistController...');
-        
-        // Sauvegarder l'état
-        this.saveState();
-        
-        // Nettoyer les références
-        this.playbackController = null;
-        this.state.currentPlaylist = null;
-        this.state.currentFile = null;
-        
-        this.logDebug('playlist', '✓ PlaylistController destroyed');
-    }
-
-}
-
-// ============================================================================
-// EXPORT
-// ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlaylistController;
 }
 
 if (typeof window !== 'undefined') {
     window.PlaylistController = PlaylistController;
 }
-
-window.PlaylistController = PlaylistController;

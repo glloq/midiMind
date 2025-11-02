@@ -291,7 +291,7 @@ class DebugController extends BaseController {
         
         try {
             const start = performance.now();
-            await this.backend.sendCommand('system.info');
+            await this.backend.sendCommand('get_status');
             const latency = performance.now() - start;
             return latency;
         } catch (error) {

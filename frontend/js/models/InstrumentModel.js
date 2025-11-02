@@ -1,31 +1,26 @@
 // ============================================================================
 // Fichier: frontend/js/models/InstrumentModel.js
-// Version: v4.0.0 - API COMPATIBLE v4.2.2
-// Date: 2025-11-01
+// Chemin réel: frontend/js/models/InstrumentModel.js
+// Version: v4.2.2 - API CORRECTED
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.0.0:
-// âœ… list_devices â†’ devices.list
-// âœ… connect_device â†’ devices.connect
-// âœ… disconnect_device â†’ devices.disconnect
-// âœ… Adaptation format rÃ©ponse API v4.2.2
+// CORRECTIONS v4.2.2:
+// ✅ device_id snake_case
+// ✅ response via BackendService (déjà extrait)
+// ✅ devices.scan pour count
 // ============================================================================
 
 class InstrumentModel extends BaseModel {
     constructor(eventBus, backend, logger, initialData = {}, options = {}) {
-        // âœ… Appel super() avec signature cohÃ©rente
-        super(eventBus, backend, logger, {
-            ...initialData
-        }, {
+        super(eventBus, backend, logger, initialData, {
             persistKey: 'instrumentmodel',
             eventPrefix: 'instrument',
             autoPersist: false,
             ...options
         });
         
-        // Cache des instruments
         this.instruments = new Map();
         
-        // Ã‰tat
         this.state = {
             scanning: false,
             lastScan: null,
@@ -33,262 +28,146 @@ class InstrumentModel extends BaseModel {
             connectedCount: 0
         };
         
-        this.log('info', 'InstrumentModel', 'âœ“ InstrumentModel v4.0.0 initialized');
+        this.log('info', 'InstrumentModel', '✓ v4.2.2 initialized');
     }
     
-    // ========================================================================
-    // SCAN ET CHARGEMENT
-    // ========================================================================
-    
     /**
-     * Scanne les instruments disponibles
+     * ✅ devices.scan pour count
      */
-    async scan() {
-        if (this.state.scanning) {
-            this.log('warn', 'InstrumentModel', 'Scan already in progress');
-            return Array.from(this.instruments.values());
-        }
-        
-        if (!this.backend) {
-            throw new Error('Backend service not available');
-        }
+    async scan(full_scan = false) {
+        if (this.state.scanning) return Array.from(this.instruments.values());
+        if (!this.backend) throw new Error('Backend not available');
         
         this.state.scanning = true;
-        if (this.eventBus) {
-            this.eventBus.emit('instruments:scan:started');
-        }
+        this.eventBus?.emit('instruments:scan:started');
         
         try {
-            this.log('info', 'InstrumentModel', 'Scanning for instruments...');
+            const response = await this.backend.scanDevices(full_scan);
             
-            // âœ… Nouvelle commande API v4.0.0
-            const response = await this.backend.sendCommand('devices.list', {});
-            
-            // Le nouveau format renvoie directement les donnÃ©es
+            // ✅ BackendService extrait déjà response.data
             const instruments = response.devices || [];
+            const count = response.count || instruments.length;
             
-            // Mettre Ã  jour le cache
             this.instruments.clear();
             instruments.forEach(inst => {
-                // Adapter le format backend au format interne
                 this.instruments.set(inst.id, {
                     id: inst.id,
                     name: inst.name,
                     type: inst.type,
                     status: inst.status,
-                    connected: inst.status === 2, // 2 = Connected
+                    connected: inst.status === 2,
                     available: inst.available || true
                 });
             });
             
-            this.state.totalInstruments = instruments.length;
+            this.state.totalInstruments = count;
             this.state.connectedCount = instruments.filter(i => i.status === 2).length;
             this.state.lastScan = Date.now();
             
-            this.log('info', 'InstrumentModel', 
-                `Found ${instruments.length} instruments (${this.state.connectedCount} connected)`
-            );
+            this.log('info', 'InstrumentModel', `Found ${count} instruments (${this.state.connectedCount} connected)`);
             
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:scan:complete', {
-                    instruments: Array.from(this.instruments.values()),
-                    total: instruments.length,
-                    connected: this.state.connectedCount
-                });
-            }
+            this.eventBus?.emit('instruments:scan:complete', {
+                instruments: Array.from(this.instruments.values()),
+                total: count,
+                connected: this.state.connectedCount
+            });
             
             return Array.from(this.instruments.values());
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', `Scan error: ${error.message}`);
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:scan:error', { error: error.message });
-            }
+            this.log('error', 'InstrumentModel.scan', error);
             throw error;
-            
         } finally {
             this.state.scanning = false;
         }
     }
     
-    /**
-     * Connecte un instrument
-     */
-    async connect(instrumentId) {
-        if (!this.backend) {
-            throw new Error('Backend service not available');
-        }
+    async listDevices() {
+        if (!this.backend) throw new Error('Backend not available');
         
         try {
-            this.log('info', 'InstrumentModel', `Connecting instrument: ${instrumentId}`);
+            const response = await this.backend.listDevices();
+            const instruments = response.devices || [];
             
-            // âœ… Nouvelle commande API v4.0.0
-            const response = await this.backend.sendCommand('devices.connect', {
-                device_id: instrumentId
+            instruments.forEach(inst => {
+                this.instruments.set(inst.id, {
+                    id: inst.id,
+                    name: inst.name,
+                    type: inst.type,
+                    status: inst.status,
+                    connected: inst.status === 2,
+                    available: inst.available || true
+                });
             });
             
-            // Le nouveau format renvoie directement les donnÃ©es
-            // Mettre Ã  jour le cache
-            const instrument = this.instruments.get(instrumentId);
-            if (instrument) {
-                instrument.connected = true;
-                instrument.status = 2; // Connected
-                this.instruments.set(instrumentId, instrument);
-                this.state.connectedCount++;
-            }
-            
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:connected', {
-                    instrumentId,
-                    instrument
-                });
-            }
-            
-            return true;
+            return Array.from(this.instruments.values());
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', `Connection error: ${error.message}`);
+            this.log('error', 'InstrumentModel.listDevices', error);
             throw error;
         }
     }
     
     /**
-     * DÃ©connecte un instrument
+     * ✅ device_id snake_case
      */
-    async disconnect(instrumentId) {
-        if (!this.backend) {
-            throw new Error('Backend service not available');
-        }
+    async connect(device_id) {
+        if (!this.backend) throw new Error('Backend not available');
         
         try {
-            this.log('info', 'InstrumentModel', `Disconnecting instrument: ${instrumentId}`);
+            await this.backend.connectDevice(device_id);
             
-            // âœ… Nouvelle commande API v4.0.0
-            const response = await this.backend.sendCommand('devices.disconnect', {
-                device_id: instrumentId
-            });
-            
-            // Le nouveau format renvoie directement les donnÃ©es
-            // Mettre Ã  jour le cache
-            const instrument = this.instruments.get(instrumentId);
-            if (instrument) {
-                instrument.connected = false;
-                instrument.status = 1; // Disconnected
-                this.instruments.set(instrumentId, instrument);
-                this.state.connectedCount = Math.max(0, this.state.connectedCount - 1);
+            const inst = this.instruments.get(device_id);
+            if (inst) {
+                inst.connected = true;
+                inst.status = 2;
             }
             
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:disconnected', {
-                    instrumentId,
-                    instrument
-                });
-            }
-            
-            return true;
+            this.eventBus?.emit('instrument:connected', { device_id });
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', `Disconnection error: ${error.message}`);
+            this.log('error', 'InstrumentModel.connect', error);
             throw error;
         }
     }
     
-    // ========================================================================
-    // GETTERS / HELPERS
-    // ========================================================================
+    async disconnect(device_id) {
+        if (!this.backend) throw new Error('Backend not available');
+        
+        try {
+            await this.backend.disconnectDevice(device_id);
+            
+            const inst = this.instruments.get(device_id);
+            if (inst) {
+                inst.connected = false;
+                inst.status = 1;
+            }
+            
+            this.eventBus?.emit('instrument:disconnected', { device_id });
+            
+        } catch (error) {
+            this.log('error', 'InstrumentModel.disconnect', error);
+            throw error;
+        }
+    }
     
-    /**
-     * Obtient tous les instruments
-     */
-    getAll() {
+    getInstrument(device_id) {
+        return this.instruments.get(device_id);
+    }
+    
+    getAllInstruments() {
         return Array.from(this.instruments.values());
     }
     
-    /**
-     * Obtient un instrument par ID
-     */
-    getById(instrumentId) {
-        return this.instruments.get(instrumentId);
-    }
-    
-    /**
-     * Obtient les instruments connectÃ©s
-     */
-    getConnected() {
-        return this.getAll().filter(i => i.connected);
-    }
-    
-    /**
-     * Alias pour getConnected() - compatibilitÃ© NavigationController
-     */
     getConnectedInstruments() {
-        return this.getConnected();
-    }
-    
-    /**
-     * Obtient les instruments dÃ©connectÃ©s
-     */
-    getDisconnected() {
-        return this.getAll().filter(i => !i.connected);
-    }
-    
-    /**
-     * VÃ©rifie si un instrument est connectÃ©
-     */
-    isConnected(instrumentId) {
-        const instrument = this.instruments.get(instrumentId);
-        return instrument ? instrument.connected : false;
-    }
-    
-    /**
-     * Obtient le nombre total d'instruments
-     */
-    getCount() {
-        return this.state.totalInstruments;
-    }
-    
-    /**
-     * Obtient le nombre d'instruments connectÃ©s
-     */
-    getConnectedCount() {
-        return this.state.connectedCount;
-    }
-    
-    /**
-     * Obtient les statistiques
-     */
-    getStats() {
-        return {
-            total: this.state.totalInstruments,
-            connected: this.state.connectedCount,
-            disconnected: this.state.totalInstruments - this.state.connectedCount,
-            scanning: this.state.scanning,
-            lastScan: this.state.lastScan
-        };
-    }
-    
-    /**
-     * Filtre les instruments par nom
-     */
-    filterByName(query) {
-        const lowerQuery = query.toLowerCase();
-        return this.getAll().filter(i => 
-            i.name.toLowerCase().includes(lowerQuery) ||
-            (i.model && i.model.toLowerCase().includes(lowerQuery))
-        );
-    }
-    
-    /**
-     * Filtre les instruments par type
-     */
-    filterByType(type) {
-        return this.getAll().filter(i => i.type === type);
+        return Array.from(this.instruments.values()).filter(i => i.connected);
     }
 }
 
-// ============================================================================
-// EXPORT GLOBAL
-// ============================================================================
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = InstrumentModel;
+}
+
 if (typeof window !== 'undefined') {
     window.InstrumentModel = InstrumentModel;
 }

@@ -1,18 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/services/FileService.js
-// Version: v4.0.0 - API COMPATIBLE DOCUMENTATION v4.2.2
-// Date: 2025-11-01
+// Chemin réel: frontend/js/services/FileService.js
+// Version: v4.2.2 - API CORRECTED
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.0.0:
-// ✅ Utilise files.list, files.read, files.write, files.delete
-// ✅ Compatible avec le format API documenté
-// ✅ Gestion des réponses { success: true, data: {...} }
-//
-// CONSERVÉ:
-// ✅ Logger avec fallback robuste
-// ✅ Cache des fichiers
-// ✅ Index de recherche
-// ✅ Statistiques
+// CORRECTIONS v4.2.2:
+// ✅ midi.import: {filename, content, base64}
+// ✅ response.data.files extraction
+// ✅ snake_case paramètres
 // ============================================================================
 
 class FileService {
@@ -21,14 +16,10 @@ class FileService {
         this.eventBus = eventBus;
         this.logger = logger || this.createFallbackLogger();
         
-        // Cache des fichiers
         this.fileCache = new Map();
         this.lastScanTimestamp = 0;
-        
-        // Index de recherche
         this.searchIndex = new Map();
         
-        // État du service
         this.state = {
             isScanning: false,
             isUploading: false,
@@ -38,17 +29,15 @@ class FileService {
             totalSize: 0
         };
         
-        // Configuration
         this.config = {
-            cacheExpiration: 60000,        // 1 minute
+            cacheExpiration: 60000,
             autoRefresh: true,
             supportedExtensions: ['.mid', '.midi', '.MID', '.MIDI'],
-            maxFileSize: 10 * 1024 * 1024, // 10 MB
-            uploadChunkSize: 64 * 1024,     // 64 KB
+            maxFileSize: 10 * 1024 * 1024,
+            uploadChunkSize: 64 * 1024,
             allowedMimeTypes: ['audio/midi', 'audio/x-midi', 'application/octet-stream']
         };
         
-        // Statistiques
         this.stats = {
             scansPerformed: 0,
             filesLoaded: 0,
@@ -60,14 +49,10 @@ class FileService {
             deletesCount: 0
         };
         
-        this.log('info', 'FileService', '✓ Service initialized (v4.0.0)');
-        
+        this.log('info', 'FileService', '✓ Service initialized (v4.2.2)');
         this._bindBackendEvents();
     }
     
-    /**
-     * Crée un logger fallback si aucun logger fourni
-     */
     createFallbackLogger() {
         return {
             debug: (...args) => console.log('[DEBUG]', ...args),
@@ -78,9 +63,6 @@ class FileService {
         };
     }
     
-    /**
-     * Log sécurisé
-     */
     log(level, ...args) {
         if (this.logger && typeof this.logger[level] === 'function') {
             this.logger[level](...args);
@@ -89,47 +71,24 @@ class FileService {
         }
     }
     
-    // ========================================================================
-    // INITIALISATION
-    // ========================================================================
-    
     _bindBackendEvents() {
         if (!this.eventBus) return;
         
-        // Événements backend
-        this.eventBus.on('backend:event:file:added', (data) => {
-            this._handleFileAdded(data);
-        });
-        
-        this.eventBus.on('backend:event:file:removed', (data) => {
-            this._handleFileRemoved(data);
-        });
-        
-        this.eventBus.on('backend:event:file:modified', (data) => {
-            this._handleFileModified(data);
-        });
-        
+        this.eventBus.on('backend:event:file:added', (data) => this._handleFileAdded(data));
+        this.eventBus.on('backend:event:file:removed', (data) => this._handleFileRemoved(data));
+        this.eventBus.on('backend:event:file:modified', (data) => this._handleFileModified(data));
         this.eventBus.on('backend:connected', async () => {
             this.log('info', 'FileService', 'Backend connected, refreshing files');
             await this.scanFiles();
         });
     }
     
-    // ========================================================================
-    // SCAN & LISTE
-    // ========================================================================
-    
-    /**
-     * Scan tous les fichiers MIDI disponibles
-     */
     async scanFiles(forceRefresh = false) {
-        // Vérifier si scan déjà en cours
         if (this.state.isScanning) {
             this.log('warn', 'FileService', 'Scan already in progress');
             return this.getFilesFromCache();
         }
         
-        // Vérifier cache si pas force refresh
         if (!forceRefresh && this._isCacheValid()) {
             this.stats.cacheHits++;
             this.log('debug', 'FileService', 'Using cached files');
@@ -143,29 +102,23 @@ class FileService {
         try {
             this.log('info', 'FileService', 'Scanning files...');
             
-            // Émettre événement scan start
             if (this.eventBus) {
                 this.eventBus.emit('files:scan_start');
             }
             
-            // ✅ Appeler backend avec nouvelle API
             let filesData = [];
             if (this.backend && typeof this.backend.listFiles === 'function') {
                 const response = await this.backend.listFiles('/midi');
-                // Le backend renvoie { success: true, data: { files: [...] } }
+                // ✅ Extraction via response.data
                 filesData = response.files || [];
             } else {
                 this.log('warn', 'FileService', 'Backend not available, using mock data');
                 filesData = this._getMockFiles();
             }
             
-            // Mettre à jour cache
             this._updateCache(filesData);
-            
-            // Mettre à jour index de recherche
             this._updateSearchIndex(filesData);
             
-            // Statistiques
             this.state.totalFiles = filesData.length;
             this.state.totalSize = filesData.reduce((sum, f) => sum + (f.size || 0), 0);
             this.state.lastScanDuration = Date.now() - startTime;
@@ -176,7 +129,6 @@ class FileService {
             
             this.log('info', 'FileService', `Scan complete: ${filesData.length} files in ${this.state.lastScanDuration}ms`);
             
-            // Émettre événement scan complete
             if (this.eventBus) {
                 this.eventBus.emit('files:scan_complete', { 
                     files: filesData,
@@ -194,7 +146,6 @@ class FileService {
                 this.eventBus.emit('files:scan_error', { error });
             }
             
-            // Retourner cache si disponible
             return this.getFilesFromCache();
             
         } finally {
@@ -202,25 +153,16 @@ class FileService {
         }
     }
     
-    /**
-     * Récupère les fichiers depuis le cache
-     */
     getFilesFromCache() {
         return Array.from(this.fileCache.values());
     }
     
-    /**
-     * Vérifie si le cache est valide
-     */
     _isCacheValid() {
         if (this.fileCache.size === 0) return false;
         const age = Date.now() - this.lastScanTimestamp;
         return age < this.config.cacheExpiration;
     }
     
-    /**
-     * Met à jour le cache
-     */
     _updateCache(files) {
         this.fileCache.clear();
         files.forEach(file => {
@@ -229,9 +171,6 @@ class FileService {
         });
     }
     
-    /**
-     * Met à jour l'index de recherche
-     */
     _updateSearchIndex(files) {
         this.searchIndex.clear();
         files.forEach(file => {
@@ -246,97 +185,33 @@ class FileService {
         });
     }
     
-    /**
-     * Données mock pour développement
-     */
     _getMockFiles() {
         return [
-            {
-                id: 'mock-1',
-                name: 'Example Song.mid',
-                path: '/midi/Example Song.mid',
-                size: 45678,
-                duration: 180,
-                tracks: 4,
-                noteCount: 1234,
-                modified: Date.now()
-            },
-            {
-                id: 'mock-2',
-                name: 'Test Track.mid',
-                path: '/midi/Test Track.mid',
-                size: 23456,
-                duration: 120,
-                tracks: 2,
-                noteCount: 567,
-                modified: Date.now()
-            }
+            { id: 1, name: 'example.mid', path: '/midi/example.mid', size: 1024 }
         ];
     }
     
-    // ========================================================================
-    // GESTION DES ÉVÉNEMENTS BACKEND
-    // ========================================================================
-    
-    /**
-     * Gère l'ajout d'un fichier
-     */
     _handleFileAdded(data) {
-        if (data && data.file) {
-            const fileId = data.file.id || data.file.path || data.file.name;
-            this.fileCache.set(fileId, data.file);
-            
-            // Mettre à jour l'index de recherche
-            const searchText = [
-                data.file.name || '',
-                data.file.path || '',
-                data.file.tags?.join(' ') || ''
-            ].join(' ').toLowerCase();
-            this.searchIndex.set(fileId, searchText);
-            
-            if (this.eventBus) {
-                this.eventBus.emit('files:file_added', { file: data.file });
-            }
-        }
+        this.log('debug', 'FileService', 'File added:', data);
+        this.scanFiles(true);
     }
     
-    /**
-     * Gère la suppression d'un fichier
-     */
     _handleFileRemoved(data) {
-        if (data && (data.fileId || data.path)) {
-            const key = data.fileId || data.path;
-            this.fileCache.delete(key);
-            this.searchIndex.delete(key);
-            
-            if (this.eventBus) {
-                this.eventBus.emit('files:file_removed', { fileId: key });
-            }
-        }
+        this.log('debug', 'FileService', 'File removed:', data);
+        const fileId = data.fileId || data.path;
+        this.fileCache.delete(fileId);
+        this.searchIndex.delete(fileId);
     }
     
-    /**
-     * Gère la modification d'un fichier
-     */
     _handleFileModified(data) {
-        if (data && data.file) {
-            const fileId = data.file.id || data.file.path || data.file.name;
-            this.fileCache.set(fileId, data.file);
-            
-            if (this.eventBus) {
-                this.eventBus.emit('files:file_modified', { file: data.file });
-            }
-        }
+        this.log('debug', 'FileService', 'File modified:', data);
+        this.scanFiles(true);
     }
     
-    // ========================================================================
-    // UPLOAD
-    // ========================================================================
-    
     /**
-     * Upload un fichier MIDI
+     * ✅ CORRECTION: Upload avec midi.import {filename, content, base64}
      */
-    async uploadFile(file, metadata = {}) {
+    async uploadFile(file, progressCallback = null) {
         if (this.state.isUploading) {
             throw new Error('Upload already in progress');
         }
@@ -346,36 +221,34 @@ class FileService {
         this.stats.uploadsCount++;
         
         try {
-            this.log('info', 'FileService', 'Uploading file:', file.name);
+            this.log('info', 'FileService', 'Uploading:', file.name);
             
             if (this.eventBus) {
                 this.eventBus.emit('files:upload_start', { filename: file.name });
             }
             
-            // Valider fichier
             this._validateFile(file);
             
-            // Lire fichier
             const content = await this._readFile(file);
             
-            // Convertir en base64
             const base64Data = btoa(
                 new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), '')
             );
             
-            // ✅ Envoyer au backend avec nouvelle API
+            // ✅ CORRECTION: Utiliser midi.import avec nouveau format
             let result;
-            if (this.backend && typeof this.backend.writeFile === 'function') {
-                result = await this.backend.writeFile(
-                    `/midi/${file.name}`,
+            if (this.backend && typeof this.backend.importMidi === 'function') {
+                result = await this.backend.importMidi(
+                    file.name,
                     base64Data,
-                    'base64'
+                    true  // base64
                 );
             } else {
-                // Mock upload
                 result = {
                     success: true,
-                    path: `/midi/${file.name}`,
+                    midi_id: Date.now(),
+                    filename: file.name,
+                    filepath: `/uploads/${file.name}`,
                     message: 'File uploaded (mock)'
                 };
             }
@@ -390,7 +263,6 @@ class FileService {
                 });
             }
             
-            // Rafraîchir liste
             await this.scanFiles(true);
             
             return result;
@@ -414,16 +286,11 @@ class FileService {
         }
     }
     
-    /**
-     * Valide un fichier
-     */
     _validateFile(file) {
-        // Taille
         if (file.size > this.config.maxFileSize) {
             throw new Error(`File too large: ${file.size} bytes (max ${this.config.maxFileSize})`);
         }
         
-        // Extension
         const ext = '.' + file.name.split('.').pop();
         if (!this.config.supportedExtensions.includes(ext)) {
             throw new Error(`Unsupported file type: ${ext}`);
@@ -432,9 +299,6 @@ class FileService {
         return true;
     }
     
-    /**
-     * Lit un fichier
-     */
     _readFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -458,13 +322,6 @@ class FileService {
         });
     }
     
-    // ========================================================================
-    // RECHERCHE
-    // ========================================================================
-    
-    /**
-     * Recherche de fichiers
-     */
     searchFiles(query) {
         if (!query || query.trim() === '') {
             return this.getFilesFromCache();
@@ -487,21 +344,12 @@ class FileService {
         return results;
     }
     
-    // ========================================================================
-    // OPÉRATIONS FICHIER
-    // ========================================================================
-    
-    /**
-     * Récupère un fichier par ID
-     */
     async getFile(fileId) {
-        // Vérifier cache
         const cached = this.fileCache.get(fileId);
         if (cached) {
             return cached;
         }
         
-        // ✅ Charger depuis backend avec nouvelle API
         if (this.backend && typeof this.backend.getFileInfo === 'function') {
             const fileInfo = await this.backend.getFileInfo(fileId);
             this.fileCache.set(fileId, fileInfo);
@@ -511,58 +359,44 @@ class FileService {
         throw new Error(`File not found: ${fileId}`);
     }
     
-    /**
-     * Récupère le contenu d'un fichier
-     */
-    async readFile(path) {
+    async readFile(filename) {
         if (this.backend && typeof this.backend.readFile === 'function') {
-            return await this.backend.readFile(path);
+            return await this.backend.readFile(filename);
         }
         throw new Error('Backend not available');
     }
     
-    /**
-     * Vérifie si un fichier existe
-     */
-    async fileExists(path) {
+    async fileExists(filename) {
         if (this.backend && typeof this.backend.fileExists === 'function') {
-            const response = await this.backend.fileExists(path);
+            const response = await this.backend.fileExists(filename);
             return response.exists || false;
         }
         return false;
     }
     
-    /**
-     * Supprime un fichier
-     */
-    async deleteFile(fileIdOrPath) {
-        this.log('info', 'FileService', 'Deleting file:', fileIdOrPath);
+    async deleteFile(filename) {
+        this.log('info', 'FileService', 'Deleting file:', filename);
         
         try {
-            // ✅ Supprimer via backend avec nouvelle API
             if (this.backend && typeof this.backend.deleteFile === 'function') {
-                await this.backend.deleteFile(fileIdOrPath);
+                await this.backend.deleteFile(filename);
             }
             
-            this.fileCache.delete(fileIdOrPath);
-            this.searchIndex.delete(fileIdOrPath);
+            this.fileCache.delete(filename);
+            this.searchIndex.delete(filename);
             this.stats.deletesCount++;
             
             if (this.eventBus) {
-                this.eventBus.emit('files:file_deleted', { fileId: fileIdOrPath });
+                this.eventBus.emit('files:file_deleted', { fileId: filename });
             }
             
-            this.log('info', 'FileService', 'File deleted:', fileIdOrPath);
+            this.log('info', 'FileService', 'File deleted:', filename);
             
         } catch (error) {
             this.log('error', 'FileService', 'Delete failed:', error);
             throw error;
         }
     }
-    
-    // ========================================================================
-    // STATISTIQUES
-    // ========================================================================
     
     getStats() {
         return {
@@ -573,20 +407,12 @@ class FileService {
         };
     }
     
-    // ========================================================================
-    // CLEANUP
-    // ========================================================================
-    
     destroy() {
         this.fileCache.clear();
         this.searchIndex.clear();
         this.log('info', 'FileService', 'Service destroyed');
     }
 }
-
-// ============================================================================
-// EXPORT
-// ============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FileService;

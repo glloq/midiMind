@@ -1,13 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/SystemView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
 // Date: 2025-11-02
 // ============================================================================
-// AMÉLIORATIONS v4.0.0:
-// ✅ API v4.2.2: system.*, network.*, logger.*
-// ✅ Monitoring temps réel
-// ✅ Statistiques réseau
-// ✅ Gestion des logs
+// AMÃ‰LIORATIONS v4.0.0:
+// âœ… API v4.2.2: system.*, network.*, logger.*
+// âœ… Monitoring temps rÃ©el
+// âœ… Statistiques rÃ©seau
+// âœ… Gestion des logs
 // ============================================================================
 
 class SystemView {
@@ -27,7 +27,7 @@ class SystemView {
         this.eventBus = eventBus;
         this.logger = window.logger || console;
         
-        // État
+        // Ã‰tat
         this.state = {
             systemInfo: null,
             memory: null,
@@ -68,34 +68,34 @@ class SystemView {
         
         this.container.innerHTML = `
             <div class="page-header">
-                <h1>⚙️ Système & Réseau</h1>
+                <h1>âš™ï¸ SystÃ¨me & RÃ©seau</h1>
                 <div class="header-actions">
                     <button class="btn-refresh" data-action="refresh">
-                        🔄 Actualiser
+                        ðŸ”„ Actualiser
                     </button>
                 </div>
             </div>
             
             <div class="system-layout">
-                <!-- Informations système -->
+                <!-- Informations systÃ¨me -->
                 <div class="system-section">
-                    <h2>📊 Informations système</h2>
+                    <h2>ðŸ“Š Informations systÃ¨me</h2>
                     <div id="systemInfo">
                         ${this.renderSystemInfo()}
                     </div>
                 </div>
                 
-                <!-- Mémoire et disque -->
+                <!-- MÃ©moire et disque -->
                 <div class="system-section">
-                    <h2>💾 Ressources</h2>
+                    <h2>ðŸ’¾ Ressources</h2>
                     <div id="systemResources">
                         ${this.renderResources()}
                     </div>
                 </div>
                 
-                <!-- Réseau -->
+                <!-- RÃ©seau -->
                 <div class="system-section">
-                    <h2>🌐 Réseau</h2>
+                    <h2>ðŸŒ RÃ©seau</h2>
                     <div id="networkInfo">
                         ${this.renderNetwork()}
                     </div>
@@ -104,7 +104,7 @@ class SystemView {
                 <!-- Logger -->
                 <div class="system-section logs-section">
                     <div class="logs-header">
-                        <h2>📝 Logs</h2>
+                        <h2>ðŸ“ Logs</h2>
                         <div class="logs-controls">
                             <select class="log-level-select" data-action="change-log-level">
                                 <option value="debug" ${this.state.logLevel === 'debug' ? 'selected' : ''}>Debug</option>
@@ -113,10 +113,10 @@ class SystemView {
                                 <option value="error" ${this.state.logLevel === 'error' ? 'selected' : ''}>Error</option>
                             </select>
                             <button class="btn-clear-logs" data-action="clear-logs">
-                                🗑️ Effacer
+                                ðŸ—‘ï¸ Effacer
                             </button>
                             <button class="btn-export-logs" data-action="export-logs">
-                                💾 Exporter
+                                ðŸ’¾ Exporter
                             </button>
                         </div>
                     </div>
@@ -235,23 +235,23 @@ class SystemView {
             <div class="info-grid">
                 <div class="info-item">
                     <span class="info-label">Version:</span>
-                    <span class="info-value">${info.version || '—'}</span>
+                    <span class="info-value">${info.version || 'â€”'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Plateforme:</span>
-                    <span class="info-value">${info.platform || '—'}</span>
+                    <span class="info-value">${info.platform || 'â€”'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Architecture:</span>
-                    <span class="info-value">${info.arch || '—'}</span>
+                    <span class="info-value">${info.arch || 'â€”'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Uptime:</span>
-                    <span class="info-value">${uptime ? this.formatUptime(uptime) : '—'}</span>
+                    <span class="info-value">${uptime ? this.formatUptime(uptime) : 'â€”'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Hostname:</span>
-                    <span class="info-value">${info.hostname || '—'}</span>
+                    <span class="info-value">${info.hostname || 'â€”'}</span>
                 </div>
             </div>
         `;
@@ -281,7 +281,7 @@ class SystemView {
 
     renderMemory(memory) {
         if (!memory) {
-            return '<div class="loading">Chargement mémoire...</div>';
+            return '<div class="loading">Chargement mÃ©moire...</div>';
         }
         
         const total = memory.total || 0;
@@ -291,16 +291,16 @@ class SystemView {
         
         return `
             <div class="resource-card">
-                <h3>💾 Mémoire RAM</h3>
+                <h3>ðŸ’¾ MÃ©moire RAM</h3>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: ${percent}%"></div>
                 </div>
                 <div class="resource-stats">
-                    <span>Utilisée: ${this.formatBytes(used)}</span>
+                    <span>UtilisÃ©e: ${this.formatBytes(used)}</span>
                     <span>Libre: ${this.formatBytes(free)}</span>
                     <span>Total: ${this.formatBytes(total)}</span>
                 </div>
-                <div class="resource-percent">${percent}% utilisé</div>
+                <div class="resource-percent">${percent}% utilisÃ©</div>
             </div>
         `;
     }
@@ -317,16 +317,16 @@ class SystemView {
         
         return `
             <div class="resource-card">
-                <h3>💿 Disque</h3>
+                <h3>ðŸ’¿ Disque</h3>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: ${percent}%"></div>
                 </div>
                 <div class="resource-stats">
-                    <span>Utilisé: ${this.formatBytes(used)}</span>
+                    <span>UtilisÃ©: ${this.formatBytes(used)}</span>
                     <span>Libre: ${this.formatBytes(free)}</span>
                     <span>Total: ${this.formatBytes(total)}</span>
                 </div>
-                <div class="resource-percent">${percent}% utilisé</div>
+                <div class="resource-percent">${percent}% utilisÃ©</div>
             </div>
         `;
     }
@@ -357,14 +357,14 @@ class SystemView {
 
     renderNetworkStatus(status) {
         if (!status) {
-            return '<div class="loading">Chargement statut réseau...</div>';
+            return '<div class="loading">Chargement statut rÃ©seau...</div>';
         }
         
         return `
             <div class="network-card">
-                <h3>🌐 Statut</h3>
+                <h3>ðŸŒ Statut</h3>
                 <div class="network-status ${status.connected ? 'connected' : 'disconnected'}">
-                    ${status.connected ? '✓ Connecté' : '✗ Déconnecté'}
+                    ${status.connected ? 'âœ“ ConnectÃ©' : 'âœ— DÃ©connectÃ©'}
                 </div>
             </div>
         `;
@@ -372,17 +372,17 @@ class SystemView {
 
     renderNetworkInterfaces(interfaces) {
         if (!interfaces || interfaces.length === 0) {
-            return '<div class="loading">Aucune interface réseau</div>';
+            return '<div class="loading">Aucune interface rÃ©seau</div>';
         }
         
         return `
             <div class="network-card">
-                <h3>🔌 Interfaces</h3>
+                <h3>ðŸ”Œ Interfaces</h3>
                 <div class="interfaces-list">
                     ${interfaces.map(iface => `
                         <div class="interface-item">
                             <span class="interface-name">${iface.name}</span>
-                            <span class="interface-ip">${iface.ip || '—'}</span>
+                            <span class="interface-ip">${iface.ip || 'â€”'}</span>
                         </div>
                     `).join('')}
                 </div>
@@ -392,19 +392,19 @@ class SystemView {
 
     renderNetworkStats(stats) {
         if (!stats) {
-            return '<div class="loading">Chargement stats réseau...</div>';
+            return '<div class="loading">Chargement stats rÃ©seau...</div>';
         }
         
         return `
             <div class="network-card">
-                <h3>📊 Statistiques</h3>
+                <h3>ðŸ“Š Statistiques</h3>
                 <div class="stats-grid">
                     <div class="stat-item">
-                        <span class="stat-label">↓ Reçu:</span>
+                        <span class="stat-label">â†“ ReÃ§u:</span>
                         <span class="stat-value">${this.formatBytes(stats.rx_bytes || 0)}</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">↑ Envoyé:</span>
+                        <span class="stat-label">â†‘ EnvoyÃ©:</span>
                         <span class="stat-value">${this.formatBytes(stats.tx_bytes || 0)}</span>
                     </div>
                 </div>
@@ -442,7 +442,7 @@ class SystemView {
 
     renderLogEntry(log) {
         const levelClass = `log-${log.level || 'info'}`;
-        const timestamp = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString() : '—';
+        const timestamp = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString() : 'â€”';
         
         return `
             <div class="log-entry ${levelClass}">
@@ -466,7 +466,7 @@ class SystemView {
     async loadSystemData() {
         if (!this.eventBus) return;
         
-        // Appels API parallèles
+        // Appels API parallÃ¨les
         this.eventBus.emit('system:info_requested');
         this.eventBus.emit('system:uptime_requested');
         this.eventBus.emit('system:memory_requested');
@@ -506,7 +506,7 @@ class SystemView {
     }
 
     startAutoRefresh() {
-        // Rafraîchir toutes les 5 secondes
+        // RafraÃ®chir toutes les 5 secondes
         this.state.refreshInterval = setInterval(() => {
             this.loadSystemData();
         }, 5000);

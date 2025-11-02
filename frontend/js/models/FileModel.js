@@ -1,10 +1,10 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
 // Chemin rÃ©el: frontend/js/models/FileModel.js
-// Version: v4.0.0 - API COMPATIBLE v4.2.2
-// Date: 2025-11-01
+// Version: v4.2.2 - API COMPATIBLE v4.2.2
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v4.0.0:
+// CORRECTIONS v4.2.2:
 // âœ… list_files â†’ files.list
 // âœ… load_file â†’ playback.load
 // âœ… unload_file â†’ playback.stop
@@ -12,6 +12,7 @@
 // âœ… delete_file â†’ files.delete
 // âœ… import_file â†’ files.write
 // âœ… export_file â†’ files.read
+// âœ… Extraction response.data corrigÃ©e
 // ============================================================================
 
 class FileModel extends BaseModel {
@@ -37,7 +38,7 @@ class FileModel extends BaseModel {
         this.data.selectedFile = this.data.selectedFile || null;
         this.data.recentFiles = this.data.recentFiles || [];
         
-        this.log('debug', 'FileModel', 'âœ“ FileModel v4.0.0 initialized (API v4.2.2)');
+        this.log('debug', 'FileModel', 'âœ“ FileModel v4.2.2 initialized (API v4.2.2)');
     }
     
     // ========================================================================
@@ -46,7 +47,7 @@ class FileModel extends BaseModel {
     
     /**
      * RafraÃ®chit la liste des fichiers
-     * âœ… API v4.0.0: files.list
+     * âœ… API v4.2.2: files.list
      */
     async refreshFileList(path = null) {
         const targetPath = path || this.getCurrentPath();
@@ -60,12 +61,13 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Refreshing file list: ${targetPath}`);
             
-            // âœ… Nouvelle commande API v4.0.0
+            // âœ… Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.list', {
                 path: targetPath
             });
+            const data = response.data || response;
             
-            const files = response.files || [];
+            const files = data.files || [];
             
             this.set('files', files);
             this.set('currentPath', targetPath);
@@ -87,7 +89,7 @@ class FileModel extends BaseModel {
     
     /**
      * Charge un fichier MIDI pour lecture
-     * âœ… API v4.0.0: playback.load
+     * âœ… API v4.2.2: playback.load
      */
     async loadFile(filePath) {
         if (!this.backend) {
@@ -97,22 +99,23 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Loading file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.0.0 - charge pour lecture
+            // âœ… Nouvelle commande API v4.2.2 - charge pour lecture
             const response = await this.backend.sendCommand('playback.load', {
-                file_path: filePath
+                filename: filePath
             });
+            const data = response.data || response;
             
-            this.set('selectedFile', response);
+            this.set('selectedFile', data);
             this.addToRecent(filePath);
             
             if (this.eventBus) {
                 this.eventBus.emit('file:loaded', {
                     filePath,
-                    data: response
+                    data: data
                 });
             }
             
-            return response;
+            return data;
             
         } catch (error) {
             this.log('error', 'FileModel', `Load failed: ${error.message}`);
@@ -122,7 +125,7 @@ class FileModel extends BaseModel {
     
     /**
      * Lit le contenu d'un fichier
-     * âœ… API v4.0.0: files.read
+     * âœ… API v4.2.2: files.read
      */
     async readFile(filePath) {
         if (!this.backend) {
@@ -132,12 +135,13 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Reading file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.0.0
+            // âœ… Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.read', {
-                path: filePath
+                filename: filePath
             });
+            const data = response.data || response;
             
-            return response;
+            return data;
             
         } catch (error) {
             this.log('error', 'FileModel', `Read failed: ${error.message}`);
@@ -147,7 +151,7 @@ class FileModel extends BaseModel {
     
     /**
      * DÃ©charge le fichier actuel
-     * âœ… API v4.0.0: playback.stop
+     * âœ… API v4.2.2: playback.stop
      */
     async unloadFile() {
         if (!this.backend) {
@@ -157,8 +161,9 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', 'Unloading current file');
             
-            // âœ… Nouvelle commande API v4.0.0
-            await this.backend.sendCommand('playback.stop');
+            // âœ… Nouvelle commande API v4.2.2
+            const response = await this.backend.sendCommand('playback.stop');
+            const data = response.data || response;
             
             this.set('selectedFile', null);
             
@@ -178,7 +183,7 @@ class FileModel extends BaseModel {
     
     /**
      * Obtient les informations d'un fichier
-     * âœ… API v4.0.0: files.getInfo
+     * âœ… API v4.2.2: files.getInfo
      */
     async getFileInfo(filePath) {
         if (!this.backend) {
@@ -188,12 +193,13 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Getting file info: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.0.0
+            // âœ… Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.getInfo', {
-                path: filePath
+                filename: filePath
             });
+            const data = response.data || response;
             
-            return response;
+            return data;
             
         } catch (error) {
             this.log('error', 'FileModel', `Get file info failed: ${error.message}`);
@@ -203,7 +209,7 @@ class FileModel extends BaseModel {
     
     /**
      * Supprime un fichier
-     * âœ… API v4.0.0: files.delete
+     * âœ… API v4.2.2: files.delete
      */
     async deleteFile(filePath) {
         if (!this.backend) {
@@ -213,10 +219,11 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Deleting file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.0.0
-            await this.backend.sendCommand('files.delete', {
-                path: filePath
+            // âœ… Nouvelle commande API v4.2.2
+            const response = await this.backend.sendCommand('files.delete', {
+                filename: filePath
             });
+            const data = response.data || response;
             
             const files = this.get('files');
             const updatedFiles = files.filter(f => f.path !== filePath);
@@ -241,7 +248,7 @@ class FileModel extends BaseModel {
     
     /**
      * Importe/Upload un fichier
-     * âœ… API v4.0.0: files.write
+     * âœ… API v4.2.2: files.write
      */
     async importFile(fileName, fileData, size, type = 'audio/midi') {
         if (!this.backend) {
@@ -251,12 +258,13 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Importing file: ${fileName}`);
             
-            // âœ… Nouvelle commande API v4.0.0
+            // âœ… Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.write', {
                 path: `/midi/${fileName}`,
                 content: fileData,
                 encoding: 'base64'
             });
+            const data = response.data || response;
             
             await this.refreshFileList();
             
@@ -267,7 +275,7 @@ class FileModel extends BaseModel {
                 });
             }
             
-            return response;
+            return data;
             
         } catch (error) {
             this.log('error', 'FileModel', `Import failed: ${error.message}`);
@@ -277,7 +285,7 @@ class FileModel extends BaseModel {
     
     /**
      * Exporte/TÃ©lÃ©charge un fichier
-     * âœ… API v4.0.0: files.read
+     * âœ… API v4.2.2: files.read
      */
     async exportFile(filePath, format = 'midi') {
         if (!this.backend) {
@@ -287,10 +295,11 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Exporting file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.0.0
+            // âœ… Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.read', {
-                path: filePath
+                filename: filePath
             });
+            const data = response.data || response;
             
             if (this.eventBus) {
                 this.eventBus.emit('file:exported', {
@@ -300,7 +309,7 @@ class FileModel extends BaseModel {
                 });
             }
             
-            return response;
+            return data;
             
         } catch (error) {
             this.log('error', 'FileModel', `Export failed: ${error.message}`);
@@ -309,11 +318,11 @@ class FileModel extends BaseModel {
     }
     
     // ========================================================================
-    // GESTION FICHIERS RÃƒâ€°CENTS
+    // GESTION FICHIERS RÃ‰CENTS
     // ========================================================================
     
     /**
-     * Ajoute un fichier aux rÃƒÂ©cents
+     * Ajoute un fichier aux rÃ©cents
      */
     addToRecent(filePath) {
         let recentFiles = this.get('recentFiles');
@@ -324,7 +333,7 @@ class FileModel extends BaseModel {
         // Ajouter en tÃªte
         recentFiles.unshift(filePath);
         
-        // Limiter Ãƒ  10 fichiers
+        // Limiter Ã  10 fichiers
         if (recentFiles.length > 10) {
             recentFiles = recentFiles.slice(0, 10);
         }
@@ -374,21 +383,21 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * DÃƒÂ©finit le chemin actuel
+     * DÃ©finit le chemin actuel
      */
     setCurrentPath(path) {
         this.set('currentPath', path);
     }
     
     /**
-     * Obtient le fichier sÃƒÂ©lectionnÃƒÂ©
+     * Obtient le fichier sÃ©lectionnÃ©
      */
     getSelectedFile() {
         return this.get('selectedFile');
     }
     
     /**
-     * DÃƒÂ©finit le fichier sÃƒÂ©lectionnÃƒÂ©
+     * DÃ©finit le fichier sÃ©lectionnÃ©
      */
     setSelectedFile(file) {
         this.set('selectedFile', file);
