@@ -306,7 +306,7 @@ class BackendService {
             
             // Ã¢Å“â€¦ Si type="response" => Utiliser data.id au lieu de payload.request_id. Matcher sur request_id
             if (messageType === 'response') {
-                const requestId = data.id;
+                const requestId = payload.id;
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
