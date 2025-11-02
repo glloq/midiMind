@@ -465,11 +465,9 @@ class BackendService {
                             .reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
                     
-                    const response = await this.sendCommand('files.upload', {
-                        filename: file.name,
-                        data: base64Data,
-                        size: file.size,
-                        type: file.type
+                    const response = await this.sendCommand('files.write', {
+                        filepath: `/midi/${file.name}`,
+                        content: base64Data
                     });
                     
                     resolve(response);

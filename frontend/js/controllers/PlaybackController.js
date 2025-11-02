@@ -1,20 +1,20 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaybackController.js
-// Chemin réel: frontend/js/controllers/PlaybackController.js
+// Chemin rÃ©el: frontend/js/controllers/PlaybackController.js
 // Version: v3.4.0 - API v4.0.0 COMPATIBLE
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.4.0:
-// ✔ load_file → playback.load
-// ✔ play → playback.play
-// ✔ pause → playback.pause
-// ✔ CORRECTIONS v4.0.0: Compatibilité API v4.0.0
-// ✔ stop → playback.stop
-// ✔ seek → playback.seek
-// ✔ set_tempo → playback.setTempo
-// ✔ set_loop → playback.setLoop
-// ⚠️ setVolume commenté (pas dans la doc API)
-// ⚠️ getPosition supprimé (utilise événement playback_position)
+// âœ” load_file â†’ playback.load
+// âœ” play â†’ playback.play
+// âœ” pause â†’ playback.pause
+// âœ” CORRECTIONS v4.0.0: CompatibilitÃ© API v4.0.0
+// âœ” stop â†’ playback.stop
+// âœ” seek â†’ playback.seek
+// âœ” set_tempo â†’ playback.setTempo
+// âœ” set_loop â†’ playback.setLoop
+// âš ï¸ setVolume commentÃ© (pas dans la doc API)
+// âš ï¸ getPosition supprimÃ© (utilise Ã©vÃ©nement playback_position)
 // ============================================================================
 
 class PlaybackController extends BaseController {
@@ -27,7 +27,7 @@ class PlaybackController extends BaseController {
         this.view = views.playback;
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // État
+        // Ã‰tat
         this.state = {
             ...this.state,
             isPlaying: false,
@@ -59,7 +59,7 @@ class PlaybackController extends BaseController {
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS
+    // Ã‰VÃ‰NEMENTS
     // ========================================================================
     
     bindEvents() {
@@ -73,7 +73,7 @@ class PlaybackController extends BaseController {
         this.eventBus.on('playback:toggle-loop', () => this.toggleLoop());
         this.eventBus.on('playback:load-file', (data) => this.loadFile(data.filePath || data.fileId));
         
-        // Backend événements
+        // Backend Ã©vÃ©nements
         this.eventBus.on('backend:event:playback_position', (data) => {
             this.handlePositionUpdate(data);
         });
@@ -95,19 +95,19 @@ class PlaybackController extends BaseController {
             }
         });
         
-        this.log('info', 'PlaybackController', '✔ Events bound (v3.4.0 - API v4.0.0)');
+        this.log('info', 'PlaybackController', 'âœ” Events bound (v3.4.0 - API v4.0.0)');
     }
     
     async onBackendConnected() {
         this.state.backendReady = true;
-        this.log('info', 'PlaybackController', '✔ Backend connected');
+        this.log('info', 'PlaybackController', 'âœ” Backend connected');
     }
     
     onBackendDisconnected() {
         this.state.backendReady = false;
         this.stopPositionUpdates();
         this.state.isPlaying = false;
-        this.log('warn', 'PlaybackController', '⚠️ Backend disconnected');
+        this.log('warn', 'PlaybackController', 'âš ï¸ Backend disconnected');
     }
     
     // ========================================================================
@@ -116,13 +116,13 @@ class PlaybackController extends BaseController {
     
     /**
      * Charge un fichier pour lecture
-     * ✔ API v4.0.0: playback.load
+     * âœ” API v4.0.0: playback.load
      */
     async loadFile(filePath) {
         try {
             this.log('info', 'PlaybackController', `Loading file for playback: ${filePath}`);
             
-            // ✔ API v4.0.0: playback.load
+            // âœ” API v4.0.0: playback.load
             const response = await this.backend.sendCommand('playback.load', {
                 file_path: filePath
             });
@@ -131,14 +131,14 @@ class PlaybackController extends BaseController {
             this.state.position = 0;
             this.state.duration = response.duration || 0;
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('currentFile', filePath);
                 this.playbackModel.set('duration', this.state.duration);
                 this.playbackModel.set('position', 0);
             }
             
-            this.log('info', 'PlaybackController', `✔ File loaded: ${filePath}`);
+            this.log('info', 'PlaybackController', `âœ” File loaded: ${filePath}`);
             this.eventBus.emit('playback:file-loaded', { filePath, duration: this.state.duration });
             
             if (this.notifications) {
@@ -167,35 +167,35 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Démarre la lecture
-     * ✔ API v4.0.0: playback.play
+     * DÃ©marre la lecture
+     * âœ” API v4.0.0: playback.play
      */
     async play(filePath = null) {
         try {
             this.log('info', 'PlaybackController', 'Starting playback...');
             
-            // ✔ API v4.0.0: playback.play
+            // âœ” API v4.0.0: playback.play
             const params = filePath ? { file_path: filePath } : {};
             const response = await this.backend.sendCommand('playback.play', params);
             
             this.state.isPlaying = true;
             
-            // Si file_path fourni, mettre à jour l'état
+            // Si file_path fourni, mettre Ã  jour l'Ã©tat
             if (filePath) {
                 this.state.loadedFile = filePath;
                 this.state.duration = response.duration || this.state.duration;
             }
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('state', 'playing');
                 this.playbackModel.set('isPlaying', true);
             }
             
-            // Démarrer updates position via événements backend
+            // DÃ©marrer updates position via Ã©vÃ©nements backend
             this.startPositionUpdates();
             
-            this.log('info', 'PlaybackController', '✔ Playback started');
+            this.log('info', 'PlaybackController', 'âœ” Playback started');
             this.eventBus.emit('playback:started');
             
             return true;
@@ -216,27 +216,27 @@ class PlaybackController extends BaseController {
     
     /**
      * Met en pause la lecture
-     * ✔ API v4.0.0: playback.pause
+     * âœ” API v4.0.0: playback.pause
      */
     async pause() {
         try {
             this.log('info', 'PlaybackController', 'Pausing playback...');
             
-            // ✔ API v4.0.0: playback.pause
+            // âœ” API v4.0.0: playback.pause
             await this.backend.sendCommand('playback.pause');
             
             this.state.isPlaying = false;
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('state', 'paused');
                 this.playbackModel.set('isPlaying', false);
             }
             
-            // Arrêter updates position
+            // ArrÃªter updates position
             this.stopPositionUpdates();
             
-            this.log('info', 'PlaybackController', '✔ Playback paused');
+            this.log('info', 'PlaybackController', 'âœ” Playback paused');
             this.eventBus.emit('playback:paused');
             
             return true;
@@ -248,30 +248,30 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Arrête la lecture
-     * ✔ API v4.0.0: playback.stop
+     * ArrÃªte la lecture
+     * âœ” API v4.0.0: playback.stop
      */
     async stop() {
         try {
             this.log('info', 'PlaybackController', 'Stopping playback...');
             
-            // ✔ API v4.0.0: playback.stop
+            // âœ” API v4.0.0: playback.stop
             await this.backend.sendCommand('playback.stop');
             
             this.state.isPlaying = false;
             this.state.position = 0;
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('state', 'stopped');
                 this.playbackModel.set('isPlaying', false);
                 this.playbackModel.set('position', 0);
             }
             
-            // Arrêter updates position
+            // ArrÃªter updates position
             this.stopPositionUpdates();
             
-            this.log('info', 'PlaybackController', '✔ Playback stopped');
+            this.log('info', 'PlaybackController', 'âœ” Playback stopped');
             this.eventBus.emit('playback:stopped');
             
             return true;
@@ -283,21 +283,21 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Déplace la position de lecture
-     * ✔ API v4.0.0: playback.seek
+     * DÃ©place la position de lecture
+     * âœ” API v4.0.0: playback.seek
      */
     async seek(position) {
         try {
             this.log('info', 'PlaybackController', `Seeking to: ${position}`);
             
-            // ✔ API v4.0.0: playback.seek
+            // âœ” API v4.0.0: playback.seek
             await this.backend.sendCommand('playback.seek', {
                 position: position
             });
             
             this.state.position = position;
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('position', position);
             }
@@ -314,20 +314,20 @@ class PlaybackController extends BaseController {
     
     /**
      * Change le tempo
-     * ✔ API v4.0.0: playback.setTempo
+     * âœ” API v4.0.0: playback.setTempo
      */
     async setTempo(tempo) {
         try {
             this.log('info', 'PlaybackController', `Setting tempo: ${tempo}`);
             
-            // ✔ API v4.0.0: playback.setTempo
+            // âœ” API v4.0.0: playback.setTempo
             await this.backend.sendCommand('playback.setTempo', {
                 tempo: tempo
             });
             
             this.state.tempo = tempo;
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('tempo', tempo);
             }
@@ -344,19 +344,19 @@ class PlaybackController extends BaseController {
     
     /**
      * Change le volume
-     * ⚠️ NOTE: Cette fonction n'est pas dans la documentation API backend
-     * Elle est conservée pour compatibilité mais pourrait ne pas fonctionner
-     * TODO: Vérifier si le backend supporte cette commande
+     * âš ï¸ NOTE: Cette fonction n'est pas dans la documentation API backend
+     * Elle est conservÃ©e pour compatibilitÃ© mais pourrait ne pas fonctionner
+     * TODO: VÃ©rifier si le backend supporte cette commande
      */
     async setVolume(volume) {
         try {
             const clampedVolume = Math.max(0, Math.min(100, volume));
             
-            this.log('warn', 'PlaybackController', `Setting volume: ${clampedVolume} (⚠️ not in API doc)`);
+            this.log('warn', 'PlaybackController', `Setting volume: ${clampedVolume} (âš ï¸ not in API doc)`);
             
-            // ⚠️ COMMANDE NON DOCUMENTÉE - Pourrait échouer
-            // Si le backend ne supporte pas cette commande, elle sera rejetée
-            // DEPRECATED API - backend.sendCommand('set_volume') no longer supported
+            // âš ï¸ COMMANDE NON DOCUMENTÃ‰E - Pourrait Ã©chouer
+            // Si le backend ne supporte pas cette commande, elle sera rejetÃ©e
+            // Volume control removed - API v4.2.2 does not support set_volume
             // Update local state directly
             this.state.volume = clampedVolume;
             
@@ -367,6 +367,9 @@ class PlaybackController extends BaseController {
             this.eventBus.emit('playback:volume-changed', { volume: clampedVolume });
             
             return true;
+                this.eventBus.emit('playback:volume-changed', { volume: clampedVolume });
+                return false;
+            }
             
         } catch (error) {
             this.log('error', 'PlaybackController', 'setVolume failed:', error);
@@ -376,7 +379,7 @@ class PlaybackController extends BaseController {
     
     /**
      * Toggle loop
-     * ✔ API v4.0.0: playback.setLoop
+     * âœ” API v4.0.0: playback.setLoop
      */
     async toggleLoop(start = null, end = null) {
         const newEnabled = !this.state.loop.enabled;
@@ -388,7 +391,7 @@ class PlaybackController extends BaseController {
             const loopStart = start !== null ? start : 0;
             const loopEnd = end !== null ? end : this.state.duration;
             
-            // ✔ API v4.0.0: playback.setLoop
+            // âœ” API v4.0.0: playback.setLoop
             await this.backend.sendCommand('playback.setLoop', {
                 enabled: newEnabled,
                 start: loopStart,
@@ -401,7 +404,7 @@ class PlaybackController extends BaseController {
                 end: loopEnd
             };
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('loop', this.state.loop);
             }
@@ -417,8 +420,8 @@ class PlaybackController extends BaseController {
     }
     
     /**
-     * Active le loop avec des paramètres spécifiques
-     * ✔ API v4.0.0: playback.setLoop
+     * Active le loop avec des paramÃ¨tres spÃ©cifiques
+     * âœ” API v4.0.0: playback.setLoop
      */
     async setLoop(enabled, start = 0, end = null) {
         try {
@@ -426,7 +429,7 @@ class PlaybackController extends BaseController {
             
             this.log('info', 'PlaybackController', `Setting loop: enabled=${enabled}, start=${start}, end=${loopEnd}`);
             
-            // ✔ API v4.0.0: playback.setLoop
+            // âœ” API v4.0.0: playback.setLoop
             await this.backend.sendCommand('playback.setLoop', {
                 enabled: enabled,
                 start: start,
@@ -439,7 +442,7 @@ class PlaybackController extends BaseController {
                 end: loopEnd
             };
             
-            // Mettre à jour le model
+            // Mettre Ã  jour le model
             if (this.playbackModel) {
                 this.playbackModel.set('loop', this.state.loop);
             }
@@ -455,7 +458,7 @@ class PlaybackController extends BaseController {
     }
     
     // ========================================================================
-    // GESTION ÉVÉNEMENTS BACKEND
+    // GESTION Ã‰VÃ‰NEMENTS BACKEND
     // ========================================================================
     
     handlePositionUpdate(data) {
@@ -484,7 +487,7 @@ class PlaybackController extends BaseController {
         
         this.eventBus.emit('playback:finished');
         
-        // Rejouer si loop activé
+        // Rejouer si loop activÃ©
         if (this.state.loop.enabled) {
             setTimeout(() => {
                 this.play().catch(err => {
@@ -516,20 +519,20 @@ class PlaybackController extends BaseController {
     // ========================================================================
     
     /**
-     * Démarre l'écoute des événements de position
-     * Note: Utilise les événements playback_position du backend
+     * DÃ©marre l'Ã©coute des Ã©vÃ©nements de position
+     * Note: Utilise les Ã©vÃ©nements playback_position du backend
      * au lieu de polling avec playback.getPosition
      */
     startPositionUpdates() {
-        // Les mises à jour de position se font via l'événement 'backend:event:playback_position'
-        // qui est déjà écouté dans bindEvents()
+        // Les mises Ã  jour de position se font via l'Ã©vÃ©nement 'backend:event:playback_position'
+        // qui est dÃ©jÃ  Ã©coutÃ© dans bindEvents()
         // Pas besoin de polling actif
         this.log('info', 'PlaybackController', 'Position updates enabled (via events)');
     }
     
     stopPositionUpdates() {
-        // Rien à faire ici car on utilise les événements backend
-        // plutôt qu'un polling actif
+        // Rien Ã  faire ici car on utilise les Ã©vÃ©nements backend
+        // plutÃ´t qu'un polling actif
         this.log('info', 'PlaybackController', 'Position updates disabled');
     }
     
@@ -538,7 +541,7 @@ class PlaybackController extends BaseController {
     // ========================================================================
     
     /**
-     * Obtient l'état actuel du playback
+     * Obtient l'Ã©tat actuel du playback
      */
     getState() {
         return {
