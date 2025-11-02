@@ -1,26 +1,16 @@
-// ============================================================================
-// Fichier: frontend/js/services/BackendService.js
-// Version: v4.0.1 - CORRIGÉ FORMAT BACKEND RÉEL
-// Date: 2025-11-02
-// ============================================================================
-// CORRECTIONS v4.0.1:
-// ✅ Gestion format backend réel: type="response", payload={...}
-// ✅ Support IDs numériques ET UUID strings
-// ✅ Toutes commandes API conformes
+// Version v4.0.2 - FORMAT REQUÊTE/RÉPONSE BACKEND COMPLET
 
 class BackendService {
     constructor(url, eventBus, logger) {
         this.eventBus = eventBus;
         this.logger = logger || console;
         
-        // État de la connexion
         this.ws = null;
         this.connected = false;
         this.connecting = false;
         this.offlineMode = false;
         this.reconnectionStopped = false;
         
-        // Configuration
         this.config = {
             url: url || 'ws://localhost:8080',
             reconnectInterval: 3000,
@@ -33,26 +23,36 @@ class BackendService {
             defaultCommandTimeout: 5000
         };
         
-        // Gestion reconnexion
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
         this.connectionTimeout = null;
         
-        // Suivi activité backend
         this.lastActivityTime = Date.now();
         this.heartbeatPending = false;
         this.heartbeatFailures = 0;
         
-        // File d'attente messages
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        // Compteur requêtes
         this.requestId = 0;
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized (v4.0.1 - FORMAT BACKEND RÉEL)');
+        this.logger.info('BackendService', 'Service initialized (v4.0.2 - FORMAT COMPLET)');
+    }
+    
+    // Génère un UUID v4
+    generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
+    // Génère timestamp ISO
+    generateTimestamp() {
+        return new Date().toISOString();
     }
     
     async connect(url = null) {
@@ -313,7 +313,7 @@ class BackendService {
     }
     
     /**
-     * ✅ CORRIGÉ: Gère format backend réel type="response", payload={...}
+     * ✅ CORRIGÉ v4.0.2: Gère format backend complet
      */
     handleMessage(event) {
         try {
@@ -321,61 +321,32 @@ class BackendService {
             
             this.logger.debug('BackendService', 'Message received:', data);
             
-            // Toute réponse = activité backend
             this.lastActivityTime = Date.now();
             
-            // ✅ Détecter type de message
             const messageType = data.type || 'unknown';
             const messageId = data.id;
             
-            // ✅ Si type="response" => réponse à une commande
+            // Si type="response" => réponse à commande
             if (messageType === 'response' && messageId !== undefined) {
-                // Convertir ID string en nombre si nécessaire pour lookup
-                let lookupId = messageId;
-                if (typeof messageId === 'string' && !isNaN(parseInt(messageId))) {
-                    lookupId = parseInt(messageId);
-                }
-                
-                // Chercher avec ID original ET converti
-                let pending = this.pendingRequests.get(messageId) || this.pendingRequests.get(lookupId);
+                const pending = this.pendingRequests.get(messageId);
                 
                 if (pending) {
-                    // Supprimer avec les deux clés possibles
                     this.pendingRequests.delete(messageId);
-                    this.pendingRequests.delete(lookupId);
                     
-                    // ✅ Extraire payload
                     const payload = data.payload || {};
                     
-                    // Vérifier erreur
                     if (payload.error || payload.status === 'error') {
                         const error = new Error(payload.error || payload.message || 'Command failed');
                         error.code = payload.error_code || payload.code;
                         pending.reject(error);
                     } else {
-                        // Succès
                         pending.resolve(payload);
                     }
                     return;
                 }
             }
             
-            // ✅ Backward compatibility: ancien format {success, data}
-            if (messageId !== undefined && this.pendingRequests.has(messageId)) {
-                const pending = this.pendingRequests.get(messageId);
-                this.pendingRequests.delete(messageId);
-                
-                if (data.success === true) {
-                    pending.resolve(data.data || data);
-                } else {
-                    const error = new Error(data.error || 'Command failed');
-                    error.code = data.error_code;
-                    pending.reject(error);
-                }
-                return;
-            }
-            
-            // ✅ Si type="event" => événement backend
+            // Si type="event" => événement backend
             if (messageType === 'event' || data.event) {
                 const eventName = data.event || data.payload?.event;
                 if (eventName) {
@@ -391,7 +362,6 @@ class BackendService {
                 }
             }
             
-            // Événement générique
             this.eventBus.emit('backend:message', data);
             
         } catch (error) {
@@ -420,6 +390,9 @@ class BackendService {
         }
     }
     
+    /**
+     * ✅ CORRIGÉ v4.0.2: Format complet requête backend
+     */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
             if (!this.isConnected()) {
@@ -428,7 +401,9 @@ class BackendService {
             }
             
             const timeoutMs = timeout || this.config.defaultCommandTimeout || 5000;
-            const requestId = ++this.requestId;
+            
+            // ✅ Générer UUID pour ID
+            const requestId = this.generateUUID();
             
             const timeoutTimer = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
@@ -448,10 +423,16 @@ class BackendService {
                 }
             });
             
+            // ✅ FORMAT COMPLET BACKEND
             const message = {
+                type: "request",
                 id: requestId,
-                command: command,
-                params: params
+                timestamp: this.generateTimestamp(),
+                version: "1.0",
+                payload: {
+                    command: command,
+                    params: params
+                }
             };
             
             this.send(message);
@@ -489,382 +470,123 @@ class BackendService {
         });
     }
     
-    // === COMMANDES API ===
+    // === COMMANDES API (identique) ===
+    async listDevices() { return this.sendCommand('devices.list'); }
+    async getDevice(deviceId) { return this.sendCommand('devices.info', { device_id: deviceId }); }
+    async enableDevice(deviceId) { return this.sendCommand('devices.enable', { device_id: deviceId }); }
+    async disableDevice(deviceId) { return this.sendCommand('devices.disable', { device_id: deviceId }); }
+    async connectDevice(deviceId) { return this.sendCommand('devices.connect', { device_id: deviceId }); }
+    async disconnectDevice(deviceId) { return this.sendCommand('devices.disconnect', { device_id: deviceId }); }
+    async setDeviceConfig(deviceId, config) { return this.sendCommand('devices.config.set', { device_id: deviceId, config }); }
+    async getDeviceConfig(deviceId) { return this.sendCommand('devices.config.get', { device_id: deviceId }); }
     
-    // DEVICES
-    async listDevices() {
-        return this.sendCommand('devices.list');
-    }
-    
-    async getDevice(deviceId) {
-        return this.sendCommand('devices.info', { device_id: deviceId });
-    }
-    
-    async enableDevice(deviceId) {
-        return this.sendCommand('devices.enable', { device_id: deviceId });
-    }
-    
-    async disableDevice(deviceId) {
-        return this.sendCommand('devices.disable', { device_id: deviceId });
-    }
-    
-    async connectDevice(deviceId) {
-        return this.sendCommand('devices.connect', { device_id: deviceId });
-    }
-    
-    async disconnectDevice(deviceId) {
-        return this.sendCommand('devices.disconnect', { device_id: deviceId });
-    }
-    
-    async setDeviceConfig(deviceId, config) {
-        return this.sendCommand('devices.config.set', { device_id: deviceId, config });
-    }
-    
-    async getDeviceConfig(deviceId) {
-        return this.sendCommand('devices.config.get', { device_id: deviceId });
-    }
-    
-    // ROUTING
     async addRoute(sourceId, destId, channel = null) {
         const params = { source_id: sourceId, dest_id: destId };
         if (channel !== null) params.channel = channel;
         return this.sendCommand('routing.add', params);
     }
+    async removeRoute(routeId) { return this.sendCommand('routing.remove', { route_id: routeId }); }
+    async listRoutes() { return this.sendCommand('routing.list'); }
+    async updateRoute(routeId, config) { return this.sendCommand('routing.update', { route_id: routeId, config }); }
+    async clearRoutes() { return this.sendCommand('routing.clear'); }
+    async setRoutingMatrix(matrix) { return this.sendCommand('routing.setMatrix', { matrix }); }
+    async getRoutingMatrix() { return this.sendCommand('routing.getMatrix'); }
+    async enableChannel(routeId, channel) { return this.sendCommand('routing.channel.enable', { route_id: routeId, channel }); }
+    async disableChannel(routeId, channel) { return this.sendCommand('routing.channel.disable', { route_id: routeId, channel }); }
+    async setTranspose(routeId, semitones) { return this.sendCommand('routing.transpose', { route_id: routeId, semitones }); }
+    async setVelocityCurve(routeId, curve) { return this.sendCommand('routing.velocityCurve', { route_id: routeId, curve }); }
     
-    async removeRoute(routeId) {
-        return this.sendCommand('routing.remove', { route_id: routeId });
-    }
-    
-    async listRoutes() {
-        return this.sendCommand('routing.list');
-    }
-    
-    async updateRoute(routeId, config) {
-        return this.sendCommand('routing.update', { route_id: routeId, config });
-    }
-    
-    async clearRoutes() {
-        return this.sendCommand('routing.clear');
-    }
-    
-    async setRoutingMatrix(matrix) {
-        return this.sendCommand('routing.setMatrix', { matrix });
-    }
-    
-    async getRoutingMatrix() {
-        return this.sendCommand('routing.getMatrix');
-    }
-    
-    async enableChannel(routeId, channel) {
-        return this.sendCommand('routing.channel.enable', { route_id: routeId, channel });
-    }
-    
-    async disableChannel(routeId, channel) {
-        return this.sendCommand('routing.channel.disable', { route_id: routeId, channel });
-    }
-    
-    async setTranspose(routeId, semitones) {
-        return this.sendCommand('routing.transpose', { route_id: routeId, semitones });
-    }
-    
-    async setVelocityCurve(routeId, curve) {
-        return this.sendCommand('routing.velocityCurve', { route_id: routeId, curve });
-    }
-    
-    // PLAYBACK
-    async play(fileId = null) {
-        return this.sendCommand('playback.play', fileId ? { file_id: fileId } : {});
-    }
-    
-    async pause() {
-        return this.sendCommand('playback.pause');
-    }
-    
-    async stop() {
-        return this.sendCommand('playback.stop');
-    }
-    
-    async seek(position) {
-        return this.sendCommand('playback.seek', { position });
-    }
-    
-    async setTempo(tempo) {
-        return this.sendCommand('playback.setTempo', { tempo });
-    }
-    
-    async getStatus() {
-        return this.sendCommand('playback.getStatus');
-    }
-    
+    async play(fileId = null) { return this.sendCommand('playback.play', fileId ? { file_id: fileId } : {}); }
+    async pause() { return this.sendCommand('playback.pause'); }
+    async stop() { return this.sendCommand('playback.stop'); }
+    async seek(position) { return this.sendCommand('playback.seek', { position }); }
+    async setTempo(tempo) { return this.sendCommand('playback.setTempo', { tempo }); }
+    async getStatus() { return this.sendCommand('playback.getStatus'); }
     async setLoop(enabled, startTick = null, endTick = null) {
         const params = { enabled };
         if (startTick !== null) params.start_tick = startTick;
         if (endTick !== null) params.end_tick = endTick;
         return this.sendCommand('playback.setLoop', params);
     }
-    
     async setMetronome(enabled, volume = null) {
         const params = { enabled };
         if (volume !== null) params.volume = volume;
         return this.sendCommand('playback.setMetronome', params);
     }
     
-    // FILES
-    async listFiles(path = '/midi') {
-        return this.sendCommand('files.list', { path });
-    }
+    async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
+    async loadFile(path) { return this.sendCommand('files.load', { path }); }
+    async saveFile(path, data) { return this.sendCommand('files.save', { path, data }); }
+    async deleteFile(path) { return this.sendCommand('files.delete', { path }); }
+    async renameFile(oldPath, newPath) { return this.sendCommand('files.rename', { old_path: oldPath, new_path: newPath }); }
+    async createDirectory(path) { return this.sendCommand('files.mkdir', { path }); }
+    async getFileInfo(path) { return this.sendCommand('files.info', { path }); }
+    async scanDirectory(path) { return this.sendCommand('files.scan', { path }); }
     
-    async loadFile(path) {
-        return this.sendCommand('files.load', { path });
-    }
+    async getEditorData(fileId) { return this.sendCommand('editor.getData', { file_id: fileId }); }
+    async setEditorData(fileId, data) { return this.sendCommand('editor.setData', { file_id: fileId, data }); }
+    async addNote(fileId, track, note) { return this.sendCommand('editor.addNote', { file_id: fileId, track, note }); }
+    async removeNote(fileId, track, noteId) { return this.sendCommand('editor.removeNote', { file_id: fileId, track, note_id: noteId }); }
+    async updateNote(fileId, track, noteId, changes) { return this.sendCommand('editor.updateNote', { file_id: fileId, track, note_id: noteId, changes }); }
+    async addCC(fileId, track, cc) { return this.sendCommand('editor.addCC', { file_id: fileId, track, cc }); }
+    async removeCC(fileId, track, ccId) { return this.sendCommand('editor.removeCC', { file_id: fileId, track, cc_id: ccId }); }
+    async updateCC(fileId, track, ccId, changes) { return this.sendCommand('editor.updateCC', { file_id: fileId, track, cc_id: ccId, changes }); }
+    async quantize(fileId, track, grid) { return this.sendCommand('editor.quantize', { file_id: fileId, track, grid }); }
+    async transpose(fileId, track, semitones) { return this.sendCommand('editor.transpose', { file_id: fileId, track, semitones }); }
     
-    async saveFile(path, data) {
-        return this.sendCommand('files.save', { path, data });
-    }
+    async getVersion() { return this.sendCommand('system.version'); }
+    async getInfo() { return this.sendCommand('system.info'); }
+    async getUptime() { return this.sendCommand('system.uptime'); }
+    async getMemory() { return this.sendCommand('system.memory'); }
+    async getDisk() { return this.sendCommand('system.disk'); }
+    async shutdown() { return this.sendCommand('system.shutdown'); }
+    async restart() { return this.sendCommand('system.restart'); }
+    async getLogs(lines = 100) { return this.sendCommand('system.logs', { lines }); }
     
-    async deleteFile(path) {
-        return this.sendCommand('files.delete', { path });
-    }
+    async measureLatency(deviceId) { return this.sendCommand('latency.measure', { device_id: deviceId }); }
+    async setOffset(deviceId, offset) { return this.sendCommand('latency.setOffset', { device_id: deviceId, offset }); }
+    async getOffset(deviceId) { return this.sendCommand('latency.getOffset', { device_id: deviceId }); }
+    async enableLatencyCompensation() { return this.sendCommand('latency.enable'); }
+    async disableLatencyCompensation() { return this.sendCommand('latency.disable'); }
+    async setGlobalOffset(offset) { return this.sendCommand('latency.setGlobalOffset', { offset }); }
+    async getGlobalOffset() { return this.sendCommand('latency.getGlobalOffset'); }
+    async listInstruments() { return this.sendCommand('latency.listInstruments'); }
     
-    async renameFile(oldPath, newPath) {
-        return this.sendCommand('files.rename', { old_path: oldPath, new_path: newPath });
-    }
+    async listPresets() { return this.sendCommand('preset.list'); }
+    async loadPreset(name) { return this.sendCommand('preset.load', { name }); }
+    async savePreset(name, config) { return this.sendCommand('preset.save', { name, config }); }
+    async deletePreset(name) { return this.sendCommand('preset.delete', { name }); }
+    async exportPreset(name) { return this.sendCommand('preset.export', { name }); }
     
-    async createDirectory(path) {
-        return this.sendCommand('files.mkdir', { path });
-    }
-    
-    async getFileInfo(path) {
-        return this.sendCommand('files.info', { path });
-    }
-    
-    async scanDirectory(path) {
-        return this.sendCommand('files.scan', { path });
-    }
-    
-    // EDITOR
-    async getEditorData(fileId) {
-        return this.sendCommand('editor.getData', { file_id: fileId });
-    }
-    
-    async setEditorData(fileId, data) {
-        return this.sendCommand('editor.setData', { file_id: fileId, data });
-    }
-    
-    async addNote(fileId, track, note) {
-        return this.sendCommand('editor.addNote', { file_id: fileId, track, note });
-    }
-    
-    async removeNote(fileId, track, noteId) {
-        return this.sendCommand('editor.removeNote', { file_id: fileId, track, note_id: noteId });
-    }
-    
-    async updateNote(fileId, track, noteId, changes) {
-        return this.sendCommand('editor.updateNote', { file_id: fileId, track, note_id: noteId, changes });
-    }
-    
-    async addCC(fileId, track, cc) {
-        return this.sendCommand('editor.addCC', { file_id: fileId, track, cc });
-    }
-    
-    async removeCC(fileId, track, ccId) {
-        return this.sendCommand('editor.removeCC', { file_id: fileId, track, cc_id: ccId });
-    }
-    
-    async updateCC(fileId, track, ccId, changes) {
-        return this.sendCommand('editor.updateCC', { file_id: fileId, track, cc_id: ccId, changes });
-    }
-    
-    async quantize(fileId, track, grid) {
-        return this.sendCommand('editor.quantize', { file_id: fileId, track, grid });
-    }
-    
-    async transpose(fileId, track, semitones) {
-        return this.sendCommand('editor.transpose', { file_id: fileId, track, semitones });
-    }
-    
-    // SYSTEM
-    async getVersion() {
-        return this.sendCommand('system.version');
-    }
-    
-    async getInfo() {
-        return this.sendCommand('system.info');
-    }
-    
-    async getUptime() {
-        return this.sendCommand('system.uptime');
-    }
-    
-    async getMemory() {
-        return this.sendCommand('system.memory');
-    }
-    
-    async getDisk() {
-        return this.sendCommand('system.disk');
-    }
-    
-    async shutdown() {
-        return this.sendCommand('system.shutdown');
-    }
-    
-    async restart() {
-        return this.sendCommand('system.restart');
-    }
-    
-    async getLogs(lines = 100) {
-        return this.sendCommand('system.logs', { lines });
-    }
-    
-    // LATENCY
-    async measureLatency(deviceId) {
-        return this.sendCommand('latency.measure', { device_id: deviceId });
-    }
-    
-    async setOffset(deviceId, offset) {
-        return this.sendCommand('latency.setOffset', { device_id: deviceId, offset });
-    }
-    
-    async getOffset(deviceId) {
-        return this.sendCommand('latency.getOffset', { device_id: deviceId });
-    }
-    
-    async enableLatencyCompensation() {
-        return this.sendCommand('latency.enable');
-    }
-    
-    async disableLatencyCompensation() {
-        return this.sendCommand('latency.disable');
-    }
-    
-    async setGlobalOffset(offset) {
-        return this.sendCommand('latency.setGlobalOffset', { offset });
-    }
-    
-    async getGlobalOffset() {
-        return this.sendCommand('latency.getGlobalOffset');
-    }
-    
-    async listInstruments() {
-        return this.sendCommand('latency.listInstruments');
-    }
-    
-    // PRESETS
-    async listPresets() {
-        return this.sendCommand('preset.list');
-    }
-    
-    async loadPreset(name) {
-        return this.sendCommand('preset.load', { name });
-    }
-    
-    async savePreset(name, config) {
-        return this.sendCommand('preset.save', { name, config });
-    }
-    
-    async deletePreset(name) {
-        return this.sendCommand('preset.delete', { name });
-    }
-    
-    async exportPreset(name) {
-        return this.sendCommand('preset.export', { name });
-    }
-    
-    // MIDI
-    async convertMidi(data, format) {
-        return this.sendCommand('midi.convert', { data, format });
-    }
-    
-    async loadMidi(path) {
-        return this.sendCommand('midi.load', { path });
-    }
-    
-    async saveMidi(path, data) {
-        return this.sendCommand('midi.save', { path, data });
-    }
-    
-    async importMidi(data) {
-        return this.sendCommand('midi.import', { data });
-    }
-    
+    async convertMidi(data, format) { return this.sendCommand('midi.convert', { data, format }); }
+    async loadMidi(path) { return this.sendCommand('midi.load', { path }); }
+    async saveMidi(path, data) { return this.sendCommand('midi.save', { path, data }); }
+    async importMidi(data) { return this.sendCommand('midi.import', { data }); }
     async addMidiRoute(sourceId, destId, channel = null) {
         const params = { source_id: sourceId, dest_id: destId };
         if (channel !== null) params.channel = channel;
         return this.sendCommand('midi.routing.add', params);
     }
+    async listMidiRoutes() { return this.sendCommand('midi.routing.list'); }
+    async updateMidiRoute(routeId, config) { return this.sendCommand('midi.routing.update', { route_id: routeId, config }); }
+    async removeMidiRoute(routeId) { return this.sendCommand('midi.routing.remove', { route_id: routeId }); }
+    async clearMidiRoutes() { return this.sendCommand('midi.routing.clear'); }
+    async sendNoteOn(channel, note, velocity) { return this.sendCommand('midi.sendNoteOn', { channel, note, velocity }); }
+    async sendNoteOff(channel, note) { return this.sendCommand('midi.sendNoteOff', { channel, note }); }
     
-    async listMidiRoutes() {
-        return this.sendCommand('midi.routing.list');
-    }
-    
-    async updateMidiRoute(routeId, config) {
-        return this.sendCommand('midi.routing.update', { route_id: routeId, config });
-    }
-    
-    async removeMidiRoute(routeId) {
-        return this.sendCommand('midi.routing.remove', { route_id: routeId });
-    }
-    
-    async clearMidiRoutes() {
-        return this.sendCommand('midi.routing.clear');
-    }
-    
-    async sendNoteOn(channel, note, velocity) {
-        return this.sendCommand('midi.sendNoteOn', { channel, note, velocity });
-    }
-    
-    async sendNoteOff(channel, note) {
-        return this.sendCommand('midi.sendNoteOff', { channel, note });
-    }
-    
-    // PLAYLISTS
-    async createPlaylist(name, items = []) {
-        return this.sendCommand('playlist.create', { name, items });
-    }
-    
-    async deletePlaylist(playlistId) {
-        return this.sendCommand('playlist.delete', { playlist_id: playlistId });
-    }
-    
-    async updatePlaylist(playlistId, config) {
-        return this.sendCommand('playlist.update', { playlist_id: playlistId, config });
-    }
-    
-    async listPlaylists() {
-        return this.sendCommand('playlist.list');
-    }
-    
-    async getPlaylist(playlistId) {
-        return this.sendCommand('playlist.get', { playlist_id: playlistId });
-    }
-    
-    async addPlaylistItem(playlistId, item) {
-        return this.sendCommand('playlist.addItem', { playlist_id: playlistId, item });
-    }
-    
-    async removePlaylistItem(playlistId, itemId) {
-        return this.sendCommand('playlist.removeItem', { 
-            playlist_id: playlistId, 
-            item_id: itemId 
-        });
-    }
-    
-    async reorderPlaylist(playlistId, order) {
-        return this.sendCommand('playlist.reorder', { playlist_id: playlistId, order });
-    }
-    
-    async setPlaylistLoop(playlistId, enabled) {
-        return this.sendCommand('playlist.setLoop', { 
-            playlist_id: playlistId, 
-            enabled 
-        });
-    }
+    async createPlaylist(name, items = []) { return this.sendCommand('playlist.create', { name, items }); }
+    async deletePlaylist(playlistId) { return this.sendCommand('playlist.delete', { playlist_id: playlistId }); }
+    async updatePlaylist(playlistId, config) { return this.sendCommand('playlist.update', { playlist_id: playlistId, config }); }
+    async listPlaylists() { return this.sendCommand('playlist.list'); }
+    async getPlaylist(playlistId) { return this.sendCommand('playlist.get', { playlist_id: playlistId }); }
+    async addPlaylistItem(playlistId, item) { return this.sendCommand('playlist.addItem', { playlist_id: playlistId, item }); }
+    async removePlaylistItem(playlistId, itemId) { return this.sendCommand('playlist.removeItem', { playlist_id: playlistId, item_id: itemId }); }
+    async reorderPlaylist(playlistId, order) { return this.sendCommand('playlist.reorder', { playlist_id: playlistId, order }); }
+    async setPlaylistLoop(playlistId, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id: playlistId, enabled }); }
     
     flushMessageQueue() {
         if (this.messageQueue.length === 0) return;
-        
         this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages`);
-        
         while (this.messageQueue.length > 0) {
             const message = this.messageQueue.shift();
             this.send(message);
