@@ -367,9 +367,6 @@ class PlaybackController extends BaseController {
             this.eventBus.emit('playback:volume-changed', { volume: clampedVolume });
             
             return true;
-                this.eventBus.emit('playback:volume-changed', { volume: clampedVolume });
-                return false;
-            }
             
         } catch (error) {
             this.log('error', 'PlaybackController', 'setVolume failed:', error);
