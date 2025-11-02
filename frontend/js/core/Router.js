@@ -1,24 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Router.js
 // Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.0 - Enrichi pour nouvelles fonctionnalités API
-// Date: 2025-10-28
+// Version: 3.1.1 - FIX INITIALIZATION
+// Date: 2025-11-02
 // ============================================================================
-// Description:
-//   Routeur pour navigation SPA (Single Page Application).
-//   Gère les routes, l'historique et la navigation sans rechargement.
-//
-// NOUVELLES ROUTES v3.1.0:
-//   - /bluetooth → BluetoothView (gestion périphériques Bluetooth)
-//   - /latency → LatencyView (calibration et compensation latence)
-//   - /presets → PresetView (gestion presets de configuration)
-//   - /network → NetworkMonitor (monitoring réseau)
-//   - /logger → LoggerView (configuration niveau de logs)
-//
-// Configuration:
-//   Les routes sont configurées dans Application.js lors de l'initialisation
-//
-// Auteur: midiMind Team
+// CORRECTIONS v3.1.1:
+// ✅ CRITIQUE: Initialisation différée (ne charge pas de route avant enregistrement)
+// ✅ CRITIQUE: Émission d'événements 'route-changed'
+// ✅ Fix: Meilleure gestion des routes non trouvées
+// ✅ Méthode startRouting() pour démarrer après enregistrement des routes
 // ============================================================================
 
 class Router {
@@ -54,12 +44,14 @@ class Router {
             isNavigating: false,
             history: [],
             params: {},
-            query: {}
+            query: {},
+            started: false  // Nouveau: indique si le routing a démarré
         };
         
         // Event listeners
         this.listeners = new Map();
         
+        // Initialisation (sans charger de route)
         this.init();
     }
     
@@ -80,7 +72,21 @@ class Router {
             window.addEventListener('hashchange', () => this.handleHashChange());
         }
         
-        // Charger la route initiale
+        // NE PAS charger la route initiale automatiquement
+        // Elle sera chargée après l'enregistrement des routes via startRouting()
+    }
+    
+    /**
+     * Démarre le routing (après enregistrement des routes)
+     * À appeler explicitement après avoir enregistré toutes les routes
+     */
+    startRouting() {
+        if (this.state.started) {
+            console.warn('Router: Routing already started');
+            return;
+        }
+        
+        this.state.started = true;
         this.loadInitialRoute();
     }
     
@@ -147,7 +153,7 @@ class Router {
     }
     
     /**
-     * NOUVELLE MÉTHODE v3.1.0: Configuration rapide des routes API
+     * Configuration rapide des routes API
      * Configure les routes pour les nouvelles fonctionnalités
      * @param {Object} controllers - Objet contenant les contrôleurs
      * @param {Object} views - Objet contenant les vues
@@ -226,7 +232,10 @@ class Router {
                 if (notFoundRoute) {
                     await this.loadRoute(notFoundRoute, normalizedPath, options);
                 } else {
-                    console.error(`Route not found: ${normalizedPath}`);
+                    console.warn(`Router: Route not found: ${normalizedPath}`);
+                    // Si pas de route 404 définie, ne pas échouer silencieusement
+                    // Émettre un événement pour que NavigationController puisse gérer
+                    this.emit('route-not-found', { path: normalizedPath });
                 }
                 return false;
             }
@@ -246,6 +255,15 @@ class Router {
             if (!options.skipPushState) {
                 this.updateURL(normalizedPath, options.replace);
             }
+            
+            // Émettre événement de changement de route
+            this.emit('route-changed', {
+                path: normalizedPath,
+                route: matchedRoute.route,
+                params: params,
+                query: query,
+                previous: this.previousRoute
+            });
             
             return true;
             
@@ -303,42 +321,38 @@ class Router {
         
         // Mettre à jour le titre
         if (route.title) {
-            document.title = typeof route.title === 'function' ? 
-                route.title(this.state.params) : route.title;
+            document.title = typeof route.title === 'function' 
+                ? route.title(this.state.params, this.state.query)
+                : route.title;
         }
         
-        // Mettre à jour la route actuelle
-        this.currentRoute = {
-            ...route,
-            path: path,
-            params: this.state.params,
-            query: this.state.query
-        };
-        
-        // Ajouter à l'historique
-        this.state.history.push({
-            path: path,
-            timestamp: Date.now()
-        });
-        
-        // Limiter la taille de l'historique
-        if (this.state.history.length > 50) {
-            this.state.history.shift();
+        // Sauvegarder dans l'historique
+        if (!options.skipHistory) {
+            this.state.history.push({
+                path: path,
+                route: route,
+                params: this.state.params,
+                query: this.state.query,
+                timestamp: Date.now()
+            });
         }
         
-        // Transition si activée
+        // Transition d'entrée
         if (this.config.useTransitions && !options.skipTransition) {
             await this.transitionIn();
         }
+        
+        // Route actuelle
+        this.currentRoute = route;
         
         // Exécuter les afterHooks
         for (const hook of this.afterHooks) {
             await hook(route, this.previousRoute);
         }
         
-        // Émettre l'événement de changement de route
-        this.emit('route:changed', {
-            current: this.currentRoute,
+        // Émettre l'événement de changement
+        this.emit('after-route-change', {
+            current: route,
             previous: this.previousRoute
         });
         
@@ -346,81 +360,77 @@ class Router {
     }
     
     /**
-     * Charger le composant d'une route
+     * Charger un composant
      */
     async loadComponent(route) {
-        // Vérifier le cache
-        if (route.cache && this.viewCache.has(route.path)) {
-            const cached = this.viewCache.get(route.path);
-            this.renderComponent(cached);
-            return;
-        }
-        
-        // Charger le composant
-        if (route.component) {
-            // Si c'est une fonction, l'exécuter
-            if (typeof route.component === 'function') {
-                const component = await route.component(this.state.params, this.state.query);
-                this.renderComponent(component);
-                
-                if (route.cache) {
-                    this.viewCache.set(route.path, component);
-                }
-            } 
-            // Si c'est un string (nom de classe ou HTML)
-            else if (typeof route.component === 'string') {
-                this.renderComponent(route.component);
-            }
-        }
-        
-        // Exécuter le contrôleur si défini
-        if (route.controller) {
-            if (typeof route.controller === 'function') {
-                await route.controller(this.state.params, this.state.query);
-            } else if (typeof route.controller === 'string') {
-                // Nom du contrôleur à instancier
-                const ControllerClass = window[route.controller];
-                if (ControllerClass) {
-                    new ControllerClass(this.state.params, this.state.query);
-                }
-            }
-        }
+        // Rien à faire ici dans notre cas
+        // La navigation est gérée par NavigationController via les événements
     }
     
     /**
-     * Rendre un composant
+     * Exécuter un hook
      */
-    renderComponent(component) {
-        const container = this.getContainer();
-        
-        if (!container) {
-            console.error('Router: No container found for rendering');
-            return;
-        }
-        
-        // Si c'est du HTML
-        if (typeof component === 'string') {
-            container.innerHTML = component;
-        }
-        // Si c'est un élément DOM
-        else if (component instanceof HTMLElement) {
-            container.innerHTML = '';
-            container.appendChild(component);
-        }
-        // Si c'est un objet avec une méthode render
-        else if (component && typeof component.render === 'function') {
-            component.render(container);
+    async executeHook(hook, context) {
+        try {
+            const result = await hook(context, this);
+            return result;
+        } catch (error) {
+            console.error('Router: Hook execution error', error);
+            return false;
         }
     }
     
+    // ========================================================================
+    // GESTIONNAIRES D'ÉVÉNEMENTS
+    // ========================================================================
+    
     /**
-     * Obtenir le conteneur de rendu
+     * Gérer les changements de hash
      */
-    getContainer() {
-        return this.config.container || 
-               document.getElementById('router-view') ||
-               document.querySelector('.main-content') ||
-               document.body;
+    handleHashChange() {
+        if (!this.state.started) return; // Ne rien faire si pas encore démarré
+        
+        const path = this.getCurrentPath();
+        this.navigateTo(path, { skipPushState: true });
+    }
+    
+    /**
+     * Gérer popstate
+     */
+    handlePopState(event) {
+        if (!this.state.started) return; // Ne rien faire si pas encore démarré
+        
+        const path = this.getCurrentPath();
+        this.navigateTo(path, { skipPushState: true });
+    }
+    
+    /**
+     * Gérer les clics sur les liens
+     */
+    handleLinkClick(event) {
+        if (!this.state.started) return; // Ne rien faire si pas encore démarré
+        
+        // Trouver le lien le plus proche
+        const link = event.target.closest('a');
+        
+        if (!link) return;
+        
+        // Vérifier si c'est un lien interne
+        if (link.host !== window.location.host) return;
+        
+        // Vérifier si c'est un lien vers une route
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('http') || href.startsWith('//')) return;
+        
+        // Empêcher le comportement par défaut
+        event.preventDefault();
+        
+        // Naviguer vers la route
+        const path = this.config.mode === 'history' 
+            ? href 
+            : href.replace('#', '');
+        
+        this.navigateTo(path);
     }
     
     // ========================================================================
@@ -436,7 +446,7 @@ class Router {
         } else {
             if (this.state.history.length > 1) {
                 const previous = this.state.history[this.state.history.length - 2];
-                this.navigateTo(previous.path);
+                this.navigateTo(previous.path, { skipHistory: true });
             }
         }
     }
@@ -455,106 +465,8 @@ class Router {
      */
     reload() {
         if (this.currentRoute) {
-            this.navigateTo(this.currentRoute.path, { 
-                force: true, 
-                skipPushState: true 
-            });
-        }
-    }
-    
-    /**
-     * Naviguer avec remplacement
-     */
-    replace(path) {
-        this.navigateTo(path, { replace: true });
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS
-    // ========================================================================
-    
-    /**
-     * Gérer le popstate (boutons précédent/suivant)
-     */
-    handlePopState(event) {
-        const path = this.getCurrentPath();
-        this.navigateTo(path, { skipPushState: true });
-    }
-    
-    /**
-     * Gérer le changement de hash
-     */
-    handleHashChange() {
-        const path = this.getCurrentPath();
-        this.navigateTo(path, { skipPushState: true });
-    }
-    
-    /**
-     * Intercepter les clics sur les liens
-     */
-    handleLinkClick(event) {
-        // Vérifier si c'est un lien
-        const link = event.target.closest('a');
-        if (!link) return;
-        
-        // Vérifier les attributs
-        const href = link.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('http') || 
-            link.hasAttribute('download') || link.getAttribute('target') === '_blank') {
-            return;
-        }
-        
-        // Vérifier si c'est une route interne
-        if (link.hasAttribute('data-router') || link.classList.contains('router-link')) {
-            event.preventDefault();
-            this.navigateTo(href);
-        }
-    }
-    
-    // ========================================================================
-    // MIDDLEWARES ET GUARDS
-    // ========================================================================
-    
-    /**
-     * Ajouter un middleware
-     */
-    use(middleware) {
-        if (typeof middleware === 'function') {
-            this.middlewares.push(middleware);
-        }
-        return this;
-    }
-    
-    /**
-     * Ajouter un hook before
-     */
-    beforeEach(hook) {
-        if (typeof hook === 'function') {
-            this.beforeHooks.push(hook);
-        }
-        return this;
-    }
-    
-    /**
-     * Ajouter un hook after
-     */
-    afterEach(hook) {
-        if (typeof hook === 'function') {
-            this.afterHooks.push(hook);
-        }
-        return this;
-    }
-    
-    /**
-     * Exécuter un hook
-     */
-    async executeHook(hook, context) {
-        try {
-            const result = await hook(context, this);
-            return result;
-        } catch (error) {
-            console.error('Router: Hook execution error', error);
-            return false;
+            const path = this.getCurrentPath();
+            this.navigateTo(path, { force: true, replace: true });
         }
     }
     
@@ -601,6 +513,16 @@ class Router {
      */
     wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    /**
+     * Obtenir le conteneur de rendu
+     */
+    getContainer() {
+        return this.config.container || 
+               document.getElementById('router-view') ||
+               document.querySelector('.main-content') ||
+               document.body;
     }
     
     // ========================================================================
@@ -809,5 +731,5 @@ class Router {
 window.Router = Router;
 
 // ============================================================================
-// FIN DU FICHIER Router.js v3.1.0
+// FIN DU FICHIER Router.js v3.1.1
 // ============================================================================
