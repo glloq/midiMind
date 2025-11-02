@@ -113,7 +113,7 @@ class InstrumentController extends BaseController {
         }).catch(err => {
             this.log('warn', 'InstrumentController', 'Hot-plug status failed:', err.message);
         });
-    
+    }
 
     onBackendDisconnected() {
         if (this.logger?.warn) {

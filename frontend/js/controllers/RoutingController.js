@@ -1205,12 +1205,7 @@ class RoutingController extends BaseController {
         
         model.resetAll();
         
-        if (this.backend && this.backend.isConnected()) {
-            this.backend.// DEPRECATED API - sendCommand('reset_routing')
-                .catch(error => {
-                    this.logDebug('routing', 'Error resetting routing:', error);
-                });
-        }
+        // Backend sync removed - deprecated API
         
         this.showNotification('Routage réinitialisé', 'success');
     }
@@ -1221,12 +1216,7 @@ class RoutingController extends BaseController {
         
         model.setMasterVolume(volume);
         
-        if (this.backend && this.backend.isConnected()) {
-            this.backend.// DEPRECATED API - sendCommand('set_master_volume', { volume })
-                .catch(error => {
-                    this.logDebug('routing', 'Error setting master volume:', error);
-                });
-        }
+        // Backend sync removed - deprecated API
     }
     
     // ========================================================================
