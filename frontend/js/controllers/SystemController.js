@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/SystemController.js
-// Version: v3.2.0 - IMPLÃƒÆ’Ã¢â‚¬Â°MENTATION API COMPLÃƒÆ’Ã‹â€ TE
+// Version: v3.2.0 - IMPLÉMENTATION API COMPLÈTE
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.2.0:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Toutes les commandes system.* implÃƒÆ’Ã‚Â©mentÃƒÆ’Ã‚Â©es
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Toutes les commandes devices.* implÃƒÆ’Ã‚Â©mentÃƒÆ’Ã‚Â©es  
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements backend temps rÃƒÆ’Ã‚Â©el
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Monitoring systÃƒÆ’Ã‚Â¨me automatique
-// âœ… CORRECTIONS v4.0.0: CompatibilitÃ© API v4.0.0
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion hot-plug devices
+// ✔ Toutes les commandes system.* implémentées
+// ✔ Toutes les commandes devices.* implémentées  
+// ✔ Gestion événements backend temps réel
+// ✔ Monitoring système automatique
+// ✅ CORRECTIONS v4.0.0: Compatibilité API v4.0.0
+// ✔ Gestion hot-plug devices
 // ============================================================================
 
 class SystemController extends BaseController {
@@ -22,7 +22,7 @@ class SystemController extends BaseController {
         this.view = views.system;
         this.backend = window.app?.services?.backend || window.backendService;
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat systÃƒÆ’Ã‚Â¨me
+        // État système
         this.state = {
             ...this.state,
             backendConnected: false,
@@ -47,7 +47,7 @@ class SystemController extends BaseController {
     }
     
     // ========================================================================
-    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS
+    // ÉVÉNEMENTS
     // ========================================================================
     
     bindEvents() {
@@ -55,7 +55,7 @@ class SystemController extends BaseController {
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
         
-        // Devices (ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements backend)
+        // Devices (événements backend)
         this.eventBus.on('backend:event:device_connected', (data) => {
             this.handleDeviceConnected(data);
         });
@@ -75,21 +75,21 @@ class SystemController extends BaseController {
             }
         });
         
-        this.log('info', 'SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Events bound');
+        this.log('info', 'SystemController', '✔ Events bound');
     }
     
     async onBackendConnected() {
         this.state.backendConnected = true;
-        this.log('info', 'SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Backend connected');
+        this.log('info', 'SystemController', '✔ Backend connected');
         
         try {
-            // Charger infos systÃƒÆ’Ã‚Â¨me
+            // Charger infos système
             await this.refreshSystemInfo();
             
             // Scanner devices
             await this.scanDevices();
             
-            // DÃƒÆ’Ã‚Â©marrer monitoring si page active
+            // Démarrer monitoring si page active
             const currentPage = this.systemModel?.get('currentPage');
             if (currentPage === 'system') {
                 this.startMonitoring();
@@ -102,7 +102,7 @@ class SystemController extends BaseController {
     onBackendDisconnected() {
         this.state.backendConnected = false;
         this.stopMonitoring();
-        this.log('warn', 'SystemController', 'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Backend disconnected');
+        this.log('warn', 'SystemController', '⚠️ Backend disconnected');
     }
     
     // ========================================================================
@@ -127,7 +127,7 @@ class SystemController extends BaseController {
     }
     
     /**
-     * Obtient les infos systÃƒÆ’Ã‚Â¨me
+     * Obtient les infos système
      */
     async getInfo() {
         try {
@@ -161,7 +161,7 @@ class SystemController extends BaseController {
     }
     
     /**
-     * Obtient l'utilisation mÃƒÆ’Ã‚Â©moire
+     * Obtient l'utilisation mémoire
      */
     async getMemory() {
         try {
@@ -207,7 +207,7 @@ class SystemController extends BaseController {
     }
     
     /**
-     * RafraÃƒÆ’Ã‚Â®chit toutes les infos systÃƒÆ’Ã‚Â¨me
+     * Rafraîchit toutes les infos système
      */
     async refreshSystemInfo() {
         try {
@@ -228,12 +228,12 @@ class SystemController extends BaseController {
                 lastUpdate: Date.now()
             };
             
-            // Mettre ÃƒÆ’Ã‚Â  jour le model
+            // Mettre à jour le model
             if (this.systemModel) {
                 this.systemModel.set('systemInfo', systemInfo);
             }
             
-            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+            // Émettre événement
             this.eventBus.emit('system:info-updated', systemInfo);
             
             return systemInfo;
@@ -259,7 +259,7 @@ class SystemController extends BaseController {
                 
                 this.state.devicesCount = devices.length;
                 
-                // Mettre ÃƒÆ’Ã‚Â  jour le model instrument
+                // Mettre à jour le model instrument
                 if (this.instrumentModel && devices.length > 0) {
                     this.instrumentModel.instruments.clear();
                     devices.forEach(device => {
@@ -296,7 +296,7 @@ class SystemController extends BaseController {
                 this.state.devicesCount = devices.length;
                 this.state.lastScan = Date.now();
                 
-                // Mettre ÃƒÆ’Ã‚Â  jour le model instrument
+                // Mettre à jour le model instrument
                 if (this.instrumentModel && devices.length > 0) {
                     this.instrumentModel.instruments.clear();
                     devices.forEach(device => {
@@ -308,7 +308,7 @@ class SystemController extends BaseController {
                     this.instrumentModel.state.lastScan = Date.now();
                 }
                 
-                this.log('info', 'SystemController', \`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Found \${devices.length} devices\`);
+                this.log('info', 'SystemController', `✔ Found ${devices.length} devices`);
                 this.eventBus.emit('devices:scan-complete', { devices });
                 
                 return devices;
@@ -325,14 +325,14 @@ class SystemController extends BaseController {
      */
     async connectDevice(deviceId) {
         try {
-            this.log('info', 'SystemController', \`Connecting device: \${deviceId}\`);
+            this.log('info', 'SystemController', `Connecting device: ${deviceId}`);
             
             const response = await this.backend.sendCommand('devices.connect', {
                 device_id: deviceId
             });
             
             if (response.success !== false) {
-                // Mettre ÃƒÆ’Ã‚Â  jour le model
+                // Mettre à jour le model
                 if (this.instrumentModel) {
                     const device = this.instrumentModel.instruments.get(deviceId);
                     if (device) {
@@ -342,7 +342,7 @@ class SystemController extends BaseController {
                     }
                 }
                 
-                this.log('info', 'SystemController', \`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Device connected: \${deviceId}\`);
+                this.log('info', 'SystemController', `✔ Device connected: ${deviceId}`);
                 this.eventBus.emit('devices:connected', { deviceId });
                 
                 return true;
@@ -355,18 +355,18 @@ class SystemController extends BaseController {
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©connecte un device
+     * Déconnecte un device
      */
     async disconnectDevice(deviceId) {
         try {
-            this.log('info', 'SystemController', \`Disconnecting device: \${deviceId}\`);
+            this.log('info', 'SystemController', `Disconnecting device: ${deviceId}`);
             
             const response = await this.backend.sendCommand('devices.disconnect', {
                 device_id: deviceId
             });
             
             if (response.success !== false) {
-                // Mettre ÃƒÆ’Ã‚Â  jour le model
+                // Mettre à jour le model
                 if (this.instrumentModel) {
                     const device = this.instrumentModel.instruments.get(deviceId);
                     if (device) {
@@ -376,7 +376,7 @@ class SystemController extends BaseController {
                     }
                 }
                 
-                this.log('info', 'SystemController', \`ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Device disconnected: \${deviceId}\`);
+                this.log('info', 'SystemController', `✔ Device disconnected: ${deviceId}`);
                 this.eventBus.emit('devices:disconnected', { deviceId });
                 
                 return true;
@@ -389,45 +389,45 @@ class SystemController extends BaseController {
     }
     
     // ========================================================================
-    // GESTION ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS BACKEND
+    // GESTION ÉVÉNEMENTS BACKEND
     // ========================================================================
     
     handleDeviceConnected(data) {
-        this.log('info', 'SystemController', \`Device connected: \${data.device_id}\`);
+        this.log('info', 'SystemController', `Device connected: ${data.device_id}`);
         
         // Notifier
         if (this.notifications) {
             this.notifications.show(
                 'Device Connected',
-                \`Device \${data.device_id} has been connected\`,
+                `Device ${data.device_id} has been connected`,
                 'success',
                 3000
             );
         }
         
-        // RafraÃƒÆ’Ã‚Â®chir liste
+        // Rafraîchir liste
         this.listDevices();
     }
     
     handleDeviceDisconnected(data) {
-        this.log('info', 'SystemController', \`Device disconnected: \${data.device_id}\`);
+        this.log('info', 'SystemController', `Device disconnected: ${data.device_id}`);
         
         // Notifier
         if (this.notifications) {
             this.notifications.show(
                 'Device Disconnected',
-                \`Device \${data.device_id} has been disconnected\`,
+                `Device ${data.device_id} has been disconnected`,
                 'warning',
                 3000
             );
         }
         
-        // RafraÃƒÆ’Ã‚Â®chir liste
+        // Rafraîchir liste
         this.listDevices();
     }
     
     handleMidiMessage(data) {
-        // ÃƒÆ’Ã¢â‚¬Â°mettre pour visualisation
+        // Émettre pour visualisation
         this.eventBus.emit('midi:message', data);
     }
     
@@ -437,12 +437,12 @@ class SystemController extends BaseController {
     
     startMonitoring() {
         if (this.statsTimer || this.devicesTimer) {
-            return; // DÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â  dÃƒÆ’Ã‚Â©marrÃƒÆ’Ã‚Â©
+            return; // Déjà démarré
         }
         
         this.log('info', 'SystemController', 'Starting monitoring...');
         
-        // Stats systÃƒÆ’Ã‚Â¨me
+        // Stats système
         this.statsTimer = setInterval(() => {
             this.refreshSystemInfo().catch(err => {
                 this.log('error', 'SystemController', 'Stats update failed:', err);
@@ -456,7 +456,7 @@ class SystemController extends BaseController {
             });
         }, this.config.autoRefreshInterval);
         
-        // Premier refresh immÃƒÆ’Ã‚Â©diat
+        // Premier refresh immédiat
         this.refreshSystemInfo();
         this.listDevices();
     }

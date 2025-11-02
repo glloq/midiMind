@@ -77,21 +77,20 @@ class FileController extends BaseController {
         this.log('info', 'FileController', '✅ Events bound');
     }
     
+    
     async onBackendConnected() {
         this.log('info', 'FileController', '✅ Backend connected');
         
-        try {
-            // Charger liste initiale
-            await this.refreshFileList();
-            
-            // Démarrer auto-refresh si configuré
-            if (this.config.autoRefresh) {
-                this.startAutoRefresh();
-            }
-        } catch (error) {
-            this.log('error', 'FileController', 'Initialization failed:', error);
+        // Non-bloquant - continuer même si timeout
+        this.refreshFileList().catch(error => {
+            this.log('warn', 'FileController', 'Initial file list failed:', error.message);
+        });
+        
+        if (this.config.autoRefresh) {
+            this.startAutoRefresh();
         }
     }
+    
     
     onBackendDisconnected() {
         this.stopAutoRefresh();
