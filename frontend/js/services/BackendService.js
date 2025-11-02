@@ -327,28 +327,42 @@ class BackendService {
             const messageType = data.type || 'unknown';
             const payload = data.payload || {};
             
-            // âœ… Si type="response" => Matcher sur request_id
-            if (messageType === 'response') {
-                const requestId = payload.request_id;
+            // ✅ Si type="response" => Matcher sur request_id
+            if (messageType === "response") {
+                // Essayer payload.request_id, puis data.id (envelope), puis FIFO
+                let requestId = payload.request_id || data.id;
+                
+                if (!requestId || !this.pendingRequests.has(requestId)) {
+                    const pendingIds = Array.from(this.pendingRequests.keys());
+                    if (pendingIds.length > 0) {
+                        requestId = pendingIds[0];
+                        this.logger.debug("BackendService", `Using FIFO match: ${requestId}`);
+                    }
+                }
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
                     this.pendingRequests.delete(requestId);
-                    
                     clearTimeout(pending.timeoutTimer);
                     
-                    // âœ… VÃ©rifier payload.success selon la doc
-                    if (payload.success) {
+                    if (payload.success === true) {
                         pending.resolve(payload.data || payload);
-                    } else {
-                        const error = new Error(payload.error_message || 'Command failed');
+                    } else if (payload.success === false) {
+                        const error = new Error(payload.error_message || "Command failed");
                         error.code = payload.error_code;
                         pending.reject(error);
+                    } else {
+                        if (payload.error || payload.error_message) {
+                            const error = new Error(payload.error_message || payload.error || "Command failed");
+                            error.code = payload.error_code;
+                            pending.reject(error);
+                        } else {
+                            pending.resolve(payload.data || payload);
+                        }
                     }
                     return;
                 } else {
-                    this.logger.warn('BackendService', 
-                        `Response without matching request: ${requestId}`);
+                    this.logger.warn("BackendService", `No matching request for response: ${requestId || "unknown"}`);
                     return;
                 }
             }
