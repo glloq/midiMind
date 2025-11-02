@@ -1,12 +1,11 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseView.js
-// Version: v3.2.0 - FIXED EVENTBUS FALLBACKS
-// Date: 2025-10-31
+// Version: v3.2.1 - FIXED LOG METHOD
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v3.2.0:
-// ✅ CRITIQUE: Fallback robuste pour eventBus (window.eventBus)
-// ✅ Validation eventBus avant utilisation
-// ✅ Protection contre eventBus null
+// CORRECTIONS v3.2.1:
+// ✅ Ajout méthode log() manquante (flexible signature)
+// ✅ Compatible avec FileView et autres vues
 // ============================================================================
 
 /**
@@ -265,19 +264,33 @@ class BaseView {
      * @param {Object} options - Options
      */
     debounceRender(data, options) {
-        clearTimeout(this.renderQueue);
+        if (this.renderQueue) {
+            clearTimeout(this.renderQueue);
+        }
+        
         this.renderQueue = setTimeout(() => {
             this.render(data, { ...options, immediate: true });
+            this.renderQueue = null;
         }, this.config.debounceRender);
     }
     
     /**
-     * Update la vue avec de nouvelles données
-     * @param {Object} data - Données
-     * @param {Object} options - Options
+     * Met à jour des données spécifiques sans re-rendu complet
+     * @param {Object} updates - Mises à jour
      */
-    update(data, options = {}) {
-        this.render(data, options);
+    update(updates) {
+        this.previousData = { ...this.data };
+        this.data = { ...this.data, ...updates };
+        
+        // Hook pour mise à jour personnalisée
+        if (typeof this.onUpdate === 'function') {
+            this.onUpdate(updates);
+        }
+        
+        this.emit('view:updated', {
+            view: this.config.name,
+            updates
+        });
     }
     
     // ========================================================================
@@ -293,55 +306,62 @@ class BaseView {
             return;
         }
         
-        if (this.state.isVisible) return;
+        if (this.state.isVisible) {
+            return;
+        }
         
         this.runHooks('beforeShow');
         
         if (this.container) {
             this.container.style.display = '';
+            this.container.classList.remove('hidden');
         }
         
         this.state.isVisible = true;
-        
-        this.runHooks('afterShow');
-        this.emit('view:shown', { view: this.config.name });
         
         // Hook personnalisé
         if (typeof this.onShow === 'function') {
             this.onShow();
         }
+        
+        this.runHooks('afterShow');
+        
+        this.emit('view:shown', {
+            view: this.config.name
+        });
     }
     
     /**
      * Masque la vue
      */
     hide() {
-        if (this.state.isDestroyed) {
-            console.warn(`[${this.config.name}] Cannot hide destroyed view`);
+        if (!this.state.isVisible) {
             return;
         }
-        
-        if (!this.state.isVisible) return;
         
         this.runHooks('beforeHide');
         
         if (this.container) {
             this.container.style.display = 'none';
+            this.container.classList.add('hidden');
         }
         
         this.state.isVisible = false;
-        
-        this.runHooks('afterHide');
-        this.emit('view:hidden', { view: this.config.name });
         
         // Hook personnalisé
         if (typeof this.onHide === 'function') {
             this.onHide();
         }
+        
+        this.runHooks('afterHide');
+        
+        this.emit('view:hidden', {
+            view: this.config.name
+        });
     }
     
     /**
-     * Toggle visibility
+     * Toggle affichage/masquage
      */
     toggle() {
         if (this.state.isVisible) {
@@ -364,43 +384,62 @@ class BaseView {
     }
     
     /**
-     * Ajoute un listener d'événement DOM
-     * @param {string|HTMLElement} selector - Sélecteur ou élément
+     * Ajoute un event listener DOM
+     * @param {HTMLElement|string} element - Élément ou sélecteur
      * @param {string} event - Type d'événement
      * @param {Function} handler - Gestionnaire
-     * @param {boolean} useCapture - UseCapture
+     * @param {Object} options - Options
      */
-    addEventListener(selector, event, handler, useCapture = false) {
-        let element;
+    addEventListener(element, event, handler, options = {}) {
+        const el = typeof element === 'string'
+            ? this.container.querySelector(element)
+            : element;
         
-        if (typeof selector === 'string') {
-            element = this.container.querySelector(selector);
-        } else {
-            element = selector;
-        }
-        
-        if (!element) {
-            console.warn(`[${this.config.name}] Element not found for event listener: ${selector}`);
+        if (!el) {
+            console.warn(`[${this.config.name}] Element not found for event ${event}`);
             return;
         }
         
-        element.addEventListener(event, handler, useCapture);
+        el.addEventListener(event, handler, options);
         
-        // Garder trace pour nettoyage
+        // Garder référence pour nettoyage
         this.domEventListeners.push({
-            element,
+            element: el,
             event,
             handler,
-            useCapture
+            options
         });
     }
     
     /**
-     * Retire tous les listeners DOM
+     * Ajoute un event listener avec délégation
+     * @param {string} selector - Sélecteur CSS
+     * @param {string} event - Type d'événement
+     * @param {Function} handler - Gestionnaire
+     */
+    addDelegatedListener(selector, event, handler) {
+        const delegatedHandler = (e) => {
+            const target = e.target.closest(selector);
+            if (target && this.container.contains(target)) {
+                handler.call(target, e);
+            }
+        };
+        
+        this.container.addEventListener(event, delegatedHandler);
+        
+        this.domEventListeners.push({
+            element: this.container,
+            event,
+            handler: delegatedHandler
+        });
+    }
+    
+    /**
+     * Supprime tous les event listeners
      */
     removeAllEventListeners() {
-        this.domEventListeners.forEach(({ element, event, handler, useCapture }) => {
-            element.removeEventListener(event, handler, useCapture);
+        this.domEventListeners.forEach(({ element, event, handler, options }) => {
+            element.removeEventListener(event, handler, options);
         });
         this.domEventListeners = [];
     }
@@ -483,6 +522,29 @@ class BaseView {
                     console.error(`[${this.config.name}] Hook ${hookName} error:`, error);
                 }
             });
+        }
+    }
+    
+    // ========================================================================
+    // LOGGING
+    // ========================================================================
+    
+    /**
+     * Méthode de logging flexible
+     * Supporte plusieurs signatures:
+     * - log(level, message)
+     * - log(level, source, message)
+     * - log(level, source, message, data)
+     */
+    log(level, ...args) {
+        if (!this.logger) return;
+        
+        // Si logger a une méthode pour ce niveau, l'utiliser directement
+        if (typeof this.logger[level] === 'function') {
+            this.logger[level](...args);
+        } else {
+            // Sinon fallback sur console
+            console.log(`[${level.toUpperCase()}]`, ...args);
         }
     }
     
