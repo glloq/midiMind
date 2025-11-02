@@ -246,7 +246,7 @@ public:
                                   size_t maxBackups = 5) {
         std::lock_guard<std::mutex> lock(getMutex());
         
-        // Close existing file if open
+        // Close existing log file if open
         if (getLogFile().is_open()) {
             getLogFile().close();
         }
@@ -256,17 +256,18 @@ public:
         getMaxFileSize() = maxSizeBytes;
         getMaxBackups() = maxBackups;
         
-        // Open new file
+        // Create parent directories if needed
+        std::filesystem::path logPath(filepath);
+        if (logPath.has_parent_path()) {
+            std::filesystem::create_directories(logPath.parent_path());
+        }
+        
+        // Open log file
         getLogFile().open(filepath, std::ios::app);
-        if (getLogFile().is_open()) {
-            getFileLoggingEnabled() = true;
-            
-            // Log rotation activation
-            auto& file = getLogFile();
-            file << "[" << getCurrentTimestamp() << "] ";
-            file << "[INFO] [Logger] File logging enabled: " << filepath;
-            file << " (max: " << (maxSizeBytes / 1024 / 1024) << " MB, ";
-            file << "backups: " << maxBackups << ")" << std::endl;
+        getFileLoggingEnabled() = getLogFile().is_open();
+        
+        if (!getFileLoggingEnabled()) {
+            std::cerr << "Failed to open log file: " << filepath << std::endl;
         }
     }
     
@@ -276,17 +277,18 @@ public:
      */
     static void disableFileLogging() {
         std::lock_guard<std::mutex> lock(getMutex());
+        
         if (getLogFile().is_open()) {
             getLogFile().close();
         }
+        
         getFileLoggingEnabled() = false;
     }
     
     /**
-     * @brief Enable Linux syslog integration
-     * @param ident Program identifier for syslog
+     * @brief Enable syslog output (Linux only)
+     * @param ident Syslog identifier string
      * @note Thread-safe
-     * @note Only available on Linux systems
      */
     static void enableSyslog(const std::string& ident = "midimind") {
 #ifdef __linux__
@@ -294,84 +296,101 @@ public:
         openlog(ident.c_str(), LOG_PID | LOG_CONS, LOG_USER);
         getSyslogEnabled() = true;
 #else
-        (void)ident;  // Unused on non-Linux
+        (void)ident;  // Suppress unused parameter warning
 #endif
     }
     
     /**
-     * @brief Disable syslog integration
+     * @brief Disable syslog output
      * @note Thread-safe
      */
     static void disableSyslog() {
 #ifdef __linux__
         std::lock_guard<std::mutex> lock(getMutex());
-        closelog();
-        getSyslogEnabled() = false;
+        if (getSyslogEnabled()) {
+            closelog();
+            getSyslogEnabled() = false;
+        }
 #endif
     }
     
     /**
      * @brief Set category filter (only log these categories)
-     * 
-     * @param categories List of categories to log (empty = log all)
-     * 
+     * @param categories Vector of category names to include
+     * @note Empty filter = log all categories
      * @note Thread-safe
-     * 
-     * @example
-     * @code
-     * Logger::setCategoryFilter({"MIDI", "Database"}); // Only log MIDI and DB
-     * Logger::setCategoryFilter({});                   // Log all categories
-     * @endcode
      */
-    static void setCategoryFilter(const std::vector<std::string>& categories) {
+    static void setCategories(const std::vector<std::string>& categories) {
         std::lock_guard<std::mutex> lock(getMutex());
         getCategoryFilter() = categories;
     }
     
     /**
-     * @brief Get logging statistics
-     * 
-     * @return JSON object with statistics:
-     *         - totalMessages: Total logged
-     *         - debugMessages: DEBUG count
-     *         - infoMessages: INFO count
-     *         - warningMessages: WARNING count
-     *         - errorMessages: ERROR count
-     *         - criticalMessages: CRITICAL count
-     *         - filteredMessages: Filtered out count
-     *         - rotations: File rotation count
-     * 
+     * @brief Clear category filter (log all categories)
      * @note Thread-safe
      */
-    static std::string getStatistics() {
-        std::ostringstream oss;
-        oss << "{"
-            << "\"totalMessages\":" << getTotalMessages() << ","
-            << "\"debugMessages\":" << getDebugMessages() << ","
-            << "\"infoMessages\":" << getInfoMessages() << ","
-            << "\"warningMessages\":" << getWarningMessages() << ","
-            << "\"errorMessages\":" << getErrorMessages() << ","
-            << "\"criticalMessages\":" << getCriticalMessages() << ","
-            << "\"filteredMessages\":" << getFilteredMessages() << ","
-            << "\"rotations\":" << getRotations()
-            << "}";
-        return oss.str();
+    static void clearCategories() {
+        std::lock_guard<std::mutex> lock(getMutex());
+        getCategoryFilter().clear();
     }
-
-private:
+    
     // ========================================================================
-    // CORE LOGGING FUNCTION
+    // PUBLIC METHODS - METRICS
     // ========================================================================
     
     /**
-     * @brief Internal logging function
+     * @brief Get total message count
+     * @return Number of messages logged since startup
+     */
+    static uint64_t getTotalMessageCount() {
+        return getTotalMessages().load();
+    }
+    
+    /**
+     * @brief Get message count by level
+     * @param level Log level
+     * @return Number of messages at this level
+     */
+    static uint64_t getMessageCountByLevel(Level level) {
+        switch (level) {
+            case Level::DEBUG:    return getDebugMessages().load();
+            case Level::INFO:     return getInfoMessages().load();
+            case Level::WARNING:  return getWarningMessages().load();
+            case Level::ERROR:    return getErrorMessages().load();
+            case Level::CRITICAL: return getCriticalMessages().load();
+            default:              return 0;
+        }
+    }
+    
+    /**
+     * @brief Get filtered message count
+     * @return Number of messages filtered by level or category
+     */
+    static uint64_t getFilteredMessageCount() {
+        return getFilteredMessages().load();
+    }
+    
+    /**
+     * @brief Get rotation count
+     * @return Number of log file rotations
+     */
+    static uint64_t getRotationCount() {
+        return getRotations().load();
+    }
+    
+private:
+    // ========================================================================
+    // PRIVATE METHODS - CORE LOGGING
+    // ========================================================================
+    
+    /**
+     * @brief Core logging function (private, called by public methods)
      * @param level Log level
      * @param category Message category
-     * @param message Message content
-     * @note Thread-safe (mutex protected)
+     * @param message Message text
+     * @note Must be called with mutex locked (handled by public methods)
      */
-    static void log(Level level, const std::string& category, 
-                    const std::string& message) {
+    static void log(Level level, const std::string& category, const std::string& message) {
         std::lock_guard<std::mutex> lock(getMutex());
         
         // Filter by level
@@ -380,10 +399,12 @@ private:
             return;
         }
         
-        // Filter by category
-        auto& filter = getCategoryFilter();
-        if (!filter.empty()) {
-            if (std::find(filter.begin(), filter.end(), category) == filter.end()) {
+        // Filter by category (if filter is active)
+        if (!getCategoryFilter().empty()) {
+            bool found = std::find(getCategoryFilter().begin(), 
+                                  getCategoryFilter().end(), 
+                                  category) != getCategoryFilter().end();
+            if (!found) {
                 getFilteredMessages()++;
                 return;
             }
@@ -398,17 +419,18 @@ private:
             case Level::ERROR:    getErrorMessages()++; break;
             case Level::CRITICAL: getCriticalMessages()++; break;
         }
-          // Store in buffer
+        
+        // Format message
+        std::string timestamp = getCurrentTimestamp();
+        std::string levelStr = levelToString(level);
+        
+        // Store in buffer
         std::ostringstream bufferEntry;
         bufferEntry << "[" << timestamp << "] "
                    << "[" << levelStr << "] "
                    << "[" << category << "] "
                    << message;
         getLogBuffer().push_back(bufferEntry.str());
-		
-        // Format message
-        std::string timestamp = getCurrentTimestamp();
-        std::string levelStr = levelToString(level);
         
         // Console output with colors
         std::cout << getColorCode(level)
@@ -416,13 +438,13 @@ private:
                   << "[" << levelStr << "] "
                   << "[" << category << "] "
                   << message
-                  << "\033[0m"  // Reset color
-                  << std::endl;
+                  << "\033[0m" << std::endl;
+        
+        // Check rotation before writing to file
+        checkAndRotateLog();
         
         // File output
         if (getFileLoggingEnabled() && getLogFile().is_open()) {
-            checkAndRotateLog();
-            
             auto& file = getLogFile();
             file << "[" << timestamp << "] "
                  << "[" << levelStr << "] "
