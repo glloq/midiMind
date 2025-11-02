@@ -1,13 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/models/RoutingModel.js
-// Chemin rÃ©el: frontend/js/models/RoutingModel.js
-// Version: v3.3.0 - API FORMAT SIMPLIFIÃ‰
-// Date: 2025-11-01
+// Chemin réel: frontend/js/models/RoutingModel.js
+// Version: v4.2.0 - API CONFORME v4.2.2
+// Date: 2025-11-02
 // ============================================================================
-// MODIFICATIONS v3.3.0:
-// âœ… Utilisation sendCommand() au lieu de send()
-// âœ… Format API simplifiÃ© (id, command, params)
-// âœ… Signature constructeur cohÃ©rente avec BaseModel
+// CORRECTIONS v4.2.0:
+// ✅ get_routing → routing.listRoutes
+// ✅ add_route → routing.addRoute
+// ✅ remove_route → routing.removeRoute
+// ✅ clear_routes → routing.clearRoutes
+// ✅ enable_route → routing.enableRoute
+// ✅ disable_route → routing.disableRoute
+// ✅ Format API v4.2.2 complet
 // ============================================================================
 
 class RoutingModel extends BaseModel {
@@ -22,11 +26,16 @@ class RoutingModel extends BaseModel {
         // Initialiser les routes
         this.data.routes = initialData.routes || [];
         
-        this.log('debug', 'RoutingModel', 'Initialized v3.3.0');
+        this.log('debug', 'RoutingModel', '✓ RoutingModel v4.2.0 initialized (API v4.2.2)');
     }
     
+    // ========================================================================
+    // GESTION DES ROUTES - API v4.2.2
+    // ========================================================================
+    
     /**
-     * Liste toutes les routes configurÃ©es
+     * Liste toutes les routes configurées
+     * ✅ API v4.2.2: routing.listRoutes
      */
     async listRoutes() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -35,85 +44,105 @@ class RoutingModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('get_routing');
+            // ✅ Nouvelle commande API v4.2.2
+            const data = await this.backend.sendCommand('routing.listRoutes');
             
             if (data && data.routes) {
                 this.data.routes = data.routes;
                 this.emit('routes:updated', { routes: this.data.routes });
                 return this.data.routes;
             }
+            
+            return [];
         } catch (error) {
             this.log('error', 'RoutingModel.listRoutes', error.message);
+            return [];
         }
-        
-        return [];
     }
     
     /**
      * Ajoute une nouvelle route
-     * @param {string} sourceId - ID du pÃ©riphÃ©rique source
-     * @param {string} destinationId - ID du pÃ©riphÃ©rique destination
+     * ✅ API v4.2.2: routing.addRoute
+     * @param {string} sourceId - ID du périphérique source
+     * @param {string} destId - ID du périphérique destination
+     * @param {number} channel - Canal MIDI (optionnel, null = tous les canaux)
      */
-    async addRoute(sourceId, destinationId) {
+    async addRoute(sourceId, destId, channel = null) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'RoutingModel.addRoute', 'Backend not connected');
             return false;
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('add_route', {
-                source_id: sourceId,
-                destination_id: destinationId
-            });
+            // ✅ Nouvelle commande API v4.2.2
+            const params = { 
+                source_id: sourceId, 
+                dest_id: destId 
+            };
+            
+            if (channel !== null) {
+                params.channel = channel;
+            }
+            
+            const data = await this.backend.sendCommand('routing.addRoute', params);
             
             if (data) {
                 // Recharger la liste des routes
                 await this.listRoutes();
-                this.emit('route:added', { sourceId, destinationId });
+                this.emit('route:added', { sourceId, destId, channel });
                 return true;
             }
+            
+            return false;
         } catch (error) {
             this.log('error', 'RoutingModel.addRoute', error.message);
+            return false;
         }
-        
-        return false;
     }
     
     /**
      * Supprime une route existante
-     * @param {string} sourceId - ID du pÃ©riphÃ©rique source
-     * @param {string} destinationId - ID du pÃ©riphÃ©rique destination
+     * ✅ API v4.2.2: routing.removeRoute
+     * @param {string} sourceId - ID du périphérique source
+     * @param {string} destId - ID du périphérique destination
+     * @param {number} channel - Canal MIDI (optionnel)
      */
-    async removeRoute(sourceId, destinationId) {
+    async removeRoute(sourceId, destId, channel = null) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'RoutingModel.removeRoute', 'Backend not connected');
             return false;
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('remove_route', {
-                source_id: sourceId,
-                destination_id: destinationId
-            });
+            // ✅ Nouvelle commande API v4.2.2
+            const params = { 
+                source_id: sourceId, 
+                dest_id: destId 
+            };
+            
+            if (channel !== null) {
+                params.channel = channel;
+            }
+            
+            const data = await this.backend.sendCommand('routing.removeRoute', params);
             
             if (data) {
                 // Recharger la liste des routes
                 await this.listRoutes();
-                this.emit('route:removed', { sourceId, destinationId });
+                this.emit('route:removed', { sourceId, destId, channel });
                 return true;
             }
+            
+            return false;
         } catch (error) {
             this.log('error', 'RoutingModel.removeRoute', error.message);
+            return false;
         }
-        
-        return false;
     }
     
     /**
      * Efface toutes les routes
+     * ✅ API v4.2.2: routing.clearRoutes
      */
     async clearRoutes() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -122,120 +151,142 @@ class RoutingModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('clear_routes');
+            // ✅ Nouvelle commande API v4.2.2
+            const data = await this.backend.sendCommand('routing.clearRoutes');
             
             if (data) {
                 this.data.routes = [];
                 this.emit('routes:cleared');
                 return true;
             }
+            
+            return false;
         } catch (error) {
             this.log('error', 'RoutingModel.clearRoutes', error.message);
+            return false;
         }
-        
-        return false;
     }
     
     /**
      * Active une route
-     * @param {string} sourceId - ID du pÃ©riphÃ©rique source
-     * @param {string} destinationId - ID du pÃ©riphÃ©rique destination
+     * ✅ API v4.2.2: routing.enableRoute
+     * @param {string} sourceId - ID du périphérique source
+     * @param {string} destId - ID du périphérique destination
      */
-    async enableRoute(sourceId, destinationId) {
+    async enableRoute(sourceId, destId) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'RoutingModel.enableRoute', 'Backend not connected');
             return false;
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('enable_route', {
+            // ✅ Nouvelle commande API v4.2.2
+            const data = await this.backend.sendCommand('routing.enableRoute', {
                 source_id: sourceId,
-                destination_id: destinationId
+                dest_id: destId
             });
             
             if (data) {
                 await this.listRoutes();
-                this.emit('route:enabled', { sourceId, destinationId });
+                this.emit('route:enabled', { sourceId, destId });
                 return true;
             }
+            
+            return false;
         } catch (error) {
             this.log('error', 'RoutingModel.enableRoute', error.message);
+            return false;
         }
-        
-        return false;
     }
     
     /**
-     * DÃ©sactive une route
-     * @param {string} sourceId - ID du pÃ©riphÃ©rique source
-     * @param {string} destinationId - ID du pÃ©riphÃ©rique destination
+     * Désactive une route
+     * ✅ API v4.2.2: routing.disableRoute
+     * @param {string} sourceId - ID du périphérique source
+     * @param {string} destId - ID du périphérique destination
      */
-    async disableRoute(sourceId, destinationId) {
+    async disableRoute(sourceId, destId) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'RoutingModel.disableRoute', 'Backend not connected');
             return false;
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('disable_route', {
+            // ✅ Nouvelle commande API v4.2.2
+            const data = await this.backend.sendCommand('routing.disableRoute', {
                 source_id: sourceId,
-                destination_id: destinationId
+                dest_id: destId
             });
             
             if (data) {
                 await this.listRoutes();
-                this.emit('route:disabled', { sourceId, destinationId });
+                this.emit('route:disabled', { sourceId, destId });
                 return true;
             }
+            
+            return false;
         } catch (error) {
             this.log('error', 'RoutingModel.disableRoute', error.message);
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Obtient les statistiques de routage
-     */
-    async getStats() {
-        if (!this.backend || !this.backend.isConnected()) {
-            return null;
-        }
-        
-        try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('get_routing');
-            return data;
-        } catch (error) {
-            this.log('error', 'RoutingModel.getStats', error.message);
-            return null;
+            return false;
         }
     }
     
+    // ========================================================================
+    // MÉTHODES LOCALES (GETTERS)
+    // ========================================================================
+    
     /**
-     * Retourne toutes les routes (depuis le cache local)
+     * Retourne toutes les routes
      */
     getRoutes() {
-        return this.data.routes || [];
+        return this.data.routes;
     }
     
     /**
-     * Trouve une route spÃ©cifique
+     * Recherche une route spécifique
      */
-    findRoute(sourceId, destinationId) {
-        return this.data.routes.find(
-            route => route.source_id === sourceId && route.destination_id === destinationId
+    findRoute(sourceId, destId) {
+        return this.data.routes.find(r => 
+            r.source_id === sourceId && r.dest_id === destId
         );
     }
     
     /**
-     * VÃ©rifie si une route existe
+     * Retourne les routes pour une source donnée
      */
-    hasRoute(sourceId, destinationId) {
-        return !!this.findRoute(sourceId, destinationId);
+    getRoutesForSource(sourceId) {
+        return this.data.routes.filter(r => r.source_id === sourceId);
+    }
+    
+    /**
+     * Retourne les routes pour une destination donnée
+     */
+    getRoutesForDestination(destId) {
+        return this.data.routes.filter(r => r.dest_id === destId);
+    }
+    
+    /**
+     * Vérifie si une route existe
+     */
+    hasRoute(sourceId, destId) {
+        return this.data.routes.some(r => 
+            r.source_id === sourceId && r.dest_id === destId
+        );
+    }
+    
+    /**
+     * Compte le nombre de routes
+     */
+    getRouteCount() {
+        return this.data.routes.length;
+    }
+    
+    /**
+     * Vérifie si une route est active
+     */
+    isRouteEnabled(sourceId, destId) {
+        const route = this.findRoute(sourceId, destId);
+        return route ? route.enabled !== false : false;
     }
 }
 

@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/views/HomeView.js
-// Version: v3.8.0 - INTERFACE REFACTORISÉE COHÉRENTE
-// Date: 2025-10-29
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Date: 2025-11-02
 // Projet: MidiMind v3.1
 // ============================================================================
-// NOUVELLES FONCTIONNALITÉS v3.8.0:
-// ✅ Layout simplifié: sélection + visualizer
-// ✅ Barre d'instruments avec routing 
-// ✅ Bouton mute/unmute global
-// ✅ Tabs fichiers/playlists
-// ✅ Intégration visualizer live
+// AMÉLIORATIONS v4.0.0:
+// ✅ Conformité complète avec API Documentation v4.2.2
+// ✅ Commandes au format category.action (files.list, playlist.list, etc.)
+// ✅ Gestion réponses {success: true, data: {...}}
+// ✅ Événements au format category:event
+// ✅ Intégration visualizer MIDI temps réel
 // ============================================================================
 
 class HomeView {
@@ -37,7 +37,13 @@ class HomeView {
             currentPlaylist: null,
             files: [],
             playlists: [],
-            instruments: [],
+            devices: [],
+            playbackStatus: {
+                state: 'stopped',
+                position: 0,
+                duration: 0,
+                file: null
+            },
             allMuted: false
         };
         
@@ -45,6 +51,7 @@ class HomeView {
         this.visualizerCanvas = null;
         this.visualizerContext = null;
         this.visualizerAnimationId = null;
+        this.activeNotes = new Map(); // note -> {channel, velocity, time}
         
         // Éléments DOM
         this.elements = {};
@@ -65,12 +72,12 @@ class HomeView {
         this.attachEvents();
         this.initVisualizer();
         
-        // Charger les données initiales
+        // Charger les données initiales via API
         this.loadFiles();
         this.loadPlaylists();
-        this.loadInstruments();
+        this.loadDevices();
         
-        this.logger.info('[HomeView] Initialized');
+        this.logger.info('[HomeView] Initialized v4.0.0');
     }
 
     render() {
@@ -82,7 +89,7 @@ class HomeView {
                 <!-- Sélection fichiers/playlists -->
                 <div class="home-selector">
                     <div class="selector-tabs">
-                        <button class="selector-tab active" data-mode="files">Fichiers</button>
+                        <button class="selector-tab active" data-mode="files">Fichiers MIDI</button>
                         <button class="selector-tab" data-mode="playlists">Playlists</button>
                     </div>
                     
@@ -105,9 +112,9 @@ class HomeView {
                     <div class="instruments-bar">
                         <div class="instruments-title">
                             <span class="icon">🎸</span>
-                            <span class="label">Instruments actifs</span>
+                            <span class="label">Devices connectés</span>
                         </div>
-                        <div class="instruments-list" id="homeActiveInstruments">
+                        <div class="instruments-list" id="homeActiveDevices">
                             <!-- Généré dynamiquement -->
                         </div>
                         <div class="instruments-actions">
@@ -122,8 +129,8 @@ class HomeView {
                     <div class="visualizer-container">
                         <canvas id="homeVisualizerCanvas" class="visualizer-canvas"></canvas>
                         <div class="visualizer-info" id="homeVisualizerInfo">
-                            <span class="note-count">0 notes</span>
-                            <span class="active-channels">0 canaux actifs</span>
+                            <span class="note-count">0 notes actives</span>
+                            <span class="active-channels">0 canaux</span>
                         </div>
                     </div>
                 </div>
@@ -141,8 +148,8 @@ class HomeView {
             filesList: document.getElementById('homeFilesList'),
             playlistsList: document.getElementById('homePlaylistsList'),
             
-            // Instruments
-            instrumentsList: document.getElementById('homeActiveInstruments'),
+            // Devices
+            devicesList: document.getElementById('homeActiveDevices'),
             btnMuteAll: document.getElementById('homeBtnMuteAll'),
             
             // Visualizer
@@ -180,7 +187,7 @@ class HomeView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        // Fichiers
+        // Fichiers - écoute de files:loaded
         this.eventBus.on('files:loaded', (data) => {
             this.state.files = data.files || [];
             this.renderFilesList();
@@ -191,7 +198,7 @@ class HomeView {
             this.updateFileSelection();
         });
         
-        // Playlists
+        // Playlists - écoute de playlist:* events
         this.eventBus.on('playlists:loaded', (data) => {
             this.state.playlists = data.playlists || [];
             this.renderPlaylistsList();
@@ -202,19 +209,42 @@ class HomeView {
             this.updatePlaylistSelection();
         });
         
-        // Instruments
-        this.eventBus.on('instruments:updated', (data) => {
-            this.state.instruments = data.instruments || [];
-            this.renderInstrumentsList();
+        // Devices - écoute de device:* events
+        this.eventBus.on('devices:loaded', (data) => {
+            this.state.devices = data.devices || [];
+            this.renderDevicesList();
         });
         
-        // MIDI
+        this.eventBus.on('device:connected', (data) => {
+            this.handleDeviceConnected(data);
+        });
+        
+        this.eventBus.on('device:disconnected', (data) => {
+            this.handleDeviceDisconnected(data);
+        });
+        
+        // Playback - écoute de playback:* events
+        this.eventBus.on('playback:state', (data) => {
+            this.state.playbackStatus.state = data.state;
+            this.updatePlaybackState();
+        });
+        
+        this.eventBus.on('playback:progress', (data) => {
+            this.state.playbackStatus.position = data.position;
+            this.state.playbackStatus.duration = data.duration;
+        });
+        
+        // MIDI events pour visualizer
         this.eventBus.on('midi:note_on', (data) => {
-            this.visualizeNote(data);
+            this.visualizeNoteOn(data);
         });
         
         this.eventBus.on('midi:note_off', (data) => {
-            this.clearNote(data);
+            this.visualizeNoteOff(data);
+        });
+        
+        this.eventBus.on('midi:cc', (data) => {
+            // Gérer les contrôles si nécessaire
         });
     }
 
@@ -223,172 +253,216 @@ class HomeView {
     // ========================================================================
 
     switchMode(mode) {
+        if (this.state.mode === mode) return;
+        
         this.state.mode = mode;
         
         // Update tabs
         const tabs = this.container.querySelectorAll('.selector-tab');
         tabs.forEach(tab => {
-            if (tab.dataset.mode === mode) {
-                tab.classList.add('active');
-            } else {
-                tab.classList.remove('active');
-            }
+            const isActive = tab.dataset.mode === mode;
+            tab.classList.toggle('active', isActive);
         });
         
-        // Update lists visibility
+        // Toggle lists
         if (this.elements.filesList) {
-            this.elements.filesList.style.display = mode === 'files' ? 'flex' : 'none';
+            this.elements.filesList.style.display = mode === 'files' ? 'block' : 'none';
         }
         if (this.elements.playlistsList) {
-            this.elements.playlistsList.style.display = mode === 'playlists' ? 'flex' : 'none';
+            this.elements.playlistsList.style.display = mode === 'playlists' ? 'block' : 'none';
+        }
+        
+        // Emit event
+        if (this.eventBus) {
+            this.eventBus.emit('home:mode_changed', { mode });
         }
     }
 
     // ========================================================================
-    // RENDU DES LISTES
+    // RENDERING - STATES
+    // ========================================================================
+
+    renderEmptyState(type) {
+        const messages = {
+            files: {
+                icon: '📁',
+                title: 'Aucun fichier MIDI',
+                subtitle: 'Chargez des fichiers MIDI pour commencer'
+            },
+            playlists: {
+                icon: '🎵',
+                title: 'Aucune playlist',
+                subtitle: 'Créez une playlist pour organiser vos fichiers'
+            }
+        };
+        
+        const msg = messages[type] || messages.files;
+        
+        return `
+            <div class="empty-state">
+                <div class="empty-icon">${msg.icon}</div>
+                <p class="empty-title">${msg.title}</p>
+                <p class="empty-subtitle">${msg.subtitle}</p>
+            </div>
+        `;
+    }
+
+    // ========================================================================
+    // RENDERING - FICHIERS
     // ========================================================================
 
     renderFilesList() {
         if (!this.elements.filesList) return;
         
-        if (!this.state.files || this.state.files.length === 0) {
+        const files = this.state.files;
+        
+        if (files.length === 0) {
             this.elements.filesList.innerHTML = this.renderEmptyState('files');
             return;
         }
         
-        this.elements.filesList.innerHTML = this.state.files
-            .map(file => this.renderFileItem(file))
-            .join('');
+        const html = files.map(file => this.renderFileItem(file)).join('');
+        this.elements.filesList.innerHTML = `<div class="files-grid">${html}</div>`;
     }
 
     renderFileItem(file) {
-        const isActive = this.state.currentFile && this.state.currentFile.id === file.id;
-        const duration = this.formatDuration(file.duration || 0);
-        const tracks = file.tracks || 0;
+        const isActive = this.state.currentFile && 
+                        (this.state.currentFile.path === file.path || 
+                         this.state.currentFile.name === file.name);
+        
+        const duration = file.duration ? this.formatDuration(file.duration) : '—';
+        const size = file.size ? this.formatFileSize(file.size) : '—';
         
         return `
-            <div class="file-item ${isActive ? 'active' : ''}" data-file-id="${file.id}">
-                <div class="file-item-header">
-                    <span class="file-item-icon">🎵</span>
-                    <span class="file-item-name">${file.name || 'Sans nom'}</span>
+            <div class="file-item ${isActive ? 'active' : ''}" 
+                 data-file-path="${file.path || file.name}">
+                <div class="file-icon">🎵</div>
+                <div class="file-info">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-meta">
+                        <span>${duration}</span>
+                        <span>•</span>
+                        <span>${size}</span>
+                    </div>
                 </div>
-                <div class="file-item-info">
-                    <span class="file-duration">⏱️ ${duration}</span>
-                    <span class="file-tracks">🎹 ${tracks} pistes</span>
+                <div class="file-actions">
+                    <button class="btn-play" data-action="play-file" title="Lire">▶</button>
+                    <button class="btn-load" data-action="load-file" title="Charger">📂</button>
                 </div>
             </div>
         `;
     }
+
+    // ========================================================================
+    // RENDERING - PLAYLISTS
+    // ========================================================================
 
     renderPlaylistsList() {
         if (!this.elements.playlistsList) return;
         
-        if (!this.state.playlists || this.state.playlists.length === 0) {
+        const playlists = this.state.playlists;
+        
+        if (playlists.length === 0) {
             this.elements.playlistsList.innerHTML = this.renderEmptyState('playlists');
             return;
         }
         
-        this.elements.playlistsList.innerHTML = this.state.playlists
-            .map(playlist => this.renderPlaylistItem(playlist))
-            .join('');
+        const html = playlists.map(playlist => this.renderPlaylistItem(playlist)).join('');
+        this.elements.playlistsList.innerHTML = `<div class="playlists-grid">${html}</div>`;
     }
 
     renderPlaylistItem(playlist) {
-        const isActive = this.state.currentPlaylist && this.state.currentPlaylist.id === playlist.id;
-        const fileCount = playlist.files ? playlist.files.length : 0;
+        const isActive = this.state.currentPlaylist && 
+                        this.state.currentPlaylist.id === playlist.id;
+        
+        const itemCount = playlist.items ? playlist.items.length : 0;
+        const duration = playlist.total_duration ? this.formatDuration(playlist.total_duration) : '—';
         
         return `
-            <div class="playlist-item ${isActive ? 'active' : ''}" data-playlist-id="${playlist.id}">
-                <div class="playlist-item-header">
-                    <span class="playlist-item-icon">📋</span>
-                    <span class="playlist-item-name">${playlist.name || 'Sans nom'}</span>
-                    <span class="playlist-item-count">${fileCount}</span>
+            <div class="playlist-item ${isActive ? 'active' : ''}" 
+                 data-playlist-id="${playlist.id}">
+                <div class="playlist-icon">📋</div>
+                <div class="playlist-info">
+                    <div class="playlist-name">${playlist.name}</div>
+                    <div class="playlist-meta">
+                        <span>${itemCount} morceaux</span>
+                        <span>•</span>
+                        <span>${duration}</span>
+                    </div>
+                </div>
+                <div class="playlist-actions">
+                    <button class="btn-play" data-action="play-playlist" title="Lire">▶</button>
+                    <button class="btn-load" data-action="load-playlist" title="Charger">📂</button>
                 </div>
             </div>
         `;
     }
 
-    renderInstrumentsList() {
-        if (!this.elements.instrumentsList) return;
+    // ========================================================================
+    // RENDERING - DEVICES
+    // ========================================================================
+
+    renderDevicesList() {
+        if (!this.elements.devicesList) return;
         
-        if (!this.state.instruments || this.state.instruments.length === 0) {
-            this.elements.instrumentsList.innerHTML = `
-                <div class="empty-state" style="padding: 8px;">
-                    <span style="font-size: 12px; color: var(--text-muted);">Aucun instrument connecté</span>
-                </div>
+        const devices = this.state.devices.filter(d => d.status === 2); // Connected only
+        
+        if (devices.length === 0) {
+            this.elements.devicesList.innerHTML = `
+                <div class="devices-empty">Aucun device connecté</div>
             `;
             return;
         }
         
-        this.elements.instrumentsList.innerHTML = this.state.instruments
-            .map(instrument => this.renderInstrumentChip(instrument))
-            .join('');
+        const html = devices.map(device => this.renderDeviceItem(device)).join('');
+        this.elements.devicesList.innerHTML = html;
     }
 
-    renderInstrumentChip(instrument) {
-        const icon = this.getInstrumentIcon(instrument.type);
-        const isActive = instrument.connected;
+    renderDeviceItem(device) {
+        const typeIcons = {
+            0: '❓', // Unknown
+            1: '🔌', // USB
+            2: '📡', // BLE
+            3: '💻'  // Virtual
+        };
+        
+        const icon = typeIcons[device.type] || '🎸';
         
         return `
-            <div class="instrument-chip ${isActive ? 'active' : ''}" data-instrument-id="${instrument.id}">
-                <span class="instrument-chip-icon">${icon}</span>
-                <span class="instrument-chip-name">${instrument.name}</span>
-                <span class="instrument-chip-status"></span>
+            <div class="device-chip" data-device-id="${device.id}">
+                <span class="device-icon">${icon}</span>
+                <span class="device-name">${device.name}</span>
+                <span class="device-status connected"></span>
             </div>
         `;
     }
 
-    renderEmptyState(type) {
-        if (type === 'files') {
-            return `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🎵</div>
-                    <div class="empty-state-text">Aucun fichier MIDI</div>
-                    <div class="empty-state-hint">Importez des fichiers depuis la page Fichiers</div>
-                </div>
-            `;
-        } else {
-            return `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📋</div>
-                    <div class="empty-state-text">Aucune playlist</div>
-                    <div class="empty-state-hint">Créez une playlist depuis la page Fichiers</div>
-                </div>
-            `;
-        }
-    }
-
     // ========================================================================
-    // GESTION DES CLICS
+    // INTERACTION - FICHIERS
     // ========================================================================
 
     handleFileClick(e) {
         const fileItem = e.target.closest('.file-item');
         if (!fileItem) return;
         
-        const fileId = fileItem.dataset.fileId;
-        const file = this.state.files.find(f => f.id === fileId);
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        const filePath = fileItem.dataset.filePath;
+        const file = this.state.files.find(f => f.path === filePath || f.name === filePath);
         
-        if (file) {
-            this.selectFile(file);
+        if (!file) return;
+        
+        switch (action) {
+            case 'play-file':
+                this.playFile(file);
+                break;
+            case 'load-file':
+                this.loadFile(file);
+                break;
+            default:
+                this.selectFile(file);
+                break;
         }
     }
-
-    handlePlaylistClick(e) {
-        const playlistItem = e.target.closest('.playlist-item');
-        if (!playlistItem) return;
-        
-        const playlistId = playlistItem.dataset.playlistId;
-        const playlist = this.state.playlists.find(p => p.id === playlistId);
-        
-        if (playlist) {
-            this.selectPlaylist(playlist);
-        }
-    }
-
-    // ========================================================================
-    // SÉLECTION
-    // ========================================================================
 
     selectFile(file) {
         this.state.currentFile = file;
@@ -397,6 +471,72 @@ class HomeView {
         
         if (this.eventBus) {
             this.eventBus.emit('home:file_selected', { file });
+        }
+    }
+
+    async playFile(file) {
+        if (!this.eventBus) return;
+        
+        try {
+            // Utilise playback.load puis playback.play via API
+            this.eventBus.emit('home:play_file_requested', { 
+                file_path: file.path || file.name 
+            });
+        } catch (error) {
+            this.logger.error('[HomeView] Play file error:', error);
+        }
+    }
+
+    async loadFile(file) {
+        if (!this.eventBus) return;
+        
+        try {
+            // Utilise playback.load via API
+            this.eventBus.emit('home:load_file_requested', { 
+                file_path: file.path || file.name 
+            });
+        } catch (error) {
+            this.logger.error('[HomeView] Load file error:', error);
+        }
+    }
+
+    updateFileSelection() {
+        const items = this.elements.filesList?.querySelectorAll('.file-item');
+        if (!items) return;
+        
+        items.forEach(item => {
+            const filePath = item.dataset.filePath;
+            const isActive = this.state.currentFile && 
+                           (this.state.currentFile.path === filePath || 
+                            this.state.currentFile.name === filePath);
+            item.classList.toggle('active', isActive);
+        });
+    }
+
+    // ========================================================================
+    // INTERACTION - PLAYLISTS
+    // ========================================================================
+
+    handlePlaylistClick(e) {
+        const playlistItem = e.target.closest('.playlist-item');
+        if (!playlistItem) return;
+        
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        const playlistId = playlistItem.dataset.playlistId;
+        const playlist = this.state.playlists.find(p => p.id === playlistId);
+        
+        if (!playlist) return;
+        
+        switch (action) {
+            case 'play-playlist':
+                this.playPlaylist(playlist);
+                break;
+            case 'load-playlist':
+                this.loadPlaylist(playlist);
+                break;
+            default:
+                this.selectPlaylist(playlist);
+                break;
         }
     }
 
@@ -410,15 +550,28 @@ class HomeView {
         }
     }
 
-    updateFileSelection() {
-        const items = this.elements.filesList?.querySelectorAll('.file-item');
-        if (!items) return;
+    async playPlaylist(playlist) {
+        if (!this.eventBus) return;
         
-        items.forEach(item => {
-            const isActive = this.state.currentFile && 
-                           item.dataset.fileId === this.state.currentFile.id;
-            item.classList.toggle('active', isActive);
-        });
+        try {
+            this.eventBus.emit('home:play_playlist_requested', { 
+                playlist_id: playlist.id 
+            });
+        } catch (error) {
+            this.logger.error('[HomeView] Play playlist error:', error);
+        }
+    }
+
+    async loadPlaylist(playlist) {
+        if (!this.eventBus) return;
+        
+        try {
+            this.eventBus.emit('home:load_playlist_requested', { 
+                playlist_id: playlist.id 
+            });
+        } catch (error) {
+            this.logger.error('[HomeView] Load playlist error:', error);
+        }
     }
 
     updatePlaylistSelection() {
@@ -430,6 +583,30 @@ class HomeView {
                            item.dataset.playlistId === this.state.currentPlaylist.id;
             item.classList.toggle('active', isActive);
         });
+    }
+
+    // ========================================================================
+    // DEVICES - HANDLERS
+    // ========================================================================
+
+    handleDeviceConnected(data) {
+        // Mise à jour de la liste des devices
+        this.loadDevices();
+        
+        // Notification visuelle
+        if (this.logger) {
+            this.logger.info(`[HomeView] Device connected: ${data.device_id}`);
+        }
+    }
+
+    handleDeviceDisconnected(data) {
+        // Mise à jour de la liste des devices
+        this.loadDevices();
+        
+        // Notification visuelle
+        if (this.logger) {
+            this.logger.info(`[HomeView] Device disconnected: ${data.device_id}`);
+        }
     }
 
     // ========================================================================
@@ -499,44 +676,109 @@ class HomeView {
         
         // Clear with gradient
         const gradient = ctx.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, 'rgba(26, 26, 46, 0.8)');
-        gradient.addColorStop(1, 'rgba(22, 33, 62, 0.8)');
+        gradient.addColorStop(0, 'rgba(26, 26, 46, 0.9)');
+        gradient.addColorStop(1, 'rgba(22, 33, 62, 0.9)');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
         
-        // TODO: Draw active notes
-        // This will be implemented when MIDI events are properly connected
+        // Dessiner les notes actives
+        this.drawActiveNotes(ctx, width, height);
+        
+        // Mise à jour des infos
+        this.updateVisualizerInfo();
     }
 
-    visualizeNote(data) {
-        // TODO: Add visual feedback for note on events
-        // This will be implemented when MIDI events are properly connected
+    drawActiveNotes(ctx, width, height) {
+        if (this.activeNotes.size === 0) return;
+        
+        const now = Date.now();
+        const noteHeight = height / 128; // 128 notes MIDI
+        
+        this.activeNotes.forEach((noteData, note) => {
+            const age = now - noteData.time;
+            const alpha = Math.max(0, 1 - age / 2000); // Fade over 2 seconds
+            
+            if (alpha <= 0) {
+                this.activeNotes.delete(note);
+                return;
+            }
+            
+            // Couleur par canal
+            const hue = (noteData.channel * 30) % 360;
+            ctx.fillStyle = `hsla(${hue}, 70%, 60%, ${alpha})`;
+            
+            // Dessiner la note
+            const y = (127 - note) * noteHeight;
+            const barWidth = (noteData.velocity / 127) * (width * 0.8);
+            ctx.fillRect(width * 0.1, y, barWidth, noteHeight);
+        });
     }
 
-    clearNote(data) {
-        // TODO: Clear visual feedback for note off events
-        // This will be implemented when MIDI events are properly connected
+    visualizeNoteOn(data) {
+        // data: {note, velocity, channel, timestamp}
+        this.activeNotes.set(data.note, {
+            channel: data.channel || 0,
+            velocity: data.velocity || 64,
+            time: Date.now()
+        });
+    }
+
+    visualizeNoteOff(data) {
+        // Laisser la note fade out naturellement
+        // ou supprimer immédiatement si souhaité
+        // this.activeNotes.delete(data.note);
+    }
+
+    updateVisualizerInfo() {
+        if (!this.elements.visualizerInfo) return;
+        
+        const noteCount = this.activeNotes.size;
+        const channels = new Set(
+            Array.from(this.activeNotes.values()).map(n => n.channel)
+        );
+        
+        const noteCountSpan = this.elements.visualizerInfo.querySelector('.note-count');
+        const channelCountSpan = this.elements.visualizerInfo.querySelector('.active-channels');
+        
+        if (noteCountSpan) {
+            noteCountSpan.textContent = `${noteCount} notes actives`;
+        }
+        if (channelCountSpan) {
+            channelCountSpan.textContent = `${channels.size} canaux`;
+        }
     }
 
     // ========================================================================
-    // CHARGEMENT DES DONNÉES
+    // PLAYBACK STATE
+    // ========================================================================
+
+    updatePlaybackState() {
+        // Mise à jour visuelle de l'état de lecture si nécessaire
+        // (ex: indicateur de lecture en cours)
+    }
+
+    // ========================================================================
+    // CHARGEMENT DES DONNÉES (API CALLS VIA EVENTBUS)
     // ========================================================================
 
     loadFiles() {
         if (this.eventBus) {
-            this.eventBus.emit('home:request_files');
+            // Le controller devra appeler files.list via API
+            this.eventBus.emit('home:request_files', { path: '/midi' });
         }
     }
 
     loadPlaylists() {
         if (this.eventBus) {
+            // Le controller devra appeler playlist.list via API
             this.eventBus.emit('home:request_playlists');
         }
     }
 
-    loadInstruments() {
+    loadDevices() {
         if (this.eventBus) {
-            this.eventBus.emit('home:request_instruments');
+            // Le controller devra appeler devices.list via API
+            this.eventBus.emit('home:request_devices');
         }
     }
 
@@ -550,14 +792,10 @@ class HomeView {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
-    getInstrumentIcon(type) {
-        const icons = {
-            usb: '🔌',
-            bluetooth: '📡',
-            network: '🌐',
-            virtual: '💻'
-        };
-        return icons[type] || '🎸';
+    formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     // ========================================================================
@@ -571,13 +809,20 @@ class HomeView {
             this.visualizerAnimationId = null;
         }
         
+        // Clear active notes
+        this.activeNotes.clear();
+        
         // Remove event listeners
         if (this.eventBus) {
             this.eventBus.off('files:loaded');
             this.eventBus.off('file:selected');
             this.eventBus.off('playlists:loaded');
             this.eventBus.off('playlist:selected');
-            this.eventBus.off('instruments:updated');
+            this.eventBus.off('devices:loaded');
+            this.eventBus.off('device:connected');
+            this.eventBus.off('device:disconnected');
+            this.eventBus.off('playback:state');
+            this.eventBus.off('playback:progress');
             this.eventBus.off('midi:note_on');
             this.eventBus.off('midi:note_off');
         }

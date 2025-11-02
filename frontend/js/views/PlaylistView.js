@@ -1,14 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/PlaylistView.js
-// Version: v3.2.0 - SIGNATURE COHÉRENTE + API COMPLÈTE
-// Date: 2025-11-01
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v3.2.0:
-// ✅ Signature cohérente : constructor(containerId, eventBus, logger = null)
-// ✅ Appel super() correct
-// ✅ Affichage liste playlists
-// ✅ Affichage fichiers dans playlist
-// ✅ Contrôles playlist (play, shuffle, repeat)
+// AMÉLIORATIONS v4.0.0:
+// ✅ API v4.2.2: playlist.* (create, delete, update, list, get, addItem, removeItem, reorder, setLoop)
+// ✅ Drag & drop pour réorganiser
+// ✅ Gestion loop
 // ============================================================================
 
 class PlaylistView extends BaseView {
@@ -17,346 +15,479 @@ class PlaylistView extends BaseView {
         
         this.logger = logger || window.logger || console;
         
-        // État spécifique à la vue
+        // État
         this.viewState = {
             playlists: [],
             selectedPlaylist: null,
-            currentFile: null,
-            isPlaying: false,
-            shuffle: false,
-            repeat: false
+            playlistItems: [],
+            isEditing: false,
+            draggedItem: null
         };
         
-        this.log('info', 'PlaylistView', '✅ PlaylistView v3.2.0 initialized');
+        this.log('info', 'PlaylistView', '✅ PlaylistView v4.0.0 initialized');
     }
     
     // ========================================================================
-    // TEMPLATE PRINCIPAL
+    // TEMPLATE
     // ========================================================================
     
     buildTemplate(data = {}) {
         const state = { ...this.viewState, ...data };
         
-        return \`
+        return `
             <div class="playlist-view-container">
                 <div class="page-header">
                     <h1>🎵 Playlists</h1>
                     <div class="header-actions">
-                        <button class="btn-primary" data-action="create-playlist">
+                        <button class="btn-create" data-action="create-playlist">
                             ➕ Nouvelle Playlist
                         </button>
                     </div>
                 </div>
                 
                 <div class="playlist-layout">
-                    <!-- Sidebar: Liste playlists -->
-                    <div class="playlist-sidebar">
-                        <h2>Mes Playlists</h2>
-                        \${this.renderPlaylistsList(state)}
+                    <!-- Liste des playlists -->
+                    <div class="playlists-sidebar">
+                        <h2>Mes playlists</h2>
+                        <div id="playlistsList">
+                            ${this.renderPlaylistsList(state)}
+                        </div>
                     </div>
                     
-                    <!-- Main: Contenu playlist -->
-                    <div class="playlist-main">
-                        \${this.renderPlaylistContent(state)}
+                    <!-- Contenu playlist -->
+                    <div class="playlist-content">
+                        ${state.selectedPlaylist ? 
+                            this.renderPlaylistContent(state) : 
+                            this.renderNoSelection()}
                     </div>
                 </div>
             </div>
-        \`;
+        `;
     }
     
     // ========================================================================
-    // RENDERING PLAYLISTS
+    // RENDERING
     // ========================================================================
     
     renderPlaylistsList(state) {
-        const playlists = state.playlists || [];
+        const playlists = state.playlists;
         
         if (playlists.length === 0) {
-            return \`
+            return `
                 <div class="playlists-empty">
                     <p>Aucune playlist</p>
-                    <p class="text-muted">Créez votre première playlist</p>
+                    <button class="btn-create-first" data-action="create-playlist">
+                        ➕ Créer
+                    </button>
                 </div>
-            \`;
+            `;
         }
         
-        return \`
+        return `
             <div class="playlists-list">
-                \${playlists.map(playlist => this.renderPlaylistItem(playlist, state.selectedPlaylist)).join('')}
+                ${playlists.map(pl => this.renderPlaylistItem(pl, state.selectedPlaylist)).join('')}
             </div>
-        \`;
+        `;
     }
     
     renderPlaylistItem(playlist, selectedPlaylist) {
         const isSelected = selectedPlaylist && selectedPlaylist.id === playlist.id;
-        const selectedClass = isSelected ? 'selected' : '';
-        const fileCount = playlist.files?.length || 0;
+        const itemCount = playlist.item_count || (playlist.items ? playlist.items.length : 0);
         
-        return \`
-            <div class="playlist-item \${selectedClass}" 
-                 data-playlist-id="\${playlist.id}"
-                 data-action="select-playlist">
+        return `
+            <div class="playlist-item ${isSelected ? 'selected' : ''}" 
+                 data-playlist-id="${playlist.id}">
                 <div class="playlist-icon">📋</div>
                 <div class="playlist-info">
-                    <div class="playlist-name">\${playlist.name}</div>
-                    <div class="playlist-meta">\${fileCount} fichier(s)</div>
+                    <div class="playlist-name">${playlist.name}</div>
+                    <div class="playlist-count">${itemCount} morceaux</div>
                 </div>
-                <button class="btn-icon btn-danger" 
-                        data-action="delete-playlist" 
-                        data-playlist-id="\${playlist.id}"
-                        title="Supprimer">
-                    🗑️
-                </button>
+                <div class="playlist-actions">
+                    <button class="btn-icon" data-action="select-playlist" title="Voir">👁️</button>
+                    <button class="btn-icon" data-action="delete-playlist" title="Supprimer">🗑️</button>
+                </div>
             </div>
-        \`;
+        `;
     }
     
-    // ========================================================================
-    // RENDERING PLAYLIST CONTENT
-    // ========================================================================
-    
     renderPlaylistContent(state) {
-        if (!state.selectedPlaylist) {
-            return \`
-                <div class="playlist-empty-state">
-                    <div class="empty-icon">🎵</div>
-                    <p>Sélectionnez une playlist</p>
-                </div>
-            \`;
-        }
+        const pl = state.selectedPlaylist;
+        const items = state.playlistItems;
         
-        const playlist = state.selectedPlaylist;
-        const files = playlist.files || [];
-        
-        return \`
-            <div class="playlist-content">
-                <div class="playlist-header">
-                    <h2>\${playlist.name}</h2>
-                    <div class="playlist-controls">
-                        \${this.renderPlaylistControls(state)}
-                    </div>
+        return `
+            <div class="playlist-header">
+                <div class="playlist-title">
+                    <input type="text" class="playlist-name-input" 
+                           value="${pl.name}" data-action="rename-playlist" />
+                    <span class="playlist-loop ${pl.loop ? 'active' : ''}" 
+                          data-action="toggle-loop">
+                        🔁 Loop ${pl.loop ? 'ON' : 'OFF'}
+                    </span>
                 </div>
-                
-                <div class="playlist-files">
-                    \${files.length === 0 
-                        ? this.renderEmptyPlaylist() 
-                        : this.renderFilesList(files, state.currentFile)}
-                </div>
-                
-                <div class="playlist-footer">
-                    <button class="btn-secondary" data-action="add-files">
+                <div class="playlist-actions">
+                    <button class="btn-play-all" data-action="play-playlist">
+                        ▶ Lire tout
+                    </button>
+                    <button class="btn-add-files" data-action="add-files">
                         ➕ Ajouter des fichiers
                     </button>
                 </div>
             </div>
-        \`;
+            
+            <div class="playlist-items" id="playlistItems">
+                ${items.length > 0 ? 
+                    this.renderPlaylistItems(items) : 
+                    this.renderEmptyPlaylist()}
+            </div>
+        `;
     }
     
-    renderPlaylistControls(state) {
-        const playIcon = state.isPlaying ? '⏸️' : '▶️';
-        const shuffleClass = state.shuffle ? 'active' : '';
-        const repeatClass = state.repeat ? 'active' : '';
-        
-        return \`
-            <div class="controls-group">
-                <button class="btn-control" data-action="play-playlist" title="Play/Pause">
-                    \${playIcon}
-                </button>
-                <button class="btn-control \${shuffleClass}" data-action="toggle-shuffle" title="Shuffle">
-                    🔀
-                </button>
-                <button class="btn-control \${repeatClass}" data-action="toggle-repeat" title="Repeat">
-                    🔁
-                </button>
+    renderPlaylistItems(items) {
+        return `
+            <div class="items-list">
+                ${items.map((item, index) => this.renderPlaylistItemEntry(item, index)).join('')}
             </div>
-        \`;
+        `;
+    }
+    
+    renderPlaylistItemEntry(item, index) {
+        return `
+            <div class="item-entry" 
+                 data-item-id="${item.id}" 
+                 data-index="${index}"
+                 draggable="true">
+                <div class="item-drag">☰</div>
+                <div class="item-order">${index + 1}</div>
+                <div class="item-info">
+                    <div class="item-name">${item.file_path || item.name || '—'}</div>
+                    <div class="item-duration">${item.duration ? this.formatDuration(item.duration) : '—'}</div>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-icon" data-action="play-item" title="Lire">▶</button>
+                    <button class="btn-icon" data-action="remove-item" title="Retirer">✕</button>
+                </div>
+            </div>
+        `;
     }
     
     renderEmptyPlaylist() {
-        return \`
-            <div class="files-empty">
-                <div class="empty-icon">📂</div>
-                <p>Cette playlist est vide</p>
-                <p class="text-muted">Ajoutez des fichiers MIDI</p>
+        return `
+            <div class="playlist-empty">
+                <div class="empty-icon">🎵</div>
+                <p>Playlist vide</p>
+                <button class="btn-add-files" data-action="add-files">
+                    ➕ Ajouter des fichiers
+                </button>
             </div>
-        \`;
+        `;
     }
     
-    renderFilesList(files, currentFile) {
-        return \`
-            <div class="files-list">
-                \${files.map((file, index) => this.renderFileItem(file, index, currentFile)).join('')}
+    renderNoSelection() {
+        return `
+            <div class="no-selection">
+                <div class="empty-icon">📋</div>
+                <p>Sélectionnez une playlist</p>
             </div>
-        \`;
+        `;
     }
     
-    renderFileItem(file, index, currentFile) {
-        const isCurrent = currentFile && (currentFile.id === file.id || currentFile.name === file.name);
-        const currentClass = isCurrent ? 'current' : '';
+    // ========================================================================
+    // EVENTS
+    // ========================================================================
+    
+    attachEvents() {
+        super.attachEvents();
         
-        return \`
-            <div class="file-item \${currentClass}" 
-                 data-file-id="\${file.id || file.name}"
-                 data-file-index="\${index}">
-                <div class="file-number">\${index + 1}</div>
-                <div class="file-icon">\${isCurrent ? '🎵' : '🎼'}</div>
-                <div class="file-info">
-                    <div class="file-name">\${file.name || file.id}</div>
-                    <div class="file-meta">
-                        \${file.duration ? this.formatDuration(file.duration) : 'N/A'}
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="btn-icon" 
-                            data-action="play-file" 
-                            data-file-index="\${index}"
-                            title="Lire">
-                        ▶️
-                    </button>
-                    <button class="btn-icon btn-danger" 
-                            data-action="remove-file" 
-                            data-file-index="\${index}"
-                            title="Retirer">
-                        ✖️
-                    </button>
-                </div>
-            </div>
-        \`;
-    }
-    
-    // ========================================================================
-    // FORMATTERS
-    // ========================================================================
-    
-    formatDuration(duration) {
-        if (!duration) return '0:00';
-        
-        const minutes = Math.floor(duration / 60);
-        const seconds = Math.floor(duration % 60);
-        
-        return \`\${minutes}:\${seconds.toString().padStart(2, '0')}\`;
-    }
-    
-    // ========================================================================
-    // UPDATE MÉTHODES
-    // ========================================================================
-    
-    updatePlaylists(playlists) {
-        this.viewState.playlists = playlists;
-        this.render();
-    }
-    
-    updateSelectedPlaylist(playlist) {
-        this.viewState.selectedPlaylist = playlist;
-        this.render();
-    }
-    
-    updateCurrentFile(file) {
-        this.viewState.currentFile = file;
-        this.render();
-    }
-    
-    updatePlaybackState(isPlaying) {
-        this.viewState.isPlaying = isPlaying;
-        this.render();
-    }
-    
-    updateControls(controls) {
-        if (controls.shuffle !== undefined) {
-            this.viewState.shuffle = controls.shuffle;
-        }
-        if (controls.repeat !== undefined) {
-            this.viewState.repeat = controls.repeat;
-        }
-        this.render();
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS UI
-    // ========================================================================
-    
-    attachEventListeners() {
         if (!this.container) return;
         
-        // Délégation événements
         this.container.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-action]');
-            if (!target) return;
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
             
-            const action = target.dataset.action;
-            const playlistId = target.dataset.playlistId;
-            const fileIndex = target.dataset.fileIndex;
-            
-            e.stopPropagation();
+            const playlistItem = e.target.closest('.playlist-item');
+            const itemEntry = e.target.closest('.item-entry');
             
             switch (action) {
                 case 'create-playlist':
-                    const name = prompt('Nom de la playlist:');
-                    if (name) {
-                        this.eventBus.emit('playlist:create', { name });
-                    }
+                    this.createPlaylist();
                     break;
-                    
                 case 'select-playlist':
-                    if (playlistId) {
-                        this.eventBus.emit('playlist:select', { playlistId });
-                    }
+                    if (playlistItem) this.selectPlaylist(playlistItem.dataset.playlistId);
                     break;
-                    
                 case 'delete-playlist':
-                    if (playlistId) {
-                        const confirmed = confirm('Supprimer cette playlist ?');
-                        if (confirmed) {
-                            this.eventBus.emit('playlist:delete', { playlistId });
-                        }
-                    }
+                    if (playlistItem) this.deletePlaylist(playlistItem.dataset.playlistId);
                     break;
-                    
                 case 'play-playlist':
-                    this.eventBus.emit('playlist:play');
+                    this.playPlaylist();
                     break;
-                    
-                case 'toggle-shuffle':
-                    this.eventBus.emit('playlist:toggle-shuffle');
-                    break;
-                    
-                case 'toggle-repeat':
-                    this.eventBus.emit('playlist:toggle-repeat');
-                    break;
-                    
                 case 'add-files':
-                    this.eventBus.emit('playlist:add-files');
+                    this.addFiles();
                     break;
-                    
-                case 'play-file':
-                    if (fileIndex !== undefined) {
-                        this.eventBus.emit('playlist:play-file', { index: parseInt(fileIndex) });
-                    }
+                case 'toggle-loop':
+                    this.toggleLoop();
                     break;
-                    
-                case 'remove-file':
-                    if (fileIndex !== undefined) {
-                        this.eventBus.emit('playlist:remove-file', { index: parseInt(fileIndex) });
-                    }
+                case 'play-item':
+                    if (itemEntry) this.playItem(itemEntry.dataset.itemId);
+                    break;
+                case 'remove-item':
+                    if (itemEntry) this.removeItem(itemEntry.dataset.itemId);
                     break;
             }
         });
+        
+        // Drag & drop
+        this.container.addEventListener('dragstart', (e) => {
+            const itemEntry = e.target.closest('.item-entry');
+            if (itemEntry) {
+                this.viewState.draggedItem = itemEntry.dataset.itemId;
+                itemEntry.classList.add('dragging');
+            }
+        });
+        
+        this.container.addEventListener('dragend', (e) => {
+            const itemEntry = e.target.closest('.item-entry');
+            if (itemEntry) {
+                itemEntry.classList.remove('dragging');
+                this.viewState.draggedItem = null;
+            }
+        });
+        
+        this.container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const itemEntry = e.target.closest('.item-entry');
+            if (itemEntry && this.viewState.draggedItem) {
+                itemEntry.classList.add('drag-over');
+            }
+        });
+        
+        this.container.addEventListener('dragleave', (e) => {
+            const itemEntry = e.target.closest('.item-entry');
+            if (itemEntry) {
+                itemEntry.classList.remove('drag-over');
+            }
+        });
+        
+        this.container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const itemEntry = e.target.closest('.item-entry');
+            if (itemEntry && this.viewState.draggedItem) {
+                this.reorderItem(this.viewState.draggedItem, itemEntry.dataset.index);
+                itemEntry.classList.remove('drag-over');
+            }
+        });
+        
+        // Rename
+        this.container.addEventListener('blur', (e) => {
+            if (e.target.dataset.action === 'rename-playlist') {
+                this.renamePlaylist(e.target.value);
+            }
+        }, true);
+        
+        this.setupEventBusListeners();
+    }
+    
+    setupEventBusListeners() {
+        if (!this.eventBus) return;
+        
+        // playlist.list response
+        this.eventBus.on('playlists:listed', (data) => {
+            this.viewState.playlists = data.playlists || [];
+            this.render();
+        });
+        
+        // playlist.get response
+        this.eventBus.on('playlist:loaded', (data) => {
+            this.viewState.selectedPlaylist = data.playlist;
+            this.viewState.playlistItems = data.playlist.items || [];
+            this.render();
+        });
+        
+        // playlist.create response
+        this.eventBus.on('playlist:created', (data) => {
+            this.loadPlaylists();
+        });
+        
+        // playlist.delete response
+        this.eventBus.on('playlist:deleted', (data) => {
+            if (this.viewState.selectedPlaylist && 
+                this.viewState.selectedPlaylist.id === data.playlist_id) {
+                this.viewState.selectedPlaylist = null;
+                this.viewState.playlistItems = [];
+            }
+            this.loadPlaylists();
+        });
+        
+        // playlist.update response
+        this.eventBus.on('playlist:updated', (data) => {
+            this.loadPlaylist(this.viewState.selectedPlaylist.id);
+        });
+    }
+    
+    // ========================================================================
+    // ACTIONS
+    // ========================================================================
+    
+    async createPlaylist() {
+        const name = prompt('Nom de la playlist:');
+        if (!name) return;
+        
+        // API: playlist.create
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:create_requested', {
+                name,
+                description: ''
+            });
+        }
+    }
+    
+    async selectPlaylist(playlistId) {
+        // API: playlist.get
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:get_requested', {
+                playlist_id: playlistId
+            });
+        }
+    }
+    
+    async deletePlaylist(playlistId) {
+        if (!confirm('Supprimer cette playlist ?')) return;
+        
+        // API: playlist.delete
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:delete_requested', {
+                playlist_id: playlistId
+            });
+        }
+    }
+    
+    async renamePlaylist(newName) {
+        if (!this.viewState.selectedPlaylist || !newName) return;
+        
+        // API: playlist.update
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:update_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id,
+                name: newName
+            });
+        }
+    }
+    
+    async toggleLoop() {
+        if (!this.viewState.selectedPlaylist) return;
+        
+        const newLoop = !this.viewState.selectedPlaylist.loop;
+        
+        // API: playlist.setLoop
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:set_loop_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id,
+                loop: newLoop
+            });
+        }
+    }
+    
+    async addFiles() {
+        // Montrer modal de sélection de fichiers
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:add_files_modal_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id
+            });
+        }
+    }
+    
+    async removeItem(itemId) {
+        if (!this.viewState.selectedPlaylist) return;
+        
+        // API: playlist.removeItem
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:remove_item_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id,
+                item_id: itemId
+            });
+        }
+    }
+    
+    async reorderItem(itemId, newIndex) {
+        if (!this.viewState.selectedPlaylist) return;
+        
+        // API: playlist.reorder
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:reorder_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id,
+                item_id: itemId,
+                new_index: parseInt(newIndex)
+            });
+        }
+    }
+    
+    async playPlaylist() {
+        if (!this.viewState.selectedPlaylist) return;
+        
+        // Émettre event pour lire la playlist
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:play_requested', {
+                playlist_id: this.viewState.selectedPlaylist.id
+            });
+        }
+    }
+    
+    async playItem(itemId) {
+        // Émettre event pour lire un item spécifique
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:play_item_requested', {
+                item_id: itemId
+            });
+        }
+    }
+    
+    // ========================================================================
+    // LOADING
+    // ========================================================================
+    
+    async loadPlaylists() {
+        // API: playlist.list
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:list_requested');
+        }
+    }
+    
+    async loadPlaylist(playlistId) {
+        // API: playlist.get
+        if (this.eventBus) {
+            this.eventBus.emit('playlist:get_requested', {
+                playlist_id: playlistId
+            });
+        }
     }
     
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
     
-    log(level, ...args) {
-        if (this.logger && typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
-        }
+    formatDuration(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // ========================================================================
+    // INIT
+    // ========================================================================
+    
+    init() {
+        super.init();
+        this.loadPlaylists();
     }
 }
 
 // ============================================================================
 // EXPORT
 // ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PlaylistView;
+}
+
 if (typeof window !== 'undefined') {
     window.PlaylistView = PlaylistView;
 }

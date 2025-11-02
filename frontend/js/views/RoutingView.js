@@ -1,562 +1,436 @@
 // ============================================================================
 // Fichier: frontend/js/views/RoutingView.js
-// Chemin réel: frontend/js/views/RoutingView.js
-// Version: v3.2.0 - SIGNATURE COHÉRENTE
-// Date: 2025-11-01
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Date: 2025-11-02
 // ============================================================================
-// MODIFICATIONS v3.2.0:
-// ✅ Signature constructeur cohérente (containerId, eventBus, logger)
-// ✅ Interface simplifiée (pas de matrice complexe)
-// ✅ Mode simple uniquement (1→1)
-// ✅ Stats visibles
-// ✅ Actions basiques
+// AMÉLIORATIONS v4.0.0:
+// ✅ API v4.2.2: routing.* (addRoute, removeRoute, clearRoutes, listRoutes, enableRoute, disableRoute)
+// ✅ Matrice de routage interactive
+// ✅ Gestion enable/disable routes
 // ============================================================================
 
-class RoutingView extends BaseView {
-    constructor(containerId, eventBus, logger = null) {
-        super(containerId, eventBus, logger);
-        
-        // Logger initialization (from BaseView or fallback)
-        this.logger = logger || window.logger || console;
-        
-        // Composants
-        this.routingMatrix = null;
-        
-        // Données
-        this.channels = [];
-        this.instruments = [];
-        this.routes = [];
-        this.presets = [];
-        
-        // Mark as fully initialized
-        this._fullyInitialized = true;
-        
-        this.logDebug('routing', '✓ RoutingView initialized v3.2.0 (simple mode)');
-        
-        // Now that all properties are set, do initial render
-        if (this.container) {
-            this.render();
+class RoutingView {
+    constructor(container, eventBus) {
+        if (typeof container === 'string') {
+            this.container = document.getElementById(container) || document.querySelector(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
+        } else {
+            this.container = null;
         }
+        
+        if (!this.container) {
+            console.error('[RoutingView] Container not found');
+        }
+        
+        this.eventBus = eventBus;
+        this.logger = window.logger || console;
+        
+        // État
+        this.state = {
+            routes: [],
+            sources: [], // devices sources
+            destinations: [], // devices destinations
+            selectedSource: null,
+            selectedDestination: null
+        };
+        
+        this.elements = {};
     }
-    
-    // Safe logging helper
-    logDebug(category, message, level = 'debug') {
-        if (!this.logger) {
-            console.log(`[${category}] ${message}`);
+
+    // ========================================================================
+    // INITIALISATION
+    // ========================================================================
+
+    init() {
+        if (!this.container) {
+            this.logger.error('[RoutingView] Cannot initialize');
             return;
         }
         
-        // Map level to logger method
-        const logMethod = level === 'warn' ? 'warn' : 
-                         level === 'error' ? 'error' : 
-                         level === 'info' ? 'info' : 'debug';
-        
-        if (typeof this.logger[logMethod] === 'function') {
-            this.logger[logMethod](category, message);
-        } else {
-            console.log(`[${category}] ${message}`);
-        }
-    }
-    
-    // Override initialize to prevent BaseView auto-render before properties are ready
-    initialize() {
-        // This is called by BaseView constructor before our properties are set
-        // Only render if we've finished our own constructor
-        if (this._fullyInitialized && this.container) {
-            this.render();
-        }
-    }
-    
-    // ========================================================================
-    // RENDERING PRINCIPAL
-    // ========================================================================
-    
-    buildTemplate(data = {}) {
-        const tempDiv = document.createElement("div");
-        const oldContainer = this.container;
-        this.container = tempDiv;
         this.render();
-        this.container = oldContainer;
-        return tempDiv.innerHTML;
+        this.cacheElements();
+        this.attachEvents();
+        this.loadRoutes();
+        this.loadDevices();
+        
+        this.logger.info('[RoutingView] Initialized v4.0.0');
     }
 
     render() {
         if (!this.container) return;
         
-        // Vérifier mode performance
-        if (!PerformanceConfig.routing.allowComplexRouting) {
-            this.renderSimpleRouting();
-        } else {
-            // Mode avancé (désactivé par défaut)
-            this.renderAdvancedRouting();
-        }
-    }
-    
-    // ========================================================================
-    // MODE SIMPLE (1→1)
-    // ========================================================================
-    
-    renderSimpleRouting() {
-        const html = `
-            <div class="routing-page-simple">
-                <!-- Header -->
-                <div class="page-header">
-                    <h2>🔀 Routage MIDI (Mode Simple)</h2>
-                    <p class="page-description">
-                        Assignez chaque canal MIDI à un instrument (routing 1→1)
-                    </p>
+        this.container.innerHTML = `
+            <div class="page-header">
+                <h1>🔀 Routage MIDI</h1>
+                <div class="header-actions">
+                    <button class="btn-clear-all" data-action="clear-all">
+                        🗑️ Tout effacer
+                    </button>
+                    <button class="btn-refresh" data-action="refresh">
+                        🔄 Actualiser
+                    </button>
                 </div>
-                
-                <!-- Info Banner -->
-                <div class="info-banner">
-                    ℹ️ Mode performance : Routing simple uniquement (1 canal → 1 instrument)
-                </div>
-                
-                <!-- Stats Cards -->
-                <div class="routing-stats">
-                    <div class="stat-card">
-                        <div class="stat-icon">🎹</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Canaux actifs</span>
-                            <span class="stat-value" id="stat-channels">0</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">🎸</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Instruments connectés</span>
-                            <span class="stat-value" id="stat-instruments">0</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">🔗</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Routes actives</span>
-                            <span class="stat-value" id="stat-routes">0</span>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Canaux non assignés</span>
-                            <span class="stat-value" id="stat-unassigned">0</span>
-                        </div>
+            </div>
+            
+            <div class="routing-layout">
+                <!-- Matrice de routage -->
+                <div class="routing-matrix-container">
+                    <h2>Matrice de routage</h2>
+                    <div id="routingMatrix">
+                        ${this.renderMatrix()}
                     </div>
                 </div>
                 
-                <!-- Matrice de routage (liste simple) -->
-                <div class="routing-matrix-container" id="routing-matrix-container">
-                    <!-- RoutingMatrix component ici -->
-                </div>
-                
-                <!-- Actions -->
-                <div class="routing-actions-panel">
-                    <div class="actions-group">
-                        <h4>Actions</h4>
-                        <button class="btn btn-secondary" id="btn-refresh-routing">
-                            🔄 Rafraîchir
-                        </button>
-                        <button class="btn btn-secondary" id="btn-export-routing">
-                            💾 Exporter
-                        </button>
-                        <button class="btn btn-secondary" id="btn-import-routing">
-                            📂 Importer
+                <!-- Nouvelle route -->
+                <div class="routing-create">
+                    <h2>Créer une route</h2>
+                    <div class="create-form">
+                        <div class="form-group">
+                            <label>Source:</label>
+                            <select id="sourceSelect" data-action="select-source">
+                                <option value="">-- Sélectionner --</option>
+                                ${this.state.sources.map(src => `
+                                    <option value="${src.id}">${src.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Destination:</label>
+                            <select id="destinationSelect" data-action="select-destination">
+                                <option value="">-- Sélectionner --</option>
+                                ${this.state.destinations.map(dst => `
+                                    <option value="${dst.id}">${dst.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <button class="btn-create-route" data-action="create-route">
+                            ➕ Créer la route
                         </button>
                     </div>
-                    
-                    <div class="actions-group">
-                        <h4>Presets</h4>
-                        <select class="preset-select" id="preset-select">
-                            <option value="">-- Sélectionner preset --</option>
-                        </select>
-                        <button class="btn btn-secondary" id="btn-save-preset">
-                            💾 Sauvegarder preset
-                        </button>
-                        <button class="btn btn-secondary" id="btn-load-preset">
-                            📂 Charger preset
-                        </button>
+                </div>
+                
+                <!-- Liste des routes -->
+                <div class="routing-list">
+                    <h2>Routes actives</h2>
+                    <div id="routesList">
+                        ${this.renderRoutesList()}
                     </div>
                 </div>
             </div>
         `;
-        
-        this.container.innerHTML = html;
-        
-        // Initialiser matrice simple
-        this.initRoutingMatrix();
-        
-        // Attacher listeners
-        this.attachEventListeners();
-        
-        // Mettre à jour stats
-        this.updateStats();
     }
-    
-    // ========================================================================
-    // MODE AVANCÉ (désactivé par défaut)
-    // ========================================================================
-    
-    renderAdvancedRouting() {
-        const html = `
-            <div class="routing-page-advanced">
-                <div class="info-banner warning">
-                    ⚠️ Mode avancé désactivé en mode performance
-                </div>
-                <p>Pour activer le mode avancé, modifiez PerformanceConfig.routing.allowComplexRouting</p>
-            </div>
-        `;
-        
-        this.container.innerHTML = html;
+
+    cacheElements() {
+        this.elements = {
+            routingMatrix: document.getElementById('routingMatrix'),
+            routesList: document.getElementById('routesList'),
+            sourceSelect: document.getElementById('sourceSelect'),
+            destinationSelect: document.getElementById('destinationSelect')
+        };
     }
-    
-    // ========================================================================
-    // INITIALISATION MATRICE
-    // ========================================================================
-    
-    initRoutingMatrix() {
-        const matrixContainer = this.container.querySelector('#routing-matrix-container');
+
+    attachEvents() {
+        if (!this.container) return;
         
-        if (!matrixContainer) {
-            this.logDebug('routing', 'Matrix container not found', 'warn');
-            return;
-        }
-        
-        // Check if RoutingMatrix class is available
-        if (typeof RoutingMatrix === 'undefined' || !window.RoutingMatrix) {
-            this.logDebug('routing', 'RoutingMatrix class not loaded - showing fallback', 'warn');
-            matrixContainer.innerHTML = `
-                <div class="info-banner warning">
-                    ⚠️ RoutingMatrix component not loaded. Please ensure RoutingMatrix.js is included.
-                </div>
-                <div class="routing-list-fallback">
-                    <h4>Routing Configuration</h4>
-                    <p>The routing matrix component is not available. Please check your script loading order.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Créer composant RoutingMatrix
-        this.routingMatrix = new RoutingMatrix(matrixContainer, {
-            mode: 'simple',
-            channels: this.channels,
-            instruments: this.instruments,
-            onRouteChange: (channel, instrumentId) => {
-                this.handleRouteChange(channel, instrumentId);
-            },
-            onTestRoute: (channel, instrumentId) => {
-                this.handleTestRoute(channel, instrumentId);
+        this.container.addEventListener('click', (e) => {
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
+            
+            const routeItem = e.target.closest('.route-item');
+            
+            switch (action) {
+                case 'refresh':
+                    this.loadRoutes();
+                    break;
+                case 'clear-all':
+                    this.clearAllRoutes();
+                    break;
+                case 'create-route':
+                    this.createRoute();
+                    break;
+                case 'delete-route':
+                    if (routeItem) this.deleteRoute(routeItem.dataset.routeId);
+                    break;
+                case 'toggle-route':
+                    if (routeItem) this.toggleRoute(routeItem.dataset.routeId, routeItem.dataset.enabled === 'true');
+                    break;
             }
         });
         
-        this.logDebug('routing', 'Matrix initialized');
-    }
-    
-    // ========================================================================
-    // EVENT LISTENERS
-    // ========================================================================
-    
-    attachEventListeners() {
-        // Refresh
-        const refreshBtn = this.container.querySelector('#btn-refresh-routing');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                this.refresh();
-            });
-        }
-        
-        // Export
-        const exportBtn = this.container.querySelector('#btn-export-routing');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => {
-                this.exportRouting();
-            });
-        }
-        
-        // Import
-        const importBtn = this.container.querySelector('#btn-import-routing');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => {
-                this.importRouting();
-            });
-        }
-        
-        // Save preset
-        const savePresetBtn = this.container.querySelector('#btn-save-preset');
-        if (savePresetBtn) {
-            savePresetBtn.addEventListener('click', () => {
-                this.savePreset();
-            });
-        }
-        
-        // Load preset
-        const loadPresetBtn = this.container.querySelector('#btn-load-preset');
-        if (loadPresetBtn) {
-            loadPresetBtn.addEventListener('click', () => {
-                this.loadPreset();
-            });
-        }
-    }
-    
-    // ========================================================================
-    // HANDLERS
-    // ========================================================================
-    
-    handleRouteChange(channel, instrumentId) {
-        this.logDebug('routing', `Route changed: CH${channel} → ${instrumentId || 'none'}`);
-        
-        // Émettre événement
-        this.eventBus.emit('routing:route-changed', {
-            channel,
-            instrumentId
+        this.container.addEventListener('change', (e) => {
+            const action = e.target.dataset.action;
+            
+            if (action === 'select-source') {
+                this.state.selectedSource = e.target.value;
+            } else if (action === 'select-destination') {
+                this.state.selectedDestination = e.target.value;
+            }
         });
         
-        // Mettre à jour stats
-        this.updateStats();
+        this.setupEventBusListeners();
     }
-    
-    handleTestRoute(channel, instrumentId) {
-        this.logDebug('routing', `Testing route: CH${channel} → ${instrumentId}`);
+
+    setupEventBusListeners() {
+        if (!this.eventBus) return;
         
-        // Émettre événement de test
-        this.eventBus.emit('routing:test-route', {
-            channel,
-            instrumentId
+        // routing.listRoutes response
+        this.eventBus.on('routes:listed', (data) => {
+            this.state.routes = data.routes || [];
+            this.renderRoutesSection();
+            this.renderMatrixSection();
+        });
+        
+        // routing.addRoute response
+        this.eventBus.on('route:added', (data) => {
+            this.logger.info('[RoutingView] Route added');
+            this.loadRoutes();
+        });
+        
+        // routing.removeRoute response
+        this.eventBus.on('route:removed', (data) => {
+            this.logger.info('[RoutingView] Route removed');
+            this.loadRoutes();
+        });
+        
+        // routing.clearRoutes response
+        this.eventBus.on('routes:cleared', (data) => {
+            this.logger.info('[RoutingView] All routes cleared');
+            this.loadRoutes();
+        });
+        
+        // routing.enableRoute / disableRoute response
+        this.eventBus.on('route:toggled', (data) => {
+            this.logger.info('[RoutingView] Route toggled');
+            this.loadRoutes();
+        });
+        
+        // devices.list response pour sources/destinations
+        this.eventBus.on('devices:listed', (data) => {
+            const devices = data.devices || [];
+            this.state.sources = devices.filter(d => d.status === 2); // Connected
+            this.state.destinations = devices.filter(d => d.status === 2);
+            this.render();
         });
     }
-    
+
+    // ========================================================================
+    // RENDERING - MATRIX
+    // ========================================================================
+
+    renderMatrix() {
+        const sources = this.state.sources;
+        const destinations = this.state.destinations;
+        const routes = this.state.routes;
+        
+        if (sources.length === 0 || destinations.length === 0) {
+            return `
+                <div class="matrix-empty">
+                    <p>Connectez des devices pour voir la matrice</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="matrix-grid">
+                <div class="matrix-header">
+                    <div class="matrix-corner"></div>
+                    ${destinations.map(dst => `
+                        <div class="matrix-col-header">${dst.name}</div>
+                    `).join('')}
+                </div>
+                ${sources.map(src => `
+                    <div class="matrix-row">
+                        <div class="matrix-row-header">${src.name}</div>
+                        ${destinations.map(dst => {
+                            const route = routes.find(r => 
+                                r.source_id === src.id && r.destination_id === dst.id
+                            );
+                            const isConnected = !!route;
+                            const isEnabled = route && route.enabled !== false;
+                            
+                            return `
+                                <div class="matrix-cell ${isConnected ? 'connected' : ''} ${!isEnabled ? 'disabled' : ''}"
+                                     data-source="${src.id}" 
+                                     data-destination="${dst.id}">
+                                    ${isConnected ? (isEnabled ? '✓' : '✕') : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    renderMatrixSection() {
+        if (this.elements.routingMatrix) {
+            this.elements.routingMatrix.innerHTML = this.renderMatrix();
+        }
+    }
+
+    // ========================================================================
+    // RENDERING - ROUTES LIST
+    // ========================================================================
+
+    renderRoutesList() {
+        const routes = this.state.routes;
+        
+        if (routes.length === 0) {
+            return `
+                <div class="routes-empty">
+                    <p>Aucune route configurée</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="routes-list">
+                ${routes.map(route => this.renderRouteItem(route)).join('')}
+            </div>
+        `;
+    }
+
+    renderRouteItem(route) {
+        const isEnabled = route.enabled !== false;
+        const routeId = route.route_id || `${route.source_id}_${route.destination_id}`;
+        
+        return `
+            <div class="route-item ${!isEnabled ? 'disabled' : ''}" 
+                 data-route-id="${routeId}"
+                 data-enabled="${isEnabled}">
+                <div class="route-info">
+                    <div class="route-source">${this.getDeviceName(route.source_id)}</div>
+                    <div class="route-arrow">→</div>
+                    <div class="route-destination">${this.getDeviceName(route.destination_id)}</div>
+                </div>
+                <div class="route-actions">
+                    <button class="btn-toggle" data-action="toggle-route" 
+                            title="${isEnabled ? 'Désactiver' : 'Activer'}">
+                        ${isEnabled ? '⏸️' : '▶️'}
+                    </button>
+                    <button class="btn-delete" data-action="delete-route" title="Supprimer">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderRoutesSection() {
+        if (this.elements.routesList) {
+            this.elements.routesList.innerHTML = this.renderRoutesList();
+        }
+    }
+
     // ========================================================================
     // ACTIONS
     // ========================================================================
-    
-    refresh() {
-        this.logDebug('routing', 'Refreshing routing view');
+
+    async createRoute() {
+        const sourceId = this.state.selectedSource;
+        const destinationId = this.state.selectedDestination;
         
-        // Réinitialiser matrice avec données actuelles
-        if (this.routingMatrix) {
-            this.routingMatrix.setChannels(this.channels);
-            this.routingMatrix.setInstruments(this.instruments);
-        }
-        
-        this.updateStats();
-    }
-    
-    exportRouting() {
-        if (!this.routingMatrix) {
-            alert('Aucune route à exporter');
+        if (!sourceId || !destinationId) {
+            alert('Sélectionnez une source et une destination');
             return;
         }
         
-        const routes = this.routingMatrix.getRoutes();
-        
-        const data = {
-            version: '3.2.0',
-            type: 'simple_routing',
-            routes: routes,
-            exported: new Date().toISOString()
-        };
-        
-        // Télécharger fichier JSON
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `routing_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        this.logDebug('routing', 'Routing exported');
-    }
-    
-    importRouting() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const data = JSON.parse(event.target.result);
-                    
-                    if (data.routes && this.routingMatrix) {
-                        this.routingMatrix.setRoutes(data.routes);
-                        this.logDebug('routing', 'Routing imported');
-                        alert('Routage importé avec succès');
-                    }
-                } catch (error) {
-                    alert('Erreur lors de l\'import: ' + error.message);
-                }
-            };
-            reader.readAsText(file);
-        };
-        
-        input.click();
-    }
-    
-    savePreset() {
-        if (!this.routingMatrix) {
-            alert('Aucune route à sauvegarder');
-            return;
-        }
-        
-        const name = prompt('Nom du preset:');
-        if (!name) return;
-        
-        const routes = this.routingMatrix.getRoutes();
-        
-        const preset = {
-            id: `preset_${Date.now()}`,
-            name: name,
-            routes: routes,
-            created: new Date().toISOString()
-        };
-        
-        this.presets.push(preset);
-        
-        // Mettre à jour dropdown
-        this.updatePresetsDropdown();
-        
-        // Émettre événement
-        this.eventBus.emit('routing:preset-saved', { preset });
-        
-        this.logDebug('routing', `Preset saved: ${name}`);
-        alert('Preset sauvegardé');
-    }
-    
-    loadPreset() {
-        const select = this.container.querySelector('#preset-select');
-        const presetId = select?.value;
-        
-        if (!presetId) {
-            alert('Sélectionnez un preset');
-            return;
-        }
-        
-        const preset = this.presets.find(p => p.id === presetId);
-        
-        if (!preset) {
-            alert('Preset non trouvé');
-            return;
-        }
-        
-        if (this.routingMatrix) {
-            this.routingMatrix.setRoutes(preset.routes);
-            
-            // Émettre événement
-            this.eventBus.emit('routing:preset-loaded', { preset });
-            
-            this.logDebug('routing', `Preset loaded: ${preset.name}`);
-            alert('Preset chargé');
+        // API: routing.addRoute
+        if (this.eventBus) {
+            this.eventBus.emit('routing:add_route_requested', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
         }
     }
-    
+
+    async deleteRoute(routeId) {
+        // Parser routeId qui peut être "source_destination"
+        const [sourceId, destinationId] = routeId.split('_');
+        
+        // API: routing.removeRoute
+        if (this.eventBus) {
+            this.eventBus.emit('routing:remove_route_requested', {
+                source_id: sourceId,
+                destination_id: destinationId
+            });
+        }
+    }
+
+    async toggleRoute(routeId, currentlyEnabled) {
+        const [sourceId, destinationId] = routeId.split('_');
+        
+        // API: routing.enableRoute ou routing.disableRoute
+        if (this.eventBus) {
+            if (currentlyEnabled) {
+                this.eventBus.emit('routing:disable_route_requested', {
+                    source_id: sourceId,
+                    destination_id: destinationId
+                });
+            } else {
+                this.eventBus.emit('routing:enable_route_requested', {
+                    source_id: sourceId,
+                    destination_id: destinationId
+                });
+            }
+        }
+    }
+
+    async clearAllRoutes() {
+        if (!confirm('Supprimer toutes les routes ?')) return;
+        
+        // API: routing.clearRoutes
+        if (this.eventBus) {
+            this.eventBus.emit('routing:clear_routes_requested');
+        }
+    }
+
     // ========================================================================
-    // UPDATE DATA
+    // LOADING
     // ========================================================================
-    
-    setChannels(channels) {
-        this.channels = channels || [];
-        
-        if (this.routingMatrix) {
-            this.routingMatrix.setChannels(this.channels);
-        }
-        
-        this.updateStats();
-    }
-    
-    setInstruments(instruments) {
-        this.instruments = instruments || [];
-        
-        if (this.routingMatrix) {
-            this.routingMatrix.setInstruments(this.instruments);
-        }
-        
-        this.updateStats();
-    }
-    
-    setRoutes(routes) {
-        this.routes = routes || [];
-        
-        if (this.routingMatrix) {
-            this.routingMatrix.setRoutes(this.routes);
-        }
-        
-        this.updateStats();
-    }
-    
-    setPresets(presets) {
-        this.presets = presets || [];
-        this.updatePresetsDropdown();
-    }
-    
-    // ========================================================================
-    // STATS
-    // ========================================================================
-    
-    updateStats() {
-        // Safety checks for uninitialized properties
-        if (!this.channels) this.channels = [];
-        if (!this.instruments) this.instruments = [];
-        
-        const activeChannels = this.routingMatrix ? 
-            this.routingMatrix.getActiveChannels().length : 
-            0;
-        
-        const connectedInstruments = this.instruments.filter(i => i && i.connected).length;
-        
-        const activeRoutes = this.routingMatrix ? 
-            this.routingMatrix.getRoutes().length : 
-            0;
-        
-        const unassigned = this.channels.length - activeChannels;
-        
-        // Mettre à jour UI
-        this.updateStatValue('stat-channels', this.channels.length);
-        this.updateStatValue('stat-instruments', connectedInstruments);
-        this.updateStatValue('stat-routes', activeRoutes);
-        this.updateStatValue('stat-unassigned', unassigned);
-    }
-    
-    updateStatValue(id, value) {
-        const elem = this.container.querySelector(`#${id}`);
-        if (elem) {
-            elem.textContent = value;
+
+    async loadRoutes() {
+        // API: routing.listRoutes
+        if (this.eventBus) {
+            this.eventBus.emit('routing:list_routes_requested');
         }
     }
-    
-    updatePresetsDropdown() {
-        const select = this.container.querySelector('#preset-select');
-        if (!select) return;
-        
-        select.innerHTML = '<option value="">-- Sélectionner preset --</option>';
-        
-        this.presets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset.id;
-            option.textContent = preset.name;
-            select.appendChild(option);
-        });
+
+    async loadDevices() {
+        // API: devices.list pour obtenir sources/destinations
+        if (this.eventBus) {
+            this.eventBus.emit('devices:list_requested');
+        }
     }
-    
+
     // ========================================================================
-    // DESTRUCTION
+    // UTILITAIRES
     // ========================================================================
-    
+
+    getDeviceName(deviceId) {
+        const allDevices = [...this.state.sources, ...this.state.destinations];
+        const device = allDevices.find(d => d.id === deviceId);
+        return device ? device.name : deviceId;
+    }
+
+    // ========================================================================
+    // CLEANUP
+    // ========================================================================
+
     destroy() {
-        if (this.routingMatrix) {
-            this.routingMatrix.destroy();
-            this.routingMatrix = null;
+        if (this.eventBus) {
+            this.eventBus.off('routes:listed');
+            this.eventBus.off('route:added');
+            this.eventBus.off('route:removed');
+            this.eventBus.off('routes:cleared');
+            this.eventBus.off('route:toggled');
+            this.eventBus.off('devices:listed');
         }
         
-        super.destroy();
+        this.logger.info('[RoutingView] Destroyed');
     }
 }
 

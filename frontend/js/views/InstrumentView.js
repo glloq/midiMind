@@ -1,14 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v3.8.0 - PAGE INSTRUMENTS REFACTORISÉE
-// Date: 2025-10-29
-// Projet: MidiMind v3.1
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Date: 2025-11-02
 // ============================================================================
-// FONCTIONNALITÉS v3.8.0:
-// ✅ Recherche et connexion (USB, Bluetooth, Réseau)
-// ✅ Liste des instruments connectés
-// ✅ Paramètres de délais par instrument
-// ✅ Affichage paramètres selon type de connexion
+// AMÉLIORATIONS v4.0.0:
+// ✅ API v4.2.2: devices.*, bluetooth.*
+// ✅ Événements device:connected, device:disconnected
+// ✅ Hot-plug support (devices.startHotPlug, devices.stopHotPlug)
+// ✅ Bluetooth pairing et scanning
 // ============================================================================
 
 class InstrumentView {
@@ -32,12 +31,13 @@ class InstrumentView {
         // État
         this.state = {
             connectedDevices: [],
-            discoveredDevices: [],
+            availableDevices: [],
+            bluetoothDevices: [],
             scanning: {
                 usb: false,
-                bluetooth: false,
-                network: false
+                bluetooth: false
             },
+            hotPlugEnabled: false,
             selectedDevice: null
         };
         
@@ -58,9 +58,10 @@ class InstrumentView {
         this.render();
         this.cacheElements();
         this.attachEvents();
-        this.loadConnectedDevices();
+        this.loadDevices();
+        this.checkHotPlugStatus();
         
-        this.logger.info('[InstrumentView] Initialized');
+        this.logger.info('[InstrumentView] Initialized v4.0.0');
     }
 
     render() {
@@ -69,28 +70,38 @@ class InstrumentView {
         this.container.innerHTML = `
             <div class="page-header">
                 <h1>🎸 Gestion des Instruments</h1>
+                <div class="header-actions">
+                    <button class="btn-hotplug" id="btnToggleHotPlug" 
+                            data-enabled="${this.state.hotPlugEnabled}">
+                        ${this.state.hotPlugEnabled ? '🔌 Hot-Plug ON' : '🔌 Hot-Plug OFF'}
+                    </button>
+                </div>
             </div>
             
             <div class="instruments-layout">
-                <!-- Recherche et connexion -->
+                <!-- Scan et découverte -->
                 <div class="instruments-discover">
                     <div class="section-header">
                         <h2>Rechercher et connecter</h2>
                         <div class="discover-controls">
-                            <button class="btn-scan" id="btnScanUSB" data-type="usb">
-                                🔌 Scan USB
+                            <button class="btn-scan ${this.state.scanning.usb ? 'scanning' : ''}" 
+                                    id="btnScanUSB" data-type="usb">
+                                🔌 ${this.state.scanning.usb ? 'Scan...' : 'Scan USB'}
                             </button>
-                            <button class="btn-scan" id="btnScanBluetooth" data-type="bluetooth">
-                                📡 Scan Bluetooth
-                            </button>
-                            <button class="btn-scan" id="btnScanNetwork" data-type="network">
-                                🌐 Scan Réseau
+                            <button class="btn-scan ${this.state.scanning.bluetooth ? 'scanning' : ''}" 
+                                    id="btnScanBluetooth" data-type="bluetooth">
+                                📡 ${this.state.scanning.bluetooth ? 'Scan...' : 'Scan Bluetooth'}
                             </button>
                         </div>
                     </div>
                     
                     <div class="devices-found" id="devicesFound">
-                        ${this.renderEmptyDiscovery()}
+                        ${this.renderAvailableDevices()}
+                    </div>
+                    
+                    <!-- Bluetooth paired devices -->
+                    <div class="bluetooth-paired" id="bluetoothPaired">
+                        ${this.renderBluetoothDevices()}
                     </div>
                 </div>
                 
@@ -98,10 +109,13 @@ class InstrumentView {
                 <div class="instruments-connected">
                     <div class="section-header">
                         <h2>Instruments connectés</h2>
+                        <button class="btn-disconnect-all" id="btnDisconnectAll">
+                            🔌 Tout déconnecter
+                        </button>
                     </div>
                     
                     <div class="devices-list" id="connectedDevices">
-                        ${this.renderEmptyConnected()}
+                        ${this.renderConnectedDevices()}
                     </div>
                 </div>
             </div>
@@ -112,30 +126,42 @@ class InstrumentView {
         this.elements = {
             btnScanUSB: document.getElementById('btnScanUSB'),
             btnScanBluetooth: document.getElementById('btnScanBluetooth'),
-            btnScanNetwork: document.getElementById('btnScanNetwork'),
+            btnToggleHotPlug: document.getElementById('btnToggleHotPlug'),
+            btnDisconnectAll: document.getElementById('btnDisconnectAll'),
             devicesFound: document.getElementById('devicesFound'),
-            connectedDevices: document.getElementById('connectedDevices')
+            connectedDevices: document.getElementById('connectedDevices'),
+            bluetoothPaired: document.getElementById('bluetoothPaired')
         };
     }
 
     attachEvents() {
-        // Boutons de scan
+        // Scan buttons
         if (this.elements.btnScanUSB) {
-            this.elements.btnScanUSB.addEventListener('click', () => this.scanDevices('usb'));
+            this.elements.btnScanUSB.addEventListener('click', () => this.scanDevices(true));
         }
         if (this.elements.btnScanBluetooth) {
-            this.elements.btnScanBluetooth.addEventListener('click', () => this.scanDevices('bluetooth'));
+            this.elements.btnScanBluetooth.addEventListener('click', () => this.scanBluetooth());
         }
-        if (this.elements.btnScanNetwork) {
-            this.elements.btnScanNetwork.addEventListener('click', () => this.scanDevices('network'));
+        
+        // Hot-plug toggle
+        if (this.elements.btnToggleHotPlug) {
+            this.elements.btnToggleHotPlug.addEventListener('click', () => this.toggleHotPlug());
+        }
+        
+        // Disconnect all
+        if (this.elements.btnDisconnectAll) {
+            this.elements.btnDisconnectAll.addEventListener('click', () => this.disconnectAll());
         }
         
         // Délégation d'événements
         if (this.elements.devicesFound) {
-            this.elements.devicesFound.addEventListener('click', (e) => this.handleDiscoveredDeviceAction(e));
+            this.elements.devicesFound.addEventListener('click', (e) => this.handleAvailableDeviceAction(e));
         }
         if (this.elements.connectedDevices) {
             this.elements.connectedDevices.addEventListener('click', (e) => this.handleConnectedDeviceAction(e));
+        }
+        if (this.elements.bluetoothPaired) {
+            this.elements.bluetoothPaired.addEventListener('click', (e) => this.handleBluetoothAction(e));
         }
         
         // EventBus
@@ -145,467 +171,413 @@ class InstrumentView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        this.eventBus.on('instruments:scan_started', (data) => {
-            this.handleScanStarted(data.type);
+        // devices.list response
+        this.eventBus.on('devices:listed', (data) => {
+            this.updateDevicesFromList(data.devices || []);
         });
         
-        this.eventBus.on('instruments:scan_completed', (data) => {
-            this.handleScanCompleted(data.type, data.devices);
+        // device:connected event
+        this.eventBus.on('device:connected', (data) => {
+            this.handleDeviceConnected(data);
         });
         
-        this.eventBus.on('instruments:device_connected', (data) => {
-            this.handleDeviceConnected(data.device);
+        // device:disconnected event
+        this.eventBus.on('device:disconnected', (data) => {
+            this.handleDeviceDisconnected(data);
         });
         
-        this.eventBus.on('instruments:device_disconnected', (data) => {
-            this.handleDeviceDisconnected(data.device);
+        // devices.scan response
+        this.eventBus.on('devices:scanned', (data) => {
+            this.state.availableDevices = data.devices || [];
+            this.state.scanning.usb = false;
+            this.renderAvailableDevicesList();
         });
         
-        this.eventBus.on('instruments:list_updated', (data) => {
-            this.state.connectedDevices = data.devices || [];
-            this.renderConnectedDevices();
+        // bluetooth.scan response
+        this.eventBus.on('bluetooth:scanned', (data) => {
+            this.state.availableDevices = data.devices || [];
+            this.state.scanning.bluetooth = false;
+            this.renderAvailableDevicesList();
+        });
+        
+        // bluetooth.paired response
+        this.eventBus.on('bluetooth:paired_list', (data) => {
+            this.state.bluetoothDevices = data.devices || [];
+            this.renderBluetoothDevicesList();
+        });
+        
+        // hot-plug status
+        this.eventBus.on('hotplug:status', (data) => {
+            this.state.hotPlugEnabled = data.enabled || false;
+            this.updateHotPlugButton();
         });
     }
 
     // ========================================================================
-    // SCAN DES PÉRIPHÉRIQUES
+    // RENDERING - AVAILABLE DEVICES
     // ========================================================================
 
-    scanDevices(type) {
-        this.logger.info(`[InstrumentView] Scanning ${type} devices...`);
+    renderAvailableDevices() {
+        const devices = this.state.availableDevices;
         
-        this.state.scanning[type] = true;
-        this.updateScanButton(type, true);
-        
-        if (this.eventBus) {
-            this.eventBus.emit('instruments:scan_requested', { type });
+        if (devices.length === 0) {
+            return `
+                <div class="devices-empty">
+                    <div class="empty-icon">🔍</div>
+                    <p>Aucun device trouvé</p>
+                    <p class="text-muted">Cliquez sur Scan pour rechercher</p>
+                </div>
+            `;
         }
-        
-        // Simuler un scan (sera remplacé par vraie logique)
-        setTimeout(() => {
-            this.handleScanCompleted(type, this.getMockDevices(type));
-        }, 2000);
-    }
-
-    handleScanStarted(type) {
-        this.state.scanning[type] = true;
-        this.updateScanButton(type, true);
-    }
-
-    handleScanCompleted(type, devices) {
-        this.state.scanning[type] = false;
-        this.updateScanButton(type, false);
-        
-        // Filtrer les périphériques déjà connectés
-        this.state.discoveredDevices = (devices || []).filter(device => {
-            return !this.state.connectedDevices.some(connected => connected.id === device.id);
-        });
-        
-        this.renderDiscoveredDevices();
-    }
-
-    updateScanButton(type, scanning) {
-        const buttonMap = {
-            usb: this.elements.btnScanUSB,
-            bluetooth: this.elements.btnScanBluetooth,
-            network: this.elements.btnScanNetwork
-        };
-        
-        const button = buttonMap[type];
-        if (!button) return;
-        
-        if (scanning) {
-            button.classList.add('scanning');
-            button.disabled = true;
-        } else {
-            button.classList.remove('scanning');
-            button.disabled = false;
-        }
-    }
-
-    // ========================================================================
-    // RENDU DES PÉRIPHÉRIQUES DÉCOUVERTS
-    // ========================================================================
-
-    renderDiscoveredDevices() {
-        if (!this.elements.devicesFound) return;
-        
-        if (!this.state.discoveredDevices || this.state.discoveredDevices.length === 0) {
-            this.elements.devicesFound.innerHTML = this.renderEmptyDiscovery();
-            return;
-        }
-        
-        this.elements.devicesFound.innerHTML = this.state.discoveredDevices
-            .map(device => this.renderDeviceCard(device))
-            .join('');
-    }
-
-    renderDeviceCard(device) {
-        const icon = this.getDeviceIcon(device.type);
-        const typeLabel = this.getTypeLabel(device.type);
         
         return `
-            <div class="device-card" data-device-id="${device.id}">
-                <div class="device-card-header">
-                    <div class="device-card-icon">${icon}</div>
-                    <div class="device-card-info">
-                        <div class="device-card-name">${device.name || 'Périphérique inconnu'}</div>
-                        <div class="device-card-type">${typeLabel}</div>
-                    </div>
+            <div class="devices-grid">
+                ${devices.map(device => this.renderAvailableDeviceCard(device)).join('')}
+            </div>
+        `;
+    }
+
+    renderAvailableDeviceCard(device) {
+        const typeIcons = {
+            0: '❓', // Unknown
+            1: '🔌', // USB
+            2: '📡', // BLE
+            3: '💻'  // Virtual
+        };
+        
+        const icon = typeIcons[device.type] || '🎸';
+        const typeName = ['Unknown', 'USB', 'Bluetooth', 'Virtual'][device.type] || 'Unknown';
+        
+        return `
+            <div class="device-card available" data-device-id="${device.id}">
+                <div class="device-icon">${icon}</div>
+                <div class="device-info">
+                    <div class="device-name">${device.name}</div>
+                    <div class="device-type">${typeName}</div>
                 </div>
-                
-                <div class="device-card-actions">
-                    <button class="btn-connect" data-action="connect" data-device-id="${device.id}">
-                        🔗 Connecter
+                <div class="device-actions">
+                    <button class="btn-connect" data-action="connect-device">
+                        Connecter
                     </button>
                 </div>
             </div>
         `;
     }
 
-    renderEmptyDiscovery() {
-        return `
-            <div class="empty-state">
-                <div class="empty-state-icon">🔍</div>
-                <div class="empty-state-text">Aucun périphérique trouvé</div>
-                <div class="empty-state-hint">Lancez un scan pour rechercher des instruments</div>
-            </div>
-        `;
+    renderAvailableDevicesList() {
+        if (this.elements.devicesFound) {
+            this.elements.devicesFound.innerHTML = this.renderAvailableDevices();
+        }
     }
 
     // ========================================================================
-    // RENDU DES PÉRIPHÉRIQUES CONNECTÉS
+    // RENDERING - CONNECTED DEVICES
     // ========================================================================
 
     renderConnectedDevices() {
-        if (!this.elements.connectedDevices) return;
+        const devices = this.state.connectedDevices;
         
-        if (!this.state.connectedDevices || this.state.connectedDevices.length === 0) {
-            this.elements.connectedDevices.innerHTML = this.renderEmptyConnected();
-            return;
+        if (devices.length === 0) {
+            return `
+                <div class="devices-empty">
+                    <div class="empty-icon">🎸</div>
+                    <p>Aucun instrument connecté</p>
+                    <p class="text-muted">Connectez un device pour commencer</p>
+                </div>
+            `;
         }
         
-        this.elements.connectedDevices.innerHTML = this.state.connectedDevices
-            .map(device => this.renderConnectedDevice(device))
-            .join('');
-    }
-
-    renderConnectedDevice(device) {
-        const icon = this.getDeviceIcon(device.type);
-        const isExpanded = this.state.selectedDevice && this.state.selectedDevice.id === device.id;
-        
         return `
-            <div class="connected-device ${isExpanded ? 'expanded' : ''}" data-device-id="${device.id}">
-                <div class="connected-device-header">
-                    <div class="connected-device-icon">${icon}</div>
-                    <div class="connected-device-info">
-                        <div class="connected-device-name">${device.name || 'Périphérique inconnu'}</div>
-                        <div class="connected-device-status">
-                            <span class="status-indicator"></span>
-                            <span>Connecté</span>
-                        </div>
-                    </div>
-                    <div class="connected-device-actions">
-                        <button class="btn-settings" data-action="settings" data-device-id="${device.id}">
-                            ⚙️ Réglages
-                        </button>
-                        <button class="btn-disconnect" data-action="disconnect" data-device-id="${device.id}">
-                            🔌 Déconnecter
-                        </button>
-                    </div>
-                </div>
-                
-                ${isExpanded ? this.renderDeviceSettings(device) : ''}
+            <div class="devices-list">
+                ${devices.map(device => this.renderConnectedDeviceCard(device)).join('')}
             </div>
         `;
     }
 
-    renderDeviceSettings(device) {
+    renderConnectedDeviceCard(device) {
+        const typeIcons = {
+            0: '❓',
+            1: '🔌',
+            2: '📡',
+            3: '💻'
+        };
+        
+        const icon = typeIcons[device.type] || '🎸';
+        const typeName = ['Unknown', 'USB', 'Bluetooth', 'Virtual'][device.type] || 'Unknown';
+        
         return `
-            <div class="instrument-settings-panel">
-                <h3>Paramètres de ${device.name}</h3>
-                
-                <!-- Délai/Latence -->
-                <div class="settings-group">
-                    <label class="settings-label">Délai (ms)</label>
-                    <input 
-                        type="number" 
-                        class="settings-input" 
-                        value="${device.latency || 0}" 
-                        min="0" 
-                        max="1000"
-                        data-setting="latency"
-                        data-device-id="${device.id}"
-                    />
-                    <div class="settings-info">Compensation de latence pour ce périphérique</div>
+            <div class="device-card connected" data-device-id="${device.id}">
+                <div class="device-icon">${icon}</div>
+                <div class="device-info">
+                    <div class="device-name">${device.name}</div>
+                    <div class="device-type">${typeName}</div>
+                    <div class="device-status connected">✓ Connecté</div>
                 </div>
-                
-                ${this.renderTypeSpecificSettings(device)}
-                
-                <div class="settings-actions">
-                    <button class="btn-action" data-action="save-settings" data-device-id="${device.id}">
-                        💾 Enregistrer
+                <div class="device-actions">
+                    <button class="btn-info" data-action="device-info">
+                        ℹ️ Info
                     </button>
-                    <button class="btn-action" data-action="reset-settings" data-device-id="${device.id}">
-                        🔄 Réinitialiser
+                    <button class="btn-disconnect" data-action="disconnect-device">
+                        Déconnecter
                     </button>
                 </div>
             </div>
         `;
     }
 
-    renderTypeSpecificSettings(device) {
-        switch (device.type) {
-            case 'bluetooth':
-                return this.renderBluetoothSettings(device);
-            case 'network':
-                return this.renderNetworkSettings(device);
-            case 'usb':
-                return this.renderUSBSettings(device);
-            default:
-                return '';
+    renderConnectedDevicesList() {
+        if (this.elements.connectedDevices) {
+            this.elements.connectedDevices.innerHTML = this.renderConnectedDevices();
         }
     }
 
-    renderBluetoothSettings(device) {
-        const signalStrength = device.signalStrength || 0;
-        const battery = device.battery || 100;
+    // ========================================================================
+    // RENDERING - BLUETOOTH DEVICES
+    // ========================================================================
+
+    renderBluetoothDevices() {
+        const devices = this.state.bluetoothDevices;
+        
+        if (devices.length === 0) {
+            return '';
+        }
         
         return `
-            <div class="settings-group">
-                <label class="settings-label">Signal Bluetooth</label>
-                <div class="signal-indicator">
-                    <div class="signal-bar" style="width: ${signalStrength}%"></div>
-                    <span>${signalStrength}%</span>
-                </div>
-            </div>
-            
-            <div class="settings-group">
-                <label class="settings-label">Batterie</label>
-                <div class="battery-indicator">
-                    <div class="battery-level" style="width: ${battery}%"></div>
-                    <span>${battery}%</span>
+            <div class="bluetooth-section">
+                <h3>Devices Bluetooth appairés</h3>
+                <div class="bluetooth-list">
+                    ${devices.map(device => this.renderBluetoothDeviceCard(device)).join('')}
                 </div>
             </div>
         `;
     }
 
-    renderNetworkSettings(device) {
+    renderBluetoothDeviceCard(device) {
         return `
-            <div class="settings-group">
-                <label class="settings-label">Adresse IP</label>
-                <input 
-                    type="text" 
-                    class="settings-input" 
-                    value="${device.ip || ''}" 
-                    data-setting="ip"
-                    data-device-id="${device.id}"
-                />
-            </div>
-            
-            <div class="settings-group">
-                <label class="settings-label">Port</label>
-                <input 
-                    type="number" 
-                    class="settings-input" 
-                    value="${device.port || 5004}" 
-                    data-setting="port"
-                    data-device-id="${device.id}"
-                />
+            <div class="device-card bluetooth" data-device-id="${device.id}">
+                <div class="device-icon">📡</div>
+                <div class="device-info">
+                    <div class="device-name">${device.name}</div>
+                    <div class="device-address">${device.address || '—'}</div>
+                </div>
+                <div class="device-actions">
+                    <button class="btn-connect" data-action="connect-bluetooth">
+                        Connecter
+                    </button>
+                    <button class="btn-forget" data-action="forget-bluetooth">
+                        Oublier
+                    </button>
+                </div>
             </div>
         `;
     }
 
-    renderUSBSettings(device) {
-        return `
-            <div class="settings-group">
-                <label class="settings-label">Port USB</label>
-                <input 
-                    type="text" 
-                    class="settings-input" 
-                    value="${device.port || ''}" 
-                    readonly
-                />
-                <div class="settings-info">Le port USB est détecté automatiquement</div>
-            </div>
-        `;
-    }
-
-    renderEmptyConnected() {
-        return `
-            <div class="empty-state">
-                <div class="empty-state-icon">🎸</div>
-                <div class="empty-state-text">Aucun instrument connecté</div>
-                <div class="empty-state-hint">Scannez et connectez des instruments</div>
-            </div>
-        `;
+    renderBluetoothDevicesList() {
+        if (this.elements.bluetoothPaired) {
+            this.elements.bluetoothPaired.innerHTML = this.renderBluetoothDevices();
+        }
     }
 
     // ========================================================================
-    // ACTIONS SUR LES PÉRIPHÉRIQUES
+    // ACTIONS - SCAN
     // ========================================================================
 
-    handleDiscoveredDeviceAction(e) {
-        const button = e.target.closest('[data-action]');
-        if (!button) return;
+    async scanDevices(fullScan = true) {
+        this.state.scanning.usb = true;
+        this.render();
         
-        const action = button.dataset.action;
-        const deviceId = button.dataset.deviceId;
-        const device = this.state.discoveredDevices.find(d => d.id === deviceId);
+        // Appel API: devices.scan
+        if (this.eventBus) {
+            this.eventBus.emit('devices:scan_requested', {
+                full_scan: fullScan
+            });
+        }
+    }
+
+    async scanBluetooth() {
+        this.state.scanning.bluetooth = true;
+        this.render();
         
-        if (!device) return;
+        // Appel API: bluetooth.scan
+        if (this.eventBus) {
+            this.eventBus.emit('bluetooth:scan_requested');
+        }
+    }
+
+    // ========================================================================
+    // ACTIONS - CONNECT/DISCONNECT
+    // ========================================================================
+
+    handleAvailableDeviceAction(e) {
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
         
-        if (action === 'connect') {
-            this.connectDevice(device);
+        const deviceCard = e.target.closest('.device-card');
+        const deviceId = deviceCard?.dataset.deviceId;
+        
+        if (!deviceId) return;
+        
+        if (action === 'connect-device') {
+            this.connectDevice(deviceId);
         }
     }
 
     handleConnectedDeviceAction(e) {
-        const button = e.target.closest('[data-action]');
-        if (!button) return;
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
         
-        const action = button.dataset.action;
-        const deviceId = button.dataset.deviceId;
-        const device = this.state.connectedDevices.find(d => d.id === deviceId);
+        const deviceCard = e.target.closest('.device-card');
+        const deviceId = deviceCard?.dataset.deviceId;
         
-        if (!device) return;
+        if (!deviceId) return;
         
         switch (action) {
-            case 'settings':
-                this.toggleDeviceSettings(device);
+            case 'disconnect-device':
+                this.disconnectDevice(deviceId);
                 break;
-            case 'disconnect':
-                this.disconnectDevice(device);
-                break;
-            case 'save-settings':
-                this.saveDeviceSettings(device);
-                break;
-            case 'reset-settings':
-                this.resetDeviceSettings(device);
+            case 'device-info':
+                this.showDeviceInfo(deviceId);
                 break;
         }
     }
 
-    connectDevice(device) {
-        this.logger.info('[InstrumentView] Connecting device:', device.name);
+    handleBluetoothAction(e) {
+        const action = e.target.closest('[data-action]')?.dataset.action;
+        if (!action) return;
         
+        const deviceCard = e.target.closest('.device-card');
+        const deviceId = deviceCard?.dataset.deviceId;
+        
+        if (!deviceId) return;
+        
+        switch (action) {
+            case 'connect-bluetooth':
+                this.connectDevice(deviceId);
+                break;
+            case 'forget-bluetooth':
+                this.forgetBluetooth(deviceId);
+                break;
+        }
+    }
+
+    async connectDevice(deviceId) {
+        // Appel API: devices.connect
         if (this.eventBus) {
-            this.eventBus.emit('instruments:connect_requested', { device });
+            this.eventBus.emit('devices:connect_requested', {
+                device_id: deviceId
+            });
         }
     }
 
-    disconnectDevice(device) {
-        this.logger.info('[InstrumentView] Disconnecting device:', device.name);
+    async disconnectDevice(deviceId) {
+        // Appel API: devices.disconnect
+        if (this.eventBus) {
+            this.eventBus.emit('devices:disconnect_requested', {
+                device_id: deviceId
+            });
+        }
+    }
+
+    async disconnectAll() {
+        if (!confirm('Déconnecter tous les instruments ?')) return;
         
-        if (confirm(`Déconnecter ${device.name} ?`)) {
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:disconnect_requested', { device });
+        // Appel API: devices.disconnectAll
+        if (this.eventBus) {
+            this.eventBus.emit('devices:disconnect_all_requested');
+        }
+    }
+
+    async forgetBluetooth(deviceId) {
+        if (!confirm('Oublier cet appareil Bluetooth ?')) return;
+        
+        // Appel API: bluetooth.forget
+        if (this.eventBus) {
+            this.eventBus.emit('bluetooth:forget_requested', {
+                device_id: deviceId
+            });
+        }
+    }
+
+    async showDeviceInfo(deviceId) {
+        // Appel API: devices.getInfo
+        if (this.eventBus) {
+            this.eventBus.emit('devices:info_requested', {
+                device_id: deviceId
+            });
+        }
+    }
+
+    // ========================================================================
+    // HOT-PLUG
+    // ========================================================================
+
+    async toggleHotPlug() {
+        const newState = !this.state.hotPlugEnabled;
+        
+        // Appel API: devices.startHotPlug ou devices.stopHotPlug
+        if (this.eventBus) {
+            if (newState) {
+                this.eventBus.emit('hotplug:start_requested');
+            } else {
+                this.eventBus.emit('hotplug:stop_requested');
             }
         }
     }
 
-    toggleDeviceSettings(device) {
-        if (this.state.selectedDevice && this.state.selectedDevice.id === device.id) {
-            this.state.selectedDevice = null;
-        } else {
-            this.state.selectedDevice = device;
-        }
-        
-        this.renderConnectedDevices();
-    }
-
-    saveDeviceSettings(device) {
-        this.logger.info('[InstrumentView] Saving settings for:', device.name);
-        
-        // Récupérer les valeurs des inputs
-        const settings = {};
-        const inputs = this.container.querySelectorAll(`[data-device-id="${device.id}"][data-setting]`);
-        
-        inputs.forEach(input => {
-            const setting = input.dataset.setting;
-            settings[setting] = input.value;
-        });
-        
+    async checkHotPlugStatus() {
+        // Appel API: devices.getHotPlugStatus
         if (this.eventBus) {
-            this.eventBus.emit('instruments:settings_saved', { device, settings });
+            this.eventBus.emit('hotplug:status_requested');
         }
     }
 
-    resetDeviceSettings(device) {
-        this.logger.info('[InstrumentView] Resetting settings for:', device.name);
-        
-        if (confirm(`Réinitialiser les paramètres de ${device.name} ?`)) {
-            if (this.eventBus) {
-                this.eventBus.emit('instruments:settings_reset', { device });
-            }
+    updateHotPlugButton() {
+        if (this.elements.btnToggleHotPlug) {
+            this.elements.btnToggleHotPlug.textContent = 
+                this.state.hotPlugEnabled ? '🔌 Hot-Plug ON' : '🔌 Hot-Plug OFF';
+            this.elements.btnToggleHotPlug.dataset.enabled = this.state.hotPlugEnabled;
         }
     }
 
-    handleDeviceConnected(device) {
-        this.state.connectedDevices.push(device);
-        this.renderConnectedDevices();
+    // ========================================================================
+    // EVENT HANDLERS
+    // ========================================================================
+
+    handleDeviceConnected(data) {
+        this.logger.info(`[InstrumentView] Device connected: ${data.device_id}`);
+        this.loadDevices();
+    }
+
+    handleDeviceDisconnected(data) {
+        this.logger.info(`[InstrumentView] Device disconnected: ${data.device_id}`);
+        this.loadDevices();
+    }
+
+    updateDevicesFromList(devices) {
+        // Séparer connectés et disponibles
+        this.state.connectedDevices = devices.filter(d => d.status === 2); // Connected
+        this.state.availableDevices = devices.filter(d => d.status !== 2 && d.available);
         
-        // Retirer des découverts
-        this.state.discoveredDevices = this.state.discoveredDevices.filter(d => d.id !== device.id);
-        this.renderDiscoveredDevices();
-    }
-
-    handleDeviceDisconnected(device) {
-        this.state.connectedDevices = this.state.connectedDevices.filter(d => d.id !== device.id);
-        this.renderConnectedDevices();
+        this.renderConnectedDevicesList();
+        this.renderAvailableDevicesList();
     }
 
     // ========================================================================
-    // CHARGEMENT DES DONNÉES
+    // LOADING
     // ========================================================================
 
-    loadConnectedDevices() {
+    async loadDevices() {
+        // Appel API: devices.list
         if (this.eventBus) {
-            this.eventBus.emit('instruments:load_requested');
+            this.eventBus.emit('devices:list_requested');
         }
     }
 
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-
-    getDeviceIcon(type) {
-        const icons = {
-            usb: '🔌',
-            bluetooth: '📡',
-            network: '🌐',
-            virtual: '💻'
-        };
-        return icons[type] || '🎸';
-    }
-
-    getTypeLabel(type) {
-        const labels = {
-            usb: 'USB',
-            bluetooth: 'Bluetooth',
-            network: 'Réseau',
-            virtual: 'Virtuel'
-        };
-        return labels[type] || 'Inconnu';
-    }
-
-    getMockDevices(type) {
-        // Mock data pour le développement
-        const mockDevices = {
-            usb: [
-                { id: 'usb1', name: 'Roland FP-30X', type: 'usb', port: '/dev/usb1' },
-                { id: 'usb2', name: 'Yamaha P-125', type: 'usb', port: '/dev/usb2' }
-            ],
-            bluetooth: [
-                { id: 'bt1', name: 'MIDI Bluetooth 1', type: 'bluetooth', signalStrength: 85, battery: 75 },
-                { id: 'bt2', name: 'MIDI Bluetooth 2', type: 'bluetooth', signalStrength: 92, battery: 100 }
-            ],
-            network: [
-                { id: 'net1', name: 'rtpMIDI Session', type: 'network', ip: '192.168.1.100', port: 5004 }
-            ]
-        };
-        
-        return mockDevices[type] || [];
+    async loadBluetoothPaired() {
+        // Appel API: bluetooth.paired
+        if (this.eventBus) {
+            this.eventBus.emit('bluetooth:paired_requested');
+        }
     }
 
     // ========================================================================
@@ -614,11 +586,13 @@ class InstrumentView {
 
     destroy() {
         if (this.eventBus) {
-            this.eventBus.off('instruments:scan_started');
-            this.eventBus.off('instruments:scan_completed');
-            this.eventBus.off('instruments:device_connected');
-            this.eventBus.off('instruments:device_disconnected');
-            this.eventBus.off('instruments:list_updated');
+            this.eventBus.off('devices:listed');
+            this.eventBus.off('device:connected');
+            this.eventBus.off('device:disconnected');
+            this.eventBus.off('devices:scanned');
+            this.eventBus.off('bluetooth:scanned');
+            this.eventBus.off('bluetooth:paired_list');
+            this.eventBus.off('hotplug:status');
         }
         
         this.logger.info('[InstrumentView] Destroyed');

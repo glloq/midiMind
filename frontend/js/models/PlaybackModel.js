@@ -1,14 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaybackModel.js
 // Chemin rÃ©el: frontend/js/models/PlaybackModel.js
-// Version: v3.3.0 - API FORMAT SIMPLIFIÃ‰
+// Version: v4.0.0 - API COMPATIBLE v4.2.2
 // Date: 2025-11-01
 // ============================================================================
-// MODIFICATIONS v3.3.0:
-// âœ… Utilisation sendCommand() au lieu de send()
-// âœ… Format API simplifiÃ© (id, command, params)
-// âœ… Signature constructeur cohÃ©rente avec BaseModel
-// âœ… Gestion amÃ©liorÃ©e des erreurs
+// CORRECTIONS v4.0.0:
+// âœ… load_file â†’ playback.load
+// âœ… play â†’ playback.play
+// âœ… pause â†’ playback.pause
+// âœ… stop â†’ playback.stop
+// âœ… seek â†’ playback.seek
+// âœ… get_status â†’ playback.getStatus
+// âœ… set_loop â†’ playback.setLoop
+// âœ… set_tempo â†’ playback.setTempo
 // ============================================================================
 
 class PlaybackModel extends BaseModel {
@@ -28,7 +32,7 @@ class PlaybackModel extends BaseModel {
         this.data.tempo = initialData.tempo || 1.0;
         this.data.loop = initialData.loop || false;
         
-        this.log('debug', 'PlaybackModel', 'Initialized v3.3.0');
+        this.log('debug', 'PlaybackModel', 'Initialized v4.0.0');
     }
     
     /**
@@ -42,9 +46,9 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('load_file', { 
-                filename 
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.load', { 
+                file_path: filename 
             });
             
             if (data) {
@@ -70,8 +74,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('play');
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.play');
             
             if (data) {
                 this.data.state = 'playing';
@@ -96,8 +100,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('pause');
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.pause');
             
             if (data) {
                 this.data.state = 'paused';
@@ -122,8 +126,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('stop');
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.stop');
             
             if (data) {
                 this.data.state = 'stopped';
@@ -150,8 +154,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('seek', { 
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.seek', { 
                 position 
             });
             
@@ -177,15 +181,15 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('get_status');
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.getStatus');
             
             if (data) {
                 // Mettre Ã  jour l'Ã©tat local
                 this.data.state = data.state || 'stopped';
-                this.data.currentTime = data.current_time || 0;
+                this.data.currentTime = data.current_time || data.position || 0;
                 this.data.duration = data.duration || 0;
-                this.data.currentFile = data.current_file || null;
+                this.data.currentFile = data.current_file || data.file || null;
                 
                 this.emit('playback:status', data);
                 return data;
@@ -200,22 +204,26 @@ class PlaybackModel extends BaseModel {
     /**
      * Active/dÃ©sactive la boucle
      * @param {boolean} enabled - True pour activer la boucle
+     * @param {number} startPos - Position de dÃ©but (optionnel)
+     * @param {number} endPos - Position de fin (optionnel)
      */
-    async setLoop(enabled) {
+    async setLoop(enabled, startPos = null, endPos = null) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaybackModel.setLoop', 'Backend not connected');
             return false;
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('set_loop', { 
-                enabled 
-            });
+            // âœ… Nouvelle commande API v4.0.0
+            const params = { enabled };
+            if (startPos !== null) params.start_position = startPos;
+            if (endPos !== null) params.end_position = endPos;
+            
+            const data = await this.backend.sendCommand('playback.setLoop', params);
             
             if (data) {
                 this.data.loop = enabled;
-                this.emit('playback:loop', { enabled });
+                this.emit('playback:loop', { enabled, startPos, endPos });
                 return true;
             }
         } catch (error) {
@@ -236,8 +244,8 @@ class PlaybackModel extends BaseModel {
         }
         
         try {
-            // âœ… Nouveau format API simplifiÃ©
-            const data = await this.backend.sendCommand('set_tempo', { 
+            // âœ… Nouvelle commande API v4.0.0
+            const data = await this.backend.sendCommand('playback.setTempo', { 
                 tempo 
             });
             

@@ -156,7 +156,7 @@ class ApiClient {
     /**
      * Requête POST
      * @param {string} endpoint - Endpoint relatif
-     * @param {Object} data - Données à envoyer
+     * @param {Object} data - Données Ã  envoyer
      * @param {Object} options - Options
      * @returns {Promise<Object>}
      */
@@ -167,7 +167,7 @@ class ApiClient {
     /**
      * Requête PUT
      * @param {string} endpoint - Endpoint relatif
-     * @param {Object} data - Données à envoyer
+     * @param {Object} data - Données Ã  envoyer
      * @param {Object} options - Options
      * @returns {Promise<Object>}
      */
@@ -309,7 +309,7 @@ class ApiClient {
                     this.invalidateCache(new RegExp(endpoint.split('/')[0]));
                 }
                 
-                this.log(`✓ ${method} ${url}`, `Latency: ${latency}ms`);
+                this.log(`âœ“ ${method} ${url}`, `Latency: ${latency}ms`);
                 
                 return responseData;
                 
@@ -361,7 +361,7 @@ class ApiClient {
         
         this.stats.cacheHits++;
         
-        // Mettre à jour ordre LRU
+        // Mettre Ã  jour ordre LRU
         this.updateCacheOrder(key);
         
         return cached.data;
@@ -394,7 +394,7 @@ class ApiClient {
     
     /**
      * Invalide le cache
-     * @param {string|RegExp|null} pattern - Pattern à invalider
+     * @param {string|RegExp|null} pattern - Pattern Ã  invalider
      */
     invalidateCache(pattern = null) {
         if (!pattern) {
@@ -445,7 +445,7 @@ class ApiClient {
     }
     
     /**
-     * Met à jour l'ordre LRU
+     * Met Ã  jour l'ordre LRU
      * @param {string} key - Clé
      */
     updateCacheOrder(key) {
@@ -563,7 +563,7 @@ class ApiClient {
     }
     
     // ========================================================================
-    // ANNULATION DE REQUÊTES
+    // ANNULATION DE REQUÃŠTES
     // ========================================================================
     
     /**
@@ -701,7 +701,7 @@ class ApiClient {
     }
     
     /**
-     * Met à jour les stats de latence
+     * Met Ã  jour les stats de latence
      * @param {number} latency - Latence en ms
      */
     updateLatencyStats(latency) {

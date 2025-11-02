@@ -1,16 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Chemin réel: frontend/js/models/FileModel.js
-// Version: v3.3.0 - CONFORMITÉ API BACKEND
+// Chemin rÃ©el: frontend/js/models/FileModel.js
+// Version: v4.0.0 - API COMPATIBLE v4.2.2
 // Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.3.0:
-// ✅ CRITIQUE: Commandes API conformes à API_DOCUMENTATION_FRONTEND.md
-// ✅ list_files (au lieu de files.list)
-// ✅ load_file (au lieu de files.read)
-// ✅ delete_file (au lieu de files.delete)
-// ✅ get_file_info pour obtenir les métadonnées
-// ✅ import_file, export_file pour gestion fichiers
+// CORRECTIONS v4.0.0:
+// âœ… list_files â†’ files.list
+// âœ… load_file â†’ playback.load
+// âœ… unload_file â†’ playback.stop
+// âœ… get_file_info â†’ files.getInfo
+// âœ… delete_file â†’ files.delete
+// âœ… import_file â†’ files.write
+// âœ… export_file â†’ files.read
 // ============================================================================
 
 class FileModel extends BaseModel {
@@ -36,7 +37,7 @@ class FileModel extends BaseModel {
         this.data.selectedFile = this.data.selectedFile || null;
         this.data.recentFiles = this.data.recentFiles || [];
         
-        this.log('debug', 'FileModel', '✓ FileModel v3.3.0 initialized (API compliant)');
+        this.log('debug', 'FileModel', 'âœ“ FileModel v4.0.0 initialized (API v4.2.2)');
     }
     
     // ========================================================================
@@ -44,8 +45,8 @@ class FileModel extends BaseModel {
     // ========================================================================
     
     /**
-     * Rafraîchit la liste des fichiers
-     * ✅ API: list_files
+     * RafraÃ®chit la liste des fichiers
+     * âœ… API v4.0.0: files.list
      */
     async refreshFileList(path = null) {
         const targetPath = path || this.getCurrentPath();
@@ -59,8 +60,8 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Refreshing file list: ${targetPath}`);
             
-            // ✅ CONFORME: list_files
-            const response = await this.backend.sendCommand('list_files', {
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('files.list', {
                 path: targetPath
             });
             
@@ -85,8 +86,8 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Charge un fichier MIDI
-     * ✅ API: load_file
+     * Charge un fichier MIDI pour lecture
+     * âœ… API v4.0.0: playback.load
      */
     async loadFile(filePath) {
         if (!this.backend) {
@@ -96,8 +97,8 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Loading file: ${filePath}`);
             
-            // ✅ CONFORME: load_file avec file_path
-            const response = await this.backend.sendCommand('load_file', {
+            // âœ… Nouvelle commande API v4.0.0 - charge pour lecture
+            const response = await this.backend.sendCommand('playback.load', {
                 file_path: filePath
             });
             
@@ -120,8 +121,33 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Décharge le fichier actuel
-     * ✅ API: unload_file
+     * Lit le contenu d'un fichier
+     * âœ… API v4.0.0: files.read
+     */
+    async readFile(filePath) {
+        if (!this.backend) {
+            throw new Error('Backend service not available');
+        }
+        
+        try {
+            this.log('info', 'FileModel', `Reading file: ${filePath}`);
+            
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('files.read', {
+                path: filePath
+            });
+            
+            return response;
+            
+        } catch (error) {
+            this.log('error', 'FileModel', `Read failed: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * DÃ©charge le fichier actuel
+     * âœ… API v4.0.0: playback.stop
      */
     async unloadFile() {
         if (!this.backend) {
@@ -131,8 +157,8 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', 'Unloading current file');
             
-            // ✅ CONFORME: unload_file
-            await this.backend.sendCommand('unload_file');
+            // âœ… Nouvelle commande API v4.0.0
+            await this.backend.sendCommand('playback.stop');
             
             this.set('selectedFile', null);
             
@@ -152,7 +178,7 @@ class FileModel extends BaseModel {
     
     /**
      * Obtient les informations d'un fichier
-     * ✅ API: get_file_info
+     * âœ… API v4.0.0: files.getInfo
      */
     async getFileInfo(filePath) {
         if (!this.backend) {
@@ -162,9 +188,9 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Getting file info: ${filePath}`);
             
-            // ✅ CONFORME: get_file_info
-            const response = await this.backend.sendCommand('get_file_info', {
-                file_path: filePath
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('files.getInfo', {
+                path: filePath
             });
             
             return response;
@@ -177,7 +203,7 @@ class FileModel extends BaseModel {
     
     /**
      * Supprime un fichier
-     * ✅ API: delete_file
+     * âœ… API v4.0.0: files.delete
      */
     async deleteFile(filePath) {
         if (!this.backend) {
@@ -187,9 +213,9 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Deleting file: ${filePath}`);
             
-            // ✅ CONFORME: delete_file
-            await this.backend.sendCommand('delete_file', {
-                file_path: filePath
+            // âœ… Nouvelle commande API v4.0.0
+            await this.backend.sendCommand('files.delete', {
+                path: filePath
             });
             
             const files = this.get('files');
@@ -214,8 +240,8 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Importe un fichier
-     * ✅ API: import_file
+     * Importe/Upload un fichier
+     * âœ… API v4.0.0: files.write
      */
     async importFile(fileName, fileData, size, type = 'audio/midi') {
         if (!this.backend) {
@@ -225,12 +251,11 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Importing file: ${fileName}`);
             
-            // ✅ CONFORME: import_file
-            const response = await this.backend.sendCommand('import_file', {
-                file_name: fileName,
-                file_data: fileData,
-                size: size,
-                type: type
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('files.write', {
+                path: `/midi/${fileName}`,
+                content: fileData,
+                encoding: 'base64'
             });
             
             await this.refreshFileList();
@@ -251,8 +276,8 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Exporte un fichier
-     * ✅ API: export_file
+     * Exporte/TÃ©lÃ©charge un fichier
+     * âœ… API v4.0.0: files.read
      */
     async exportFile(filePath, format = 'midi') {
         if (!this.backend) {
@@ -262,10 +287,9 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Exporting file: ${filePath}`);
             
-            // ✅ CONFORME: export_file
-            const response = await this.backend.sendCommand('export_file', {
-                file_path: filePath,
-                format: format
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('files.read', {
+                path: filePath
             });
             
             if (this.eventBus) {
@@ -285,151 +309,144 @@ class FileModel extends BaseModel {
     }
     
     // ========================================================================
-    // GESTION RÉCENTS
+    // GESTION FICHIERS RÃƒâ€°CENTS
     // ========================================================================
     
+    /**
+     * Ajoute un fichier aux rÃƒÂ©cents
+     */
     addToRecent(filePath) {
-        const recents = this.get('recentFiles') || [];
-        const filtered = recents.filter(f => f !== filePath);
-        filtered.unshift(filePath);
-        const limited = filtered.slice(0, 10);
-        this.set('recentFiles', limited);
-        this.log('debug', 'FileModel', `Added to recent: ${filePath}`);
+        let recentFiles = this.get('recentFiles');
+        
+        // Retirer le fichier s'il existe dÃ©jÃ 
+        recentFiles = recentFiles.filter(f => f !== filePath);
+        
+        // Ajouter en tÃªte
+        recentFiles.unshift(filePath);
+        
+        // Limiter Ãƒ  10 fichiers
+        if (recentFiles.length > 10) {
+            recentFiles = recentFiles.slice(0, 10);
+        }
+        
+        this.set('recentFiles', recentFiles);
     }
     
+    /**
+     * Retire un fichier des rÃ©cents
+     */
     removeFromRecent(filePath) {
-        const recents = this.get('recentFiles') || [];
-        const filtered = recents.filter(f => f !== filePath);
-        this.set('recentFiles', filtered);
-        this.log('debug', 'FileModel', `Removed from recent: ${filePath}`);
+        let recentFiles = this.get('recentFiles');
+        recentFiles = recentFiles.filter(f => f !== filePath);
+        this.set('recentFiles', recentFiles);
     }
     
-    clearRecent() {
-        this.set('recentFiles', []);
-        this.log('info', 'FileModel', 'Recent files cleared');
-    }
-    
-    // ========================================================================
-    // ACCESSEURS
-    // ========================================================================
-    
-    getAll() {
-        return this.data.files || [];
-    }
-    
+    /**
+     * Obtient les fichiers rÃ©cents
+     */
     getRecentFiles() {
-        return this.data.recentFiles || [];
+        return this.get('recentFiles');
     }
     
+    /**
+     * Efface les fichiers rÃ©cents
+     */
+    clearRecentFiles() {
+        this.set('recentFiles', []);
+    }
+    
+    // ========================================================================
+    // GETTERS / SETTERS
+    // ========================================================================
+    
+    /**
+     * Obtient la liste des fichiers
+     */
+    getFiles() {
+        return this.get('files');
+    }
+    
+    /**
+     * Obtient le chemin actuel
+     */
     getCurrentPath() {
-        return this.data.currentPath || '/midi';
+        return this.get('currentPath');
     }
     
+    /**
+     * DÃƒÂ©finit le chemin actuel
+     */
+    setCurrentPath(path) {
+        this.set('currentPath', path);
+    }
+    
+    /**
+     * Obtient le fichier sÃƒÂ©lectionnÃƒÂ©
+     */
     getSelectedFile() {
-        return this.data.selectedFile;
+        return this.get('selectedFile');
     }
     
+    /**
+     * DÃƒÂ©finit le fichier sÃƒÂ©lectionnÃƒÂ©
+     */
     setSelectedFile(file) {
         this.set('selectedFile', file);
-        if (file && file.path) {
-            this.addToRecent(file.path);
-        }
     }
     
-    // ========================================================================
-    // RECHERCHE & FILTRAGE
-    // ========================================================================
-    
+    /**
+     * Recherche des fichiers par nom
+     */
     searchFiles(query) {
-        const files = this.getAll();
-        if (!query || query.trim() === '') {
-            return files;
-        }
-        
+        const files = this.getFiles();
         const lowerQuery = query.toLowerCase();
-        return files.filter(file => {
-            return (
-                file.name?.toLowerCase().includes(lowerQuery) ||
-                file.path?.toLowerCase().includes(lowerQuery) ||
-                file.artist?.toLowerCase().includes(lowerQuery) ||
-                file.title?.toLowerCase().includes(lowerQuery)
-            );
-        });
+        
+        return files.filter(file => 
+            file.name.toLowerCase().includes(lowerQuery) ||
+            (file.path && file.path.toLowerCase().includes(lowerQuery))
+        );
     }
     
-    filterByType(type) {
-        const files = this.getAll();
-        return files.filter(file => {
-            return file.type === type || file.extension === type;
-        });
+    /**
+     * Filtre les fichiers par extension
+     */
+    filterByExtension(extension) {
+        const files = this.getFiles();
+        return files.filter(file => 
+            file.name.toLowerCase().endsWith(extension.toLowerCase())
+        );
     }
     
+    /**
+     * Trie les fichiers
+     */
     sortFiles(sortBy = 'name', order = 'asc') {
-        const files = [...this.getAll()];
+        const files = [...this.getFiles()];
         
         files.sort((a, b) => {
-            let valA = a[sortBy];
-            let valB = b[sortBy];
+            let valueA = a[sortBy];
+            let valueB = b[sortBy];
             
-            if (typeof valA === 'string') {
-                valA = valA.toLowerCase();
-            }
-            if (typeof valB === 'string') {
-                valB = valB.toLowerCase();
+            if (typeof valueA === 'string') {
+                valueA = valueA.toLowerCase();
+                valueB = valueB.toLowerCase();
             }
             
             if (order === 'asc') {
-                return valA > valB ? 1 : valA < valB ? -1 : 0;
+                return valueA > valueB ? 1 : -1;
             } else {
-                return valA < valB ? 1 : valA > valB ? -1 : 0;
+                return valueA < valueB ? 1 : -1;
             }
         });
         
+        this.set('files', files);
         return files;
     }
-    
-    // ========================================================================
-    // VALIDATION
-    // ========================================================================
-    
-    validateFileName(fileName) {
-        if (!fileName || typeof fileName !== 'string') {
-            return { valid: false, error: 'Nom de fichier invalide' };
-        }
-        
-        if (fileName.length > 255) {
-            return { valid: false, error: 'Nom trop long (max 255 caractères)' };
-        }
-        
-        const invalidChars = /[<>:"/\\|?*]/;
-        if (invalidChars.test(fileName)) {
-            return { valid: false, error: 'Caractères non autorisés dans le nom' };
-        }
-        
-        return { valid: true };
-    }
-    
-    validateFilePath(filePath) {
-        if (!filePath || typeof filePath !== 'string') {
-            return { valid: false, error: 'Chemin invalide' };
-        }
-        
-        if (!filePath.startsWith('/')) {
-            return { valid: false, error: 'Le chemin doit commencer par /' };
-        }
-        
-        return { valid: true };
-    }
 }
 
 // ============================================================================
-// EXPORT
+// EXPORT GLOBAL
 // ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = FileModel;
-}
-
 if (typeof window !== 'undefined') {
     window.FileModel = FileModel;
 }

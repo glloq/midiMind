@@ -1,8 +1,11 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/KeyboardController.js
 // Chemin: frontend/js/controllers/KeyboardController.js
-// Version: v3.1.2 - FIXED DOUBLE INITIALIZATION
-// Date: 2025-10-31
+// Version: v3.1.3 - LOOP RECORDER REMOVED
+// Date: 2025-11-02
+// ============================================================================
+// CORRECTIONS v3.1.3:
+// ❌ Suppression: this.enableLoopRecorder (ligne 23)
 // ============================================================================
 // CORRECTIONS v3.1.2:
 // ✅ CRITIQUE: Removed duplicate this.initialize() call from constructor
@@ -20,7 +23,6 @@ class KeyboardController extends BaseController {
         // Configuration
         this.mode = PerformanceConfig.keyboard.mode || 'monitor';
         this.enableRecording = false;
-        this.enableLoopRecorder = false;
         this.enablePlayback = PerformanceConfig.keyboard.enablePlayback || true;
         this.showIncomingNotes = false;
         
@@ -142,7 +144,7 @@ class KeyboardController extends BaseController {
         }
         
         try {
-            const response = await this.backend.sendCommand('device:scan');
+            const response = await this.backend.sendCommand('devices.scan');
             this.availableDevices = response.devices || [];
             this.logDebug('keyboard', `${this.availableDevices.length} devices available`);
             
@@ -230,7 +232,7 @@ class KeyboardController extends BaseController {
         
         // Envoyer au backend
         if (this.enablePlayback && this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('midi:note-on', {
+            this.backend.sendCommand('midi.sendNoteOn', {
                 instrument: this.selectedInstrument,
                 note: mappedNote,
                 velocity: finalVelocity
@@ -258,7 +260,7 @@ class KeyboardController extends BaseController {
         
         // Envoyer au backend
         if (this.enablePlayback && this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('midi:note-off', {
+            this.backend.sendCommand('midi.sendNoteOff', {
                 instrument: this.selectedInstrument,
                 note: noteInfo.note
             }).catch(err => {
@@ -328,5 +330,5 @@ if (typeof module !== 'undefined' && module.exports) {
 window.KeyboardController = KeyboardController;
 
 // ============================================================================
-// FIN DU FICHIER KeyboardController.js v3.1.2
+// FIN DU FICHIER KeyboardController.js v3.1.3
 // ============================================================================

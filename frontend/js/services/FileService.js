@@ -1,11 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/services/FileService.js
-// Version: v3.1.1 - LOGGER FIX
-// Date: 2025-10-30
+// Version: v4.0.0 - API COMPATIBLE DOCUMENTATION v4.2.2
+// Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.1.1:
+// CORRECTIONS v4.0.0:
+// ✅ Utilise files.list, files.read, files.write, files.delete
+// ✅ Compatible avec le format API documenté
+// ✅ Gestion des réponses { success: true, data: {...} }
+//
+// CONSERVÉ:
 // ✅ Logger avec fallback robuste
-// ✅ Méthode log() helper sécurisée
+// ✅ Cache des fichiers
+// ✅ Index de recherche
+// ✅ Statistiques
 // ============================================================================
 
 class FileService {
@@ -53,7 +60,7 @@ class FileService {
             deletesCount: 0
         };
         
-        this.log('info', 'FileService', '✓ Service initialized');
+        this.log('info', 'FileService', '✓ Service initialized (v4.0.0)');
         
         this._bindBackendEvents();
     }
@@ -89,16 +96,17 @@ class FileService {
     _bindBackendEvents() {
         if (!this.eventBus) return;
         
-        this.eventBus.on('backend:event:files_list', (data) => {
-            this._handleFilesList(data);
-        });
-        
-        this.eventBus.on('backend:event:file_added', (data) => {
+        // Événements backend
+        this.eventBus.on('backend:event:file:added', (data) => {
             this._handleFileAdded(data);
         });
         
-        this.eventBus.on('backend:event:file_removed', (data) => {
+        this.eventBus.on('backend:event:file:removed', (data) => {
             this._handleFileRemoved(data);
+        });
+        
+        this.eventBus.on('backend:event:file:modified', (data) => {
+            this._handleFileModified(data);
         });
         
         this.eventBus.on('backend:connected', async () => {
@@ -140,42 +148,44 @@ class FileService {
                 this.eventBus.emit('files:scan_start');
             }
             
-            // Appeler backend
-            let files = [];
+            // ✅ Appeler backend avec nouvelle API
+            let filesData = [];
             if (this.backend && typeof this.backend.listFiles === 'function') {
-                files = await this.backend.listFiles();
+                const response = await this.backend.listFiles('/midi');
+                // Le backend renvoie { success: true, data: { files: [...] } }
+                filesData = response.files || [];
             } else {
                 this.log('warn', 'FileService', 'Backend not available, using mock data');
-                files = this._getMockFiles();
+                filesData = this._getMockFiles();
             }
             
             // Mettre à jour cache
-            this._updateCache(files);
+            this._updateCache(filesData);
             
             // Mettre à jour index de recherche
-            this._updateSearchIndex(files);
+            this._updateSearchIndex(filesData);
             
             // Statistiques
-            this.state.totalFiles = files.length;
-            this.state.totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
+            this.state.totalFiles = filesData.length;
+            this.state.totalSize = filesData.reduce((sum, f) => sum + (f.size || 0), 0);
             this.state.lastScanDuration = Date.now() - startTime;
             this.stats.scansPerformed++;
-            this.stats.filesLoaded += files.length;
+            this.stats.filesLoaded += filesData.length;
             
             this.lastScanTimestamp = Date.now();
             
-            this.log('info', 'FileService', `Scan complete: ${files.length} files in ${this.state.lastScanDuration}ms`);
+            this.log('info', 'FileService', `Scan complete: ${filesData.length} files in ${this.state.lastScanDuration}ms`);
             
             // Émettre événement scan complete
             if (this.eventBus) {
                 this.eventBus.emit('files:scan_complete', { 
-                    files,
-                    count: files.length,
+                    files: filesData,
+                    count: filesData.length,
                     duration: this.state.lastScanDuration
                 });
             }
             
-            return files;
+            return filesData;
             
         } catch (error) {
             this.log('error', 'FileService', 'Scan failed:', error);
@@ -214,7 +224,8 @@ class FileService {
     _updateCache(files) {
         this.fileCache.clear();
         files.forEach(file => {
-            this.fileCache.set(file.id || file.path, file);
+            const fileId = file.id || file.path || file.name;
+            this.fileCache.set(fileId, file);
         });
     }
     
@@ -230,7 +241,8 @@ class FileService {
                 file.tags?.join(' ') || ''
             ].join(' ').toLowerCase();
             
-            this.searchIndex.set(file.id || file.path, searchText);
+            const fileId = file.id || file.path || file.name;
+            this.searchIndex.set(fileId, searchText);
         });
     }
     
@@ -247,19 +259,17 @@ class FileService {
                 duration: 180,
                 tracks: 4,
                 noteCount: 1234,
-                created: Date.now() - 86400000,
-                modified: Date.now() - 3600000
+                modified: Date.now()
             },
             {
                 id: 'mock-2',
-                name: 'Test Composition.mid',
-                path: '/midi/Test Composition.mid',
+                name: 'Test Track.mid',
+                path: '/midi/Test Track.mid',
                 size: 23456,
                 duration: 120,
                 tracks: 2,
                 noteCount: 567,
-                created: Date.now() - 172800000,
-                modified: Date.now() - 7200000
+                modified: Date.now()
             }
         ];
     }
@@ -268,24 +278,21 @@ class FileService {
     // GESTION DES ÉVÉNEMENTS BACKEND
     // ========================================================================
     
-    _handleFilesList(data) {
-        this.log('debug', 'FileService', 'Received files list:', data);
-        
-        if (data.files) {
-            this._updateCache(data.files);
-            this._updateSearchIndex(data.files);
-            
-            if (this.eventBus) {
-                this.eventBus.emit('files:loaded', { files: data.files });
-            }
-        }
-    }
-    
+    /**
+     * Gère l'ajout d'un fichier
+     */
     _handleFileAdded(data) {
-        this.log('info', 'FileService', 'File added:', data);
-        
-        if (data.file) {
-            this.fileCache.set(data.file.id || data.file.path, data.file);
+        if (data && data.file) {
+            const fileId = data.file.id || data.file.path || data.file.name;
+            this.fileCache.set(fileId, data.file);
+            
+            // Mettre à jour l'index de recherche
+            const searchText = [
+                data.file.name || '',
+                data.file.path || '',
+                data.file.tags?.join(' ') || ''
+            ].join(' ').toLowerCase();
+            this.searchIndex.set(fileId, searchText);
             
             if (this.eventBus) {
                 this.eventBus.emit('files:file_added', { file: data.file });
@@ -293,15 +300,31 @@ class FileService {
         }
     }
     
+    /**
+     * Gère la suppression d'un fichier
+     */
     _handleFileRemoved(data) {
-        this.log('info', 'FileService', 'File removed:', data);
-        
-        if (data.fileId || data.path) {
+        if (data && (data.fileId || data.path)) {
             const key = data.fileId || data.path;
             this.fileCache.delete(key);
+            this.searchIndex.delete(key);
             
             if (this.eventBus) {
                 this.eventBus.emit('files:file_removed', { fileId: key });
+            }
+        }
+    }
+    
+    /**
+     * Gère la modification d'un fichier
+     */
+    _handleFileModified(data) {
+        if (data && data.file) {
+            const fileId = data.file.id || data.file.path || data.file.name;
+            this.fileCache.set(fileId, data.file);
+            
+            if (this.eventBus) {
+                this.eventBus.emit('files:file_modified', { file: data.file });
             }
         }
     }
@@ -335,19 +358,24 @@ class FileService {
             // Lire fichier
             const content = await this._readFile(file);
             
-            // Envoyer au backend
+            // Convertir en base64
+            const base64Data = btoa(
+                new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            
+            // ✅ Envoyer au backend avec nouvelle API
             let result;
-            if (this.backend && typeof this.backend.uploadFile === 'function') {
-                result = await this.backend.uploadFile({
-                    filename: file.name,
-                    content: content,
-                    metadata: metadata
-                });
+            if (this.backend && typeof this.backend.writeFile === 'function') {
+                result = await this.backend.writeFile(
+                    `/midi/${file.name}`,
+                    base64Data,
+                    'base64'
+                );
             } else {
                 // Mock upload
                 result = {
                     success: true,
-                    fileId: 'mock-' + Date.now(),
+                    path: `/midi/${file.name}`,
                     message: 'File uploaded (mock)'
                 };
             }
@@ -473,36 +501,58 @@ class FileService {
             return cached;
         }
         
-        // Charger depuis backend
-        if (this.backend && typeof this.backend.getFile === 'function') {
-            const file = await this.backend.getFile(fileId);
-            this.fileCache.set(fileId, file);
-            return file;
+        // ✅ Charger depuis backend avec nouvelle API
+        if (this.backend && typeof this.backend.getFileInfo === 'function') {
+            const fileInfo = await this.backend.getFileInfo(fileId);
+            this.fileCache.set(fileId, fileInfo);
+            return fileInfo;
         }
         
         throw new Error(`File not found: ${fileId}`);
     }
     
     /**
+     * Récupère le contenu d'un fichier
+     */
+    async readFile(path) {
+        if (this.backend && typeof this.backend.readFile === 'function') {
+            return await this.backend.readFile(path);
+        }
+        throw new Error('Backend not available');
+    }
+    
+    /**
+     * Vérifie si un fichier existe
+     */
+    async fileExists(path) {
+        if (this.backend && typeof this.backend.fileExists === 'function') {
+            const response = await this.backend.fileExists(path);
+            return response.exists || false;
+        }
+        return false;
+    }
+    
+    /**
      * Supprime un fichier
      */
-    async deleteFile(fileId) {
-        this.log('info', 'FileService', 'Deleting file:', fileId);
+    async deleteFile(fileIdOrPath) {
+        this.log('info', 'FileService', 'Deleting file:', fileIdOrPath);
         
         try {
+            // ✅ Supprimer via backend avec nouvelle API
             if (this.backend && typeof this.backend.deleteFile === 'function') {
-                await this.backend.deleteFile(fileId);
+                await this.backend.deleteFile(fileIdOrPath);
             }
             
-            this.fileCache.delete(fileId);
-            this.searchIndex.delete(fileId);
+            this.fileCache.delete(fileIdOrPath);
+            this.searchIndex.delete(fileIdOrPath);
             this.stats.deletesCount++;
             
             if (this.eventBus) {
-                this.eventBus.emit('files:file_deleted', { fileId });
+                this.eventBus.emit('files:file_deleted', { fileId: fileIdOrPath });
             }
             
-            this.log('info', 'FileService', 'File deleted:', fileId);
+            this.log('info', 'FileService', 'File deleted:', fileIdOrPath);
             
         } catch (error) {
             this.log('error', 'FileService', 'Delete failed:', error);

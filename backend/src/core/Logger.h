@@ -177,7 +177,51 @@ public:
         std::lock_guard<std::mutex> lock(getMutex());
         return getMinLevel();
     }
+	
+     /**
+     * @brief Get recent log messages
+     * @param count Number of recent messages to retrieve
+     * @return Vector of recent log messages
+     * @note Thread-safe
+     */
+    static std::vector<std::string> getRecentLogs(size_t count = 100) {
+        std::lock_guard<std::mutex> lock(getMutex());
+        auto& buffer = getLogBuffer();
+        
+        size_t start = buffer.size() > count ? buffer.size() - count : 0;
+        return std::vector<std::string>(buffer.begin() + start, buffer.end());
+    }
     
+    /**
+     * @brief Clear all log messages from buffer
+     * @note Thread-safe
+     */
+    static void clearLogs() {
+        std::lock_guard<std::mutex> lock(getMutex());
+        getLogBuffer().clear();
+    }
+    
+    /**
+     * @brief Export logs to file
+     * @param filename Path to export file
+     * @return true if successful, false otherwise
+     * @note Thread-safe
+     */
+    static bool exportLogs(const std::string& filename) {
+        std::lock_guard<std::mutex> lock(getMutex());
+        
+        std::ofstream outFile(filename);
+        if (!outFile.is_open()) {
+            return false;
+        }
+        
+        for (const auto& logEntry : getLogBuffer()) {
+            outFile << logEntry << "\n";
+        }
+        
+        outFile.close();
+        return true;
+    }
     /**
      * @brief Enable file logging with automatic rotation
      * 
@@ -354,7 +398,14 @@ private:
             case Level::ERROR:    getErrorMessages()++; break;
             case Level::CRITICAL: getCriticalMessages()++; break;
         }
-        
+          // Store in buffer
+        std::ostringstream bufferEntry;
+        bufferEntry << "[" << timestamp << "] "
+                   << "[" << levelStr << "] "
+                   << "[" << category << "] "
+                   << message;
+        getLogBuffer().push_back(bufferEntry.str());
+		
         // Format message
         std::string timestamp = getCurrentTimestamp();
         std::string levelStr = levelToString(level);
@@ -599,6 +650,17 @@ private:
     static std::atomic<uint64_t>& getRotations() {
         static std::atomic<uint64_t> count{0};
         return count;
+    }
+	static std::vector<std::string>& getLogBuffer() {
+        static std::vector<std::string> buffer;
+        static const size_t MAX_BUFFER_SIZE = 1000;
+        
+        // Limiter la taille du buffer
+        if (buffer.size() >= MAX_BUFFER_SIZE) {
+            buffer.erase(buffer.begin(), buffer.begin() + 100); // Remove oldest 100 entries
+        }
+        
+        return buffer;
     }
 };
 

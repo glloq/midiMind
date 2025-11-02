@@ -1,6 +1,6 @@
 // ============================================================================
 // Fichier: frontend/js/views/PianoRollView.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
@@ -16,14 +16,14 @@
 //   - Zoom horizontal et vertical
 //   - Pan (défilement) fluide
 //   - Sélection multiple notes (rectangle)
-//   - Ã‰dition notes (déplacer, redimensionner)
+//   - Édition notes (déplacer, redimensionner)
 //   - Outils : Select, Pencil, Eraser
 //   - Snap to grid configurable
 //   - Affichage vélocité (couleur)
 //
 // Architecture:
 //   PianoRollView extends BaseCanvasView
-//   - CoordinateSystem : Conversions pixels â†” temps/pitch
+//   - CoordinateSystem : Conversions pixels ↔ temps/pitch
 //   - Viewport : Gestion zoom/pan
 //   - NoteRenderer : Rendu notes optimisé
 //   - GridRenderer : Grille et mesures
@@ -47,7 +47,7 @@ class PianoRollView extends BaseCanvasView {
     render() {
         if (!this.editorModel || !this.editorModel.data) return;
         
-        // AccÃ¨s direct Ã  la timeline JsonMidi
+        // Accès direct à la timeline JsonMidi
         const notes = this.editorModel.data.timeline.filter(e => e.type === 'noteOn');
         
         this.clearCanvas();
@@ -96,7 +96,7 @@ class PianoRollView extends BaseCanvasView {
             ? this.quantizeTime(time) 
             : time;
         
-        // Ajouter via EditorModel (qui gÃ¨re JsonMidi)
+        // Ajouter via EditorModel (qui gère JsonMidi)
         this.editorModel.addNote(
             quantizedTime,
             this.currentChannel,
@@ -363,7 +363,7 @@ class PianoRollView extends BaseCanvasView {
                     } else {
                         // Sélection de note
                         if (e.shiftKey) {
-                            // Ajouter Ã  la sélection
+                            // Ajouter à la sélection
                             this.model.selectNotes([clickedNote.id], true);
                         } else if (!this.model.state.selectedNotes.has(clickedNote.id)) {
                             // Nouvelle sélection
@@ -413,7 +413,7 @@ class PianoRollView extends BaseCanvasView {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // Mise Ã  jour de la position du curseur dans la status bar
+        // Mise à jour de la position du curseur dans la status bar
         const time = Math.round(this.xToTime(x));
         const note = this.yToNote(y);
         const noteName = this.getNoteName(note);
@@ -472,7 +472,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Gestion du relÃ¢chement de souris
+     * Gestion du relâchement de souris
      */
     onMouseUp(e) {
         this.isDragging = false;
@@ -616,7 +616,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Normalise un rectangle (gÃ¨re width/height négatifs)
+     * Normalise un rectangle (gère width/height négatifs)
      */
     normalizeRect(rect) {
         const x = rect.width < 0 ? rect.x + rect.width : rect.x;
@@ -638,7 +638,7 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Met Ã  jour le curseur selon le contexte
+     * Met à jour le curseur selon le contexte
      */
     updateCursor(x, y, hoveredNote) {
         let cursor = 'default';
@@ -709,7 +709,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-    window.PianoRollView = PianoRollView;  // â† AJOUTÃ‰
+    window.PianoRollView = PianoRollView;  // ← AJOUTÉ
 }
 
 // Export par défaut

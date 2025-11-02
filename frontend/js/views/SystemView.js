@@ -1,289 +1,579 @@
 // ============================================================================
 // Fichier: frontend/js/views/SystemView.js
-// Version: v3.2.0 - SIGNATURE COHÉRENTE + API COMPLÈTE
-// Date: 2025-11-01
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v3.2.0:
-// ✅ Signature cohérente : constructor(containerId, eventBus, logger = null)
-// ✅ Appel super() correct
-// ✅ Affichage stats système (uptime, memory, disk)
-// ✅ Affichage liste devices MIDI
-// ✅ Boutons connect/disconnect/scan devices
+// AMÉLIORATIONS v4.0.0:
+// ✅ API v4.2.2: system.*, network.*, logger.*
+// ✅ Monitoring temps réel
+// ✅ Statistiques réseau
+// ✅ Gestion des logs
 // ============================================================================
 
-class SystemView extends BaseView {
-    constructor(containerId, eventBus, logger = null) {
-        super(containerId, eventBus);
+class SystemView {
+    constructor(container, eventBus) {
+        if (typeof container === 'string') {
+            this.container = document.getElementById(container) || document.querySelector(container);
+        } else if (container instanceof HTMLElement) {
+            this.container = container;
+        } else {
+            this.container = null;
+        }
         
-        this.logger = logger || window.logger || console;
+        if (!this.container) {
+            console.error('[SystemView] Container not found');
+        }
         
-        // État spécifique à la vue
-        this.viewState = {
+        this.eventBus = eventBus;
+        this.logger = window.logger || console;
+        
+        // État
+        this.state = {
             systemInfo: null,
-            devices: [],
-            selectedDevice: null
+            memory: null,
+            disk: null,
+            uptime: null,
+            networkStatus: null,
+            networkInterfaces: [],
+            networkStats: null,
+            logLevel: 'info',
+            logs: [],
+            refreshInterval: null
         };
         
-        this.log('info', 'SystemView', '✅ SystemView v3.2.0 initialized');
+        this.elements = {};
     }
-    
+
     // ========================================================================
-    // TEMPLATE PRINCIPAL
+    // INITIALISATION
     // ========================================================================
-    
-    buildTemplate(data = {}) {
-        const state = { ...this.viewState, ...data };
-        
-        return \`
-            <div class="system-view-container">
-                <div class="page-header">
-                    <h1>⚙️ Système</h1>
-                    <div class="header-actions">
-                        <button class="btn-refresh" data-action="refresh-system">
-                            🔄 Actualiser
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="system-grid">
-                    <!-- Stats système -->
-                    <div class="system-section">
-                        <h2>📊 Statistiques Système</h2>
-                        \${this.renderSystemStats(state)}
-                    </div>
-                    
-                    <!-- Devices MIDI -->
-                    <div class="system-section">
-                        <h2>🎹 Périphériques MIDI</h2>
-                        <div class="devices-actions">
-                            <button class="btn-primary" data-action="scan-devices">
-                                🔍 Scanner
-                            </button>
-                        </div>
-                        \${this.renderDevicesList(state)}
-                    </div>
-                </div>
-            </div>
-        \`;
-    }
-    
-    // ========================================================================
-    // RENDERING STATS SYSTÈME
-    // ========================================================================
-    
-    renderSystemStats(state) {
-        const info = state.systemInfo;
-        
-        if (!info) {
-            return \`
-                <div class="stats-loading">
-                    <p>Chargement des informations système...</p>
-                </div>
-            \`;
+
+    init() {
+        if (!this.container) {
+            this.logger.error('[SystemView] Cannot initialize');
+            return;
         }
         
-        return \`
-            <div class="stats-grid">
-                <!-- Version -->
-                <div class="stat-card">
-                    <div class="stat-icon">🏷️</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Version</div>
-                        <div class="stat-value">\${info.version?.version || 'N/A'}</div>
-                    </div>
-                </div>
-                
-                <!-- Uptime -->
-                <div class="stat-card">
-                    <div class="stat-icon">⏱️</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Uptime</div>
-                        <div class="stat-value">\${this.formatUptime(info.uptime)}</div>
-                    </div>
-                </div>
-                
-                <!-- Memory -->
-                <div class="stat-card">
-                    <div class="stat-icon">💾</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Mémoire</div>
-                        <div class="stat-value">\${this.formatMemory(info.memory)}</div>
-                        <div class="stat-bar">
-                            <div class="stat-bar-fill" style="width: \${info.memory?.percent || 0}%"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Disk -->
-                <div class="stat-card">
-                    <div class="stat-icon">💿</div>
-                    <div class="stat-content">
-                        <div class="stat-label">Disque</div>
-                        <div class="stat-value">\${this.formatDisk(info.disk)}</div>
-                        <div class="stat-bar">
-                            <div class="stat-bar-fill" style="width: \${info.disk?.percent || 0}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        \`;
-    }
-    
-    // ========================================================================
-    // RENDERING DEVICES
-    // ========================================================================
-    
-    renderDevicesList(state) {
-        const devices = state.devices || [];
-        
-        if (devices.length === 0) {
-            return \`
-                <div class="devices-empty">
-                    <p>Aucun périphérique MIDI détecté</p>
-                    <p class="text-muted">Cliquez sur "Scanner" pour rechercher des périphériques</p>
-                </div>
-            \`;
-        }
-        
-        return \`
-            <div class="devices-list">
-                \${devices.map(device => this.renderDeviceCard(device)).join('')}
-            </div>
-        \`;
-    }
-    
-    renderDeviceCard(device) {
-        const isConnected = device.connected || false;
-        const statusClass = isConnected ? 'connected' : 'disconnected';
-        const statusIcon = isConnected ? '✅' : '⚪';
-        const actionButton = isConnected 
-            ? \`<button class="btn-danger" data-action="disconnect-device" data-device-id="\${device.id}">Déconnecter</button>\`
-            : \`<button class="btn-primary" data-action="connect-device" data-device-id="\${device.id}">Connecter</button>\`;
-        
-        return \`
-            <div class="device-card \${statusClass}" data-device-id="\${device.id}">
-                <div class="device-header">
-                    <span class="device-status">\${statusIcon}</span>
-                    <span class="device-name">\${device.name || device.id}</span>
-                </div>
-                <div class="device-info">
-                    <div class="device-type">\${device.type || 'MIDI'}</div>
-                    <div class="device-id">\${device.id}</div>
-                </div>
-                <div class="device-actions">
-                    \${actionButton}
-                </div>
-            </div>
-        \`;
-    }
-    
-    // ========================================================================
-    // FORMATTERS
-    // ========================================================================
-    
-    formatUptime(uptime) {
-        if (!uptime) return 'N/A';
-        
-        const days = uptime.days || 0;
-        const hours = uptime.hours || 0;
-        const minutes = uptime.minutes || 0;
-        
-        if (days > 0) {
-            return \`\${days}j \${hours}h \${minutes}m\`;
-        } else if (hours > 0) {
-            return \`\${hours}h \${minutes}m\`;
-        } else {
-            return \`\${minutes}m\`;
-        }
-    }
-    
-    formatMemory(memory) {
-        if (!memory) return 'N/A';
-        
-        const used = memory.used_mb || 0;
-        const total = memory.total_mb || 0;
-        const percent = memory.percent || 0;
-        
-        return \`\${used.toFixed(0)} / \${total.toFixed(0)} MB (\${percent.toFixed(1)}%)\`;
-    }
-    
-    formatDisk(disk) {
-        if (!disk) return 'N/A';
-        
-        const used = disk.used_gb || 0;
-        const total = disk.total_gb || 0;
-        const percent = disk.percent || 0;
-        
-        return \`\${used.toFixed(1)} / \${total.toFixed(1)} GB (\${percent.toFixed(1)}%)\`;
-    }
-    
-    // ========================================================================
-    // UPDATE MÉTHODES
-    // ========================================================================
-    
-    updateSystemInfo(systemInfo) {
-        this.viewState.systemInfo = systemInfo;
         this.render();
+        this.cacheElements();
+        this.attachEvents();
+        this.loadSystemData();
+        this.startAutoRefresh();
+        
+        this.logger.info('[SystemView] Initialized v4.0.0');
     }
-    
-    updateDevices(devices) {
-        this.viewState.devices = devices;
-        this.render();
-    }
-    
-    // ========================================================================
-    // ÉVÉNEMENTS UI
-    // ========================================================================
-    
-    attachEventListeners() {
+
+    render() {
         if (!this.container) return;
         
-        // Délégation événements
-        this.container.addEventListener('click', (e) => {
-            const target = e.target.closest('[data-action]');
-            if (!target) return;
+        this.container.innerHTML = `
+            <div class="page-header">
+                <h1>⚙️ Système & Réseau</h1>
+                <div class="header-actions">
+                    <button class="btn-refresh" data-action="refresh">
+                        🔄 Actualiser
+                    </button>
+                </div>
+            </div>
             
-            const action = target.dataset.action;
-            const deviceId = target.dataset.deviceId;
+            <div class="system-layout">
+                <!-- Informations système -->
+                <div class="system-section">
+                    <h2>📊 Informations système</h2>
+                    <div id="systemInfo">
+                        ${this.renderSystemInfo()}
+                    </div>
+                </div>
+                
+                <!-- Mémoire et disque -->
+                <div class="system-section">
+                    <h2>💾 Ressources</h2>
+                    <div id="systemResources">
+                        ${this.renderResources()}
+                    </div>
+                </div>
+                
+                <!-- Réseau -->
+                <div class="system-section">
+                    <h2>🌐 Réseau</h2>
+                    <div id="networkInfo">
+                        ${this.renderNetwork()}
+                    </div>
+                </div>
+                
+                <!-- Logger -->
+                <div class="system-section logs-section">
+                    <div class="logs-header">
+                        <h2>📝 Logs</h2>
+                        <div class="logs-controls">
+                            <select class="log-level-select" data-action="change-log-level">
+                                <option value="debug" ${this.state.logLevel === 'debug' ? 'selected' : ''}>Debug</option>
+                                <option value="info" ${this.state.logLevel === 'info' ? 'selected' : ''}>Info</option>
+                                <option value="warning" ${this.state.logLevel === 'warning' ? 'selected' : ''}>Warning</option>
+                                <option value="error" ${this.state.logLevel === 'error' ? 'selected' : ''}>Error</option>
+                            </select>
+                            <button class="btn-clear-logs" data-action="clear-logs">
+                                🗑️ Effacer
+                            </button>
+                            <button class="btn-export-logs" data-action="export-logs">
+                                💾 Exporter
+                            </button>
+                        </div>
+                    </div>
+                    <div id="logsContent">
+                        ${this.renderLogs()}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    cacheElements() {
+        this.elements = {
+            systemInfo: document.getElementById('systemInfo'),
+            systemResources: document.getElementById('systemResources'),
+            networkInfo: document.getElementById('networkInfo'),
+            logsContent: document.getElementById('logsContent')
+        };
+    }
+
+    attachEvents() {
+        if (!this.container) return;
+        
+        this.container.addEventListener('click', (e) => {
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) return;
             
             switch (action) {
-                case 'refresh-system':
-                    this.eventBus.emit('system:refresh-requested');
+                case 'refresh':
+                    this.loadSystemData();
                     break;
-                    
-                case 'scan-devices':
-                    this.eventBus.emit('system:scan-devices-requested');
+                case 'clear-logs':
+                    this.clearLogs();
                     break;
-                    
-                case 'connect-device':
-                    if (deviceId) {
-                        this.eventBus.emit('system:connect-device-requested', { deviceId });
-                    }
-                    break;
-                    
-                case 'disconnect-device':
-                    if (deviceId) {
-                        this.eventBus.emit('system:disconnect-device-requested', { deviceId });
-                    }
+                case 'export-logs':
+                    this.exportLogs();
                     break;
             }
         });
+        
+        this.container.addEventListener('change', (e) => {
+            const action = e.target.dataset.action;
+            
+            if (action === 'change-log-level') {
+                this.changeLogLevel(e.target.value);
+            }
+        });
+        
+        this.setupEventBusListeners();
     }
-    
+
+    setupEventBusListeners() {
+        if (!this.eventBus) return;
+        
+        // system.* responses
+        this.eventBus.on('system:info', (data) => {
+            this.state.systemInfo = data;
+            this.renderSystemInfoSection();
+        });
+        
+        this.eventBus.on('system:uptime', (data) => {
+            this.state.uptime = data.uptime;
+            this.renderSystemInfoSection();
+        });
+        
+        this.eventBus.on('system:memory', (data) => {
+            this.state.memory = data;
+            this.renderResourcesSection();
+        });
+        
+        this.eventBus.on('system:disk', (data) => {
+            this.state.disk = data;
+            this.renderResourcesSection();
+        });
+        
+        // network.* responses
+        this.eventBus.on('network:status', (data) => {
+            this.state.networkStatus = data;
+            this.renderNetworkSection();
+        });
+        
+        this.eventBus.on('network:interfaces', (data) => {
+            this.state.networkInterfaces = data.interfaces || [];
+            this.renderNetworkSection();
+        });
+        
+        this.eventBus.on('network:stats', (data) => {
+            this.state.networkStats = data;
+            this.renderNetworkSection();
+        });
+        
+        // logger.* responses
+        this.eventBus.on('logger:level', (data) => {
+            this.state.logLevel = data.level;
+        });
+        
+        this.eventBus.on('logger:logs', (data) => {
+            this.state.logs = data.logs || [];
+            this.renderLogsSection();
+        });
+    }
+
+    // ========================================================================
+    // RENDERING - SYSTEM INFO
+    // ========================================================================
+
+    renderSystemInfo() {
+        const info = this.state.systemInfo;
+        const uptime = this.state.uptime;
+        
+        if (!info) {
+            return '<div class="loading">Chargement...</div>';
+        }
+        
+        return `
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Version:</span>
+                    <span class="info-value">${info.version || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Plateforme:</span>
+                    <span class="info-value">${info.platform || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Architecture:</span>
+                    <span class="info-value">${info.arch || '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Uptime:</span>
+                    <span class="info-value">${uptime ? this.formatUptime(uptime) : '—'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Hostname:</span>
+                    <span class="info-value">${info.hostname || '—'}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    renderSystemInfoSection() {
+        if (this.elements.systemInfo) {
+            this.elements.systemInfo.innerHTML = this.renderSystemInfo();
+        }
+    }
+
+    // ========================================================================
+    // RENDERING - RESOURCES
+    // ========================================================================
+
+    renderResources() {
+        const memory = this.state.memory;
+        const disk = this.state.disk;
+        
+        return `
+            <div class="resources-grid">
+                ${this.renderMemory(memory)}
+                ${this.renderDisk(disk)}
+            </div>
+        `;
+    }
+
+    renderMemory(memory) {
+        if (!memory) {
+            return '<div class="loading">Chargement mémoire...</div>';
+        }
+        
+        const total = memory.total || 0;
+        const used = memory.used || 0;
+        const free = memory.free || 0;
+        const percent = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
+        
+        return `
+            <div class="resource-card">
+                <h3>💾 Mémoire RAM</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${percent}%"></div>
+                </div>
+                <div class="resource-stats">
+                    <span>Utilisée: ${this.formatBytes(used)}</span>
+                    <span>Libre: ${this.formatBytes(free)}</span>
+                    <span>Total: ${this.formatBytes(total)}</span>
+                </div>
+                <div class="resource-percent">${percent}% utilisé</div>
+            </div>
+        `;
+    }
+
+    renderDisk(disk) {
+        if (!disk) {
+            return '<div class="loading">Chargement disque...</div>';
+        }
+        
+        const total = disk.total || 0;
+        const used = disk.used || 0;
+        const free = disk.free || 0;
+        const percent = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
+        
+        return `
+            <div class="resource-card">
+                <h3>💿 Disque</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${percent}%"></div>
+                </div>
+                <div class="resource-stats">
+                    <span>Utilisé: ${this.formatBytes(used)}</span>
+                    <span>Libre: ${this.formatBytes(free)}</span>
+                    <span>Total: ${this.formatBytes(total)}</span>
+                </div>
+                <div class="resource-percent">${percent}% utilisé</div>
+            </div>
+        `;
+    }
+
+    renderResourcesSection() {
+        if (this.elements.systemResources) {
+            this.elements.systemResources.innerHTML = this.renderResources();
+        }
+    }
+
+    // ========================================================================
+    // RENDERING - NETWORK
+    // ========================================================================
+
+    renderNetwork() {
+        const status = this.state.networkStatus;
+        const interfaces = this.state.networkInterfaces;
+        const stats = this.state.networkStats;
+        
+        return `
+            <div class="network-grid">
+                ${this.renderNetworkStatus(status)}
+                ${this.renderNetworkInterfaces(interfaces)}
+                ${this.renderNetworkStats(stats)}
+            </div>
+        `;
+    }
+
+    renderNetworkStatus(status) {
+        if (!status) {
+            return '<div class="loading">Chargement statut réseau...</div>';
+        }
+        
+        return `
+            <div class="network-card">
+                <h3>🌐 Statut</h3>
+                <div class="network-status ${status.connected ? 'connected' : 'disconnected'}">
+                    ${status.connected ? '✓ Connecté' : '✗ Déconnecté'}
+                </div>
+            </div>
+        `;
+    }
+
+    renderNetworkInterfaces(interfaces) {
+        if (!interfaces || interfaces.length === 0) {
+            return '<div class="loading">Aucune interface réseau</div>';
+        }
+        
+        return `
+            <div class="network-card">
+                <h3>🔌 Interfaces</h3>
+                <div class="interfaces-list">
+                    ${interfaces.map(iface => `
+                        <div class="interface-item">
+                            <span class="interface-name">${iface.name}</span>
+                            <span class="interface-ip">${iface.ip || '—'}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    renderNetworkStats(stats) {
+        if (!stats) {
+            return '<div class="loading">Chargement stats réseau...</div>';
+        }
+        
+        return `
+            <div class="network-card">
+                <h3>📊 Statistiques</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">↓ Reçu:</span>
+                        <span class="stat-value">${this.formatBytes(stats.rx_bytes || 0)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">↑ Envoyé:</span>
+                        <span class="stat-value">${this.formatBytes(stats.tx_bytes || 0)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderNetworkSection() {
+        if (this.elements.networkInfo) {
+            this.elements.networkInfo.innerHTML = this.renderNetwork();
+        }
+    }
+
+    // ========================================================================
+    // RENDERING - LOGS
+    // ========================================================================
+
+    renderLogs() {
+        const logs = this.state.logs;
+        
+        if (!logs || logs.length === 0) {
+            return `
+                <div class="logs-empty">
+                    <p>Aucun log disponible</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="logs-list">
+                ${logs.map(log => this.renderLogEntry(log)).join('')}
+            </div>
+        `;
+    }
+
+    renderLogEntry(log) {
+        const levelClass = `log-${log.level || 'info'}`;
+        const timestamp = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString() : '—';
+        
+        return `
+            <div class="log-entry ${levelClass}">
+                <span class="log-time">${timestamp}</span>
+                <span class="log-level">${log.level || 'INFO'}</span>
+                <span class="log-message">${log.message || ''}</span>
+            </div>
+        `;
+    }
+
+    renderLogsSection() {
+        if (this.elements.logsContent) {
+            this.elements.logsContent.innerHTML = this.renderLogs();
+        }
+    }
+
+    // ========================================================================
+    // ACTIONS
+    // ========================================================================
+
+    async loadSystemData() {
+        if (!this.eventBus) return;
+        
+        // Appels API parallèles
+        this.eventBus.emit('system:info_requested');
+        this.eventBus.emit('system:uptime_requested');
+        this.eventBus.emit('system:memory_requested');
+        this.eventBus.emit('system:disk_requested');
+        this.eventBus.emit('network:status_requested');
+        this.eventBus.emit('network:interfaces_requested');
+        this.eventBus.emit('network:stats_requested');
+        this.eventBus.emit('logger:get_logs_requested', { limit: 100 });
+    }
+
+    async changeLogLevel(level) {
+        this.state.logLevel = level;
+        
+        // Appel API: logger.setLevel
+        if (this.eventBus) {
+            this.eventBus.emit('logger:set_level_requested', { level });
+        }
+    }
+
+    async clearLogs() {
+        if (!confirm('Effacer tous les logs ?')) return;
+        
+        // Appel API: logger.clear
+        if (this.eventBus) {
+            this.eventBus.emit('logger:clear_requested');
+        }
+        
+        this.state.logs = [];
+        this.renderLogsSection();
+    }
+
+    async exportLogs() {
+        // Appel API: logger.export
+        if (this.eventBus) {
+            this.eventBus.emit('logger:export_requested');
+        }
+    }
+
+    startAutoRefresh() {
+        // Rafraîchir toutes les 5 secondes
+        this.state.refreshInterval = setInterval(() => {
+            this.loadSystemData();
+        }, 5000);
+    }
+
+    stopAutoRefresh() {
+        if (this.state.refreshInterval) {
+            clearInterval(this.state.refreshInterval);
+            this.state.refreshInterval = null;
+        }
+    }
+
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
-    
-    log(level, ...args) {
-        if (this.logger && typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
+
+    formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+    }
+
+    formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        
+        const parts = [];
+        if (days > 0) parts.push(`${days}j`);
+        if (hours > 0) parts.push(`${hours}h`);
+        if (mins > 0) parts.push(`${mins}m`);
+        
+        return parts.join(' ') || '0m';
+    }
+
+    // ========================================================================
+    // CLEANUP
+    // ========================================================================
+
+    destroy() {
+        this.stopAutoRefresh();
+        
+        if (this.eventBus) {
+            this.eventBus.off('system:info');
+            this.eventBus.off('system:uptime');
+            this.eventBus.off('system:memory');
+            this.eventBus.off('system:disk');
+            this.eventBus.off('network:status');
+            this.eventBus.off('network:interfaces');
+            this.eventBus.off('network:stats');
+            this.eventBus.off('logger:level');
+            this.eventBus.off('logger:logs');
         }
+        
+        this.logger.info('[SystemView] Destroyed');
     }
 }
 
 // ============================================================================
 // EXPORT
 // ============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SystemView;
+}
+
 if (typeof window !== 'undefined') {
     window.SystemView = SystemView;
 }

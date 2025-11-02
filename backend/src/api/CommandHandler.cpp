@@ -52,7 +52,7 @@ CommandHandler::CommandHandler(
     Logger::info("CommandHandler", "Initializing CommandHandler v4.2.2...");
     registerAllCommands();
     Logger::info("CommandHandler", 
-                "✓ CommandHandler initialized (" + 
+                "âœ“ CommandHandler initialized (" + 
                 std::to_string(commands_.size()) + " commands)");
 }
 
@@ -72,7 +72,7 @@ json CommandHandler::processCommand(const json& command) {
             return createErrorResponse(error, "INVALID_COMMAND");
         }
         
-        // CORRECTION CRITIQUE 1: Validation sécurisée avant accès
+        // CORRECTION CRITIQUE 1: Validation sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e avant accÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s
         if (!command.contains("command") || !command["command"].is_string()) {
             return createErrorResponse("Missing or invalid 'command' field", "INVALID_COMMAND");
         }
@@ -219,7 +219,7 @@ void CommandHandler::registerAllCommands() {
 }
 
 // ============================================================================
-// DEVICE COMMANDS (18 commands: 10 devices + 8 bluetooth)
+// DEVICE COMMANDS (12 commands)
 // ============================================================================
 
 void CommandHandler::registerDeviceCommands() {
@@ -506,7 +506,7 @@ void CommandHandler::registerDeviceCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Device commands registered (18 commands)");  
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Device commands registered (18 commands)");  
 }
 
 // ============================================================================
@@ -618,7 +618,7 @@ void CommandHandler::registerRoutingCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Routing commands registered (6 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Routing commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -757,7 +757,7 @@ void CommandHandler::registerPlaybackCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Playback commands registered (10 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Playback commands registered (10 commands)");
 }
 
 // ============================================================================
@@ -813,12 +813,12 @@ void CommandHandler::registerFileCommands() {
         
         std::string filename = params["filename"];
         std::string content = params["content"];
-        bool isBase64 = params.value("base64", true);  // Défaut: Base64 activé
+        bool isBase64 = params.value("base64", true);  // DÃƒÂ©faut: Base64 activÃƒÂ©
         
         std::vector<uint8_t> data;
         
         if (isBase64) {
-            // Décoder Base64 pour fichiers binaires (MIDI, etc.)
+            // DÃƒÂ©coder Base64 pour fichiers binaires (MIDI, etc.)
             try {
                 data = base64Decode(content);
                 Logger::debug("CommandHandler", 
@@ -848,7 +848,7 @@ void CommandHandler::registerFileCommands() {
         }
         
         Logger::info("CommandHandler", 
-            "✓ File uploaded: " + filename + " (" + std::to_string(data.size()) + " bytes)");
+            "Ã¢Å“â€œ File uploaded: " + filename + " (" + std::to_string(data.size()) + " bytes)");
         
         return json{
             {"success", true},
@@ -906,7 +906,7 @@ void CommandHandler::registerFileCommands() {
         return infoOpt->toJson();
     });
     
-    Logger::debug("CommandHandler", "✓ File commands registered (6 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ File commands registered (6 commands)");
 }
 
 // ============================================================================
@@ -922,7 +922,7 @@ void CommandHandler::registerSystemCommands() {
     // system.version
     registerCommand("system.version", [this](const json& params) {
         return json{
-            {"version", "4.2.1"},
+            {"version", "4.2.2"},
             {"name", "MidiMind"}
         };
     });
@@ -1018,7 +1018,7 @@ void CommandHandler::registerSystemCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ System commands registered (7 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ System commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1071,11 +1071,11 @@ void CommandHandler::registerNetworkCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Network commands registered (3 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Network commands registered (3 commands)");
 }
 
 // ============================================================================
-// LOGGER COMMANDS (2 commands, 3 disabled)
+// LOGGER COMMANDS (5 commands)
 // ============================================================================
 
 void CommandHandler::registerLoggerCommands() {
@@ -1142,36 +1142,36 @@ void CommandHandler::registerLoggerCommands() {
         };
     });
     
-    // logger.getLogs - DISABLED (Logger::getRecentLogs() not available)
-    // registerCommand("logger.getLogs", [this](const json& params) {
-    //     int count = params.value("count", 100);
-    //     auto logs = Logger::getRecentLogs(count);
-    //     return json{
-    //         {"logs", logs},
-    //         {"count", logs.size()}
-    //     };
-    // });
+    // logger.getLogs
+    registerCommand("logger.getLogs", [this](const json& params) {
+        int count = params.value("count", 100);
+        auto logs = Logger::getRecentLogs(count);
+        return json{
+            {"logs", logs},
+            {"count", logs.size()}
+        };
+    });
     
-    // logger.clear - DISABLED (Logger::clearLogs() not available)
-    // registerCommand("logger.clear", [this](const json& params) {
-    //     Logger::clearLogs();
-    //     return json{{"cleared", true}};
-    // });
+    // logger.clear
+    registerCommand("logger.clear", [this](const json& params) {
+        Logger::clearLogs();
+        return json{{"cleared", true}};
+    });
     
-    // logger.export - DISABLED (Logger::exportLogs() not available)
-    // registerCommand("logger.export", [this](const json& params) {
-    //     if (!params.contains("filename")) {
-    //         throw std::runtime_error("Missing filename parameter");
-    //     }
-    //     std::string filename = params["filename"];
-    //     bool success = Logger::exportLogs(filename);
-    //     return json{
-    //         {"exported", success},
-    //         {"filename", filename}
-    //     };
-    // });
+    // logger.export
+    registerCommand("logger.export", [this](const json& params) {
+        if (!params.contains("filename")) {
+            throw std::runtime_error("Missing filename parameter");
+        }
+        std::string filename = params["filename"];
+        bool success = Logger::exportLogs(filename);
+        return json{
+            {"exported", success},
+            {"filename", filename}
+        };
+    });
     
-    Logger::debug("CommandHandler", "✓ Logger commands registered (2 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Logger commands registered (5 commands)");
 }
 
 // ============================================================================
@@ -1280,7 +1280,7 @@ void CommandHandler::registerLatencyCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Latency commands registered (7 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Latency commands registered (7 commands)");
 }
 
 // ============================================================================
@@ -1379,7 +1379,7 @@ void CommandHandler::registerPresetCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Preset commands registered (5 commands)");
+    Logger::debug("CommandHandler", "Ã¢Å“â€œ Preset commands registered (5 commands)");
 }
 
 // ============================================================================
@@ -1434,7 +1434,7 @@ std::vector<uint8_t> CommandHandler::base64Decode(const std::string& encoded) co
     static const std::string base64_chars = 
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     
-    // Créer table de décodage
+    // CrÃƒÂ©er table de dÃƒÂ©codage
     std::vector<int> decoding_table(256, -1);
     for (int i = 0; i < 64; i++) {
         decoding_table[static_cast<unsigned char>(base64_chars[i])] = i;
@@ -1447,12 +1447,12 @@ std::vector<uint8_t> CommandHandler::base64Decode(const std::string& encoded) co
     int valb = -8;
     
     for (unsigned char c : encoded) {
-        // Ignorer les caractères de padding et whitespace
+        // Ignorer les caractÃƒÂ¨res de padding et whitespace
         if (c == '=' || c == '\n' || c == '\r' || c == ' ') {
             continue;
         }
         
-        // Vérifier que le caractère est valide
+        // VÃƒÂ©rifier que le caractÃƒÂ¨re est valide
         if (decoding_table[c] == -1) {
             Logger::warning("CommandHandler", 
                 "Invalid Base64 character: " + std::to_string(static_cast<int>(c)));
@@ -1476,7 +1476,7 @@ std::vector<uint8_t> CommandHandler::base64Decode(const std::string& encoded) co
 // ============================================================================
 
 void CommandHandler::registerMidiCommands() {
-    // midi.convert - Convertir MIDI → midiJson
+    // midi.convert - Convertir MIDI Ã¢â€ â€™ midiJson
     registerCommand("midi.convert", [this](const json& params) {
         if (!params.contains("filename")) {
             throw std::runtime_error("Missing filename parameter");
@@ -1488,14 +1488,14 @@ void CommandHandler::registerMidiCommands() {
         std::string filepath = fileManager_->getDirectoryPath(DirectoryType::UPLOADS) + 
                               "/" + filename;
         
-        // Vérifier que le fichier existe
+        // VÃƒÂ©rifier que le fichier existe
         std::ifstream testFile(filepath);
         if (!testFile.good()) {
             throw std::runtime_error("File not found: " + filename);
         }
         testFile.close();
         
-        // Convertir MIDI → JsonMidi
+        // Convertir MIDI Ã¢â€ â€™ JsonMidi
         JsonMidiConverter converter;
         JsonMidi jsonMidi;
         
@@ -1506,7 +1506,7 @@ void CommandHandler::registerMidiCommands() {
         }
         
         Logger::info("CommandHandler", 
-            "✓ MIDI converted: " + filename + " -> " + 
+            "Ã¢Å“â€œ MIDI converted: " + filename + " -> " + 
             std::to_string(jsonMidi.timeline.size()) + " events");
         
         return json{
@@ -1516,7 +1516,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
     
-    // midi.load - Charger midiJson depuis la base de données
+    // midi.load - Charger midiJson depuis la base de donnÃ©es
     registerCommand("midi.load", [this](const json& params) {
         if (!params.contains("id")) {
             throw std::runtime_error("Missing id parameter");
@@ -1543,7 +1543,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
     
-    // midi.save - Sauvegarder midiJson en base de données
+    // midi.save - Sauvegarder midiJson en base de donnÃ©es
     registerCommand("midi.save", [this](const json& params) {
         if (!params.contains("filename") || !params.contains("midi_json")) {
             throw std::runtime_error("Missing filename or midi_json parameter");
@@ -1602,7 +1602,7 @@ void CommandHandler::registerMidiCommands() {
             throw std::runtime_error("Failed to upload file");
         }
         
-        // 2. Convertir MIDI → midiJson
+        // 2. Convertir MIDI â†’ midiJson
         JsonMidiConverter converter;
         JsonMidi jsonMidi;
         
@@ -1612,11 +1612,11 @@ void CommandHandler::registerMidiCommands() {
             throw std::runtime_error("Conversion failed: " + std::string(e.what()));
         }
         
-        // 3. Sauvegarder en base de données
+        // 3. Sauvegarder en base de donnÃ©es
         int midiId = midiDatabase_->save(filename, jsonMidi.toJson());
         
         Logger::info("CommandHandler", 
-            "✓ MIDI file imported (ID: " + std::to_string(midiId) + 
+            "âœ“ MIDI file imported (ID: " + std::to_string(midiId) + 
             ", events: " + std::to_string(jsonMidi.timeline.size()) + ")");
         
         return json{
@@ -1628,7 +1628,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
     
-    // midi.routing.add - Ajouter routing instrument → device
+    // midi.routing.add - Ajouter routing instrument â†’ device
     registerCommand("midi.routing.add", [this](const json& params) {
         if (!params.contains("midi_file_id") || 
             !params.contains("track_id") || 
@@ -1680,7 +1680,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
     
-    // midi.routing.update - Mettre à jour un routing
+    // midi.routing.update - Mettre Ã  jour un routing
     registerCommand("midi.routing.update", [this](const json& params) {
         if (!params.contains("routing_id")) {
             throw std::runtime_error("Missing routing_id parameter");
@@ -1757,7 +1757,7 @@ void CommandHandler::registerMidiCommands() {
             throw std::runtime_error("Channel must be 0-15");
         }
         
-        // Créer message MIDI Note On (0x90 + channel)
+        // CrÃ©er message MIDI Note On (0x90 + channel)
         std::vector<uint8_t> data = {
             static_cast<uint8_t>(0x90 | channel),
             note,
@@ -1805,7 +1805,7 @@ void CommandHandler::registerMidiCommands() {
             throw std::runtime_error("Channel must be 0-15");
         }
         
-        // Créer message MIDI Note Off (0x80 + channel)
+        // CrÃ©er message MIDI Note Off (0x80 + channel)
         std::vector<uint8_t> data = {
             static_cast<uint8_t>(0x80 | channel),
             note,
@@ -1834,7 +1834,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
 
-    Logger::debug("CommandHandler", "✓ MIDI commands registered (11 commands)");  // 9 + 2 nouvelles
+    Logger::debug("CommandHandler", "âœ“ MIDI commands registered (11 commands)");  // 9 + 2 nouvelles
 }
 
 void CommandHandler::registerPlaylistCommands() {
@@ -2004,7 +2004,7 @@ void CommandHandler::registerPlaylistCommands() {
         };
     });
     
-    Logger::debug("CommandHandler", "✓ Playlist commands registered (9 commands)");
+    Logger::debug("CommandHandler", "âœ“ Playlist commands registered (9 commands)");
 }
 
 

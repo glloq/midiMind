@@ -1,8 +1,11 @@
 // ============================================================================
 // Fichier: frontend/js/config/PerformanceConfig.js
-// Version: v3.1.0 - NOUVEAU
-// Date: 2025-10-16
+// Version: v3.1.1 - LOOP RECORDER DISABLED
+// Date: 2025-11-02
 // Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// ============================================================================
+// MODIFICATIONS v3.1.1:
+// ✅ Désactivation Loop Recorder (enableLoopRecorder: false)
 // ============================================================================
 
 const PerformanceConfig = {
@@ -112,7 +115,7 @@ const PerformanceConfig = {
     // FEATURE FLAGS
     // ========================================================================
     features: {
-        enableLoopRecorder: true,           // Garder loop recorder
+        enableLoopRecorder: false,          // ❌ Loop recorder désactivé
         enablePlaylistManagement: true,     // Garder playlists
         enableMIDIExport: true,             // Garder export MIDI
         enableThemeSwitch: false,           // Pas de switch thème
@@ -131,4 +134,3 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.PerformanceConfig = PerformanceConfig;
 }
-window.PerformanceConfig = PerformanceConfig;

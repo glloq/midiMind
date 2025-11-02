@@ -1,18 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/models/InstrumentModel.js
-// Version: v3.2.0 - SIGNATURE COHÃ‰RENTE
+// Version: v4.0.0 - API COMPATIBLE v4.2.2
 // Date: 2025-11-01
 // ============================================================================
-// CORRECTIONS v3.2.0:
-// âœ… CRITIQUE: Signature cohÃ©rente avec BaseModel
-// âœ… Appel super(eventBus, backend, logger, initialData, options)
-// âœ… Ajout mÃ©thode getConnectedInstruments() (alias pour getConnected)
-// âœ… CohÃ©rence avec appels NavigationController
+// CORRECTIONS v4.0.0:
+// âœ… list_devices â†’ devices.list
+// âœ… connect_device â†’ devices.connect
+// âœ… disconnect_device â†’ devices.disconnect
+// âœ… Adaptation format rÃ©ponse API v4.2.2
 // ============================================================================
 
 class InstrumentModel extends BaseModel {
     constructor(eventBus, backend, logger, initialData = {}, options = {}) {
-        // âœ… NOUVEAU: Appel super() avec signature cohÃ©rente
+        // âœ… Appel super() avec signature cohÃ©rente
         super(eventBus, backend, logger, {
             ...initialData
         }, {
@@ -33,7 +33,7 @@ class InstrumentModel extends BaseModel {
             connectedCount: 0
         };
         
-        this.log('info', 'InstrumentModel', 'âœ… InstrumentModel v3.2.0 initialized');
+        this.log('info', 'InstrumentModel', 'âœ“ InstrumentModel v4.0.0 initialized');
     }
     
     // ========================================================================
@@ -61,40 +61,46 @@ class InstrumentModel extends BaseModel {
         try {
             this.log('info', 'InstrumentModel', 'Scanning for instruments...');
             
-            const response = await this.backend.sendCommand('list_devices', {});
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('devices.list', {});
             
-            if (response.success) {
-                const instruments = response.data.instruments || [];
-                
-                // Mettre Ã  jour le cache
-                this.instruments.clear();
-                instruments.forEach(inst => {
-                    this.instruments.set(inst.id, inst);
+            // Le nouveau format renvoie directement les donnÃ©es
+            const instruments = response.devices || [];
+            
+            // Mettre Ã  jour le cache
+            this.instruments.clear();
+            instruments.forEach(inst => {
+                // Adapter le format backend au format interne
+                this.instruments.set(inst.id, {
+                    id: inst.id,
+                    name: inst.name,
+                    type: inst.type,
+                    status: inst.status,
+                    connected: inst.status === 2, // 2 = Connected
+                    available: inst.available || true
                 });
-                
-                this.state.totalInstruments = instruments.length;
-                this.state.connectedCount = instruments.filter(i => i.connected).length;
-                this.state.lastScan = Date.now();
-                
-                this.log('info', 'InstrumentModel', 
-                    \`Found \${instruments.length} instruments (\${this.state.connectedCount} connected)\`
-                );
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('instruments:scan:complete', {
-                        instruments,
-                        total: instruments.length,
-                        connected: this.state.connectedCount
-                    });
-                }
-                
-                return instruments;
+            });
+            
+            this.state.totalInstruments = instruments.length;
+            this.state.connectedCount = instruments.filter(i => i.status === 2).length;
+            this.state.lastScan = Date.now();
+            
+            this.log('info', 'InstrumentModel', 
+                `Found ${instruments.length} instruments (${this.state.connectedCount} connected)`
+            );
+            
+            if (this.eventBus) {
+                this.eventBus.emit('instruments:scan:complete', {
+                    instruments: Array.from(this.instruments.values()),
+                    total: instruments.length,
+                    connected: this.state.connectedCount
+                });
             }
             
-            throw new Error(response.error || 'Scan failed');
+            return Array.from(this.instruments.values());
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', \`Scan error: \${error.message}\`);
+            this.log('error', 'InstrumentModel', `Scan error: ${error.message}`);
             if (this.eventBus) {
                 this.eventBus.emit('instruments:scan:error', { error: error.message });
             }
@@ -114,35 +120,34 @@ class InstrumentModel extends BaseModel {
         }
         
         try {
-            this.log('info', 'InstrumentModel', \`Connecting instrument: \${instrumentId}\`);
+            this.log('info', 'InstrumentModel', `Connecting instrument: ${instrumentId}`);
             
-            const response = await this.backend.sendCommand('connect_device', {
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('devices.connect', {
                 device_id: instrumentId
             });
             
-            if (response.success) {
-                // Mettre Ã  jour le cache
-                const instrument = this.instruments.get(instrumentId);
-                if (instrument) {
-                    instrument.connected = true;
-                    this.instruments.set(instrumentId, instrument);
-                    this.state.connectedCount++;
-                }
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('instruments:connected', {
-                        instrumentId,
-                        instrument
-                    });
-                }
-                
-                return true;
+            // Le nouveau format renvoie directement les donnÃ©es
+            // Mettre Ã  jour le cache
+            const instrument = this.instruments.get(instrumentId);
+            if (instrument) {
+                instrument.connected = true;
+                instrument.status = 2; // Connected
+                this.instruments.set(instrumentId, instrument);
+                this.state.connectedCount++;
             }
             
-            throw new Error(response.error || 'Connection failed');
+            if (this.eventBus) {
+                this.eventBus.emit('instruments:connected', {
+                    instrumentId,
+                    instrument
+                });
+            }
+            
+            return true;
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', \`Connection error: \${error.message}\`);
+            this.log('error', 'InstrumentModel', `Connection error: ${error.message}`);
             throw error;
         }
     }
@@ -156,35 +161,34 @@ class InstrumentModel extends BaseModel {
         }
         
         try {
-            this.log('info', 'InstrumentModel', \`Disconnecting instrument: \${instrumentId}\`);
+            this.log('info', 'InstrumentModel', `Disconnecting instrument: ${instrumentId}`);
             
-            const response = await this.backend.sendCommand('disconnect_device', {
+            // âœ… Nouvelle commande API v4.0.0
+            const response = await this.backend.sendCommand('devices.disconnect', {
                 device_id: instrumentId
             });
             
-            if (response.success) {
-                // Mettre Ã  jour le cache
-                const instrument = this.instruments.get(instrumentId);
-                if (instrument) {
-                    instrument.connected = false;
-                    this.instruments.set(instrumentId, instrument);
-                    this.state.connectedCount = Math.max(0, this.state.connectedCount - 1);
-                }
-                
-                if (this.eventBus) {
-                    this.eventBus.emit('instruments:disconnected', {
-                        instrumentId,
-                        instrument
-                    });
-                }
-                
-                return true;
+            // Le nouveau format renvoie directement les donnÃ©es
+            // Mettre Ã  jour le cache
+            const instrument = this.instruments.get(instrumentId);
+            if (instrument) {
+                instrument.connected = false;
+                instrument.status = 1; // Disconnected
+                this.instruments.set(instrumentId, instrument);
+                this.state.connectedCount = Math.max(0, this.state.connectedCount - 1);
             }
             
-            throw new Error(response.error || 'Disconnection failed');
+            if (this.eventBus) {
+                this.eventBus.emit('instruments:disconnected', {
+                    instrumentId,
+                    instrument
+                });
+            }
+            
+            return true;
             
         } catch (error) {
-            this.log('error', 'InstrumentModel', \`Disconnection error: \${error.message}\`);
+            this.log('error', 'InstrumentModel', `Disconnection error: ${error.message}`);
             throw error;
         }
     }

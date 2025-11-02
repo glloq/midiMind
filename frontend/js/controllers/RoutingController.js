@@ -1,22 +1,22 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/RoutingController.js
-// Version: 4.2.1 - API BACKEND FULL COMPATIBILITY + FEATURES COMPLÃƒË†TES
+// Version: 4.2.1 - API BACKEND FULL COMPATIBILITY + FEATURES COMPLÃƒÆ’Ã‹â€ TES
 // Date: 2025-10-28
 // ============================================================================
 // Description:
-//   ContrÃƒÂ´leur gÃƒÂ©rant le routage MIDI avec transformations avancÃƒÂ©es.
-//   Support complet API v4.2.1 + toutes fonctionnalitÃƒÂ©s existantes.
+//   ContrÃƒÆ’Ã‚Â´leur gÃƒÆ’Ã‚Â©rant le routage MIDI avec transformations avancÃƒÆ’Ã‚Â©es.
+//   Support complet API v4.2.1 + toutes fonctionnalitÃƒÆ’Ã‚Â©s existantes.
 //
 // MODIFICATIONS v4.2.1:
-//   Ã¢Å“â€¦ Support routing.enableRoute, routing.disableRoute
-//   Ã¢Å“â€¦ Gestion format API (request/response standardisÃƒÂ©)
-//   Ã¢Å“â€¦ Statistiques routing via routing.getStats
-//   Ã¢Å“â€¦ Conservation TOUTES fonctionnalitÃƒÂ©s existantes
-//   Ã¢Å“â€¦ Transformations MIDI (velocity, transpose, filters)
-//   Ã¢Å“â€¦ Presets complets
-//   Ã¢Å“â€¦ LocalStorage
-//   Ã¢Å“â€¦ Auto-routing
-//   Ã¢Å“â€¦ Test routes
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Support routing.enableRoute, routing.disableRoute
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion format API (request/response standardisÃƒÆ’Ã‚Â©)
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Statistiques routing via routing.getStats
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Conservation TOUTES fonctionnalitÃƒÆ’Ã‚Â©s existantes
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Transformations MIDI (velocity, transpose, filters)
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Presets complets
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ LocalStorage
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Auto-routing
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Test routes
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -25,13 +25,13 @@ class RoutingController extends BaseController {
     constructor(eventBus, models, views, notifications, debugConsole) {
         super(eventBus, models, views, notifications, debugConsole);
         
-        // RÃƒÂ©fÃƒÂ©rence au backend (sera injectÃƒÂ©e par Application)
+        // RÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rence au backend (sera injectÃƒÆ’Ã‚Â©e par Application)
         this.backend = null;
         
         // Logger - Initialize FIRST
         this.logger = window.logger || console;
         
-        // Ãƒâ€°tat local
+        // ÃƒÆ’Ã¢â‚¬Â°tat local
         this.localState = {
             isInitialized: false,
             isSyncing: false,
@@ -46,11 +46,11 @@ class RoutingController extends BaseController {
             confirmReset: true,
             enablePresets: true,
             maxPresets: 10,
-            validateBeforeAssign: true,  // Ã¢Å“â€¦ Validation avant assignation
-            applyTransformations: true    // Ã¢Å“â€¦ Application transformations
+            validateBeforeAssign: true,  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Validation avant assignation
+            applyTransformations: true    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Application transformations
         };
         
-        // Ã¢Å“â€¦ NOUVEAU v4.2.1: Ãƒâ€°tat des routes avec enable/disable
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: ÃƒÆ’Ã¢â‚¬Â°tat des routes avec enable/disable
         this.routes = new Map(); // key: "source_id:destination_id" -> route object
         this.routeStats = {
             total: 0,
@@ -60,7 +60,7 @@ class RoutingController extends BaseController {
             lastUpdate: null
         };
         
-        // Ã¢Å“â€¦ NOUVEAU v4.2.1: Synchronisation auto
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: Synchronisation auto
         this.autoSyncEnabled = true;
         this.autoSyncTimer = null;
         
@@ -72,7 +72,7 @@ class RoutingController extends BaseController {
         this._fullyInitialized = true;
         
         // Now initialize
-        // âœ… REMOVED: this.initialize() - BaseController calls it via autoInitialize
+        // Ã¢Å“â€¦ REMOVED: this.initialize() - BaseController calls it via autoInitialize
     }
     
     // ========================================================================
@@ -104,12 +104,12 @@ class RoutingController extends BaseController {
             return;
         }
         
-        this.logDebug('routing', 'Ã°Å¸â€â‚¬ Initializing RoutingController v4.2.1');
+        this.logDebug('routing', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬ Initializing RoutingController v4.2.1');
         
-        // CrÃƒÂ©er le modÃƒÂ¨le s'il n'existe pas
+        // CrÃƒÆ’Ã‚Â©er le modÃƒÆ’Ã‚Â¨le s'il n'existe pas
         if (!this.getModel('routing')) {
             if (typeof RoutingModel !== 'undefined') {
-                // Ã¢Å“â€¦ Ajouter backend et logger
+                // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ajouter backend et logger
                 const backend = this.models?.backend || window.backendService;
                 this.models.routing = new RoutingModel(
                     this.eventBus,
@@ -120,7 +120,7 @@ class RoutingController extends BaseController {
             }
         }
         
-        // CrÃƒÂ©er la vue si elle n'existe pas
+        // CrÃƒÆ’Ã‚Â©er la vue si elle n'existe pas
         if (!this.getView('routing')) {
             if (typeof RoutingView !== 'undefined') {
                 this.views.routing = new RoutingView('routing-page', this.eventBus);
@@ -135,7 +135,7 @@ class RoutingController extends BaseController {
     }
     
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements du modÃƒÂ¨le
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements du modÃƒÆ’Ã‚Â¨le
         this.eventBus.on('routing:channel-assigned', (data) => this.onChannelAssigned(data));
         this.eventBus.on('routing:channel-muted', (data) => this.onChannelMuted(data));
         this.eventBus.on('routing:channel-solo', (data) => this.onChannelSolo(data));
@@ -143,13 +143,13 @@ class RoutingController extends BaseController {
         this.eventBus.on('routing:preset-loaded', (data) => this.onPresetLoaded(data));
         this.eventBus.on('routing:reset', () => this.onReset());
         
-        // Ãƒâ€°vÃƒÂ©nements de transformations
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements de transformations
         this.eventBus.on('routing:velocity-mapping', (data) => this.onVelocityMappingChanged(data));
         this.eventBus.on('routing:note-filter', (data) => this.onNoteFilterChanged(data));
         this.eventBus.on('routing:note-remap', (data) => this.onNoteRemapChanged(data));
         this.eventBus.on('routing:cc-remap', (data) => this.onCCRemapChanged(data));
         
-        // Ãƒâ€°vÃƒÂ©nements du backend
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements du backend
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
         this.eventBus.on('backend:status', (data) => this.onBackendStatus(data));
@@ -157,12 +157,12 @@ class RoutingController extends BaseController {
         this.eventBus.on('backend:event:devices_changed', (data) => this.onBackendDevicesChanged(data));
         this.eventBus.on('backend:event:channel_activity', (data) => this.onChannelActivity(data));
         
-        // Ã¢Å“â€¦ NOUVEAU v4.2.1: Ãƒâ€°vÃƒÂ©nements routes
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements routes
         this.eventBus.on('backend:route:added', (data) => this.onBackendRoutingChanged(data));
         this.eventBus.on('backend:route:removed', (data) => this.onBackendRoutingChanged(data));
         this.eventBus.on('backend:route:updated', (data) => this.onBackendRoutingChanged(data));
         
-        // Ãƒâ€°vÃƒÂ©nements UI
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements UI
         this.eventBus.on('ui:routing-matrix-click', (data) => this.onMatrixClick(data));
         
         // Navigation
@@ -189,7 +189,7 @@ class RoutingController extends BaseController {
                 }
             }, this.config.syncInterval);
             
-            this.logDebug('routing', 'Ã¢Å“â€œ Auto-sync started');
+            this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Auto-sync started');
         }
     }
     
@@ -205,21 +205,21 @@ class RoutingController extends BaseController {
     // ========================================================================
     
     onBackendConnected() {
-        this.logDebug('routing', 'Ã¢Å“â€œ Backend connected, loading routing configuration');
+        this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Backend connected, loading routing configuration');
         
         // Charger configuration
         this.loadFromBackend();
         
-        // DÃƒÂ©marrer auto-sync
+        // DÃƒÆ’Ã‚Â©marrer auto-sync
         if (this.autoSyncEnabled) {
             this.setupAutoSync();
         }
     }
     
     onBackendDisconnected() {
-        this.logDebug('routing', 'Ã¢Å“â€” Backend disconnected');
+        this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ Backend disconnected');
         
-        // ArrÃƒÂªter auto-sync
+        // ArrÃƒÆ’Ã‚Âªter auto-sync
         this.stopAutoSync();
         
         if (this.config.autoSave) {
@@ -287,10 +287,10 @@ class RoutingController extends BaseController {
             const devices = await this.backend.listDevices();
             this.updateDevicesFromBackend(devices);
             
-            // Ã¢Å“â€¦ NOUVEAU v4.2.1: Charger toutes les routes
+            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: Charger toutes les routes
             await this.listRoutesAPI();
             
-            // Ã¢Å“â€¦ NOUVEAU v4.2.1: Charger stats
+            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: Charger stats
             try {
                 await this.getRoutingStatsAPI();
             } catch (error) {
@@ -299,7 +299,7 @@ class RoutingController extends BaseController {
             }
             
             this.localState.lastSync = Date.now();
-            this.logDebug('routing', 'Ã¢Å“â€œ Routing configuration loaded from backend');
+            this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Routing configuration loaded from backend');
             
         } catch (error) {
             this.logDebug('routing', 'Error loading from backend:', error);
@@ -349,13 +349,13 @@ class RoutingController extends BaseController {
                         break;
                     // Transformations
                     case 'velocity_mapping':
-                        await this.backend.sendCommand('set_velocity_mapping', {
+                        await this.backend.sendCommand('midi.routing.update', {
                             channel: change.channel,
                             config: change.config
                         });
                         break;
                     case 'note_filter':
-                        await this.backend.sendCommand('set_note_filter', {
+                        await this.backend.sendCommand('midi.routing.update', {
                             channel: change.channel,
                             config: change.config
                         });
@@ -395,13 +395,13 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // Ã¢Å“â€¦ NOUVEAU v4.2.1: API ROUTES (ENABLE/DISABLE)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU v4.2.1: API ROUTES (ENABLE/DISABLE)
     // ========================================================================
     
     /**
      * Ajoute une route MIDI
-     * @param {string} sourceId - ID pÃƒÂ©riphÃƒÂ©rique source
-     * @param {string} destinationId - ID pÃƒÂ©riphÃƒÂ©rique destination
+     * @param {string} sourceId - ID pÃƒÆ’Ã‚Â©riphÃƒÆ’Ã‚Â©rique source
+     * @param {string} destinationId - ID pÃƒÆ’Ã‚Â©riphÃƒÆ’Ã‚Â©rique destination
      * @returns {Promise<boolean>}
      */
     async addRouteAPI(sourceId, destinationId) {
@@ -410,7 +410,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('add_route', {
+            const response = await this.backend.sendCommand('routing.addRoute', {
                 source_id: sourceId,
                 destination_id: destinationId
             });
@@ -427,10 +427,10 @@ class RoutingController extends BaseController {
                 
                 this.updateRouteStats();
                 
-                this.logDebug('routing', `Ã¢Å“â€œ Route added: ${sourceId} Ã¢â€ â€™ ${destinationId}`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Route added: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`);
                 
                 this.eventBus.emit('routing:route_added', { sourceId, destinationId });
-                this.showNotification(`Route created: ${sourceId} Ã¢â€ â€™ ${destinationId}`, 'success');
+                this.showNotification(`Route created: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`, 'success');
                 
                 this.updateView();
                 
@@ -454,7 +454,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('remove_route', {
+            const response = await this.backend.sendCommand('routing.removeRoute', {
                 source_id: sourceId,
                 destination_id: destinationId
             });
@@ -465,10 +465,10 @@ class RoutingController extends BaseController {
                 
                 this.updateRouteStats();
                 
-                this.logDebug('routing', `Ã¢Å“â€œ Route removed: ${sourceId} Ã¢â€ â€™ ${destinationId}`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Route removed: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`);
                 
                 this.eventBus.emit('routing:route_removed', { sourceId, destinationId });
-                this.showNotification(`Route deleted: ${sourceId} Ã¢â€ â€™ ${destinationId}`, 'info');
+                this.showNotification(`Route deleted: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`, 'info');
                 
                 this.updateView();
                 
@@ -492,7 +492,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('enable_route', {
+            const response = await this.backend.sendCommand('routing.enableRoute', {
                 source_id: sourceId,
                 destination_id: destinationId
             });
@@ -508,10 +508,10 @@ class RoutingController extends BaseController {
                 
                 this.updateRouteStats();
                 
-                this.logDebug('routing', `Ã¢Å“â€œ Route enabled: ${sourceId} Ã¢â€ â€™ ${destinationId}`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Route enabled: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`);
                 
                 this.eventBus.emit('routing:route_enabled', { sourceId, destinationId });
-                this.showNotification(`Route enabled: ${sourceId} Ã¢â€ â€™ ${destinationId}`, 'success');
+                this.showNotification(`Route enabled: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`, 'success');
                 
                 this.updateView();
                 
@@ -527,7 +527,7 @@ class RoutingController extends BaseController {
     }
 
     /**
-     * DÃƒÂ©sactive une route (sans la supprimer)
+     * DÃƒÆ’Ã‚Â©sactive une route (sans la supprimer)
      */
     async disableRoute(sourceId, destinationId) {
         if (!this.backend) {
@@ -535,7 +535,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('disable_route', {
+            const response = await this.backend.sendCommand('routing.disableRoute', {
                 source_id: sourceId,
                 destination_id: destinationId
             });
@@ -551,10 +551,10 @@ class RoutingController extends BaseController {
                 
                 this.updateRouteStats();
                 
-                this.logDebug('routing', `Ã¢Å“â€œ Route disabled: ${sourceId} Ã¢â€ â€™ ${destinationId}`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Route disabled: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`);
                 
                 this.eventBus.emit('routing:route_disabled', { sourceId, destinationId });
-                this.showNotification(`Route disabled: ${sourceId} Ã¢â€ â€™ ${destinationId}`, 'info');
+                this.showNotification(`Route disabled: ${sourceId} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${destinationId}`, 'info');
                 
                 this.updateView();
                 
@@ -570,7 +570,7 @@ class RoutingController extends BaseController {
     }
 
     /**
-     * Toggle l'ÃƒÂ©tat enabled/disabled d'une route
+     * Toggle l'ÃƒÆ’Ã‚Â©tat enabled/disabled d'une route
      */
     async toggleRoute(sourceId, destinationId) {
         const routeKey = this.getRouteKey(sourceId, destinationId);
@@ -596,13 +596,13 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('clear_routes', {});
+            const response = await this.backend.sendCommand('routing.clearRoutes', {});
             
             if (response.success) {
                 this.routes.clear();
                 this.updateRouteStats();
                 
-                this.logDebug('routing', 'Ã¢Å“â€œ All routes cleared');
+                this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ All routes cleared');
                 
                 this.eventBus.emit('routing:routes_cleared');
                 this.showNotification('All routes cleared', 'success');
@@ -629,7 +629,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('get_routing', {});
+            const response = await this.backend.sendCommand('routing.listRoutes', {});
             
             if (response.success) {
                 const routes = response.data?.routes || [];
@@ -645,7 +645,7 @@ class RoutingController extends BaseController {
                 
                 this.updateRouteStats();
                 
-                this.logDebug('routing', `Ã¢Å“â€œ Listed ${routes.length} routes`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Listed ${routes.length} routes`);
                 
                 return routes;
             } else {
@@ -666,7 +666,7 @@ class RoutingController extends BaseController {
         }
 
         try {
-            const response = await this.backend.sendCommand('get_routing', {});
+            const response = await this.backend.sendCommand('routing.listRoutes', {});
             
             if (response.success) {
                 const stats = response.data;
@@ -770,7 +770,7 @@ class RoutingController extends BaseController {
                 count++;
             } catch (error) {
                 this.logDebug('routing', 
-                    `Failed to enable route ${route.source_id} Ã¢â€ â€™ ${route.destination_id}`);
+                    `Failed to enable route ${route.source_id} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${route.destination_id}`);
             }
         }
 
@@ -791,7 +791,7 @@ class RoutingController extends BaseController {
                 count++;
             } catch (error) {
                 this.logDebug('routing', 
-                    `Failed to disable route ${route.source_id} Ã¢â€ â€™ ${route.destination_id}`);
+                    `Failed to disable route ${route.source_id} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${route.destination_id}`);
             }
         }
 
@@ -803,18 +803,18 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // ACTIONS CANAUX - Ã¢Å“â€¦ AVEC VALIDATION
+    // ACTIONS CANAUX - ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ AVEC VALIDATION
     // ========================================================================
     
     /**
-     * Assigner un canal ÃƒÂ  un device
-     * Ã¢Å“â€¦ CORRIGÃƒâ€°: Avec validation et transformations
+     * Assigner un canal ÃƒÆ’Ã‚Â  un device
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRIGÃƒÆ’Ã¢â‚¬Â°: Avec validation et transformations
      */
     async assignChannelToDevice(channelNumber, deviceId, config = {}) {
         const model = this.getModel('routing');
         if (!model) return false;
         
-        // Construire la configuration complÃƒÂ¨te
+        // Construire la configuration complÃƒÆ’Ã‚Â¨te
         const routing = {
             channel: channelNumber,
             device: deviceId,
@@ -833,10 +833,10 @@ class RoutingController extends BaseController {
             }
         }
         
-        // Mise ÃƒÂ  jour locale immÃƒÂ©diate
+        // Mise ÃƒÆ’Ã‚Â  jour locale immÃƒÆ’Ã‚Â©diate
         model.assignChannelToDevice(channelNumber, deviceId);
         
-        // Appliquer les transformations si configurÃƒÂ©es
+        // Appliquer les transformations si configurÃƒÆ’Ã‚Â©es
         if (config.transpose !== undefined) {
             model.setChannelTranspose(channelNumber, config.transpose);
         }
@@ -849,7 +849,7 @@ class RoutingController extends BaseController {
             model.setNoteFilter(channelNumber, config.noteFilter);
         }
         
-        // Ajouter ÃƒÂ  la file des changements
+        // Ajouter ÃƒÆ’Ã‚Â  la file des changements
         this.localState.pendingChanges.push({
             type: 'assign',
             channel: channelNumber,
@@ -864,11 +864,11 @@ class RoutingController extends BaseController {
             applyTransformations: this.config.applyTransformations
         });
         
-        // Envoyer au backend si connectÃƒÂ©
+        // Envoyer au backend si connectÃƒÆ’Ã‚Â©
         if (this.backend && this.backend.isConnected()) {
             try {
                 await this.backend.setChannelRouting(channelNumber, deviceId);
-                this.logDebug('routing', `Ã¢Å“â€œ Channel ${channelNumber} assigned to ${deviceId}`);
+                this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Channel ${channelNumber} assigned to ${deviceId}`);
             } catch (error) {
                 this.logDebug('routing', 'Error assigning channel:', error);
                 this.showNotification('Erreur lors de l\'assignation', 'error');
@@ -879,7 +879,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Muter/DÃƒÂ©muter un canal
+     * Muter/DÃƒÆ’Ã‚Â©muter un canal
      */
     muteChannel(channelNumber, muted = null) {
         const model = this.getModel('routing');
@@ -986,7 +986,7 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // TRANSFORMATIONS AVANCÃƒâ€°ES
+    // TRANSFORMATIONS AVANCÃƒÆ’Ã¢â‚¬Â°ES
     // ========================================================================
     
     /**
@@ -1013,7 +1013,7 @@ class RoutingController extends BaseController {
             this.showSuccess(`Velocity curve set to "${config.curve}"`);
             
             if (this.backend && this.backend.isConnected()) {
-                this.backend.sendCommand('set_velocity_mapping', {
+                this.backend.sendCommand('midi.routing.update', {
                     channel: channelNumber,
                     config: config
                 }).catch(error => {
@@ -1049,7 +1049,7 @@ class RoutingController extends BaseController {
             this.showSuccess('Note filter updated');
             
             if (this.backend && this.backend.isConnected()) {
-                this.backend.sendCommand('set_note_filter', {
+                this.backend.sendCommand('midi.routing.update', {
                     channel: channelNumber,
                     config: config
                 }).catch(error => {
@@ -1074,7 +1074,7 @@ class RoutingController extends BaseController {
             this.showSuccess(`${mappings.length} note mapping${mappings.length > 1 ? 's' : ''} applied`);
             
             if (this.backend && this.backend.isConnected()) {
-                this.backend.sendCommand('set_note_remap', {
+                this.backend.sendCommand('midi.routing.update', {
                     channel: channelNumber,
                     mappings: mappings
                 }).catch(error => {
@@ -1099,7 +1099,7 @@ class RoutingController extends BaseController {
             this.showSuccess(`${mappings.length} CC mapping${mappings.length > 1 ? 's' : ''} applied`);
             
             if (this.backend && this.backend.isConnected()) {
-                this.backend.sendCommand('set_cc_remap', {
+                this.backend.sendCommand('midi.routing.update', {
                     channel: channelNumber,
                     mappings: mappings
                 }).catch(error => {
@@ -1142,7 +1142,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * DÃƒÂ©sactive toutes les transformations d'un canal
+     * DÃƒÆ’Ã‚Â©sactive toutes les transformations d'un canal
      */
     disableAllTransformations(channelNumber) {
         const model = this.getModel('routing');
@@ -1174,13 +1174,13 @@ class RoutingController extends BaseController {
         model.muteAll();
         
         if (this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('mute_all')
+            this.backend.// DEPRECATED API - sendCommand('mute_all')
                 .catch(error => {
                     this.logDebug('routing', 'Error muting all:', error);
                 });
         }
         
-        this.showNotification('Tous les canaux ont ÃƒÂ©tÃƒÂ© mutÃƒÂ©s', 'info');
+        this.showNotification('Tous les canaux ont ÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â© mutÃƒÆ’Ã‚Â©s', 'info');
     }
     
     unmuteAll() {
@@ -1190,20 +1190,20 @@ class RoutingController extends BaseController {
         model.unmuteAll();
         
         if (this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('unmute_all')
+            this.backend.// DEPRECATED API - sendCommand('unmute_all')
                 .catch(error => {
                     this.logDebug('routing', 'Error unmuting all:', error);
                 });
         }
         
-        this.showNotification('Tous les canaux ont ÃƒÂ©tÃƒÂ© dÃƒÂ©mutÃƒÂ©s', 'info');
+        this.showNotification('Tous les canaux ont ÃƒÆ’Ã‚Â©tÃƒÆ’Ã‚Â© dÃƒÆ’Ã‚Â©mutÃƒÆ’Ã‚Â©s', 'info');
     }
     
     async resetAll() {
         if (this.config.confirmReset) {
             const confirmed = await this.confirmAction(
-                'ÃƒÅ tes-vous sÃƒÂ»r de vouloir rÃƒÂ©initialiser tout le routage ?',
-                'RÃƒÂ©initialisation'
+                'ÃƒÆ’Ã…Â tes-vous sÃƒÆ’Ã‚Â»r de vouloir rÃƒÆ’Ã‚Â©initialiser tout le routage ?',
+                'RÃƒÆ’Ã‚Â©initialisation'
             );
             
             if (!confirmed) return;
@@ -1215,13 +1215,13 @@ class RoutingController extends BaseController {
         model.resetAll();
         
         if (this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('reset_routing')
+            this.backend.// DEPRECATED API - sendCommand('reset_routing')
                 .catch(error => {
                     this.logDebug('routing', 'Error resetting routing:', error);
                 });
         }
         
-        this.showNotification('Routage rÃƒÂ©initialisÃƒÂ©', 'success');
+        this.showNotification('Routage rÃƒÆ’Ã‚Â©initialisÃƒÆ’Ã‚Â©', 'success');
     }
     
     setMasterVolume(volume) {
@@ -1231,7 +1231,7 @@ class RoutingController extends BaseController {
         model.setMasterVolume(volume);
         
         if (this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('set_master_volume', { volume })
+            this.backend.// DEPRECATED API - sendCommand('set_master_volume', { volume })
                 .catch(error => {
                     this.logDebug('routing', 'Error setting master volume:', error);
                 });
@@ -1254,11 +1254,11 @@ class RoutingController extends BaseController {
         const preset = model.savePreset(name);
         
         if (preset) {
-            this.showNotification(`Preset "${name}" enregistrÃƒÂ©`, 'success');
+            this.showNotification(`Preset "${name}" enregistrÃƒÆ’Ã‚Â©`, 'success');
             this.savePresetsToLocalStorage();
             
             if (this.backend && this.backend.isConnected()) {
-                this.backend.sendCommand('save_preset', preset)
+                this.backend.sendCommand('preset.save', preset)
                     .catch(error => {
                         this.logDebug('routing', 'Error saving preset to backend:', error);
                     });
@@ -1275,7 +1275,7 @@ class RoutingController extends BaseController {
         const preset = model.loadPreset(presetId);
         
         if (preset) {
-            this.showNotification(`Preset "${preset.name}" chargÃƒÂ©`, 'success');
+            this.showNotification(`Preset "${preset.name}" chargÃƒÆ’Ã‚Â©`, 'success');
             
             if (this.backend && this.backend.isConnected()) {
                 await this.syncWithBackend();
@@ -1300,11 +1300,11 @@ class RoutingController extends BaseController {
         if (!confirmed) return;
         
         model.deletePreset(presetId);
-        this.showNotification(`Preset "${preset.name}" supprimÃƒÂ©`, 'success');
+        this.showNotification(`Preset "${preset.name}" supprimÃƒÆ’Ã‚Â©`, 'success');
         this.savePresetsToLocalStorage();
         
         if (this.backend && this.backend.isConnected()) {
-            this.backend.sendCommand('delete_preset', { id: presetId })
+            this.backend.sendCommand('preset.delete', { id: presetId })
                 .catch(error => {
                     this.logDebug('routing', 'Error deleting preset from backend:', error);
                 });
@@ -1381,7 +1381,7 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // MISE Ãƒâ‚¬ JOUR DE LA VUE
+    // MISE ÃƒÆ’Ã¢â€šÂ¬ JOUR DE LA VUE
     // ========================================================================
     
     updateView() {
@@ -1391,7 +1391,7 @@ class RoutingController extends BaseController {
         if (view && model) {
             const data = model.getRoutingConfiguration();
             
-            // Ã¢Å“â€¦ Ajouter les nouvelles donnÃƒÂ©es v4.2.1
+            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ajouter les nouvelles donnÃƒÆ’Ã‚Â©es v4.2.1
             data.routes = Array.from(this.routes.values());
             data.routeStats = this.routeStats;
             data.selectedRoute = this.selectedRoute;
@@ -1420,7 +1420,7 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS DU MODÃƒË†LE
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS DU MODÃƒÆ’Ã‹â€ LE
     // ========================================================================
     
     onChannelAssigned(data) {
@@ -1471,7 +1471,7 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS UI
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS UI
     // ========================================================================
     
     onMatrixClick(data) {
@@ -1485,16 +1485,16 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS PAGE
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS PAGE
     // ========================================================================
     
     onRoutingPageActive() {
         this.logDebug('routing', 'Routing page active');
         
-        // Synchroniser immÃƒÂ©diatement
+        // Synchroniser immÃƒÆ’Ã‚Â©diatement
         this.syncWithBackend();
         
-        // DÃƒÂ©marrer auto-sync
+        // DÃƒÆ’Ã‚Â©marrer auto-sync
         if (this.autoSyncEnabled) {
             this.setupAutoSync();
         }
@@ -1503,12 +1503,12 @@ class RoutingController extends BaseController {
     onRoutingPageInactive() {
         this.logDebug('routing', 'Routing page inactive');
         
-        // ArrÃƒÂªter auto-sync pour ÃƒÂ©conomiser ressources
+        // ArrÃƒÆ’Ã‚Âªter auto-sync pour ÃƒÆ’Ã‚Â©conomiser ressources
         this.stopAutoSync();
     }
     
     // ========================================================================
-    // MÃƒâ€°THODES D'AIDE UI
+    // MÃƒÆ’Ã¢â‚¬Â°THODES D'AIDE UI
     // ========================================================================
     
     async confirmAction(message, title) {
@@ -1557,7 +1557,7 @@ class RoutingController extends BaseController {
     }
     
     // ========================================================================
-    // API PUBLIQUE - CONFORMITÃƒâ€° RÃƒâ€°FÃƒâ€°RENCE
+    // API PUBLIQUE - CONFORMITÃƒÆ’Ã¢â‚¬Â° RÃƒÆ’Ã¢â‚¬Â°FÃƒÆ’Ã¢â‚¬Â°RENCE
     // ========================================================================
     
     /**
@@ -1589,7 +1589,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Assigne un canal ÃƒÂ  un pÃƒÂ©riphÃƒÂ©rique (alias)
+     * Assigne un canal ÃƒÆ’Ã‚Â  un pÃƒÆ’Ã‚Â©riphÃƒÆ’Ã‚Â©rique (alias)
      */
     async assignChannel(channelId, deviceId) {
         return await this.assignChannelToDevice(channelId, deviceId);
@@ -1608,7 +1608,7 @@ class RoutingController extends BaseController {
             }
             
             if (this.backend && this.backend.isConnected()) {
-                await this.backend.sendCommand('midi.test_note', {
+                await this.backend.sendCommand('midi.sendNoteOn', {
                     channel: parseInt(channel),
                     device: device,
                     note: 60,  // Middle C
@@ -1616,7 +1616,7 @@ class RoutingController extends BaseController {
                     duration: 500
                 });
                 
-                this.showNotification(`Testing route: Channel ${channel} Ã¢â€ â€™ ${device}`, 'info');
+                this.showNotification(`Testing route: Channel ${channel} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${device}`, 'info');
                 return true;
             } else {
                 this.showError('Backend not connected');
@@ -1631,7 +1631,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * CrÃƒÂ©e une nouvelle route
+     * CrÃƒÆ’Ã‚Â©e une nouvelle route
      */
     async createRoute(channel, deviceId, options = {}) {
         return await this.assignChannel(channel, deviceId, options);
@@ -1651,7 +1651,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Met ÃƒÂ  jour une route existante
+     * Met ÃƒÆ’Ã‚Â  jour une route existante
      */
     async updateRoute(channel, options) {
         const model = this.getModel('routing');
@@ -1670,7 +1670,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Obtient toutes les routes configurÃƒÂ©es
+     * Obtient toutes les routes configurÃƒÆ’Ã‚Â©es
      */
     getRoutes() {
         const model = this.getModel('routing');
@@ -1680,7 +1680,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Auto-routage automatique des canaux aux pÃƒÂ©riphÃƒÂ©riques
+     * Auto-routage automatique des canaux aux pÃƒÆ’Ã‚Â©riphÃƒÆ’Ã‚Â©riques
      */
     async autoRoute() {
         const model = this.getModel('routing');
@@ -1708,7 +1708,7 @@ class RoutingController extends BaseController {
             }
             
             this.showSuccess(`Auto-routed ${routedCount} channels to ${devices.length} device(s)`);
-            this.logDebug('routing', `Ã¢Å“â€¦ Auto-route complete: ${routedCount} channels`);
+            this.logDebug('routing', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Auto-route complete: ${routedCount} channels`);
             
             return true;
             
@@ -1741,7 +1741,7 @@ class RoutingController extends BaseController {
             await this.syncWithBackend();
             
             this.showSuccess('All routing cleared');
-            this.logDebug('routing', 'Ã¢Å“â€¦ Routing cleared');
+            this.logDebug('routing', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Routing cleared');
             
             return true;
             

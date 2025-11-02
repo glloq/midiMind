@@ -1,320 +1,417 @@
 // ============================================================================
 // Fichier: frontend/js/models/PlaylistModel.js
 // Chemin réel: frontend/js/models/PlaylistModel.js
-// Version: v3.3.0 - SIGNATURE CORRIGÉE (5 PARAMÈTRES)
-// Date: 2025-11-01
+// Version: v4.2.0 - API CONFORME v4.2.2
+// Date: 2025-11-02
 // ============================================================================
-// CORRECTIONS v3.3.0:
-// ✅ CRITIQUE: Ajout paramètres initialData et options manquants
-// ✅ Signature cohérente: (eventBus, backend, logger, initialData = {}, options = {})
-// ✅ Merge intelligente des options par défaut
-// ✅ Ajout méthodes de gestion de playlist améliorées
+// API v4.2.2 - PLAYLISTS (9 commandes):
+// ✅ playlist.create
+// ✅ playlist.delete
+// ✅ playlist.update
+// ✅ playlist.list
+// ✅ playlist.get
+// ✅ playlist.addItem
+// ✅ playlist.removeItem
+// ✅ playlist.reorder
+// ✅ playlist.setLoop
 // ============================================================================
 
 class PlaylistModel extends BaseModel {
     constructor(eventBus, backend, logger, initialData = {}, options = {}) {
-        // ✅ NOUVEAU: Appel super() avec les 5 paramètres
-        super(eventBus, backend, logger, initialData, {
+        super(eventBus, backend, logger, {
+            playlists: [],
+            currentPlaylist: null,
+            currentPlaylistId: null,
+            ...initialData
+        }, {
             persistKey: 'playlistmodel',
             eventPrefix: 'playlist',
             autoPersist: true,
             ...options
         });
         
-        // Initialisation des données de playlist avec valeurs par défaut
+        if (!this.data) {
+            this.data = {};
+        }
+        
         this.data.playlists = this.data.playlists || [];
         this.data.currentPlaylist = this.data.currentPlaylist || null;
-        this.data.currentIndex = this.data.currentIndex || 0;
+        this.data.currentPlaylistId = this.data.currentPlaylistId || null;
         
-        this.log('debug', 'PlaylistModel', 'Initialized v3.3.0');
+        this.log('debug', 'PlaylistModel', '✓ PlaylistModel v4.2.0 initialized (API v4.2.2)');
     }
+    
+    // ========================================================================
+    // GESTION DES PLAYLISTS - API v4.2.2
+    // ========================================================================
     
     /**
      * Crée une nouvelle playlist
+     * ✅ API v4.2.2: playlist.create
      * @param {string} name - Nom de la playlist
-     * @returns {Object} Playlist créée
+     * @param {Array} items - Items initiaux (optionnel)
      */
-    createPlaylist(name) {
-        const playlist = {
-            id: Date.now().toString(),
-            name,
-            files: [],
-            created: Date.now(),
-            modified: Date.now(),
-            description: '',
-            isActive: false
-        };
+    async createPlaylist(name, items = []) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.createPlaylist', 'Backend not connected');
+            return null;
+        }
         
-        this.data.playlists.push(playlist);
-        this.emit('playlist:created', { playlist });
-        
-        this.log('info', 'PlaylistModel', `Playlist created: ${name}`);
-        return playlist;
+        try {
+            this.log('info', 'PlaylistModel', `Creating playlist: ${name}`);
+            
+            const data = await this.backend.sendCommand('playlist.create', {
+                name,
+                items
+            });
+            
+            if (data && data.playlist_id) {
+                // Recharger la liste des playlists
+                await this.refreshPlaylists();
+                
+                this.emit('playlist:created', {
+                    playlistId: data.playlist_id,
+                    name
+                });
+                
+                return data.playlist_id;
+            }
+            
+            return null;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.createPlaylist', error.message);
+            throw error;
+        }
     }
     
     /**
      * Supprime une playlist
-     * @param {string} id - ID de la playlist
-     * @returns {boolean} Succès
+     * ✅ API v4.2.2: playlist.delete
+     * @param {string} playlistId - ID de la playlist
      */
-    deletePlaylist(id) {
-        const index = this.data.playlists.findIndex(p => p.id === id);
+    async deletePlaylist(playlistId) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.deletePlaylist', 'Backend not connected');
+            return false;
+        }
         
-        if (index !== -1) {
-            const playlist = this.data.playlists.splice(index, 1)[0];
+        try {
+            this.log('info', 'PlaylistModel', `Deleting playlist: ${playlistId}`);
             
-            // Si c'était la playlist courante, la réinitialiser
-            if (this.data.currentPlaylist?.id === id) {
+            await this.backend.sendCommand('playlist.delete', {
+                playlist_id: playlistId
+            });
+            
+            // Si c'était la playlist actuelle, la déselectionner
+            if (this.data.currentPlaylistId === playlistId) {
                 this.data.currentPlaylist = null;
-                this.data.currentIndex = 0;
+                this.data.currentPlaylistId = null;
             }
             
-            this.emit('playlist:deleted', { playlist });
-            this.log('info', 'PlaylistModel', `Playlist deleted: ${playlist.name}`);
-            return true;
-        }
-        
-        this.log('warn', 'PlaylistModel', `Playlist not found: ${id}`);
-        return false;
-    }
-    
-    /**
-     * Renomme une playlist
-     * @param {string} id - ID de la playlist
-     * @param {string} newName - Nouveau nom
-     * @returns {boolean} Succès
-     */
-    renamePlaylist(id, newName) {
-        const playlist = this.data.playlists.find(p => p.id === id);
-        
-        if (playlist) {
-            playlist.name = newName;
-            playlist.modified = Date.now();
-            this.emit('playlist:updated', { playlist });
-            return true;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Ajoute un fichier à une playlist
-     * @param {string} playlistId - ID de la playlist
-     * @param {Object} file - Fichier à ajouter
-     * @returns {boolean} Succès
-     */
-    addFile(playlistId, file) {
-        const playlist = this.data.playlists.find(p => p.id === playlistId);
-        
-        if (playlist) {
-            // Vérifier que le fichier n'est pas déjà dans la playlist
-            const exists = playlist.files.some(f => f.id === file.id || f.path === file.path);
-            if (!exists) {
-                playlist.files.push(file);
-                playlist.modified = Date.now();
-                this.emit('playlist:updated', { playlist });
-                this.log('info', 'PlaylistModel', `File added to playlist: ${file.name || file.path}`);
-                return true;
-            } else {
-                this.log('warn', 'PlaylistModel', 'File already in playlist');
-                return false;
-            }
-        }
-        
-        this.log('warn', 'PlaylistModel', `Playlist not found: ${playlistId}`);
-        return false;
-    }
-    
-    /**
-     * Retire un fichier d'une playlist
-     * @param {string} playlistId - ID de la playlist
-     * @param {number} fileIndex - Index du fichier
-     * @returns {boolean} Succès
-     */
-    removeFile(playlistId, fileIndex) {
-        const playlist = this.data.playlists.find(p => p.id === playlistId);
-        
-        if (playlist && fileIndex >= 0 && fileIndex < playlist.files.length) {
-            const removed = playlist.files.splice(fileIndex, 1)[0];
-            playlist.modified = Date.now();
-            this.emit('playlist:updated', { playlist });
-            this.log('info', 'PlaylistModel', `File removed from playlist: ${removed.name || removed.path}`);
-            return true;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Déplace un fichier dans une playlist
-     * @param {string} playlistId - ID de la playlist
-     * @param {number} fromIndex - Index source
-     * @param {number} toIndex - Index destination
-     * @returns {boolean} Succès
-     */
-    moveFile(playlistId, fromIndex, toIndex) {
-        const playlist = this.data.playlists.find(p => p.id === playlistId);
-        
-        if (playlist && 
-            fromIndex >= 0 && fromIndex < playlist.files.length &&
-            toIndex >= 0 && toIndex < playlist.files.length) {
+            // Recharger la liste
+            await this.refreshPlaylists();
             
-            const file = playlist.files.splice(fromIndex, 1)[0];
-            playlist.files.splice(toIndex, 0, file);
-            playlist.modified = Date.now();
-            this.emit('playlist:updated', { playlist });
+            this.emit('playlist:deleted', { playlistId });
+            
             return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.deletePlaylist', error.message);
+            throw error;
         }
-        
-        return false;
     }
     
     /**
-     * Récupère toutes les playlists
-     * @returns {Array}
+     * Met à jour une playlist
+     * ✅ API v4.2.2: playlist.update
+     * @param {string} playlistId - ID de la playlist
+     * @param {Object} config - Configuration à mettre à jour
+     */
+    async updatePlaylist(playlistId, config) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.updatePlaylist', 'Backend not connected');
+            return false;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Updating playlist: ${playlistId}`);
+            
+            await this.backend.sendCommand('playlist.update', {
+                playlist_id: playlistId,
+                config
+            });
+            
+            // Recharger la liste
+            await this.refreshPlaylists();
+            
+            this.emit('playlist:updated', { playlistId, config });
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.updatePlaylist', error.message);
+            throw error;
+        }
+    }
+    
+    /**
+     * Liste toutes les playlists
+     * ✅ API v4.2.2: playlist.list
+     */
+    async refreshPlaylists() {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.refreshPlaylists', 'Backend not connected');
+            return [];
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', 'Refreshing playlists');
+            
+            const data = await this.backend.sendCommand('playlist.list');
+            
+            const playlists = data.playlists || [];
+            this.set('playlists', playlists);
+            
+            this.emit('playlists:refreshed', { playlists });
+            
+            return playlists;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.refreshPlaylists', error.message);
+            return [];
+        }
+    }
+    
+    /**
+     * Récupère une playlist spécifique
+     * ✅ API v4.2.2: playlist.get
+     * @param {string} playlistId - ID de la playlist
+     */
+    async getPlaylist(playlistId) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.getPlaylist', 'Backend not connected');
+            return null;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Getting playlist: ${playlistId}`);
+            
+            const data = await this.backend.sendCommand('playlist.get', {
+                playlist_id: playlistId
+            });
+            
+            if (data) {
+                // Mettre à jour la playlist actuelle
+                this.set('currentPlaylist', data);
+                this.set('currentPlaylistId', playlistId);
+                
+                this.emit('playlist:loaded', { 
+                    playlistId, 
+                    playlist: data 
+                });
+                
+                return data;
+            }
+            
+            return null;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.getPlaylist', error.message);
+            return null;
+        }
+    }
+    
+    /**
+     * Ajoute un item à une playlist
+     * ✅ API v4.2.2: playlist.addItem
+     * @param {string} playlistId - ID de la playlist
+     * @param {Object} item - Item à ajouter
+     */
+    async addItem(playlistId, item) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.addItem', 'Backend not connected');
+            return false;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Adding item to playlist: ${playlistId}`);
+            
+            await this.backend.sendCommand('playlist.addItem', {
+                playlist_id: playlistId,
+                item
+            });
+            
+            // Recharger la playlist actuelle si c'est celle-ci
+            if (this.data.currentPlaylistId === playlistId) {
+                await this.getPlaylist(playlistId);
+            }
+            
+            this.emit('playlist:item-added', { playlistId, item });
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.addItem', error.message);
+            throw error;
+        }
+    }
+    
+    /**
+     * Retire un item d'une playlist
+     * ✅ API v4.2.2: playlist.removeItem
+     * @param {string} playlistId - ID de la playlist
+     * @param {string} itemId - ID de l'item
+     */
+    async removeItem(playlistId, itemId) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.removeItem', 'Backend not connected');
+            return false;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Removing item from playlist: ${playlistId}`);
+            
+            await this.backend.sendCommand('playlist.removeItem', {
+                playlist_id: playlistId,
+                item_id: itemId
+            });
+            
+            // Recharger la playlist actuelle si c'est celle-ci
+            if (this.data.currentPlaylistId === playlistId) {
+                await this.getPlaylist(playlistId);
+            }
+            
+            this.emit('playlist:item-removed', { playlistId, itemId });
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.removeItem', error.message);
+            throw error;
+        }
+    }
+    
+    /**
+     * Réordonne les items d'une playlist
+     * ✅ API v4.2.2: playlist.reorder
+     * @param {string} playlistId - ID de la playlist
+     * @param {Array} order - Nouvel ordre des items
+     */
+    async reorderItems(playlistId, order) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.reorderItems', 'Backend not connected');
+            return false;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Reordering playlist: ${playlistId}`);
+            
+            await this.backend.sendCommand('playlist.reorder', {
+                playlist_id: playlistId,
+                order
+            });
+            
+            // Recharger la playlist actuelle si c'est celle-ci
+            if (this.data.currentPlaylistId === playlistId) {
+                await this.getPlaylist(playlistId);
+            }
+            
+            this.emit('playlist:reordered', { playlistId, order });
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.reorderItems', error.message);
+            throw error;
+        }
+    }
+    
+    /**
+     * Active/désactive la boucle sur une playlist
+     * ✅ API v4.2.2: playlist.setLoop
+     * @param {string} playlistId - ID de la playlist
+     * @param {boolean} enabled - État de la boucle
+     */
+    async setLoop(playlistId, enabled) {
+        if (!this.backend || !this.backend.isConnected()) {
+            this.log('warn', 'PlaylistModel.setLoop', 'Backend not connected');
+            return false;
+        }
+        
+        try {
+            this.log('info', 'PlaylistModel', `Setting loop for playlist: ${playlistId} = ${enabled}`);
+            
+            await this.backend.sendCommand('playlist.setLoop', {
+                playlist_id: playlistId,
+                enabled
+            });
+            
+            // Recharger la playlist actuelle si c'est celle-ci
+            if (this.data.currentPlaylistId === playlistId) {
+                await this.getPlaylist(playlistId);
+            }
+            
+            this.emit('playlist:loop-changed', { playlistId, enabled });
+            
+            return true;
+        } catch (error) {
+            this.log('error', 'PlaylistModel.setLoop', error.message);
+            throw error;
+        }
+    }
+    
+    // ========================================================================
+    // MÉTHODES LOCALES (GETTERS)
+    // ========================================================================
+    
+    /**
+     * Retourne toutes les playlists
      */
     getPlaylists() {
-        return this.data.playlists;
+        return this.get('playlists') || [];
     }
     
     /**
-     * Récupère une playlist par son ID
-     * @param {string} id - ID de la playlist
-     * @returns {Object|null}
-     */
-    getPlaylist(id) {
-        return this.data.playlists.find(p => p.id === id) || null;
-    }
-    
-    /**
-     * Définit la playlist courante
-     * @param {string} playlistId - ID de la playlist
-     * @returns {boolean} Succès
-     */
-    setCurrentPlaylist(playlistId) {
-        const playlist = this.getPlaylist(playlistId);
-        
-        if (playlist) {
-            // Désactiver l'ancienne playlist active
-            if (this.data.currentPlaylist) {
-                this.data.currentPlaylist.isActive = false;
-            }
-            
-            this.data.currentPlaylist = playlist;
-            this.data.currentIndex = 0;
-            playlist.isActive = true;
-            
-            this.emit('playlist:current:changed', { playlist });
-            this.log('info', 'PlaylistModel', `Current playlist: ${playlist.name}`);
-            return true;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Récupère la playlist courante
-     * @returns {Object|null}
+     * Retourne la playlist actuelle
      */
     getCurrentPlaylist() {
-        return this.data.currentPlaylist;
+        return this.get('currentPlaylist');
     }
     
     /**
-     * Définit l'index courant dans la playlist
-     * @param {number} index
+     * Retourne l'ID de la playlist actuelle
      */
-    setCurrentIndex(index) {
-        if (this.data.currentPlaylist && 
-            index >= 0 && 
-            index < this.data.currentPlaylist.files.length) {
-            
-            this.data.currentIndex = index;
-            this.emit('playlist:index:changed', { 
-                index, 
-                file: this.data.currentPlaylist.files[index] 
-            });
-        }
+    getCurrentPlaylistId() {
+        return this.get('currentPlaylistId');
     }
     
     /**
-     * Récupère l'index courant
-     * @returns {number}
+     * Recherche une playlist par nom
      */
-    getCurrentIndex() {
-        return this.data.currentIndex;
+    findPlaylistByName(name) {
+        const playlists = this.getPlaylists();
+        return playlists.find(p => p.name === name);
     }
     
     /**
-     * Récupère le fichier courant dans la playlist
-     * @returns {Object|null}
+     * Recherche une playlist par ID
      */
-    getCurrentFile() {
-        if (this.data.currentPlaylist && 
-            this.data.currentIndex >= 0 &&
-            this.data.currentIndex < this.data.currentPlaylist.files.length) {
-            
-            return this.data.currentPlaylist.files[this.data.currentIndex];
-        }
-        
-        return null;
+    findPlaylistById(id) {
+        const playlists = this.getPlaylists();
+        return playlists.find(p => p.id === id);
     }
     
     /**
-     * Passe au fichier suivant dans la playlist
-     * @returns {Object|null} Fichier suivant ou null si fin
+     * Vérifie si une playlist existe
      */
-    nextFile() {
-        if (this.data.currentPlaylist && 
-            this.data.currentIndex < this.data.currentPlaylist.files.length - 1) {
-            
-            this.data.currentIndex++;
-            const file = this.data.currentPlaylist.files[this.data.currentIndex];
-            this.emit('playlist:index:changed', { 
-                index: this.data.currentIndex, 
-                file 
-            });
-            return file;
-        }
-        
-        return null;
+    hasPlaylist(playlistId) {
+        return this.findPlaylistById(playlistId) !== undefined;
     }
     
     /**
-     * Passe au fichier précédent dans la playlist
-     * @returns {Object|null} Fichier précédent ou null si début
+     * Compte le nombre de playlists
      */
-    previousFile() {
-        if (this.data.currentPlaylist && this.data.currentIndex > 0) {
-            this.data.currentIndex--;
-            const file = this.data.currentPlaylist.files[this.data.currentIndex];
-            this.emit('playlist:index:changed', { 
-                index: this.data.currentIndex, 
-                file 
-            });
-            return file;
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Vérifie s'il y a un fichier suivant
-     * @returns {boolean}
-     */
-    hasNext() {
-        return this.data.currentPlaylist && 
-               this.data.currentIndex < this.data.currentPlaylist.files.length - 1;
-    }
-    
-    /**
-     * Vérifie s'il y a un fichier précédent
-     * @returns {boolean}
-     */
-    hasPrevious() {
-        return this.data.currentPlaylist && this.data.currentIndex > 0;
+    getPlaylistCount() {
+        return this.getPlaylists().length;
     }
 }
+
+// ============================================================================
+// EXPORT
+// ============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PlaylistModel;
