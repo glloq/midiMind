@@ -1,16 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Version: v5.0.0 - PROTOCOLE WEBSOCKET CONFORME
+// Version: v4.0.1 - CORRIGÉ FORMAT BACKEND RÉEL
 // Date: 2025-11-02
 // ============================================================================
-// MODIFICATIONS v5.0.0:
-// ✅ Format de message conforme: { id, type, timestamp, version, payload }
-// ✅ Types: request, response, event, error
-// ✅ Heartbeat avec system.ping (30s interval, 5s timeout)
-// ✅ UUID v4 pour les IDs
-// ✅ Gestion complète des erreurs selon codes protocole
-// ✅ Reconnexion automatique avec backoff exponentiel
-// ============================================================================
+// CORRECTIONS v4.0.1:
+// ✅ Gestion format backend réel: type="response", payload={...}
+// ✅ Support IDs numériques ET UUID strings
+// ✅ Toutes commandes API conformes
 
 class BackendService {
     constructor(url, eventBus, logger) {
@@ -24,63 +20,41 @@ class BackendService {
         this.offlineMode = false;
         this.reconnectionStopped = false;
         
-        // Configuration selon documentation
+        // Configuration
         this.config = {
             url: url || 'ws://localhost:8080',
             reconnectInterval: 3000,
             maxReconnectInterval: 30000,
             reconnectDecay: 1.5,
             timeoutInterval: 5000,
-            heartbeatInterval: 30000,      // 30 secondes selon doc
-            heartbeatTimeout: 5000,        // 5 secondes selon doc
+            heartbeatInterval: 20000,
+            heartbeatTimeout: 45000,
             maxReconnectAttempts: 5,
-            defaultCommandTimeout: 5000,
-            protocolVersion: '1.0'
+            defaultCommandTimeout: 5000
         };
         
-        // Gestion de la reconnexion
+        // Gestion reconnexion
         this.reconnectAttempts = 0;
         this.reconnectTimer = null;
         this.heartbeatTimer = null;
-        this.heartbeatTimeoutTimer = null;
         this.connectionTimeout = null;
         
-        // Suivi de l'activité backend
+        // Suivi activité backend
         this.lastActivityTime = Date.now();
         this.heartbeatPending = false;
         this.heartbeatFailures = 0;
         
-        // File d'attente des messages
+        // File d'attente messages
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        // Requêtes en attente
+        // Compteur requêtes
+        this.requestId = 0;
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized (v5.0.0 - WebSocket Protocol)');
+        this.logger.info('BackendService', 'Service initialized (v4.0.1 - FORMAT BACKEND RÉEL)');
     }
     
-    /**
-     * Génère un UUID v4
-     */
-    generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-    
-    /**
-     * Obtient timestamp ISO 8601 avec millisecondes
-     */
-    getISO8601Timestamp() {
-        return new Date().toISOString();
-    }
-    
-    /**
-     * Se connecte au backend
-     */
     async connect(url = null) {
         if (this.connected) {
             this.logger.warn('BackendService', 'Already connected');
@@ -101,7 +75,6 @@ class BackendService {
             try {
                 this.ws = new WebSocket(wsUrl);
                 
-                // Timeout de connexion
                 this.connectionTimeout = setTimeout(() => {
                     if (!this.connected) {
                         this.logger.error('BackendService', 'Connection timeout');
@@ -110,7 +83,6 @@ class BackendService {
                     }
                 }, this.config.timeoutInterval);
                 
-                // Événements WebSocket
                 this.ws.onopen = () => {
                     clearTimeout(this.connectionTimeout);
                     this.handleOpen();
@@ -139,9 +111,6 @@ class BackendService {
         });
     }
     
-    /**
-     * Gère l'ouverture de la connexion
-     */
     handleOpen() {
         this.connected = true;
         this.connecting = false;
@@ -158,16 +127,10 @@ class BackendService {
             timestamp: Date.now()
         });
         
-        // Démarrer le heartbeat
         this.startHeartbeat();
-        
-        // Envoyer les messages en attente
         this.flushMessageQueue();
     }
     
-    /**
-     * Gère la fermeture de la connexion
-     */
     handleClose(event) {
         const wasConnected = this.connected;
         
@@ -187,7 +150,6 @@ class BackendService {
             offlineMode: this.offlineMode
         });
         
-        // Tenter une reconnexion automatique
         if (!event.wasClean && !this.reconnectionStopped) {
             this.scheduleReconnect();
         } else if (this.reconnectionStopped) {
@@ -195,17 +157,11 @@ class BackendService {
         }
     }
     
-    /**
-     * Gère les erreurs
-     */
     handleError(error) {
         this.logger.error('BackendService', 'WebSocket error:', error);
         this.eventBus.emit('backend:error', { error });
     }
     
-    /**
-     * Gère une erreur de connexion
-     */
     handleConnectionError(message) {
         this.connected = false;
         this.connecting = false;
@@ -219,9 +175,6 @@ class BackendService {
         this.scheduleReconnect();
     }
     
-    /**
-     * Planifie une tentative de reconnexion avec backoff exponentiel
-     */
     scheduleReconnect() {
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -242,7 +195,6 @@ class BackendService {
             return;
         }
         
-        // Calculer le délai avec backoff exponentiel
         const delay = Math.min(
             this.config.reconnectInterval * Math.pow(this.config.reconnectDecay, this.reconnectAttempts),
             this.config.maxReconnectInterval
@@ -265,9 +217,6 @@ class BackendService {
         }, delay);
     }
     
-    /**
-     * Entre en mode offline
-     */
     enterOfflineMode() {
         this.offlineMode = true;
         this.logger.warn('BackendService', '⚠️ Entering offline mode');
@@ -277,106 +226,74 @@ class BackendService {
         });
     }
     
-    /**
-     * Démarre le heartbeat selon documentation
-     */
     startHeartbeat() {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
         }
         
-        // Envoyer ping toutes les 30 secondes
         this.heartbeatTimer = setInterval(() => {
-            this.sendPing();
+            this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', '💗 Heartbeat started (30s interval)');
+        this.logger.debug('BackendService', '💗 Heartbeat started');
     }
     
-    /**
-     * Envoie un ping selon documentation
-     */
-    sendPing() {
+    async checkHeartbeat() {
+        const timeSinceActivity = Date.now() - this.lastActivityTime;
+        
+        if (timeSinceActivity > this.config.heartbeatTimeout) {
+            this.heartbeatFailures++;
+            
+            this.logger.warn('BackendService', 
+                `✗ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+            
+            if (this.heartbeatFailures >= 2) {
+                this.logger.error('BackendService', '💀 Connection dead, forcing reconnect');
+                this.forceReconnect('Heartbeat timeout - connection dead');
+                return;
+            }
+        }
+        
         if (this.heartbeatPending) {
-            this.logger.debug('BackendService', 'Ping already pending, skipping');
+            this.logger.debug('BackendService', 'Heartbeat pending, skipping');
             return;
         }
         
-        const heartbeatId = `heartbeat-${Date.now()}`;
-        
-        const ping = {
-            id: heartbeatId,
-            type: 'request',
-            timestamp: this.getISO8601Timestamp(),
-            version: this.config.protocolVersion,
-            payload: {
-                id: heartbeatId,
-                command: 'system.ping',
-                params: {},
-                timeout: this.config.heartbeatTimeout
+        try {
+            this.heartbeatPending = true;
+            this.logger.debug('BackendService', '💗 Sending heartbeat (devices.list)');
+            
+            const startTime = Date.now();
+            await this.sendCommand('devices.list');
+            const latency = Date.now() - startTime;
+            
+            this.heartbeatPending = false;
+            this.heartbeatFailures = 0;
+            
+            this.logger.debug('BackendService', `✓ Heartbeat OK (latency: ${latency}ms)`);
+            
+        } catch (error) {
+            this.heartbeatPending = false;
+            this.heartbeatFailures++;
+            
+            this.logger.warn('BackendService', 
+                `⚠️ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+            
+            if (this.heartbeatFailures >= 3) {
+                this.logger.error('BackendService', '💀 Multiple heartbeat failures, forcing reconnect');
+                this.forceReconnect('Multiple heartbeat failures');
             }
-        };
-        
-        this.heartbeatPending = true;
-        
-        // Créer une promesse pour gérer le timeout
-        const timeoutPromise = new Promise((resolve) => {
-            this.heartbeatTimeoutTimer = setTimeout(() => {
-                if (this.heartbeatPending) {
-                    this.logger.error('BackendService', '💀 Heartbeat timeout - reconnecting');
-                    this.heartbeatPending = false;
-                    this.heartbeatFailures++;
-                    
-                    if (this.heartbeatFailures >= 2) {
-                        this.forceReconnect('Heartbeat timeout');
-                    }
-                }
-                resolve();
-            }, this.config.heartbeatTimeout);
-        });
-        
-        // Enregistrer la requête pour recevoir la réponse
-        this.pendingRequests.set(heartbeatId, {
-            resolve: (data) => {
-                clearTimeout(this.heartbeatTimeoutTimer);
-                this.heartbeatPending = false;
-                this.heartbeatFailures = 0;
-                this.logger.debug('BackendService', '✓ Heartbeat OK');
-            },
-            reject: (error) => {
-                clearTimeout(this.heartbeatTimeoutTimer);
-                this.heartbeatPending = false;
-                this.heartbeatFailures++;
-                this.logger.warn('BackendService', `⚠️ Heartbeat failed: ${error.message}`);
-                
-                if (this.heartbeatFailures >= 2) {
-                    this.forceReconnect('Multiple heartbeat failures');
-                }
-            }
-        });
-        
-        this.send(ping);
-        this.logger.debug('BackendService', '💗 Sending ping (system.ping)');
+        }
     }
     
-    /**
-     * Arrête le heartbeat
-     */
     stopHeartbeat() {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
             this.heartbeatTimer = null;
+            this.heartbeatPending = false;
         }
-        if (this.heartbeatTimeoutTimer) {
-            clearTimeout(this.heartbeatTimeoutTimer);
-            this.heartbeatTimeoutTimer = null;
-        }
-        this.heartbeatPending = false;
     }
     
-    /**
-     * Force une reconnexion immédiate
-     */
     forceReconnect(reason) {
         this.logger.warn('BackendService', `Forcing reconnect: ${reason}`);
         
@@ -390,130 +307,100 @@ class BackendService {
         this.connected = false;
         this.connecting = false;
         
-        // Reconnexion immédiate (sans backoff)
         setTimeout(() => {
             this.connect();
         }, 1000);
     }
     
     /**
-     * Gère les messages reçus selon le protocole
+     * ✅ CORRIGÉ: Gère format backend réel type="response", payload={...}
      */
     handleMessage(event) {
         try {
-            const message = JSON.parse(event.data);
+            const data = JSON.parse(event.data);
             
-            // Toute réponse/event = activité backend
+            this.logger.debug('BackendService', 'Message received:', data);
+            
+            // Toute réponse = activité backend
             this.lastActivityTime = Date.now();
             
-            this.logger.debug('BackendService', 'Message received:', message);
+            // ✅ Détecter type de message
+            const messageType = data.type || 'unknown';
+            const messageId = data.id;
             
-            // Vérifier le format du protocole
-            if (!message.id || !message.type) {
-                this.logger.warn('BackendService', 'Invalid message format (missing id or type)');
+            // ✅ Si type="response" => réponse à une commande
+            if (messageType === 'response' && messageId !== undefined) {
+                // Convertir ID string en nombre si nécessaire pour lookup
+                let lookupId = messageId;
+                if (typeof messageId === 'string' && !isNaN(parseInt(messageId))) {
+                    lookupId = parseInt(messageId);
+                }
+                
+                // Chercher avec ID original ET converti
+                let pending = this.pendingRequests.get(messageId) || this.pendingRequests.get(lookupId);
+                
+                if (pending) {
+                    // Supprimer avec les deux clés possibles
+                    this.pendingRequests.delete(messageId);
+                    this.pendingRequests.delete(lookupId);
+                    
+                    // ✅ Extraire payload
+                    const payload = data.payload || {};
+                    
+                    // Vérifier erreur
+                    if (payload.error || payload.status === 'error') {
+                        const error = new Error(payload.error || payload.message || 'Command failed');
+                        error.code = payload.error_code || payload.code;
+                        pending.reject(error);
+                    } else {
+                        // Succès
+                        pending.resolve(payload);
+                    }
+                    return;
+                }
+            }
+            
+            // ✅ Backward compatibility: ancien format {success, data}
+            if (messageId !== undefined && this.pendingRequests.has(messageId)) {
+                const pending = this.pendingRequests.get(messageId);
+                this.pendingRequests.delete(messageId);
+                
+                if (data.success === true) {
+                    pending.resolve(data.data || data);
+                } else {
+                    const error = new Error(data.error || 'Command failed');
+                    error.code = data.error_code;
+                    pending.reject(error);
+                }
                 return;
             }
             
-            switch (message.type) {
-                case 'response':
-                    this.handleResponse(message);
-                    break;
+            // ✅ Si type="event" => événement backend
+            if (messageType === 'event' || data.event) {
+                const eventName = data.event || data.payload?.event;
+                if (eventName) {
+                    this.eventBus.emit(`backend:event:${eventName}`, data);
                     
-                case 'event':
-                    this.handleEvent(message);
-                    break;
+                    const deviceId = data.device_id || data.payload?.device_id;
+                    if (deviceId !== undefined) {
+                        this.eventBus.emit(`${eventName}:${deviceId}`, data);
+                    }
                     
-                case 'error':
-                    this.handleErrorMessage(message);
-                    break;
-                    
-                default:
-                    this.logger.warn('BackendService', `Unknown message type: ${message.type}`);
+                    this.logger.debug('BackendService', `Event received: ${eventName}`, data);
+                    return;
+                }
             }
+            
+            // Événement générique
+            this.eventBus.emit('backend:message', data);
             
         } catch (error) {
             this.logger.error('BackendService', 'Error parsing message:', error);
         }
     }
     
-    /**
-     * Gère les réponses
-     */
-    handleResponse(message) {
-        const { payload } = message;
-        
-        if (!payload || !payload.request_id) {
-            this.logger.warn('BackendService', 'Response missing request_id');
-            return;
-        }
-        
-        const requestId = payload.request_id;
-        
-        if (!this.pendingRequests.has(requestId)) {
-            this.logger.debug('BackendService', `No pending request for id: ${requestId}`);
-            return;
-        }
-        
-        const pending = this.pendingRequests.get(requestId);
-        this.pendingRequests.delete(requestId);
-        
-        if (payload.success === true) {
-            pending.resolve(payload.data || payload);
-        } else {
-            const error = new Error(payload.error_message || 'Command failed');
-            error.code = payload.error_code;
-            pending.reject(error);
-        }
-    }
-    
-    /**
-     * Gère les événements
-     */
-    handleEvent(message) {
-        const { payload } = message;
-        
-        if (!payload || !payload.name) {
-            this.logger.warn('BackendService', 'Event missing name');
-            return;
-        }
-        
-        const eventName = payload.name;
-        const eventData = payload.data || {};
-        
-        // Émettre événement spécifique
-        this.eventBus.emit(`backend:event:${eventName}`, {
-            ...eventData,
-            priority: payload.priority,
-            source: payload.source,
-            timestamp: message.timestamp
-        });
-        
-        this.logger.debug('BackendService', `Event received: ${eventName}`, eventData);
-    }
-    
-    /**
-     * Gère les messages d'erreur
-     */
-    handleErrorMessage(message) {
-        const { payload } = message;
-        
-        this.logger.error('BackendService', 'Error message:', payload);
-        
-        this.eventBus.emit('backend:error-message', {
-            code: payload.code,
-            message: payload.message,
-            details: payload.details,
-            retryable: payload.retryable,
-            timestamp: message.timestamp
-        });
-    }
-    
-    /**
-     * Envoie un message au backend
-     */
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            // Ajouter à la file d'attente
             if (this.messageQueue.length < this.maxQueueSize) {
                 this.messageQueue.push(data);
                 this.logger.debug('BackendService', 'Message queued (not connected)');
@@ -533,9 +420,6 @@ class BackendService {
         }
     }
     
-    /**
-     * Envoie une commande au backend selon le protocole
-     */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
             if (!this.isConnected()) {
@@ -543,10 +427,9 @@ class BackendService {
                 return;
             }
             
-            const timeoutMs = timeout || this.config.defaultCommandTimeout;
-            const requestId = this.generateUUID();
+            const timeoutMs = timeout || this.config.defaultCommandTimeout || 5000;
+            const requestId = ++this.requestId;
             
-            // Timer de timeout
             const timeoutTimer = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
@@ -554,7 +437,6 @@ class BackendService {
                 }
             }, timeoutMs);
             
-            // Enregistrer avec cleanup du timeout
             this.pendingRequests.set(requestId, {
                 resolve: (data) => {
                     clearTimeout(timeoutTimer);
@@ -566,18 +448,10 @@ class BackendService {
                 }
             });
             
-            // Format selon protocole
             const message = {
                 id: requestId,
-                type: 'request',
-                timestamp: this.getISO8601Timestamp(),
-                version: this.config.protocolVersion,
-                payload: {
-                    id: requestId,
-                    command: command,
-                    params: params,
-                    timeout: timeoutMs
-                }
+                command: command,
+                params: params
             };
             
             this.send(message);
@@ -586,126 +460,52 @@ class BackendService {
         });
     }
     
-    /**
-     * Vide la file d'attente des messages
-     */
-    flushMessageQueue() {
-        if (this.messageQueue.length === 0) return;
-        
-        this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages`);
-        
-        while (this.messageQueue.length > 0) {
-            const message = this.messageQueue.shift();
-            this.send(message);
-        }
+    async uploadFile(file, progressCallback = null) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = async () => {
+                try {
+                    const base64Data = btoa(
+                        new Uint8Array(reader.result)
+                            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    
+                    const response = await this.sendCommand('files.upload', {
+                        filename: file.name,
+                        data: base64Data,
+                        size: file.size,
+                        type: file.type
+                    });
+                    
+                    resolve(response);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = () => reject(new Error('File read error'));
+            reader.readAsArrayBuffer(file);
+        });
     }
     
-    /**
-     * Déconnecte du backend
-     */
-    disconnect() {
-        this.stopHeartbeat();
-        this.reconnectionStopped = true;
-        
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = null;
-        }
-        
-        // Rejeter toutes les requêtes en attente
-        for (const [requestId, { reject }] of this.pendingRequests.entries()) {
-            reject(new Error('Disconnected'));
-        }
-        this.pendingRequests.clear();
-        
-        if (this.ws) {
-            this.ws.close(1000, 'Client disconnect');
-            this.ws = null;
-        }
-        
-        this.connected = false;
-        this.connecting = false;
-        this.reconnectAttempts = 0;
-        
-        this.logger.info('BackendService', 'Disconnected');
-    }
+    // === COMMANDES API ===
     
-    /**
-     * Réactive la reconnexion automatique
-     */
-    enableReconnection() {
-        this.reconnectionStopped = false;
-        this.offlineMode = false;
-        this.reconnectAttempts = 0;
-        
-        if (!this.connected && !this.connecting) {
-            this.logger.info('BackendService', 'Reconnection enabled, attempting to connect');
-            this.connect();
-        }
-    }
-    
-    /**
-     * Vérifie si connecté
-     */
-    isConnected() {
-        return this.connected && this.ws && this.ws.readyState === WebSocket.OPEN;
-    }
-    
-    /**
-     * Vérifie si en mode offline
-     */
-    isOffline() {
-        return this.offlineMode;
-    }
-    
-    /**
-     * Obtient l'état de la connexion
-     */
-    getConnectionState() {
-        if (this.offlineMode) return 'offline';
-        if (!this.ws) return 'disconnected';
-        
-        switch (this.ws.readyState) {
-            case WebSocket.CONNECTING: return 'connecting';
-            case WebSocket.OPEN: return 'connected';
-            case WebSocket.CLOSING: return 'closing';
-            case WebSocket.CLOSED: return 'disconnected';
-            default: return 'unknown';
-        }
-    }
-    
-    /**
-     * Obtient le statut complet
-     */
-    getStatus() {
-        return {
-            connected: this.connected,
-            connecting: this.connecting,
-            offlineMode: this.offlineMode,
-            reconnectAttempts: this.reconnectAttempts,
-            maxReconnectAttempts: this.config.maxReconnectAttempts,
-            reconnectionStopped: this.reconnectionStopped,
-            state: this.getConnectionState(),
-            queuedMessages: this.messageQueue.length,
-            url: this.config.url,
-            lastActivityTime: this.lastActivityTime,
-            timeSinceActivity: Date.now() - this.lastActivityTime,
-            heartbeatFailures: this.heartbeatFailures,
-            heartbeatPending: this.heartbeatPending
-        };
-    }
-    
-    // ========================================================================
-    // MÉTHODES API - Wrapper pour les commandes backend
-    // ========================================================================
-    
-    // --- DEVICES ---
+    // DEVICES
     async listDevices() {
         return this.sendCommand('devices.list');
     }
     
     async getDevice(deviceId) {
-        return this.sendCommand('devices.get', { device_id: deviceId });
+        return this.sendCommand('devices.info', { device_id: deviceId });
+    }
+    
+    async enableDevice(deviceId) {
+        return this.sendCommand('devices.enable', { device_id: deviceId });
+    }
+    
+    async disableDevice(deviceId) {
+        return this.sendCommand('devices.disable', { device_id: deviceId });
     }
     
     async connectDevice(deviceId) {
@@ -716,13 +516,64 @@ class BackendService {
         return this.sendCommand('devices.disconnect', { device_id: deviceId });
     }
     
-    async refreshDevices() {
-        return this.sendCommand('devices.refresh');
+    async setDeviceConfig(deviceId, config) {
+        return this.sendCommand('devices.config.set', { device_id: deviceId, config });
     }
     
-    // --- PLAYBACK ---
-    async play() {
-        return this.sendCommand('playback.play');
+    async getDeviceConfig(deviceId) {
+        return this.sendCommand('devices.config.get', { device_id: deviceId });
+    }
+    
+    // ROUTING
+    async addRoute(sourceId, destId, channel = null) {
+        const params = { source_id: sourceId, dest_id: destId };
+        if (channel !== null) params.channel = channel;
+        return this.sendCommand('routing.add', params);
+    }
+    
+    async removeRoute(routeId) {
+        return this.sendCommand('routing.remove', { route_id: routeId });
+    }
+    
+    async listRoutes() {
+        return this.sendCommand('routing.list');
+    }
+    
+    async updateRoute(routeId, config) {
+        return this.sendCommand('routing.update', { route_id: routeId, config });
+    }
+    
+    async clearRoutes() {
+        return this.sendCommand('routing.clear');
+    }
+    
+    async setRoutingMatrix(matrix) {
+        return this.sendCommand('routing.setMatrix', { matrix });
+    }
+    
+    async getRoutingMatrix() {
+        return this.sendCommand('routing.getMatrix');
+    }
+    
+    async enableChannel(routeId, channel) {
+        return this.sendCommand('routing.channel.enable', { route_id: routeId, channel });
+    }
+    
+    async disableChannel(routeId, channel) {
+        return this.sendCommand('routing.channel.disable', { route_id: routeId, channel });
+    }
+    
+    async setTranspose(routeId, semitones) {
+        return this.sendCommand('routing.transpose', { route_id: routeId, semitones });
+    }
+    
+    async setVelocityCurve(routeId, curve) {
+        return this.sendCommand('routing.velocityCurve', { route_id: routeId, curve });
+    }
+    
+    // PLAYBACK
+    async play(fileId = null) {
+        return this.sendCommand('playback.play', fileId ? { file_id: fileId } : {});
     }
     
     async pause() {
@@ -742,11 +593,24 @@ class BackendService {
     }
     
     async getStatus() {
-        return this.sendCommand('playback.status');
+        return this.sendCommand('playback.getStatus');
     }
     
-    // --- FILES ---
-    async listFiles(path = '/') {
+    async setLoop(enabled, startTick = null, endTick = null) {
+        const params = { enabled };
+        if (startTick !== null) params.start_tick = startTick;
+        if (endTick !== null) params.end_tick = endTick;
+        return this.sendCommand('playback.setLoop', params);
+    }
+    
+    async setMetronome(enabled, volume = null) {
+        const params = { enabled };
+        if (volume !== null) params.volume = volume;
+        return this.sendCommand('playback.setMetronome', params);
+    }
+    
+    // FILES
+    async listFiles(path = '/midi') {
         return this.sendCommand('files.list', { path });
     }
     
@@ -762,17 +626,82 @@ class BackendService {
         return this.sendCommand('files.delete', { path });
     }
     
+    async renameFile(oldPath, newPath) {
+        return this.sendCommand('files.rename', { old_path: oldPath, new_path: newPath });
+    }
+    
+    async createDirectory(path) {
+        return this.sendCommand('files.mkdir', { path });
+    }
+    
     async getFileInfo(path) {
         return this.sendCommand('files.info', { path });
     }
     
-    // --- SYSTEM ---
-    async getSystemInfo() {
+    async scanDirectory(path) {
+        return this.sendCommand('files.scan', { path });
+    }
+    
+    // EDITOR
+    async getEditorData(fileId) {
+        return this.sendCommand('editor.getData', { file_id: fileId });
+    }
+    
+    async setEditorData(fileId, data) {
+        return this.sendCommand('editor.setData', { file_id: fileId, data });
+    }
+    
+    async addNote(fileId, track, note) {
+        return this.sendCommand('editor.addNote', { file_id: fileId, track, note });
+    }
+    
+    async removeNote(fileId, track, noteId) {
+        return this.sendCommand('editor.removeNote', { file_id: fileId, track, note_id: noteId });
+    }
+    
+    async updateNote(fileId, track, noteId, changes) {
+        return this.sendCommand('editor.updateNote', { file_id: fileId, track, note_id: noteId, changes });
+    }
+    
+    async addCC(fileId, track, cc) {
+        return this.sendCommand('editor.addCC', { file_id: fileId, track, cc });
+    }
+    
+    async removeCC(fileId, track, ccId) {
+        return this.sendCommand('editor.removeCC', { file_id: fileId, track, cc_id: ccId });
+    }
+    
+    async updateCC(fileId, track, ccId, changes) {
+        return this.sendCommand('editor.updateCC', { file_id: fileId, track, cc_id: ccId, changes });
+    }
+    
+    async quantize(fileId, track, grid) {
+        return this.sendCommand('editor.quantize', { file_id: fileId, track, grid });
+    }
+    
+    async transpose(fileId, track, semitones) {
+        return this.sendCommand('editor.transpose', { file_id: fileId, track, semitones });
+    }
+    
+    // SYSTEM
+    async getVersion() {
+        return this.sendCommand('system.version');
+    }
+    
+    async getInfo() {
         return this.sendCommand('system.info');
     }
     
-    async ping() {
-        return this.sendCommand('system.ping');
+    async getUptime() {
+        return this.sendCommand('system.uptime');
+    }
+    
+    async getMemory() {
+        return this.sendCommand('system.memory');
+    }
+    
+    async getDisk() {
+        return this.sendCommand('system.disk');
     }
     
     async shutdown() {
@@ -783,60 +712,112 @@ class BackendService {
         return this.sendCommand('system.restart');
     }
     
-    // --- ROUTING ---
-    async addRoute(sourceId, destId, channel = null) {
+    async getLogs(lines = 100) {
+        return this.sendCommand('system.logs', { lines });
+    }
+    
+    // LATENCY
+    async measureLatency(deviceId) {
+        return this.sendCommand('latency.measure', { device_id: deviceId });
+    }
+    
+    async setOffset(deviceId, offset) {
+        return this.sendCommand('latency.setOffset', { device_id: deviceId, offset });
+    }
+    
+    async getOffset(deviceId) {
+        return this.sendCommand('latency.getOffset', { device_id: deviceId });
+    }
+    
+    async enableLatencyCompensation() {
+        return this.sendCommand('latency.enable');
+    }
+    
+    async disableLatencyCompensation() {
+        return this.sendCommand('latency.disable');
+    }
+    
+    async setGlobalOffset(offset) {
+        return this.sendCommand('latency.setGlobalOffset', { offset });
+    }
+    
+    async getGlobalOffset() {
+        return this.sendCommand('latency.getGlobalOffset');
+    }
+    
+    async listInstruments() {
+        return this.sendCommand('latency.listInstruments');
+    }
+    
+    // PRESETS
+    async listPresets() {
+        return this.sendCommand('preset.list');
+    }
+    
+    async loadPreset(name) {
+        return this.sendCommand('preset.load', { name });
+    }
+    
+    async savePreset(name, config) {
+        return this.sendCommand('preset.save', { name, config });
+    }
+    
+    async deletePreset(name) {
+        return this.sendCommand('preset.delete', { name });
+    }
+    
+    async exportPreset(name) {
+        return this.sendCommand('preset.export', { name });
+    }
+    
+    // MIDI
+    async convertMidi(data, format) {
+        return this.sendCommand('midi.convert', { data, format });
+    }
+    
+    async loadMidi(path) {
+        return this.sendCommand('midi.load', { path });
+    }
+    
+    async saveMidi(path, data) {
+        return this.sendCommand('midi.save', { path, data });
+    }
+    
+    async importMidi(data) {
+        return this.sendCommand('midi.import', { data });
+    }
+    
+    async addMidiRoute(sourceId, destId, channel = null) {
         const params = { source_id: sourceId, dest_id: destId };
         if (channel !== null) params.channel = channel;
-        return this.sendCommand('routing.add', params);
+        return this.sendCommand('midi.routing.add', params);
     }
     
-    async removeRoute(routeId) {
-        return this.sendCommand('routing.remove', { route_id: routeId });
+    async listMidiRoutes() {
+        return this.sendCommand('midi.routing.list');
     }
     
-    async listRoutes() {
-        return this.sendCommand('routing.list');
+    async updateMidiRoute(routeId, config) {
+        return this.sendCommand('midi.routing.update', { route_id: routeId, config });
     }
     
-    async clearRoutes() {
-        return this.sendCommand('routing.clear');
+    async removeMidiRoute(routeId) {
+        return this.sendCommand('midi.routing.remove', { route_id: routeId });
     }
     
-    // --- EDITOR ---
-    async getEditorState() {
-        return this.sendCommand('editor.getState');
+    async clearMidiRoutes() {
+        return this.sendCommand('midi.routing.clear');
     }
     
-    async setEditorState(state) {
-        return this.sendCommand('editor.setState', state);
+    async sendNoteOn(channel, note, velocity) {
+        return this.sendCommand('midi.sendNoteOn', { channel, note, velocity });
     }
     
-    async addNote(note) {
-        return this.sendCommand('editor.addNote', note);
+    async sendNoteOff(channel, note) {
+        return this.sendCommand('midi.sendNoteOff', { channel, note });
     }
     
-    async removeNote(noteId) {
-        return this.sendCommand('editor.removeNote', { note_id: noteId });
-    }
-    
-    async updateNote(noteId, note) {
-        return this.sendCommand('editor.updateNote', { note_id: noteId, ...note });
-    }
-    
-    // --- INSTRUMENTS ---
-    async listInstruments() {
-        return this.sendCommand('instruments.list');
-    }
-    
-    async getInstrument(instrumentId) {
-        return this.sendCommand('instruments.get', { instrument_id: instrumentId });
-    }
-    
-    async setInstrumentConfig(instrumentId, config) {
-        return this.sendCommand('instruments.setConfig', { instrument_id: instrumentId, config });
-    }
-    
-    // --- PLAYLISTS ---
+    // PLAYLISTS
     async createPlaylist(name, items = []) {
         return this.sendCommand('playlist.create', { name, items });
     }
@@ -867,9 +848,106 @@ class BackendService {
             item_id: itemId 
         });
     }
+    
+    async reorderPlaylist(playlistId, order) {
+        return this.sendCommand('playlist.reorder', { playlist_id: playlistId, order });
+    }
+    
+    async setPlaylistLoop(playlistId, enabled) {
+        return this.sendCommand('playlist.setLoop', { 
+            playlist_id: playlistId, 
+            enabled 
+        });
+    }
+    
+    flushMessageQueue() {
+        if (this.messageQueue.length === 0) return;
+        
+        this.logger.info('BackendService', `Sending ${this.messageQueue.length} queued messages`);
+        
+        while (this.messageQueue.length > 0) {
+            const message = this.messageQueue.shift();
+            this.send(message);
+        }
+    }
+    
+    disconnect() {
+        this.stopHeartbeat();
+        this.reconnectionStopped = true;
+        
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        
+        for (const [requestId, { reject }] of this.pendingRequests.entries()) {
+            reject(new Error('Disconnected'));
+        }
+        this.pendingRequests.clear();
+        
+        if (this.ws) {
+            this.ws.close(1000, 'Client disconnect');
+            this.ws = null;
+        }
+        
+        this.connected = false;
+        this.connecting = false;
+        this.reconnectAttempts = 0;
+        
+        this.logger.info('BackendService', 'Disconnected');
+    }
+    
+    enableReconnection() {
+        this.reconnectionStopped = false;
+        this.offlineMode = false;
+        this.reconnectAttempts = 0;
+        
+        if (!this.connected && !this.connecting) {
+            this.logger.info('BackendService', 'Reconnection enabled, attempting to connect');
+            this.connect();
+        }
+    }
+    
+    isConnected() {
+        return this.connected && this.ws && this.ws.readyState === WebSocket.OPEN;
+    }
+    
+    isOffline() {
+        return this.offlineMode;
+    }
+    
+    getConnectionState() {
+        if (this.offlineMode) return 'offline';
+        if (!this.ws) return 'disconnected';
+        
+        switch (this.ws.readyState) {
+            case WebSocket.CONNECTING: return 'connecting';
+            case WebSocket.OPEN: return 'connected';
+            case WebSocket.CLOSING: return 'closing';
+            case WebSocket.CLOSED: return 'disconnected';
+            default: return 'unknown';
+        }
+    }
+    
+    getStatus() {
+        return {
+            connected: this.connected,
+            connecting: this.connecting,
+            offlineMode: this.offlineMode,
+            reconnectAttempts: this.reconnectAttempts,
+            maxReconnectAttempts: this.config.maxReconnectAttempts,
+            reconnectionStopped: this.reconnectionStopped,
+            state: this.getConnectionState(),
+            queuedMessages: this.messageQueue.length,
+            url: this.config.url,
+            lastActivityTime: this.lastActivityTime,
+            timeSinceActivity: Date.now() - this.lastActivityTime,
+            heartbeatFailures: this.heartbeatFailures,
+            heartbeatPending: this.heartbeatPending
+        };
+    }
 }
 
-// Export pour utilisation
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = BackendService;
 }
