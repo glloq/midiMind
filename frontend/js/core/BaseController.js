@@ -1,26 +1,26 @@
 /* ======================================================================================
-   CONTRÔLEUR DE BASE - PATTERN CONTROLLER DU MVC
+   CONTRÃ”LEUR DE BASE - PATTERN CONTROLLER DU MVC
    ======================================================================================
    Fichier: frontend/js/core/BaseController.js
    Version: v3.3.0 - FIXED EVENTBUS FALLBACKS
    Date: 2025-10-31
    ======================================================================================
    CORRECTIONS v3.3.0:
-   ✅ CRITIQUE: Fallback robuste pour eventBus (window.eventBus)
-   ✅ Validation eventBus avant toute utilisation
-   ✅ Signature cohérente maintenue
-   ✅ Protection contre eventBus null
+   âœ… CRITIQUE: Fallback robuste pour eventBus (window.eventBus)
+   âœ… Validation eventBus avant toute utilisation
+   âœ… Signature cohÃ©rente maintenue
+   âœ… Protection contre eventBus null
    ====================================================================================== */
 
 class BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null) {
-        // ✅ CRITIQUE: EventBus avec fallback robuste
+        // âœ… CRITIQUE: EventBus avec fallback robuste
         this.eventBus = eventBus || window.eventBus || null;
         
         // Validation EventBus
         if (!this.eventBus) {
             console.error(`[${this.constructor.name}] CRITIQUE: EventBus non disponible!`);
-            // Créer un fallback minimal pour éviter les crashes
+            // CrÃ©er un fallback minimal pour Ã©viter les crashes
             this.eventBus = {
                 on: () => () => {},
                 once: () => () => {},
@@ -29,13 +29,13 @@ class BaseController {
             };
         }
         
-        // Références aux composants principaux
+        // RÃ©fÃ©rences aux composants principaux
         this.models = models;
         this.views = views;
         this.notifications = notifications;
         this.debugConsole = debugConsole;
         
-        // État du contrôleur
+        // Ã‰tat du contrÃ´leur
         this.state = {
             isInitialized: false,
             isActive: false,
@@ -54,11 +54,11 @@ class BaseController {
             cacheTTL: 5 * 60 * 1000 // 5 minutes
         };
         
-        // Gestion des événements
+        // Gestion des Ã©vÃ©nements
         this.eventSubscriptions = [];
         this.actionQueue = [];
         
-        // Métriques et monitoring
+        // MÃ©triques et monitoring
         this.metrics = {
             actionsExecuted: 0,
             errorsHandled: 0,
@@ -71,42 +71,42 @@ class BaseController {
         this.cacheTimestamps = new Map();
         this._lastCacheClean = null;
 		
-        // Validateurs d'entrée
+        // Validateurs d'entrÃ©e
         this.validators = {};
         
-        // Actions debouncées
+        // Actions debouncÃ©es
         this.debouncedActions = new Map();
         
-        // Initialisation automatique si configurée
+        // Initialisation automatique si configurÃ©e
         if (this.config.autoInitialize) {
             this.initialize();
         }
     }
 
     /**
-     * Initialiser le contrôleur
+     * Initialiser le contrÃ´leur
      */
     initialize() {
         if (this.state.isInitialized) {
-            this.logDebug('warning', `Contrôleur ${this.constructor.name} déjà initialisé`);
+            this.logDebug('warning', `ContrÃ´leur ${this.constructor.name} dÃ©jÃ  initialisÃ©`);
             return;
         }
         
         try {
-            // Exécuter l'initialisation personnalisée
+            // ExÃ©cuter l'initialisation personnalisÃ©e
             this.onInitialize();
             
-            // Lier les événements
+            // Lier les Ã©vÃ©nements
             this.bindEvents();
             
-            // Configurer les actions debouncées
+            // Configurer les actions debouncÃ©es
             this.setupDebouncedActions();
             
-            // Marquer comme initialisé
+            // Marquer comme initialisÃ©
             this.state.isInitialized = true;
             this.state.isActive = true;
             
-            this.logDebug('system', `Contrôleur ${this.constructor.name} initialisé`);
+            this.logDebug('system', `ContrÃ´leur ${this.constructor.name} initialisÃ©`);
             this.emitEvent('controller:initialized', {
                 controller: this.constructor.name
             });
@@ -117,26 +117,26 @@ class BaseController {
     }
 
     /**
-     * Hook d'initialisation personnalisée (à surcharger)
+     * Hook d'initialisation personnalisÃ©e (Ã  surcharger)
      */
     onInitialize() {
-        // À implémenter dans les classes filles
+        // Ã€ implÃ©menter dans les classes filles
     }
 
     /**
-     * Lier les événements du contrôleur (à surcharger)
+     * Lier les Ã©vÃ©nements du contrÃ´leur (Ã  surcharger)
      */
     bindEvents() {
-        // À surcharger dans les classes filles
-        this.logDebug('info', `Liaison des événements pour ${this.constructor.name}`);
+        // Ã€ surcharger dans les classes filles
+        this.logDebug('info', `Liaison des Ã©vÃ©nements pour ${this.constructor.name}`);
     }
 
     /**
-     * S'abonner à un événement avec gestion automatique
-     * @param {string} event - Nom de l'événement
+     * S'abonner Ã  un Ã©vÃ©nement avec gestion automatique
+     * @param {string} event - Nom de l'Ã©vÃ©nement
      * @param {function} handler - Gestionnaire
      * @param {Object} options - Options
-     * @returns {function} Fonction de désabonnement
+     * @returns {function} Fonction de dÃ©sabonnement
      */
     subscribe(event, handler, options = {}) {
         if (!this.eventBus || !this.eventBus.on) {
@@ -154,13 +154,13 @@ class BaseController {
         // Wrapper du gestionnaire avec gestion d'erreur et validation
         const wrappedHandler = (data) => {
             try {
-                // Validation optionnelle des données
+                // Validation optionnelle des donnÃ©es
                 if (opts.validate && !this.validateEventData(event, data)) {
-                    this.logDebug('warning', `Données invalides pour l'événement ${event}`);
+                    this.logDebug('warning', `DonnÃ©es invalides pour l'Ã©vÃ©nement ${event}`);
                     return;
                 }
                 
-                // Exécution du gestionnaire
+                // ExÃ©cution du gestionnaire
                 handler.call(this, data);
                 
             } catch (error) {
@@ -168,12 +168,12 @@ class BaseController {
             }
         };
         
-        // Debouncing si spécifié
+        // Debouncing si spÃ©cifiÃ©
         const finalHandler = opts.debounce > 0 
             ? this.debounce(wrappedHandler, opts.debounce)
             : wrappedHandler;
         
-        // S'abonner à l'événement
+        // S'abonner Ã  l'Ã©vÃ©nement
         const unsubscribe = opts.once
             ? this.eventBus.once(event, finalHandler)
             : this.eventBus.on(event, finalHandler);
@@ -189,9 +189,9 @@ class BaseController {
     }
 
     /**
-     * Émettre un événement
-     * @param {string} event - Nom de l'événement
-     * @param {*} data - Données de l'événement
+     * Ã‰mettre un Ã©vÃ©nement
+     * @param {string} event - Nom de l'Ã©vÃ©nement
+     * @param {*} data - DonnÃ©es de l'Ã©vÃ©nement
      */
     emitEvent(event, data) {
         if (!this.eventBus || !this.eventBus.emit) {
@@ -202,17 +202,17 @@ class BaseController {
         try {
             this.eventBus.emit(event, data);
         } catch (error) {
-            this.logDebug('error', `Erreur lors de l'émission de l'événement ${event}:`, error);
+            this.logDebug('error', `Erreur lors de l'Ã©mission de l'Ã©vÃ©nement ${event}:`, error);
         }
     }
 
     /**
-     * Exécuter une action avec gestion d'erreur et logging
+     * ExÃ©cuter une action avec gestion d'erreur et logging
      * @param {string} actionName - Nom de l'action
      * @param {function} action - Fonction d'action
-     * @param {*} data - Données pour l'action
-     * @param {Object} options - Options d'exécution
-     * @returns {*} Résultat de l'action
+     * @param {*} data - DonnÃ©es pour l'action
+     * @param {Object} options - Options d'exÃ©cution
+     * @returns {*} RÃ©sultat de l'action
      */
     async executeAction(actionName, action, data = null, options = {}) {
         const opts = {
@@ -225,23 +225,23 @@ class BaseController {
             ...options
         };
         
-        // Vérifier si le contrôleur est actif
+        // VÃ©rifier si le contrÃ´leur est actif
         if (!this.state.isActive) {
-            throw new Error(`Contrôleur ${this.constructor.name} n'est pas actif`);
+            throw new Error(`ContrÃ´leur ${this.constructor.name} n'est pas actif`);
         }
         
-        // Validation des données d'entrée
+        // Validation des donnÃ©es d'entrÃ©e
         if (opts.validate && !this.validateActionData(actionName, data)) {
-            throw new Error(`Données invalides pour l'action ${actionName}`);
+            throw new Error(`DonnÃ©es invalides pour l'action ${actionName}`);
         }
         
-        // Nettoyer cache si nécessaire
+        // Nettoyer cache si nÃ©cessaire
         if (opts.cache && this.shouldCleanCache()) {
             this.cleanCache();
             this._lastCacheClean = Date.now();
         }
         
-        // Vérifier cache
+        // VÃ©rifier cache
         if (opts.cache) {
             const cached = this.getCached(actionName);
             if (cached !== null) {
@@ -260,10 +260,10 @@ class BaseController {
             try {
                 // Logging de l'action
                 if (opts.log) {
-                    this.logDebug('action', `Exécution: ${actionName}`, data);
+                    this.logDebug('action', `ExÃ©cution: ${actionName}`, data);
                 }
                 
-                // Exécution avec timeout optionnel
+                // ExÃ©cution avec timeout optionnel
                 let result;
                 if (opts.timeout > 0) {
                     result = await this.executeWithTimeout(action, data, opts.timeout);
@@ -271,14 +271,14 @@ class BaseController {
                     result = await action.call(this, data);
                 }
                 
-                // Mise en cache du résultat
+                // Mise en cache du rÃ©sultat
                 if (opts.cache && result !== undefined) {
                     const cacheKey = `${actionName}:${JSON.stringify(data)}`;
                     this.cache.set(cacheKey, result);
                     this.cacheTimestamps.set(cacheKey, Date.now());
                 }
                 
-                // Métriques
+                // MÃ©triques
                 this.metrics.actionsExecuted++;
                 this.state.lastAction = {
                     name: actionName,
@@ -287,7 +287,7 @@ class BaseController {
                     success: true
                 };
                 
-                // Notification de succès
+                // Notification de succÃ¨s
                 if (opts.notify && opts.notify.success) {
                     this.showNotification(opts.notify.success, 'success');
                 }
@@ -297,7 +297,7 @@ class BaseController {
             } catch (error) {
                 lastError = error;
                 
-                // Retry si demandé
+                // Retry si demandÃ©
                 if (attempts <= opts.retry) {
                     this.logDebug('warning', `Retry ${attempts}/${opts.retry} pour ${actionName}`);
                     await this.sleep(Math.min(1000 * attempts, 5000)); // Backoff exponentiel
@@ -307,7 +307,7 @@ class BaseController {
                 // Logging de l'erreur
                 this.logDebug('error', `Erreur dans action ${actionName}:`, error);
                 
-                // Métriques
+                // MÃ©triques
                 this.metrics.errorsHandled++;
                 this.state.lastAction = {
                     name: actionName,
@@ -322,7 +322,7 @@ class BaseController {
                     this.showNotification(opts.notify.error, 'error');
                 }
                 
-                // Gérer l'erreur ou la propager
+                // GÃ©rer l'erreur ou la propager
                 if (this.config.handleErrors) {
                     this.handleError(actionName, error);
                 } else {
@@ -331,25 +331,25 @@ class BaseController {
             }
         } while (attempts <= opts.retry);
         
-        // Si on arrive ici, toutes les tentatives ont échoué
+        // Si on arrive ici, toutes les tentatives ont Ã©chouÃ©
         throw lastError;
     }
 
     /**
-     * Valider les données d'un événement
-     * @param {string} event - Nom de l'événement
-     * @param {*} data - Données à valider
+     * Valider les donnÃ©es d'un Ã©vÃ©nement
+     * @param {string} event - Nom de l'Ã©vÃ©nement
+     * @param {*} data - DonnÃ©es Ã  valider
      * @returns {boolean} True si valide
      */
     validateEventData(event, data) {
-        // Implémentation basique - à surcharger si nécessaire
+        // ImplÃ©mentation basique - Ã  surcharger si nÃ©cessaire
         return true;
     }
 
     /**
-     * Valider les données d'une action
+     * Valider les donnÃ©es d'une action
      * @param {string} action - Nom de l'action
-     * @param {*} data - Données à valider
+     * @param {*} data - DonnÃ©es Ã  valider
      * @returns {boolean} True si valide
      */
     validateActionData(action, data) {
@@ -369,7 +369,7 @@ class BaseController {
     }
 
     /**
-     * Gérer une erreur
+     * GÃ©rer une erreur
      * @param {string} context - Contexte de l'erreur
      * @param {Error} error - Erreur
      */
@@ -384,7 +384,7 @@ class BaseController {
         this.state.errors.push(errorInfo);
         this.logDebug('error', `[${context}]`, error);
         
-        // Émettre un événement d'erreur
+        // Ã‰mettre un Ã©vÃ©nement d'erreur
         this.emitEvent('controller:error', errorInfo);
     }
 
@@ -423,7 +423,7 @@ class BaseController {
     /**
      * Logger avec niveau de debug
      * @param {string} level - Niveau (debug, info, warning, error, action, system)
-     * @param {...*} args - Arguments à logger
+     * @param {...*} args - Arguments Ã  logger
      */
     logDebug(level, ...args) {
         if (this.debugConsole && typeof this.debugConsole.log === 'function') {
@@ -444,6 +444,17 @@ class BaseController {
     }
 
     /**
+     * Méthode de logging flexible
+     * Compatible avec signatures multiples
+     * @param {string} level - Niveau (info, warn, error, debug)
+     * @param {...*} args - Arguments
+     */
+    log(level, ...args) {
+        // Rediriger vers logDebug pour cohérence
+        this.logDebug(level, ...args);
+    }
+
+    /**
      * Configurer les actions debouncées
      */
     setupDebouncedActions() {
@@ -456,8 +467,8 @@ class BaseController {
     }
 
     /**
-     * Obtenir l'état du contrôleur
-     * @returns {Object} État
+     * Obtenir l'Ã©tat du contrÃ´leur
+     * @returns {Object} Ã‰tat
      */
     getState() {
         return {
@@ -467,8 +478,8 @@ class BaseController {
     }
 
     /**
-     * Obtenir les métriques du contrôleur
-     * @returns {Object} Métriques
+     * Obtenir les mÃ©triques du contrÃ´leur
+     * @returns {Object} MÃ©triques
      */
     getMetrics() {
         return {
@@ -480,7 +491,7 @@ class BaseController {
 
     /**
      * Obtenir une valeur du cache
-     * @param {string} key - Clé
+     * @param {string} key - ClÃ©
      * @returns {*} Valeur ou null
      */
     getCached(key) {
@@ -500,7 +511,7 @@ class BaseController {
 
     /**
      * Mettre une valeur en cache
-     * @param {string} key - Clé
+     * @param {string} key - ClÃ©
      * @param {*} value - Valeur
      */
     setCached(key, value) {
@@ -526,11 +537,11 @@ class BaseController {
             this.cacheTimestamps.clear();
         }
         
-        this.logDebug('info', `Cache nettoyé${pattern ? ` (pattern: ${pattern})` : ''}`);
+        this.logDebug('info', `Cache nettoyÃ©${pattern ? ` (pattern: ${pattern})` : ''}`);
     }
 
     /**
-     * Nettoie les entrées de cache expirées
+     * Nettoie les entrÃ©es de cache expirÃ©es
      * @private
      */
     cleanCache() {
@@ -546,7 +557,7 @@ class BaseController {
     }
 
     /**
-     * Vérifie si le cache doit être nettoyé
+     * VÃ©rifie si le cache doit Ãªtre nettoyÃ©
      * @private
      */
     shouldCleanCache() {
@@ -558,32 +569,32 @@ class BaseController {
     }
 
     /**
-     * Activer le contrôleur
+     * Activer le contrÃ´leur
      */
     activate() {
         this.state.isActive = true;
-        this.logDebug('system', `Contrôleur ${this.constructor.name} activé`);
+        this.logDebug('system', `ContrÃ´leur ${this.constructor.name} activÃ©`);
         this.emitEvent('controller:activated', { controller: this.constructor.name });
     }
 
     /**
-     * Désactiver le contrôleur
+     * DÃ©sactiver le contrÃ´leur
      */
     deactivate() {
         this.state.isActive = false;
-        this.logDebug('system', `Contrôleur ${this.constructor.name} désactivé`);
+        this.logDebug('system', `ContrÃ´leur ${this.constructor.name} dÃ©sactivÃ©`);
         this.emitEvent('controller:deactivated', { controller: this.constructor.name });
     }
 
     /**
-     * Détruire le contrôleur et nettoyer les ressources
+     * DÃ©truire le contrÃ´leur et nettoyer les ressources
      */
     destroy() {
         if (this.state.isDestroyed) {
             return;
         }
         
-        // Hook de destruction personnalisé
+        // Hook de destruction personnalisÃ©
         if (typeof this.onDestroy === 'function') {
             try {
                 this.onDestroy();
@@ -592,7 +603,7 @@ class BaseController {
             }
         }
         
-        // Nettoyer les abonnements aux événements
+        // Nettoyer les abonnements aux Ã©vÃ©nements
         this.eventSubscriptions.forEach(({ unsubscribe }) => {
             if (typeof unsubscribe === 'function') {
                 unsubscribe();
@@ -604,24 +615,24 @@ class BaseController {
         this.cache.clear();
         this.cacheTimestamps.clear();
         
-        // Nettoyer les actions debouncées
+        // Nettoyer les actions debouncÃ©es
         this.debouncedActions.clear();
         
-        // Marquer comme détruit
+        // Marquer comme dÃ©truit
         this.state.isDestroyed = true;
         this.state.isActive = false;
         
-        this.logDebug('system', `Contrôleur ${this.constructor.name} détruit`);
+        this.logDebug('system', `ContrÃ´leur ${this.constructor.name} dÃ©truit`);
         this.emitEvent('controller:destroyed', { controller: this.constructor.name });
     }
 
-    // ===== MÉTHODES UTILITAIRES =====
+    // ===== MÃ‰THODES UTILITAIRES =====
 
     /**
-     * Créer une fonction debouncée
-     * @param {function} func - Fonction à debouncer
-     * @param {number} delay - Délai en ms
-     * @returns {function} Fonction debouncée
+     * CrÃ©er une fonction debouncÃ©e
+     * @param {function} func - Fonction Ã  debouncer
+     * @param {number} delay - DÃ©lai en ms
+     * @returns {function} Fonction debouncÃ©e
      */
     debounce(func, delay) {
         let timeoutId;
@@ -632,10 +643,10 @@ class BaseController {
     }
 
     /**
-     * Créer une fonction throttlée
-     * @param {function} func - Fonction à throttler
-     * @param {number} delay - Délai en ms
-     * @returns {function} Fonction throttlée
+     * CrÃ©er une fonction throttlÃ©e
+     * @param {function} func - Fonction Ã  throttler
+     * @param {number} delay - DÃ©lai en ms
+     * @returns {function} Fonction throttlÃ©e
      */
     throttle(func, delay) {
         let lastCall = 0;
@@ -649,11 +660,11 @@ class BaseController {
     }
 
     /**
-     * Exécuter une fonction avec timeout
-     * @param {function} func - Fonction à exécuter
-     * @param {*} data - Données
+     * ExÃ©cuter une fonction avec timeout
+     * @param {function} func - Fonction Ã  exÃ©cuter
+     * @param {*} data - DonnÃ©es
      * @param {number} timeout - Timeout en ms
-     * @returns {Promise} Résultat ou timeout
+     * @returns {Promise} RÃ©sultat ou timeout
      */
     executeWithTimeout(func, data, timeout) {
         return Promise.race([
@@ -665,18 +676,18 @@ class BaseController {
     }
 
     /**
-     * Attendre un délai
-     * @param {number} ms - Délai en ms
-     * @returns {Promise} Promise qui se résout après le délai
+     * Attendre un dÃ©lai
+     * @param {number} ms - DÃ©lai en ms
+     * @returns {Promise} Promise qui se rÃ©sout aprÃ¨s le dÃ©lai
      */
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /**
-     * Formater une durée en millisecondes
+     * Formater une durÃ©e en millisecondes
      * @param {number} ms - Millisecondes
-     * @returns {string} Durée formatée
+     * @returns {string} DurÃ©e formatÃ©e
      */
     formatDuration(ms) {
         if (ms < 1000) return `${ms}ms`;
@@ -685,7 +696,7 @@ class BaseController {
     }
 
     /**
-     * Générer un ID unique
+     * GÃ©nÃ©rer un ID unique
      * @returns {string} ID unique
      */
     generateId() {
@@ -693,9 +704,9 @@ class BaseController {
     }
 
     /**
-     * Obtenir un modèle de manière sécurisée
-     * @param {string} name - Nom du modèle
-     * @returns {Object|null} Modèle ou null
+     * Obtenir un modÃ¨le de maniÃ¨re sÃ©curisÃ©e
+     * @param {string} name - Nom du modÃ¨le
+     * @returns {Object|null} ModÃ¨le ou null
      */
     getModel(name) {
         if (!this.models || typeof this.models !== 'object') {
@@ -705,7 +716,7 @@ class BaseController {
     }
 
     /**
-     * Obtenir une vue de manière sécurisée
+     * Obtenir une vue de maniÃ¨re sÃ©curisÃ©e
      * @param {string} name - Nom de la vue
      * @returns {Object|null} Vue ou null
      */
@@ -717,9 +728,9 @@ class BaseController {
     }
 
     /**
-     * Définir un modèle
-     * @param {string} name - Nom du modèle
-     * @param {Object} model - Instance du modèle
+     * DÃ©finir un modÃ¨le
+     * @param {string} name - Nom du modÃ¨le
+     * @param {Object} model - Instance du modÃ¨le
      */
     setModel(name, model) {
         if (!this.models || typeof this.models !== 'object') {
@@ -730,7 +741,7 @@ class BaseController {
     }
 
     /**
-     * Définir une vue
+     * DÃ©finir une vue
      * @param {string} name - Nom de la vue
      * @param {Object} view - Instance de la vue
      */
@@ -743,16 +754,16 @@ class BaseController {
     }
 
     /**
-     * Vérifier si un modèle existe
-     * @param {string} name - Nom du modèle
-     * @returns {boolean} True si le modèle existe
+     * VÃ©rifier si un modÃ¨le existe
+     * @param {string} name - Nom du modÃ¨le
+     * @returns {boolean} True si le modÃ¨le existe
      */
     hasModel(name) {
         return this.getModel(name) !== null;
     }
 
     /**
-     * Vérifier si une vue existe
+     * VÃ©rifier si une vue existe
      * @param {string} name - Nom de la vue
      * @returns {boolean} True si la vue existe
      */
