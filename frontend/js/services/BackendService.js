@@ -306,7 +306,7 @@ class BackendService {
             
             // Ã¢Å“â€¦ Si type="response" => Utiliser data.id au lieu de payload.request_id. Matcher sur request_id
             if (messageType === 'response') {
-                const requestId = payload.id;
+                const requestId = payload.request_id;
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
@@ -421,6 +421,7 @@ class BackendService {
                 version: "1.0",
                 payload: {
                     id: requestId,
+                    request_id: requestId,  // ✅ Pour matching réponse
                     command: command,
                     params: params,
                     timeout: timeoutMs
