@@ -1,22 +1,22 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
-// Chemin réel: frontend/js/controllers/NavigationController.js
+// Chemin rÃ©el: frontend/js/controllers/NavigationController.js
 // Version: v4.0.0 - FIX PAGES NOT DISPLAYING
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.0.0:
-// ✅ CRITIQUE: Affichage/masquage direct des éléments DOM
-// ✅ CRITIQUE: Initialisation des vues quand la page est affichée
-// ✅ CRITIQUE: Suppression de la génération dynamique de contenu
-// ✅ Fix: Toutes les pages s'affichent correctement
-// ✅ Simplification: Navigation plus directe et fiable
+// âœ… CRITIQUE: Affichage/masquage direct des Ã©lÃ©ments DOM
+// âœ… CRITIQUE: Initialisation des vues quand la page est affichÃ©e
+// âœ… CRITIQUE: Suppression de la gÃ©nÃ©ration dynamique de contenu
+// âœ… Fix: Toutes les pages s'affichent correctement
+// âœ… Simplification: Navigation plus directe et fiable
 // ============================================================================
 
 class NavigationController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models, views, notifications, debugConsole, backend) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // État de navigation
+        // Ã‰tat de navigation
         this.currentPage = 'home';
         this.previousPage = null;
         this.navigationHistory = ['home'];
@@ -27,8 +27,8 @@ class NavigationController extends BaseController {
             home: {
                 id: 'home-view',
                 element: null,
-                title: '🏠 Accueil',
-                icon: '🏠',
+                title: 'ðŸ  Accueil',
+                icon: 'ðŸ ',
                 shortcut: 'h',
                 viewKey: 'home',
                 initialized: false
@@ -36,8 +36,8 @@ class NavigationController extends BaseController {
             files: {
                 id: 'file-view',
                 element: null,
-                title: '📁 Fichiers',
-                icon: '📁',
+                title: 'ðŸ“ Fichiers',
+                icon: 'ðŸ“',
                 shortcut: 'f',
                 viewKey: 'file',
                 initialized: false
@@ -45,8 +45,8 @@ class NavigationController extends BaseController {
             editor: {
                 id: 'editor-view',
                 element: null,
-                title: '✏️ Éditeur',
-                icon: '✏️',
+                title: 'âœï¸ Ã‰diteur',
+                icon: 'âœï¸',
                 shortcut: 'e',
                 viewKey: 'editor',
                 initialized: false
@@ -54,8 +54,8 @@ class NavigationController extends BaseController {
             routing: {
                 id: 'routing-view',
                 element: null,
-                title: '🔀 Routage',
-                icon: '🔀',
+                title: 'ðŸ”€ Routage',
+                icon: 'ðŸ”€',
                 shortcut: 'r',
                 viewKey: 'routing',
                 initialized: false
@@ -63,8 +63,8 @@ class NavigationController extends BaseController {
             keyboard: {
                 id: 'keyboard-view',
                 element: null,
-                title: '🎹 Clavier',
-                icon: '🎹',
+                title: 'ðŸŽ¹ Clavier',
+                icon: 'ðŸŽ¹',
                 shortcut: 'k',
                 viewKey: 'keyboard',
                 initialized: false
@@ -72,8 +72,8 @@ class NavigationController extends BaseController {
             instruments: {
                 id: 'instruments-view',
                 element: null,
-                title: '🎸 Instruments',
-                icon: '🎸',
+                title: 'ðŸŽ¸ Instruments',
+                icon: 'ðŸŽ¸',
                 shortcut: 'i',
                 viewKey: 'instrument',
                 initialized: false
@@ -81,8 +81,8 @@ class NavigationController extends BaseController {
             playlist: {
                 id: 'playlist-view',
                 element: null,
-                title: '📋 Playlist',
-                icon: '📋',
+                title: 'ðŸ“‹ Playlist',
+                icon: 'ðŸ“‹',
                 shortcut: 'p',
                 viewKey: 'playlist',
                 initialized: false
@@ -90,8 +90,8 @@ class NavigationController extends BaseController {
             system: {
                 id: 'system-view',
                 element: null,
-                title: '⚙️ Système',
-                icon: '⚙️',
+                title: 'âš™ï¸ SystÃ¨me',
+                icon: 'âš™ï¸',
                 shortcut: 's',
                 viewKey: 'system',
                 initialized: false
@@ -99,8 +99,8 @@ class NavigationController extends BaseController {
             visualizer: {
                 id: 'visualizer-view',
                 element: null,
-                title: '📊 Visualiseur',
-                icon: '📊',
+                title: 'ðŸ“Š Visualiseur',
+                icon: 'ðŸ“Š',
                 shortcut: 'v',
                 viewKey: 'visualizer',
                 initialized: false
@@ -113,13 +113,13 @@ class NavigationController extends BaseController {
             duration: 300
         };
         
-        this.log('info', 'NavigationController', '✅ Initialized v4.0.0');
+        this.logDebug('info', 'NavigationController', 'âœ… Initialized v4.0.0');
         
         this.initializeNavigation();
     }
 
     /**
-     * Liaison des événements
+     * Liaison des Ã©vÃ©nements
      */
     bindEvents() {
         this.eventBus.on('navigation:page_request', (data) => {
@@ -139,7 +139,7 @@ class NavigationController extends BaseController {
      * Initialisation
      */
     initializeNavigation() {
-        // Cacher l'élément #app d'abord
+        // Cacher l'Ã©lÃ©ment #app d'abord
         this.cachePageElements();
         this.setupKeyboardShortcuts();
         this.setupBrowserHistory();
@@ -148,11 +148,11 @@ class NavigationController extends BaseController {
         // Afficher la page initiale
         this.showPage('home', { skipHistory: true });
         
-        this.log('debug', 'NavigationController', 'Navigation system initialized');
+        this.logDebug('debug', 'NavigationController', 'Navigation system initialized');
     }
 
     /**
-     * Cache les références aux éléments DOM des pages
+     * Cache les rÃ©fÃ©rences aux Ã©lÃ©ments DOM des pages
      */
     cachePageElements() {
         Object.keys(this.pages).forEach(pageKey => {
@@ -166,7 +166,7 @@ class NavigationController extends BaseController {
                     pageConfig.element.classList.remove('active');
                 }
             } else {
-                this.log('warn', 'NavigationController', `Page element not found: ${pageConfig.id}`);
+                this.logDebug('warn', 'NavigationController', `Page element not found: ${pageConfig.id}`);
             }
         });
     }
@@ -236,21 +236,21 @@ class NavigationController extends BaseController {
         } = options;
         
         if (!this.pages[pageKey]) {
-            this.log('warn', 'NavigationController', `Page not found: ${pageKey}`);
+            this.logDebug('warn', 'NavigationController', `Page not found: ${pageKey}`);
             return false;
         }
         
         if (pageKey === this.currentPage && !forceRefresh) {
-            this.log('debug', 'NavigationController', `Page already active: ${pageKey}`);
+            this.logDebug('debug', 'NavigationController', `Page already active: ${pageKey}`);
             return true;
         }
         
         if (this.transitionState.inProgress) {
-            this.log('debug', 'NavigationController', 'Transition in progress');
+            this.logDebug('debug', 'NavigationController', 'Transition in progress');
             return false;
         }
         
-        this.log('debug', 'NavigationController', `Navigating to: ${pageKey}`);
+        this.logDebug('debug', 'NavigationController', `Navigating to: ${pageKey}`);
         
         try {
             this.transitionState.inProgress = true;
@@ -282,7 +282,7 @@ class NavigationController extends BaseController {
                     page: pageKey
                 });
                 
-                this.log('debug', 'NavigationController', `Navigation successful: ${this.previousPage} → ${pageKey}`);
+                this.logDebug('debug', 'NavigationController', `Navigation successful: ${this.previousPage} â†’ ${pageKey}`);
                 return true;
             }
             
@@ -308,7 +308,7 @@ class NavigationController extends BaseController {
         const targetPageElement = targetPageConfig.element;
         
         if (!currentPageElement || !targetPageElement) {
-            this.log('error', 'NavigationController', 'Missing page elements', {
+            this.logDebug('error', 'NavigationController', 'Missing page elements', {
                 currentId: currentPageConfig.id,
                 targetId: targetPageConfig.id
             });
@@ -324,7 +324,7 @@ class NavigationController extends BaseController {
             targetPageElement.style.display = 'block';
             targetPageElement.classList.add('active');
             
-            // Initialiser la vue si ce n'est pas déjà fait
+            // Initialiser la vue si ce n'est pas dÃ©jÃ  fait
             if (!targetPageConfig.initialized || forceRefresh) {
                 await this.initializePageView(pageKey);
                 targetPageConfig.initialized = true;
@@ -333,7 +333,7 @@ class NavigationController extends BaseController {
             return true;
             
         } catch (error) {
-            this.log('error', 'NavigationController', 'Transition error', error);
+            this.logDebug('error', 'NavigationController', 'Transition error', error);
             return false;
         }
     }
@@ -346,25 +346,25 @@ class NavigationController extends BaseController {
         const view = this.getView(pageConfig.viewKey);
         
         if (!view) {
-            this.log('warn', 'NavigationController', `View not found: ${pageConfig.viewKey}`);
+            this.logDebug('warn', 'NavigationController', `View not found: ${pageConfig.viewKey}`);
             return;
         }
         
         try {
-            // Si la vue a une méthode init, l'appeler
+            // Si la vue a une mÃ©thode init, l'appeler
             if (typeof view.init === 'function') {
                 await view.init();
-                this.log('debug', 'NavigationController', `View initialized: ${pageConfig.viewKey}`);
+                this.logDebug('debug', 'NavigationController', `View initialized: ${pageConfig.viewKey}`);
             }
             
-            // Si la vue a une méthode render, l'appeler
+            // Si la vue a une mÃ©thode render, l'appeler
             if (typeof view.render === 'function') {
                 await view.render();
-                this.log('debug', 'NavigationController', `View rendered: ${pageConfig.viewKey}`);
+                this.logDebug('debug', 'NavigationController', `View rendered: ${pageConfig.viewKey}`);
             }
             
         } catch (error) {
-            this.log('error', 'NavigationController', `View initialization error: ${pageConfig.viewKey}`, error);
+            this.logDebug('error', 'NavigationController', `View initialization error: ${pageConfig.viewKey}`, error);
         }
     }
 
@@ -373,10 +373,10 @@ class NavigationController extends BaseController {
     // ========================================================================
 
     /**
-     * Ajoute à l'historique
+     * Ajoute Ã  l'historique
      */
     addToHistory(pageKey) {
-        // Si on n'est pas à la fin de l'historique, supprimer tout ce qui suit
+        // Si on n'est pas Ã  la fin de l'historique, supprimer tout ce qui suit
         if (this.historyIndex < this.navigationHistory.length - 1) {
             this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
         }
@@ -392,7 +392,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Retour en arrière
+     * Retour en arriÃ¨re
      */
     async goBack() {
         if (this.historyIndex > 0) {
@@ -418,7 +418,7 @@ class NavigationController extends BaseController {
     // ========================================================================
 
     /**
-     * Met à jour l'UI de navigation
+     * Met Ã  jour l'UI de navigation
      */
     updateNavigationUI() {
         document.querySelectorAll('.nav-item').forEach(link => {
@@ -432,7 +432,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Rafraîchit la page courante
+     * RafraÃ®chit la page courante
      */
     async refreshCurrentPage() {
         await this.showPage(this.currentPage, { forceRefresh: true });
@@ -446,7 +446,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Obtient l'état de navigation
+     * Obtient l'Ã©tat de navigation
      */
     getNavigationState() {
         return {
