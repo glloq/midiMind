@@ -298,16 +298,13 @@ class BackendService {
             const data = JSON.parse(event.data);
             
             this.logger.debug('BackendService', 'Message received:', data);
+            console.log("[DEBUG] Response:", JSON.stringify(data, null, 2));
             
             this.lastActivityTime = Date.now();
             
-            const messageType = data.type || 'unknown';
-            const payload = data.payload || {};
-            
-            // Ã¢Å“â€¦ Si type="response" => Utiliser data.id au lieu de payload.request_id. Matcher sur request_id
-            if (messageType === 'response') {
-                const requestId = payload.request_id;
-                console.log("[DEBUG] Response payload:", JSON.stringify(payload, null, 2));
+            // ✅ FORMAT SIMPLE: Réponse avec id, success, data
+            if (data.hasOwnProperty('success')) {
+                const requestId = data.id;
                 
                 if (requestId && this.pendingRequests.has(requestId)) {
                     const pending = this.pendingRequests.get(requestId);
@@ -315,13 +312,11 @@ class BackendService {
                     
                     clearTimeout(pending.timeoutTimer);
                     
-                    // Ã¢Å“â€¦ VÃƒÂ©rifier payload.success selon la doc
-                    if (payload.success) {
-                        // Ã¢Å“â€¦ Retourner payload.data (pas payload directement)
-                        pending.resolve(payload.data || {});
+                    if (data.success) {
+                        pending.resolve(data.data || data);
                     } else {
-                        const error = new Error(payload.error_message || 'Command failed');
-                        error.code = payload.error_code;
+                        const error = new Error(data.error || data.error_message || 'Command failed');
+                        error.code = data.error_code;
                         pending.reject(error);
                     }
                     return;
@@ -332,48 +327,29 @@ class BackendService {
                 }
             }
             
-            // Si type="event" => ÃƒÂ©vÃƒÂ©nement backend
-            if (messageType === 'event') {
-                const eventName = payload.name;
+            // Si data.event => Événement backend
+            if (data.event) {
+                const eventName = data.event;
                 if (eventName) {
-                    this.eventBus.emit(`backend:event:${eventName}`, payload);
+                    this.eventBus.emit(`backend:event:${eventName}`, data);
                     
-                    const device_id = payload.data?.device_id;
+                    const device_id = data.device_id;
                     if (device_id !== undefined) {
-                        this.eventBus.emit(`${eventName}:${device_id}`, payload);
+                        this.eventBus.emit(`${eventName}:${device_id}`, data);
                     }
                     
-                    this.logger.debug('BackendService', `Event received: ${eventName}`, payload);
+                    this.logger.debug('BackendService', `Event received: ${eventName}`, data);
                     return;
                 }
             }
             
-            // Si type="error"
-            if (messageType === 'error') {
-                this.logger.error('BackendService', 'Error message:', payload);
-                this.eventBus.emit('backend:error', payload);
-                return;
-            }
-            
-            this.eventBus.emit('backend:message', data);
+            // Message non reconnu
+            this.logger.warn('BackendService', 'Unknown message format:', data);
             
         } catch (error) {
-            this.logger.error('BackendService', 'Error parsing message:', error);
+            this.logger.error('BackendService', 'Error handling message:', error);
         }
     }
-    
-    send(data) {
-        if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            if (this.messageQueue.length < this.maxQueueSize) {
-                this.messageQueue.push(data);
-                this.logger.debug('BackendService', 'Message queued (not connected)');
-            } else {
-                this.logger.warn('BackendService', 'Message queue full, dropping message');
-            }
-            return false;
-        }
-        
-        try {
             const message = typeof data === 'string' ? 
                 data : JSON.stringify(data);
             this.ws.send(message);
@@ -413,22 +389,14 @@ class BackendService {
                 },
                 timeoutTimer: timeoutTimer
             });
-            
-            // Ã¢Å“â€¦ FORMAT API v4.2.2
+            // ✅ FORMAT API SIMPLE (selon doc)
             const message = {
                 id: requestId,
-                type: "request",
-                timestamp: this.generateTimestamp(),
-                version: "1.0",
-                payload: {
-                    id: requestId,
-                    request_id: requestId,  // ✅ Pour matching réponse
-                    command: command,
-                    params: params,
-                    timeout: timeoutMs
-                }
+                command: command,
+                params: params
             };
             
+            console.log("[DEBUG] Sending:", JSON.stringify(message, null, 2));
             this.send(message);
             
             this.logger.debug('BackendService', `Sent command: ${command}`, message);
