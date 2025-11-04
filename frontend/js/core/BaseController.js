@@ -36,7 +36,7 @@ class BaseController {
         }
         
         // ✦ CRITIQUE: Backend avec fallback robuste
-        this.backend = backend || window.backendService || null;
+        this.backend = backend || window.backendService || window.app?.services?.backend || null;
         
         // Validation Backend (warning seulement, pas d'erreur critique)
         if (!this.backend) {
@@ -270,12 +270,20 @@ class BaseController {
     log(level, source, ...args) {
         const prefix = `[${source}]`;
         
-        if (this.debugConsole) {
+        // Essayer debugConsole si la méthode existe
+        if (this.debugConsole && typeof this.debugConsole[level] === 'function') {
             this.debugConsole[level](prefix, ...args);
-        } else if (window.logger) {
+        } 
+        // Sinon essayer window.logger si la méthode existe
+        else if (window.logger && typeof window.logger[level] === 'function') {
             window.logger[level](prefix, ...args);
-        } else {
+        } 
+        // Fallback sur console standard
+        else if (typeof console[level] === 'function') {
             console[level](prefix, ...args);
+        } else {
+            // Dernier recours : console.log
+            console.log(prefix, ...args);
         }
     }
 
