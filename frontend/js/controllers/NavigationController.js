@@ -1,28 +1,28 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
-// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/controllers/NavigationController.js
+// Chemin rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©el: frontend/js/controllers/NavigationController.js
 // Version: v4.0.1 - FIXED BACKEND SIGNATURE - FIX PAGES NOT DISPLAYING
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.0.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// Ã¢Å“â€¦ CRITIQUE: Ajout paramÃƒÂ¨tre backend au constructeur (6ÃƒÂ¨me paramÃƒÂ¨tre)
+// Ã¢Å“â€¦ Fix: super() appelle BaseController avec backend
+// Ã¢Å“â€¦ this.backend initialisÃƒÂ© automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // CORRECTIONS v4.0.0:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Affichage/masquage direct des ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Initialisation des vues quand la page est affichÃƒÆ’Ã‚Â©e
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Suppression de la gÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©ration dynamique de contenu
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Fix: Toutes les pages s'affichent correctement
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Simplification: Navigation plus directe et fiable
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CRITIQUE: Affichage/masquage direct des ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ments DOM
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CRITIQUE: Initialisation des vues quand la page est affichÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CRITIQUE: Suppression de la gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ration dynamique de contenu
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Fix: Toutes les pages s'affichent correctement
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Simplification: Navigation plus directe et fiable
 // ============================================================================
 
 class NavigationController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat de navigation
+        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat de navigation
         this.currentPage = 'home';
         this.previousPage = null;
         this.navigationHistory = ['home'];
@@ -33,8 +33,8 @@ class NavigationController extends BaseController {
             home: {
                 id: 'home-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã‚ÂÃ‚Â  Accueil',
-                icon: 'ÃƒÂ°Ã…Â¸Ã‚ÂÃ‚Â ',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â  Accueil',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â ',
                 shortcut: 'h',
                 viewKey: 'home',
                 initialized: false
@@ -42,8 +42,8 @@ class NavigationController extends BaseController {
             files: {
                 id: 'file-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Fichiers',
-                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â Fichiers',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â',
                 shortcut: 'f',
                 viewKey: 'file',
                 initialized: false
@@ -51,8 +51,8 @@ class NavigationController extends BaseController {
             editor: {
                 id: 'editor-view',
                 element: null,
-                title: 'ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÆ’Ã¢â‚¬Â°diteur',
-                icon: 'ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â',
+                title: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°diteur',
+                icon: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â',
                 shortcut: 'e',
                 viewKey: 'editor',
                 initialized: false
@@ -60,8 +60,8 @@ class NavigationController extends BaseController {
             routing: {
                 id: 'routing-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬ Routage',
-                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€šÂ¬',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Routage',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬',
                 shortcut: 'r',
                 viewKey: 'routing',
                 initialized: false
@@ -69,8 +69,8 @@ class NavigationController extends BaseController {
             keyboard: {
                 id: 'keyboard-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹ Clavier',
-                icon: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¹',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹ Clavier',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¹',
                 shortcut: 'k',
                 viewKey: 'keyboard',
                 initialized: false
@@ -78,8 +78,8 @@ class NavigationController extends BaseController {
             instruments: {
                 id: 'instruments-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¸ Instruments',
-                icon: 'ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¸',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸ Instruments',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸',
                 shortcut: 'i',
                 viewKey: 'instrument',
                 initialized: false
@@ -87,8 +87,8 @@ class NavigationController extends BaseController {
             playlist: {
                 id: 'playlist-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Playlist',
-                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ Playlist',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹',
                 shortcut: 'p',
                 viewKey: 'playlist',
                 initialized: false
@@ -96,8 +96,8 @@ class NavigationController extends BaseController {
             system: {
                 id: 'system-view',
                 element: null,
-                title: 'ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â SystÃƒÆ’Ã‚Â¨me',
-                icon: 'ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â',
+                title: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â SystÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨me',
+                icon: 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â',
                 shortcut: 's',
                 viewKey: 'system',
                 initialized: false
@@ -105,8 +105,8 @@ class NavigationController extends BaseController {
             visualizer: {
                 id: 'visualizer-view',
                 element: null,
-                title: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Visualiseur',
-                icon: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â ',
+                title: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  Visualiseur',
+                icon: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â ',
                 shortcut: 'v',
                 viewKey: 'visualizer',
                 initialized: false
@@ -119,13 +119,13 @@ class NavigationController extends BaseController {
             duration: 300
         };
         
-        this.logDebug('info', 'NavigationController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Initialized v4.0.0');
+        this.log('info', 'NavigationController', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Initialized v4.0.0');
         
         this.initializeNavigation();
     }
 
     /**
-     * Liaison des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Liaison des ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements
      */
     bindEvents() {
         this.eventBus.on('navigation:page_request', (data) => {
@@ -145,7 +145,7 @@ class NavigationController extends BaseController {
      * Initialisation
      */
     initializeNavigation() {
-        // Cacher l'ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment #app d'abord
+        // Cacher l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ment #app d'abord
         this.cachePageElements();
         this.setupKeyboardShortcuts();
         this.setupBrowserHistory();
@@ -154,11 +154,11 @@ class NavigationController extends BaseController {
         // Afficher la page initiale
         this.showPage('home', { skipHistory: true });
         
-        this.logDebug('debug', 'NavigationController', 'Navigation system initialized');
+        this.log('debug', 'NavigationController', 'Navigation system initialized');
     }
 
     /**
-     * Cache les rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rences aux ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM des pages
+     * Cache les rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences aux ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ments DOM des pages
      */
     cachePageElements() {
         Object.keys(this.pages).forEach(pageKey => {
@@ -172,7 +172,7 @@ class NavigationController extends BaseController {
                     pageConfig.element.classList.remove('active');
                 }
             } else {
-                this.logDebug('warn', 'NavigationController', `Page element not found: ${pageConfig.id}`);
+                this.log('warn', 'NavigationController', `Page element not found: ${pageConfig.id}`);
             }
         });
     }
@@ -242,21 +242,21 @@ class NavigationController extends BaseController {
         } = options;
         
         if (!this.pages[pageKey]) {
-            this.logDebug('warn', 'NavigationController', `Page not found: ${pageKey}`);
+            this.log('warn', 'NavigationController', `Page not found: ${pageKey}`);
             return false;
         }
         
         if (pageKey === this.currentPage && !forceRefresh) {
-            this.logDebug('debug', 'NavigationController', `Page already active: ${pageKey}`);
+            this.log('debug', 'NavigationController', `Page already active: ${pageKey}`);
             return true;
         }
         
         if (this.transitionState.inProgress) {
-            this.logDebug('debug', 'NavigationController', 'Transition in progress');
+            this.log('debug', 'NavigationController', 'Transition in progress');
             return false;
         }
         
-        this.logDebug('debug', 'NavigationController', `Navigating to: ${pageKey}`);
+        this.log('debug', 'NavigationController', `Navigating to: ${pageKey}`);
         
         try {
             this.transitionState.inProgress = true;
@@ -288,7 +288,7 @@ class NavigationController extends BaseController {
                     page: pageKey
                 });
                 
-                this.logDebug('debug', 'NavigationController', `Navigation successful: ${this.previousPage} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${pageKey}`);
+                this.log('debug', 'NavigationController', `Navigation successful: ${this.previousPage} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ ${pageKey}`);
                 return true;
             }
             
@@ -314,7 +314,7 @@ class NavigationController extends BaseController {
         const targetPageElement = targetPageConfig.element;
         
         if (!currentPageElement || !targetPageElement) {
-            this.logDebug('error', 'NavigationController', 'Missing page elements', {
+            this.log('error', 'NavigationController', 'Missing page elements', {
                 currentId: currentPageConfig.id,
                 targetId: targetPageConfig.id
             });
@@ -330,7 +330,7 @@ class NavigationController extends BaseController {
             targetPageElement.style.display = 'block';
             targetPageElement.classList.add('active');
             
-            // Initialiser la vue si ce n'est pas dÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â  fait
+            // Initialiser la vue si ce n'est pas dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  fait
             if (!targetPageConfig.initialized || forceRefresh) {
                 await this.initializePageView(pageKey);
                 targetPageConfig.initialized = true;
@@ -339,7 +339,7 @@ class NavigationController extends BaseController {
             return true;
             
         } catch (error) {
-            this.logDebug('error', 'NavigationController', 'Transition error', error);
+            this.log('error', 'NavigationController', 'Transition error', error);
             return false;
         }
     }
@@ -349,28 +349,28 @@ class NavigationController extends BaseController {
      */
     async initializePageView(pageKey) {
         const pageConfig = this.pages[pageKey];
-        const view = this.getView(pageConfig.viewKey);
+        const view = this.views[pageConfig.viewKey];
         
         if (!view) {
-            this.logDebug('warn', 'NavigationController', `View not found: ${pageConfig.viewKey}`);
+            this.log('warn', 'NavigationController', `View not found: ${pageConfig.viewKey}`);
             return;
         }
         
         try {
-            // Si la vue a une mÃƒÆ’Ã‚Â©thode init, l'appeler
+            // Si la vue a une mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode init, l'appeler
             if (typeof view.init === 'function') {
                 await view.init();
-                this.logDebug('debug', 'NavigationController', `View initialized: ${pageConfig.viewKey}`);
+                this.log('debug', 'NavigationController', `View initialized: ${pageConfig.viewKey}`);
             }
             
-            // Si la vue a une mÃƒÆ’Ã‚Â©thode render, l'appeler
+            // Si la vue a une mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode render, l'appeler
             if (typeof view.render === 'function') {
                 await view.render();
-                this.logDebug('debug', 'NavigationController', `View rendered: ${pageConfig.viewKey}`);
+                this.log('debug', 'NavigationController', `View rendered: ${pageConfig.viewKey}`);
             }
             
         } catch (error) {
-            this.logDebug('error', 'NavigationController', `View initialization error: ${pageConfig.viewKey}`, error);
+            this.log('error', 'NavigationController', `View initialization error: ${pageConfig.viewKey}`, error);
         }
     }
 
@@ -379,10 +379,10 @@ class NavigationController extends BaseController {
     // ========================================================================
 
     /**
-     * Ajoute ÃƒÆ’Ã‚Â  l'historique
+     * Ajoute ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  l'historique
      */
     addToHistory(pageKey) {
-        // Si on n'est pas ÃƒÆ’Ã‚Â  la fin de l'historique, supprimer tout ce qui suit
+        // Si on n'est pas ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la fin de l'historique, supprimer tout ce qui suit
         if (this.historyIndex < this.navigationHistory.length - 1) {
             this.navigationHistory = this.navigationHistory.slice(0, this.historyIndex + 1);
         }
@@ -398,7 +398,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Retour en arriÃƒÆ’Ã‚Â¨re
+     * Retour en arriÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re
      */
     async goBack() {
         if (this.historyIndex > 0) {
@@ -424,7 +424,7 @@ class NavigationController extends BaseController {
     // ========================================================================
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'UI de navigation
+     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'UI de navigation
      */
     updateNavigationUI() {
         document.querySelectorAll('.nav-item').forEach(link => {
@@ -438,7 +438,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * RafraÃƒÆ’Ã‚Â®chit la page courante
+     * RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chit la page courante
      */
     async refreshCurrentPage() {
         await this.showPage(this.currentPage, { forceRefresh: true });
@@ -452,7 +452,7 @@ class NavigationController extends BaseController {
     }
 
     /**
-     * Obtient l'ÃƒÆ’Ã‚Â©tat de navigation
+     * Obtient l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de navigation
      */
     getNavigationState() {
         return {
