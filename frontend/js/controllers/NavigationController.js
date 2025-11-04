@@ -1,8 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©el: frontend/js/controllers/NavigationController.js
-// Version: v4.0.1 - FIXED BACKEND SIGNATURE - FIX PAGES NOT DISPLAYING
-// Date: 2025-11-02
+// Version: v4.0.3 - FIXED BACKEND SIGNATURE - FIX PAGES NOT DISPLAYING
+// Date: 2025-11-04
+// ============================================================================
+// CORRECTIONS v4.0.3:
+// ✦ CRITIQUE: Gestion des parents des pages (ex: <div id="files"> parent de file-view)
+// ✦ Fix: Affichage/masquage des éléments parents pour éviter display:none hérité
+// ✦ Les pages sont maintenant vraiment visibles
 // ============================================================================
 // CORRECTIONS v4.0.1:
 // Ã¢Å“â€¦ CRITIQUE: Ajout paramÃƒÂ¨tre backend au constructeur (6ÃƒÂ¨me paramÃƒÂ¨tre)
@@ -166,10 +171,27 @@ class NavigationController extends BaseController {
             pageConfig.element = document.getElementById(pageConfig.id);
             
             if (pageConfig.element) {
+                // Cacher le parent aussi si c'est une section
+                const parent = pageConfig.element.parentElement;
+                if (parent && parent.id && parent.id !== 'app-main' && parent.id !== 'app') {
+                    pageConfig.parentElement = parent;
+                }
+                
                 // Masquer toutes les pages sauf home
                 if (pageKey !== 'home') {
                     pageConfig.element.style.display = 'none';
                     pageConfig.element.classList.remove('active');
+                    
+                    // Masquer le parent aussi
+                    if (pageConfig.parentElement) {
+                        pageConfig.parentElement.style.display = 'none';
+                    }
+                } else {
+                    // S'assurer que home est visible
+                    pageConfig.element.style.display = 'block';
+                    if (pageConfig.parentElement) {
+                        pageConfig.parentElement.style.display = 'block';
+                    }
                 }
             } else {
                 this.log('warn', 'NavigationController', `Page element not found: ${pageConfig.id}`);
@@ -326,9 +348,19 @@ class NavigationController extends BaseController {
             currentPageElement.classList.remove('active');
             currentPageElement.style.display = 'none';
             
+            // Masquer le parent de la page actuelle aussi
+            if (currentPageConfig.parentElement) {
+                currentPageConfig.parentElement.style.display = 'none';
+            }
+            
             // Afficher la nouvelle page
             targetPageElement.style.display = 'block';
             targetPageElement.classList.add('active');
+            
+            // Afficher le parent de la nouvelle page aussi
+            if (targetPageConfig.parentElement) {
+                targetPageConfig.parentElement.style.display = 'block';
+            }
             
             // Initialiser la vue si ce n'est pas dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  fait
             if (!targetPageConfig.initialized || forceRefresh) {
