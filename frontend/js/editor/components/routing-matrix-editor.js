@@ -1,11 +1,11 @@
 // ============================================================================
 // Fichier: frontend/scripts/editor/components/RoutingMatrixEditor.js
 // Version: v3.2
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI
+// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // Description:
-//   Composant matrice interactive pour configurer le routage MIDI dans l'éditeur
-//   Support des topologies 1→1, 1→N, N→1, N→M avec interface visuelle
+//   Composant matrice interactive pour configurer le routage MIDI dans l'Ã©diteur
+//   Support des topologies 1â†’1, 1â†’N, Nâ†’1, Nâ†’M avec interface visuelle
 // ============================================================================
 
 class RoutingMatrixEditor {
@@ -13,9 +13,9 @@ class RoutingMatrixEditor {
         this.container = typeof container === 'string' ?
             document.getElementById(container) : container;
         this.routingManager = routingManager;
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         
-        // État
+        // Ã‰tat
         this.state = {
             viewMode: 'matrix',    // 'matrix', 'list', 'graph'
             selectedChannels: new Set(),
@@ -93,7 +93,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Toolbar avec contrôles
+     * Toolbar avec contrÃ´les
      */
     renderToolbar() {
         return `
@@ -101,17 +101,17 @@ class RoutingMatrixEditor {
                 <button class="tool-btn ${this.state.viewMode === 'matrix' ? 'active' : ''}" 
                         onclick="window.routingMatrixEditor.setViewMode('matrix')"
                         title="Matrix View">
-                    <span class="icon">⊞</span> Matrix
+                    <span class="icon">âŠž</span> Matrix
                 </button>
                 <button class="tool-btn ${this.state.viewMode === 'list' ? 'active' : ''}"
                         onclick="window.routingMatrixEditor.setViewMode('list')"
                         title="List View">
-                    <span class="icon">≡</span> List
+                    <span class="icon">â‰¡</span> List
                 </button>
                 <button class="tool-btn ${this.state.viewMode === 'graph' ? 'active' : ''}"
                         onclick="window.routingMatrixEditor.setViewMode('graph')"
                         title="Graph View">
-                    <span class="icon">◈</span> Graph
+                    <span class="icon">â—ˆ</span> Graph
                 </button>
             </div>
             
@@ -131,11 +131,11 @@ class RoutingMatrixEditor {
             <div class="toolbar-right">
                 <button class="tool-btn" onclick="window.routingMatrixEditor.autoRoute()"
                         title="Auto Route">
-                    <span class="icon">⚡</span> Auto
+                    <span class="icon">âš¡</span> Auto
                 </button>
                 <button class="tool-btn" onclick="window.routingMatrixEditor.clearAll()"
                         title="Clear All">
-                    <span class="icon">✕</span> Clear
+                    <span class="icon">âœ•</span> Clear
                 </button>
             </div>
         `;
@@ -157,15 +157,15 @@ class RoutingMatrixEditor {
                 <span class="stat-value">${stats.totalRoutes}</span>
             </div>
             <div class="quick-stat">
-                <span class="stat-label">1→1</span>
+                <span class="stat-label">1â†’1</span>
                 <span class="stat-value">${stats.oneToOne}</span>
             </div>
             <div class="quick-stat">
-                <span class="stat-label">1→N</span>
+                <span class="stat-label">1â†’N</span>
                 <span class="stat-value">${stats.oneToMany}</span>
             </div>
             <div class="quick-stat">
-                <span class="stat-label">N→1</span>
+                <span class="stat-label">Nâ†’1</span>
                 <span class="stat-value">${stats.manyToOne}</span>
             </div>
             <div class="quick-stat">
@@ -194,7 +194,7 @@ class RoutingMatrixEditor {
         
         let html = '<div class="matrix-grid">';
         
-        // En-tête avec instruments
+        // En-tÃªte avec instruments
         html += '<div class="matrix-row header-row">';
         html += '<div class="matrix-cell corner-cell"><span>CH/Inst</span></div>';
         
@@ -223,7 +223,7 @@ class RoutingMatrixEditor {
             
             html += '<div class="matrix-row">';
             
-            // En-tête du canal
+            // En-tÃªte du canal
             html += `
                 <div class="matrix-cell ch-header ${this.state.selectedChannels.has(channel.number) ? 'selected' : ''}"
                      data-channel="${channel.number}"
@@ -246,7 +246,7 @@ class RoutingMatrixEditor {
                     cellClass += ' hovered';
                 }
                 
-                // Compatibilité
+                // CompatibilitÃ©
                 const compat = this.routingManager.checkCompatibility(
                     channel, inst
                 );
@@ -264,9 +264,9 @@ class RoutingMatrixEditor {
                         
                         ${isAssigned ? `
                             <div class="cell-indicator" style="background: ${color};">
-                                ${route.type === '1→1' ? '●' :
-                                  route.type === '1→N' ? '▶' :
-                                  route.type === 'N→1' ? '◀' : '◆'}
+                                ${route.type === '1â†’1' ? 'â—' :
+                                  route.type === '1â†’N' ? 'â–¶' :
+                                  route.type === 'Nâ†’1' ? 'â—€' : 'â—†'}
                             </div>
                         ` : this.config.showCompatibility ? `
                             <div class="cell-compat ${this.getCompatClass(compat.score)}">
@@ -303,11 +303,11 @@ class RoutingMatrixEditor {
                         <div class="ch-badge" style="background: ${color};">CH${channel.number + 1}</div>
                         <div class="ch-info">
                             <div class="ch-title">${channel.instrument}</div>
-                            <div class="ch-meta">${channel.noteCount} notes • ${channel.noteRange.min}-${channel.noteRange.max}</div>
+                            <div class="ch-meta">${channel.noteCount} notes â€¢ ${channel.noteRange.min}-${channel.noteRange.max}</div>
                         </div>
                     </div>
                     
-                    <div class="list-arrow">→</div>
+                    <div class="list-arrow">â†’</div>
                     
                     <div class="list-destinations">
                         ${routes.length === 0 ? `
@@ -325,7 +325,7 @@ class RoutingMatrixEditor {
                                     const inst = this.routingManager.instruments.find(i => i.id === destId);
                                     return inst ? inst.name : destId;
                                 }).join(', ')}
-                                <button class="remove-btn" onclick="event.stopPropagation(); window.routingMatrixEditor.removeRoute('${route.id}')">✕</button>
+                                <button class="remove-btn" onclick="event.stopPropagation(); window.routingMatrixEditor.removeRoute('${route.id}')">âœ•</button>
                             </div>
                         `).join('')}
                         
@@ -346,7 +346,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Vue Graph (simplifié)
+     * Vue Graph (simplifiÃ©)
      */
     renderGraph() {
         return `
@@ -359,7 +359,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Génère le SVG du graphe
+     * GÃ©nÃ¨re le SVG du graphe
      */
     renderGraphSVG() {
         const channels = this.routingManager.midiChannels;
@@ -368,7 +368,7 @@ class RoutingMatrixEditor {
         
         let svg = '';
         
-        // Canaux à gauche
+        // Canaux Ã  gauche
         channels.forEach((ch, i) => {
             const y = 50 + i * 40;
             const color = this.channelColors[ch.number % 16];
@@ -378,7 +378,7 @@ class RoutingMatrixEditor {
             `;
         });
         
-        // Instruments à droite
+        // Instruments Ã  droite
         instruments.forEach((inst, i) => {
             const y = 50 + i * 40;
             svg += `
@@ -420,24 +420,24 @@ class RoutingMatrixEditor {
             <button class="quick-action-btn" 
                     ${!hasSelection ? 'disabled' : ''}
                     onclick="window.routingMatrixEditor.createRouteFromSelection()">
-                <span class="icon">➕</span> Create Route
+                <span class="icon">âž•</span> Create Route
             </button>
             
             <button class="quick-action-btn"
                     ${this.state.selectedChannels.size < 2 ? 'disabled' : ''}
                     onclick="window.routingMatrixEditor.mergeSelected()">
-                <span class="icon">⇶</span> Merge (N→1)
+                <span class="icon">â‡¶</span> Merge (Nâ†’1)
             </button>
             
             <button class="quick-action-btn"
                     ${this.state.selectedChannels.size !== 1 ? 'disabled' : ''}
                     onclick="window.routingMatrixEditor.splitSelected()">
-                <span class="icon">⇉</span> Split (1→N)
+                <span class="icon">â‡‰</span> Split (1â†’N)
             </button>
             
             <button class="quick-action-btn"
                     onclick="window.routingMatrixEditor.clearSelection()">
-                <span class="icon">✓</span> Clear Selection
+                <span class="icon">âœ“</span> Clear Selection
             </button>
         `;
     }
@@ -454,15 +454,15 @@ class RoutingMatrixEditor {
         const existingRoute = routes.find(r => r.destinations.includes(instrumentId));
         
         if (existingRoute) {
-            // Déjà assigné - retirer
+            // DÃ©jÃ  assignÃ© - retirer
             this.routingManager.removeDestination(channel, instrumentId);
         } else {
-            // Pas assigné - ajouter
+            // Pas assignÃ© - ajouter
             if (routes.length > 0) {
-                // Ajouter destination (1→N)
+                // Ajouter destination (1â†’N)
                 this.routingManager.addDestination(channel, instrumentId);
             } else {
-                // Créer nouvelle route (1→1)
+                // CrÃ©er nouvelle route (1â†’1)
                 this.routingManager.assign(channel, instrumentId);
             }
         }
@@ -472,7 +472,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Sélection de canal
+     * SÃ©lection de canal
      */
     selectChannel(channel) {
         if (this.state.isMultiSelect) {
@@ -490,7 +490,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Sélection d'instrument
+     * SÃ©lection d'instrument
      */
     selectInstrument(instrumentId) {
         if (this.state.isMultiSelect) {
@@ -508,7 +508,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Créer route depuis sélection
+     * CrÃ©er route depuis sÃ©lection
      */
     createRouteFromSelection() {
         if (this.state.selectedChannels.size === 0 || 
@@ -527,12 +527,12 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Merge canaux sélectionnés
+     * Merge canaux sÃ©lectionnÃ©s
      */
     mergeSelected() {
         if (this.state.selectedChannels.size < 2 || 
             this.state.selectedInstruments.size !== 1) {
-            alert('Select multiple channels and ONE instrument for merge (N→1)');
+            alert('Select multiple channels and ONE instrument for merge (Nâ†’1)');
             return;
         }
         
@@ -547,12 +547,12 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Split canal sélectionné
+     * Split canal sÃ©lectionnÃ©
      */
     splitSelected() {
         if (this.state.selectedChannels.size !== 1 || 
             this.state.selectedInstruments.size < 2) {
-            alert('Select ONE channel and multiple instruments for split (1→N)');
+            alert('Select ONE channel and multiple instruments for split (1â†’N)');
             return;
         }
         
@@ -567,7 +567,7 @@ class RoutingMatrixEditor {
     }
     
     /**
-     * Clear sélection
+     * Clear sÃ©lection
      */
     clearSelection() {
         this.state.selectedChannels.clear();
@@ -594,7 +594,7 @@ class RoutingMatrixEditor {
         
         tooltip.innerHTML = `
             <div class="tooltip-header">
-                <strong>CH${channel + 1}</strong> → <strong>${instrument.name}</strong>
+                <strong>CH${channel + 1}</strong> â†’ <strong>${instrument.name}</strong>
             </div>
             <div class="tooltip-body">
                 ${route ? `
@@ -691,7 +691,7 @@ class RoutingMatrixEditor {
     }
     
     showRouteDetails(routeId) {
-        // TODO: Afficher détails de la route
+        // TODO: Afficher dÃ©tails de la route
         console.log('Show details for route:', routeId);
     }
     
@@ -701,16 +701,16 @@ class RoutingMatrixEditor {
     
     getInstrumentIcon(type) {
         const icons = {
-            'piano': '🎹',
-            'synth': '🎛️',
-            'drums': '🥁',
-            'bass': '🎸',
-            'strings': '🎻',
-            'guitar': '🎸',
-            'brass': '🎺',
-            'woodwinds': '🎷'
+            'piano': 'ðŸŽ¹',
+            'synth': 'ðŸŽ›ï¸',
+            'drums': 'ðŸ¥',
+            'bass': 'ðŸŽ¸',
+            'strings': 'ðŸŽ»',
+            'guitar': 'ðŸŽ¸',
+            'brass': 'ðŸŽº',
+            'woodwinds': 'ðŸŽ·'
         };
-        return icons[type?.toLowerCase()] || '🎵';
+        return icons[type?.toLowerCase()] || 'ðŸŽµ';
     }
     
     getCompatClass(score) {
@@ -724,14 +724,14 @@ class RoutingMatrixEditor {
     }
     
     cacheElements() {
-        // Cache des éléments DOM si nécessaire
+        // Cache des Ã©lÃ©ments DOM si nÃ©cessaire
     }
     
     attachEvents() {
         // Exposer l'instance globalement pour les onclick
         window.routingMatrixEditor = this;
         
-        // Écouter les événements du routing manager
+        // Ã‰couter les Ã©vÃ©nements du routing manager
         this.eventBus?.on('routing:route-created', () => this.render());
         this.eventBus?.on('routing:route-removed', () => this.render());
         this.eventBus?.on('routing:assigned', () => this.render());

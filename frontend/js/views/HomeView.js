@@ -1,36 +1,31 @@
 // ============================================================================
 // Fichier: frontend/js/views/HomeView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
-// Date: 2025-11-02
-// Projet: MidiMind v3.1
+// Version: v4.1.0 - SIGNATURE CORRIGÉE (HÉRITE DE BASEVIEW)
+// Date: 2025-11-04
+// ============================================================================
+// CORRECTIONS v4.1.0:
+// ✅ CRITIQUE: HomeView hérite maintenant de BaseView
+// ✅ Appel super(containerId, eventBus) au début du constructeur
+// ✅ Suppression réimplémentation manuelle de resolveContainer
+// ✅ Accès aux méthodes BaseView (render, update, show, hide, emit, etc.)
 // ============================================================================
 // AMÉLIORATIONS v4.0.0:
-// ✅ Conformité complète avec API Documentation v4.2.2
-// ✅ Commandes au format category.action (files.list, playlist.list, etc.)
-// ✅ Gestion réponses {success: true, data: {...}}
-// ✅ Événements au format category:event
-// ✅ Intégration visualizer MIDI temps réel
+// ✦ Conformité complète avec API Documentation v4.2.2
+// ✦ Commandes au format category.action (files.list, playlist.list, etc.)
+// ✦ Gestion réponses {success: true, data: {...}}
+// ✦ Événements au format category:event
+// ✦ Intégration visualizer MIDI temps réel
 // ============================================================================
 
-class HomeView {
-    constructor(container, eventBus) {
-        // Container
-        if (typeof container === 'string') {
-            this.container = document.getElementById(container) || document.querySelector(container);
-        } else if (container instanceof HTMLElement) {
-            this.container = container;
-        } else {
-            this.container = null;
-        }
+class HomeView extends BaseView {
+    constructor(containerId, eventBus) {
+        // ✅ NOUVEAU: Appel super() pour hériter de BaseView
+        super(containerId, eventBus);
         
-        if (!this.container) {
-            console.error('[HomeView] Container not found:', container);
-        }
-        
-        this.eventBus = eventBus;
+        // ✅ this.container et this.eventBus déjà initialisés par BaseView
         this.logger = window.logger || console;
         
-        // État
+// Ãƒâ€°tat
         this.state = {
             mode: 'files', // 'files' ou 'playlists'
             currentFile: null,
@@ -53,7 +48,7 @@ class HomeView {
         this.visualizerAnimationId = null;
         this.activeNotes = new Map(); // note -> {channel, velocity, time}
         
-        // Éléments DOM
+        // Ãƒâ€°lÃƒÂ©ments DOM
         this.elements = {};
     }
 
@@ -72,7 +67,7 @@ class HomeView {
         this.attachEvents();
         this.initVisualizer();
         
-        // Charger les données initiales via API
+        // Charger les donnÃƒÂ©es initiales via API
         this.loadFiles();
         this.loadPlaylists();
         this.loadDevices();
@@ -86,7 +81,7 @@ class HomeView {
         this.container.innerHTML = `
             <div class="home-layout">
                 
-                <!-- Sélection fichiers/playlists -->
+                <!-- SÃƒÂ©lection fichiers/playlists -->
                 <div class="home-selector">
                     <div class="selector-tabs">
                         <button class="selector-tab active" data-mode="files">Fichiers MIDI</button>
@@ -111,15 +106,15 @@ class HomeView {
                     <!-- Barre instruments -->
                     <div class="instruments-bar">
                         <div class="instruments-title">
-                            <span class="icon">🎸</span>
-                            <span class="label">Devices connectés</span>
+                            <span class="icon">Ã°Å¸Å½Â¸</span>
+                            <span class="label">Devices connectÃƒÂ©s</span>
                         </div>
                         <div class="instruments-list" id="homeActiveDevices">
-                            <!-- Généré dynamiquement -->
+                            <!-- GÃƒÂ©nÃƒÂ©rÃƒÂ© dynamiquement -->
                         </div>
                         <div class="instruments-actions">
                             <button class="btn-mute-all" id="homeBtnMuteAll" title="Mute/Unmute tous les canaux">
-                                <span class="mute-icon">🔇</span>
+                                <span class="mute-icon">Ã°Å¸â€â€¡</span>
                                 <span class="mute-label">Mute All</span>
                             </button>
                         </div>
@@ -172,7 +167,7 @@ class HomeView {
             this.elements.btnMuteAll.addEventListener('click', () => this.toggleMuteAll());
         }
         
-        // Délégation d'événements pour les listes
+        // DÃƒÂ©lÃƒÂ©gation d'ÃƒÂ©vÃƒÂ©nements pour les listes
         if (this.elements.filesList) {
             this.elements.filesList.addEventListener('click', (e) => this.handleFileClick(e));
         }
@@ -187,7 +182,7 @@ class HomeView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        // Fichiers - écoute de files:loaded
+        // Fichiers - ÃƒÂ©coute de files:loaded
         this.eventBus.on('files:loaded', (data) => {
             this.state.files = data.files || [];
             this.renderFilesList();
@@ -198,7 +193,7 @@ class HomeView {
             this.updateFileSelection();
         });
         
-        // Playlists - écoute de playlist:* events
+        // Playlists - ÃƒÂ©coute de playlist:* events
         this.eventBus.on('playlists:loaded', (data) => {
             this.state.playlists = data.playlists || [];
             this.renderPlaylistsList();
@@ -209,7 +204,7 @@ class HomeView {
             this.updatePlaylistSelection();
         });
         
-        // Devices - écoute de device:* events
+        // Devices - ÃƒÂ©coute de device:* events
         this.eventBus.on('devices:loaded', (data) => {
             this.state.devices = data.devices || [];
             this.renderDevicesList();
@@ -223,7 +218,7 @@ class HomeView {
             this.handleDeviceDisconnected(data);
         });
         
-        // Playback - écoute de playback:* events
+        // Playback - ÃƒÂ©coute de playback:* events
         this.eventBus.on('playback:state', (data) => {
             this.state.playbackStatus.state = data.state;
             this.updatePlaybackState();
@@ -244,7 +239,7 @@ class HomeView {
         });
         
         this.eventBus.on('midi:cc', (data) => {
-            // Gérer les contrôles si nécessaire
+            // GÃƒÂ©rer les contrÃƒÂ´les si nÃƒÂ©cessaire
         });
     }
 
@@ -285,14 +280,14 @@ class HomeView {
     renderEmptyState(type) {
         const messages = {
             files: {
-                icon: '📁',
+                icon: 'Ã°Å¸â€œÂ',
                 title: 'Aucun fichier MIDI',
                 subtitle: 'Chargez des fichiers MIDI pour commencer'
             },
             playlists: {
-                icon: '🎵',
+                icon: 'Ã°Å¸Å½Âµ',
                 title: 'Aucune playlist',
-                subtitle: 'Créez une playlist pour organiser vos fichiers'
+                subtitle: 'CrÃƒÂ©ez une playlist pour organiser vos fichiers'
             }
         };
         
@@ -330,24 +325,24 @@ class HomeView {
                         (this.state.currentFile.path === file.path || 
                          this.state.currentFile.name === file.name);
         
-        const duration = file.duration ? this.formatDuration(file.duration) : '—';
-        const size = file.size ? this.formatFileSize(file.size) : '—';
+        const duration = file.duration ? this.formatDuration(file.duration) : 'Ã¢â‚¬â€';
+        const size = file.size ? this.formatFileSize(file.size) : 'Ã¢â‚¬â€';
         
         return `
             <div class="file-item ${isActive ? 'active' : ''}" 
                  data-file-path="${file.path || file.name}">
-                <div class="file-icon">🎵</div>
+                <div class="file-icon">Ã°Å¸Å½Âµ</div>
                 <div class="file-info">
                     <div class="file-name">${file.name}</div>
                     <div class="file-meta">
                         <span>${duration}</span>
-                        <span>•</span>
+                        <span>Ã¢â‚¬Â¢</span>
                         <span>${size}</span>
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-play" data-action="play-file" title="Lire">▶</button>
-                    <button class="btn-load" data-action="load-file" title="Charger">📂</button>
+                    <button class="btn-play" data-action="play-file" title="Lire">Ã¢â€“Â¶</button>
+                    <button class="btn-load" data-action="load-file" title="Charger">Ã°Å¸â€œâ€š</button>
                 </div>
             </div>
         `;
@@ -376,23 +371,23 @@ class HomeView {
                         this.state.currentPlaylist.id === playlist.id;
         
         const itemCount = playlist.items ? playlist.items.length : 0;
-        const duration = playlist.total_duration ? this.formatDuration(playlist.total_duration) : '—';
+        const duration = playlist.total_duration ? this.formatDuration(playlist.total_duration) : 'Ã¢â‚¬â€';
         
         return `
             <div class="playlist-item ${isActive ? 'active' : ''}" 
                  data-playlist-id="${playlist.id}">
-                <div class="playlist-icon">📋</div>
+                <div class="playlist-icon">Ã°Å¸â€œâ€¹</div>
                 <div class="playlist-info">
                     <div class="playlist-name">${playlist.name}</div>
                     <div class="playlist-meta">
                         <span>${itemCount} morceaux</span>
-                        <span>•</span>
+                        <span>Ã¢â‚¬Â¢</span>
                         <span>${duration}</span>
                     </div>
                 </div>
                 <div class="playlist-actions">
-                    <button class="btn-play" data-action="play-playlist" title="Lire">▶</button>
-                    <button class="btn-load" data-action="load-playlist" title="Charger">📂</button>
+                    <button class="btn-play" data-action="play-playlist" title="Lire">Ã¢â€“Â¶</button>
+                    <button class="btn-load" data-action="load-playlist" title="Charger">Ã°Å¸â€œâ€š</button>
                 </div>
             </div>
         `;
@@ -409,7 +404,7 @@ class HomeView {
         
         if (devices.length === 0) {
             this.elements.devicesList.innerHTML = `
-                <div class="devices-empty">Aucun device connecté</div>
+                <div class="devices-empty">Aucun device connectÃƒÂ©</div>
             `;
             return;
         }
@@ -420,13 +415,13 @@ class HomeView {
 
     renderDeviceItem(device) {
         const typeIcons = {
-            0: '❓', // Unknown
-            1: '🔌', // USB
-            2: '📡', // BLE
-            3: '💻'  // Virtual
+            0: 'Ã¢Ââ€œ', // Unknown
+            1: 'Ã°Å¸â€Å’', // USB
+            2: 'Ã°Å¸â€œÂ¡', // BLE
+            3: 'Ã°Å¸â€™Â»'  // Virtual
         };
         
-        const icon = typeIcons[device.type] || '🎸';
+        const icon = typeIcons[device.type] || 'Ã°Å¸Å½Â¸';
         
         return `
             <div class="device-chip" data-device-id="${device.id}">
@@ -590,7 +585,7 @@ class HomeView {
     // ========================================================================
 
     handleDeviceConnected(data) {
-        // Mise à jour de la liste des devices
+        // Mise ÃƒÂ  jour de la liste des devices
         this.loadDevices();
         
         // Notification visuelle
@@ -600,7 +595,7 @@ class HomeView {
     }
 
     handleDeviceDisconnected(data) {
-        // Mise à jour de la liste des devices
+        // Mise ÃƒÂ  jour de la liste des devices
         this.loadDevices();
         
         // Notification visuelle
@@ -621,11 +616,11 @@ class HomeView {
             this.elements.btnMuteAll.classList.toggle('muted', this.state.allMuted);
             const icon = this.elements.btnMuteAll.querySelector('.mute-icon');
             const label = this.elements.btnMuteAll.querySelector('.mute-label');
-            if (icon) icon.textContent = this.state.allMuted ? '🔊' : '🔇';
+            if (icon) icon.textContent = this.state.allMuted ? 'Ã°Å¸â€Å ' : 'Ã°Å¸â€â€¡';
             if (label) label.textContent = this.state.allMuted ? 'Unmute All' : 'Mute All';
         }
         
-        // Émettre événement
+        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
         if (this.eventBus) {
             this.eventBus.emit('home:mute_all_toggled', { muted: this.state.allMuted });
         }
@@ -684,7 +679,7 @@ class HomeView {
         // Dessiner les notes actives
         this.drawActiveNotes(ctx, width, height);
         
-        // Mise à jour des infos
+        // Mise ÃƒÂ  jour des infos
         this.updateVisualizerInfo();
     }
 
@@ -725,7 +720,7 @@ class HomeView {
 
     visualizeNoteOff(data) {
         // Laisser la note fade out naturellement
-        // ou supprimer immédiatement si souhaité
+        // ou supprimer immÃƒÂ©diatement si souhaitÃƒÂ©
         // this.activeNotes.delete(data.note);
     }
 
@@ -753,12 +748,12 @@ class HomeView {
     // ========================================================================
 
     updatePlaybackState() {
-        // Mise à jour visuelle de l'état de lecture si nécessaire
+        // Mise ÃƒÂ  jour visuelle de l'ÃƒÂ©tat de lecture si nÃƒÂ©cessaire
         // (ex: indicateur de lecture en cours)
     }
 
     // ========================================================================
-    // CHARGEMENT DES DONNÉES (API CALLS VIA EVENTBUS)
+    // CHARGEMENT DES DONNÃƒâ€°ES (API CALLS VIA EVENTBUS)
     // ========================================================================
 
     loadFiles() {

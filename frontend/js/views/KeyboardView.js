@@ -1,22 +1,22 @@
 // ============================================================================
 // Fichier: frontend/js/views/KeyboardView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
+// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
 // Date: 2025-11-02
 // ============================================================================
-// AMÉLIORATIONS v4.0.0:
-// ✅ API v4.2.2: midi.sendNoteOn, midi.sendNoteOff
-// ✅ Clavier interactif 88 touches
-// ✅ Sélection device de sortie
+// AMÃ‰LIORATIONS v4.0.0:
+// âœ… API v4.2.2: midi.sendNoteOn, midi.sendNoteOff
+// âœ… Clavier interactif 88 touches
+// âœ… SÃ©lection device de sortie
 // ============================================================================
 
 class KeyboardView extends BaseView {
-    constructor(container, eventBus) {
-        super(container, eventBus);
+    constructor(containerId, eventBus) {
+        super(containerId, eventBus);
         
         this.config.autoRender = false;
         this.config.name = 'KeyboardView';
         
-        // État
+        // Ã‰tat
         this.viewState = {
             selectedDevice: null,
             devices: [],
@@ -47,10 +47,10 @@ class KeyboardView extends BaseView {
         return `
             <div class="keyboard-view">
                 <div class="keyboard-header">
-                    <h2>🎹 Clavier MIDI</h2>
+                    <h2>ðŸŽ¹ Clavier MIDI</h2>
                     <div class="keyboard-controls">
                         <select class="device-select" data-action="select-device">
-                            <option value="">-- Sélectionner device --</option>
+                            <option value="">-- SÃ©lectionner device --</option>
                             ${state.devices.map(d => `
                                 <option value="${d.id}" ${state.selectedDevice?.id === d.id ? 'selected' : ''}>
                                     ${d.name}
@@ -58,14 +58,14 @@ class KeyboardView extends BaseView {
                             `).join('')}
                         </select>
                         
-                        <label>Vélocité: <input type="range" min="1" max="127" 
+                        <label>VÃ©locitÃ©: <input type="range" min="1" max="127" 
                                value="${state.velocity}" data-action="set-velocity" />
                                <span>${state.velocity}</span></label>
                         
                         <div class="octave-controls">
-                            <button data-action="octave-down">◄</button>
+                            <button data-action="octave-down">â—„</button>
                             <span>Octave: ${state.octaveOffset}</span>
-                            <button data-action="octave-up">►</button>
+                            <button data-action="octave-up">â–º</button>
                         </div>
                     </div>
                 </div>

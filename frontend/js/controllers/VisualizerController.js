@@ -1,41 +1,41 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/VisualizerController.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.1 - CORRECTION DOCUMENTATION
 // Date: 2025-10-29
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ Documentation corrigée - N'hérite PAS de BaseController
-// ✅ Architecture clarifiée - Standalone controller
+// âœ… Documentation corrigÃ©e - N'hÃ©rite PAS de BaseController
+// âœ… Architecture clarifiÃ©e - Standalone controller
 // ============================================================================
 // Description:
-//   Contrôleur du visualiseur temps réel MIDI.
-//   Gère l'affichage, le routing des notes actives, et les performances
-//   du rendu en temps réel.
+//   ContrÃ´leur du visualiseur temps rÃ©el MIDI.
+//   GÃ¨re l'affichage, le routing des notes actives, et les performances
+//   du rendu en temps rÃ©el.
 //
-// Fonctionnalités:
-//   - Réception notes MIDI temps réel
-//   - Mise à jour visualiseur (60 FPS max)
+// FonctionnalitÃ©s:
+//   - RÃ©ception notes MIDI temps rÃ©el
+//   - Mise Ã  jour visualiseur (60 FPS max)
 //   - Gestion pool notes actives (object pooling)
 //   - Filtrage par canal/instrument
-//   - Configuration fenêtre temporelle
-//   - Statistiques temps réel (notes/sec, latence)
+//   - Configuration fenÃªtre temporelle
+//   - Statistiques temps rÃ©el (notes/sec, latence)
 //   - Optimisation performance (throttling)
 //   - Pause/Resume visualisation
 //
 // Architecture:
 //   VisualizerController - Standalone visualizer controller
 //   - Utilise VisualizerView pour rendu
-//   - Utilise PlaybackModel pour données MIDI
+//   - Utilise PlaybackModel pour donnÃ©es MIDI
 //   - PerformanceMonitor pour optimisation
 //   - Object pooling pour notes actives
-//   - Ne hérite PAS de BaseController (contrôleur léger optimisé)
+//   - Ne hÃ©rite PAS de BaseController (contrÃ´leur lÃ©ger optimisÃ©)
 //
 // Auteur: MidiMind Team
 // ============================================================================
 
 class VisualizerController {
-    constructor(eventBus) {
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         this.eventBus = eventBus;
         this.visualizer = null;
         this.playbackController = null;
@@ -46,7 +46,7 @@ class VisualizerController {
     }
 
     /**
-     * Initialise le contrÃ´leur
+     * Initialise le contrÃƒÂ´leur
      */
     init(visualizer, playbackController, routingModel) {
         this.visualizer = visualizer;
@@ -57,10 +57,10 @@ class VisualizerController {
     }
 
     /**
-     * Attache les Ã©vÃ©nements
+     * Attache les ÃƒÂ©vÃƒÂ©nements
      */
     attachEvents() {
-        // Ã‰vÃ©nements de lecture
+        // Ãƒâ€°vÃƒÂ©nements de lecture
         this.eventBus.on('playback:started', () => {
             this.startUpdates();
         });
@@ -82,26 +82,26 @@ class VisualizerController {
             }
         });
 
-        // Ã‰vÃ©nements MIDI
+        // Ãƒâ€°vÃƒÂ©nements MIDI
         this.eventBus.on('playback:event', (event) => {
             this.handleMidiEvent(event);
         });
 
-        // Ã‰vÃ©nements de routing
+        // Ãƒâ€°vÃƒÂ©nements de routing
         this.eventBus.on('routing:changed', () => {
             if (this.visualizer) {
                 this.visualizer.invalidate();
             }
         });
 
-        // Ã‰vÃ©nements de performance
+        // Ãƒâ€°vÃƒÂ©nements de performance
         this.eventBus.on('performance:quality:changed', (data) => {
             this.adjustQuality(data.quality);
         });
     }
 
     /**
-     * DÃ©marre les mises Ã  jour
+     * DÃƒÂ©marre les mises ÃƒÂ  jour
      */
     startUpdates() {
         this.stopUpdates();
@@ -120,7 +120,7 @@ class VisualizerController {
     }
 
     /**
-     * ArrÃªte les mises Ã  jour
+     * ArrÃƒÂªte les mises ÃƒÂ  jour
      */
     stopUpdates() {
         if (this.updateInterval) {
@@ -130,12 +130,12 @@ class VisualizerController {
     }
 
     /**
-     * GÃ¨re un Ã©vÃ©nement MIDI
+     * GÃƒÂ¨re un ÃƒÂ©vÃƒÂ©nement MIDI
      */
     handleMidiEvent(event) {
         if (!this.visualizer) return;
 
-        // VÃ©rifier la validitÃ© avec le routing
+        // VÃƒÂ©rifier la validitÃƒÂ© avec le routing
         if (event.channel !== undefined) {
             const routing = this.routingModel.getRouting(event.channel);
 
@@ -151,11 +151,11 @@ class VisualizerController {
             }
         }
 
-        // L'Ã©vÃ©nement sera visible dans le visualizer via la mise Ã  jour normale
+        // L'ÃƒÂ©vÃƒÂ©nement sera visible dans le visualizer via la mise ÃƒÂ  jour normale
     }
 
     /**
-     * Ajuste la qualitÃ© selon les performances
+     * Ajuste la qualitÃƒÂ© selon les performances
      */
     adjustQuality(quality) {
         if (!this.visualizer) return;
@@ -180,14 +180,14 @@ class VisualizerController {
                 break;
         }
 
-        // RedÃ©marrer avec le nouveau rate
+        // RedÃƒÂ©marrer avec le nouveau rate
         if (this.updateInterval) {
             this.startUpdates();
         }
     }
 
     /**
-     * DÃ©finit le temps d'aperÃ§u
+     * DÃƒÂ©finit le temps d'aperÃƒÂ§u
      */
     setPreviewTime(ms) {
         if (this.visualizer) {
@@ -196,7 +196,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/dÃ©sactive un canal
+     * Active/dÃƒÂ©sactive un canal
      */
     toggleChannel(channel, enabled) {
         if (this.visualizer) {
@@ -205,7 +205,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/dÃ©sactive l'affichage de la vÃ©locitÃ©
+     * Active/dÃƒÂ©sactive l'affichage de la vÃƒÂ©locitÃƒÂ©
      */
     setShowVelocity(show) {
         if (this.visualizer) {
@@ -214,7 +214,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/dÃ©sactive l'affichage des CC
+     * Active/dÃƒÂ©sactive l'affichage des CC
      */
     setShowCC(show) {
         if (this.visualizer) {
@@ -223,7 +223,7 @@ class VisualizerController {
     }
 
     /**
-     * Active/dÃ©sactive l'affichage des noms de notes
+     * Active/dÃƒÂ©sactive l'affichage des noms de notes
      */
     setShowNoteNames(show) {
         if (this.visualizer) {
@@ -232,7 +232,7 @@ class VisualizerController {
     }
 
     /**
-     * Obtient un snapshot de l'Ã©tat actuel
+     * Obtient un snapshot de l'ÃƒÂ©tat actuel
      */
     getSnapshot() {
         if (!this.visualizer || !this.playbackController) {

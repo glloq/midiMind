@@ -1,14 +1,19 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Version: v4.0.0 - FIX NAVIGATION & ROUTER
-// Date: 2025-11-02
-// Projet: MidiMind v3.1
+// Chemin rÃ©el: frontend/js/core/Application.js
+// Version: v4.1.0 - FIXED MODEL SIGNATURES
+// Date: 2025-11-03
 // ============================================================================
+// CORRECTIONS v4.1.0:
+// âœ… CRITIQUE: Passer 5 paramÃ¨tres aux modÃ¨les (eventBus, backend, logger, initialData, options)
+// âœ… Fix: StateModel, FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
+// âœ… Tous les modÃ¨les reÃ§oivent maintenant backend et logger correctement
+//
 // CORRECTIONS v4.0.0:
-// âœ… CRITIQUE: Initialisation correcte de NavigationController AVANT Router
-// âœ… CRITIQUE: Connexion Router <-> NavigationController simplifiÃ©e
-// âœ… CRITIQUE: StartRouting() appelÃ© APRÃˆS l'enregistrement des routes
-// âœ… Fix: Toutes les pages fonctionnent correctement
+// âœ¦ CRITIQUE: Initialisation correcte de NavigationController AVANT Router
+// âœ¦ CRITIQUE: Connexion Router <-> NavigationController simplifiÃ©e
+// âœ¦ CRITIQUE: StartRouting() appelÃ©e APRÃˆS l'enregistrement des routes
+// âœ¦ Fix: Toutes les pages fonctionnent correctement
 // ============================================================================
 
 class Application {
@@ -138,8 +143,8 @@ class Application {
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('âœ… MidiMind v3.1 initialized successfully');
-            this.log('info', 'âœ… Application ready');
+            console.log('âœ“ MidiMind v3.1 initialized successfully');
+            this.log('info', 'âœ“ Application ready');
             
             // Ã‰mettre Ã©vÃ©nement ready
             if (this.eventBus) {
@@ -147,7 +152,7 @@ class Application {
             }
             
         } catch (error) {
-            console.error('âŒ Failed to initialize application:', error);
+            console.error('âœ— Failed to initialize application:', error);
             this.log('error', 'Initialization failed', error);
             this.handleInitError(error);
         }
@@ -194,16 +199,21 @@ class Application {
             }
         }
         
-        this.log('info', 'âœ… Foundations initialized');
+        this.log('info', 'âœ“ Foundations initialized');
     }
     
     /**
-     * CrÃ©Ã©e un logger robuste avec fallback
+     * CrÃ©e un logger robuste avec fallback
      */
     createLogger() {
         if (window.Logger) {
             try {
-                return new Logger(this.config.logLevel);
+                return new Logger({
+                    level: this.config.logLevel,
+                    eventBus: this.eventBus,
+                    enableConsole: true,
+                    enableEventBus: true
+                });
             } catch (e) {
                 console.warn('Logger initialization failed, using fallback');
             }
@@ -264,64 +274,114 @@ class Application {
             window.fileService = this.services.file;
         }
         
-        this.log('info', 'âœ… Services initialized');
+        this.log('info', 'âœ“ Services initialized');
     }
     
     /**
      * Initialise les modÃ¨les
+     * âœ… v4.1.0: CORRECTION - Passer les 5 paramÃ¨tres requis par BaseModel
      */
     async initModels() {
         console.log('ðŸ“¦ Initializing models...');
         
         // StateModel
+        // âœ… NOUVEAU: Passer 5 paramÃ¨tres (eventBus, backend, logger, initialData, options)
         if (window.StateModel) {
-            this.models.state = new StateModel(this.eventBus);
+            this.models.state = new StateModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},  // initialData
+                {}   // options
+            );
             window.stateModel = this.models.state;
         }
         
         // FileModel
         if (window.FileModel) {
-            this.models.file = new FileModel(this.eventBus);
+            this.models.file = new FileModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.fileModel = this.models.file;
         }
         
         // PlaylistModel
         if (window.PlaylistModel) {
-            this.models.playlist = new PlaylistModel(this.eventBus);
+            this.models.playlist = new PlaylistModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.playlistModel = this.models.playlist;
         }
         
         // InstrumentModel
         if (window.InstrumentModel) {
-            this.models.instrument = new InstrumentModel(this.eventBus);
+            this.models.instrument = new InstrumentModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.instrumentModel = this.models.instrument;
         }
         
         // SystemModel
         if (window.SystemModel) {
-            this.models.system = new SystemModel(this.eventBus);
+            this.models.system = new SystemModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.systemModel = this.models.system;
         }
         
         // PlaybackModel
         if (window.PlaybackModel) {
-            this.models.playback = new PlaybackModel(this.eventBus);
+            this.models.playback = new PlaybackModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.playbackModel = this.models.playback;
         }
         
         // EditorModel
         if (window.EditorModel) {
-            this.models.editor = new EditorModel(this.eventBus);
+            this.models.editor = new EditorModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.editorModel = this.models.editor;
         }
         
         // RoutingModel
         if (window.RoutingModel) {
-            this.models.routing = new RoutingModel(this.eventBus);
+            this.models.routing = new RoutingModel(
+                this.eventBus,
+                this.services.backend,
+                this.logger,
+                {},
+                {}
+            );
             window.routingModel = this.models.routing;
         }
         
-        this.log('info', 'âœ… Models initialized');
+        this.log('info', 'âœ“ Models initialized');
     }
     
     /**
@@ -384,7 +444,7 @@ class Application {
             window.visualizerView = this.views.visualizer;
         }
         
-        this.log('info', 'âœ… Views initialized');
+        this.log('info', 'âœ“ Views initialized');
     }
     
     /**
@@ -401,7 +461,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -413,7 +473,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -425,7 +485,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -437,7 +497,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -449,7 +509,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -471,7 +531,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -483,7 +543,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -495,7 +555,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -507,7 +567,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -519,11 +579,11 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
-        this.log('info', 'âœ… Controllers initialized');
+        this.log('info', 'âœ“ Controllers initialized');
     }
     
     /**
@@ -540,7 +600,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // ✦ BACKEND PASSED
+                this.services.backend  // âœ¦ BACKEND PASSED
             );
         }
         
@@ -567,10 +627,10 @@ class Application {
             
             // DÃ©marrer le routing maintenant
             this.router.startRouting();
-            this.log('info', 'âœ… Routing started');
+            this.log('info', 'âœ“ Routing started');
         }
         
-        this.log('info', 'âœ… Navigation initialized');
+        this.log('info', 'âœ“ Navigation initialized');
     }
     
     /**
@@ -610,11 +670,6 @@ class Application {
             view: 'keyboard'
         });
         
-        this.router.route('/playlist', {
-            title: 'MidiMind - Playlist',
-            view: 'playlist'
-        });
-        
         this.router.route('/system', {
             title: 'MidiMind - SystÃ¨me',
             view: 'system'
@@ -627,17 +682,11 @@ class Application {
         
         // Route par dÃ©faut
         this.router.route('/', {
-            title: 'MidiMind - Accueil',
+            title: 'MidiMind',
             view: 'home'
         });
         
-        // Route 404
-        this.router.notFound({
-            title: 'MidiMind - Page non trouvÃ©e',
-            view: 'home'
-        });
-        
-        this.log('info', 'âœ… Routes registered');
+        this.log('info', 'âœ“ Routes registered');
     }
     
     /**
@@ -645,18 +694,18 @@ class Application {
      */
     async connectBackend() {
         if (!this.services.backend) {
-            this.log('warn', 'BackendService not available');
+            this.log('warn', 'BackendService not initialized');
             return false;
         }
         
-        this.log('info', 'Connecting to backend...');
-        
         try {
+            this.log('info', 'Connecting to backend...');
+            
             const success = await this.services.backend.connect();
             
             if (success) {
                 this.state.backendConnected = true;
-                this.log('info', 'âœ… Backend connected');
+                this.log('info', 'âœ“ Backend connected');
                 
                 if (this.eventBus) {
                     this.eventBus.emit('app:backend-connected');
@@ -696,7 +745,7 @@ class Application {
             this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.logger);
         }
         
-        this.log('info', 'âœ… Finalization complete');
+        this.log('info', 'âœ“ Finalization complete');
     }
     
     /**
@@ -740,7 +789,7 @@ class Application {
             this.state.offlineMode = false;
             this.state.reconnectAttempts = 0;
             
-            this.log('info', 'âœ… Backend connected');
+            this.log('info', 'âœ“ Backend connected');
             
             if (this.notifications) {
                 this.notifications.show('Backend connected', 'success', 3000);
@@ -786,7 +835,7 @@ class Application {
      * GÃ¨re les erreurs d'initialisation
      */
     handleInitError(error) {
-        console.error('âŒ Initialization error:', error);
+        console.error('âœ— Initialization error:', error);
         
         if (this.notifications) {
             this.notifications.show(
@@ -812,7 +861,7 @@ class Application {
             max-width: 500px;
         `;
         errorDiv.innerHTML = `
-            <h3 style="margin: 0 0 10px 0;">âŒ Initialization Failed</h3>
+            <h3 style="margin: 0 0 10px 0;">âœ— Initialization Failed</h3>
             <p style="margin: 0;">${error.message}</p>
             <button onclick="location.reload()" 
                     style="margin-top: 15px; padding: 8px 16px; border: none; background: white; color: #dc3545; cursor: pointer; border-radius: 4px;">
@@ -887,7 +936,7 @@ class Application {
         this.state.initialized = false;
         this.state.ready = false;
         
-        this.log('info', 'âœ… Application destroyed');
+        this.log('info', 'âœ“ Application destroyed');
     }
 }
 

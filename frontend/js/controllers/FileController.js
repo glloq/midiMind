@@ -1,23 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
-// Chemin réel: frontend/js/controllers/FileController.js
-// Version: v4.2.2 - API CORRECTED
+// Chemin rÃƒÂ©el: frontend/js/controllers/FileController.js
+// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
+// CORRECTIONS v4.2.3:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // CORRECTIONS v4.2.2:
-// ✅ Paramètre "filename" pour files.* (snake_case déjà OK)
-// ✅ response.data extraction
-// ✅ Integration FileService pour upload
+// Ã¢Å“â€¦ ParamÃƒÂ¨tre "filename" pour files.* (snake_case dÃƒÂ©jÃƒÂ  OK)
+// Ã¢Å“â€¦ response.data extraction
+// Ã¢Å“â€¦ Integration FileService pour upload
 // ============================================================================
 
 class FileController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         this.logger = window.logger || console;
         this.fileModel = models.file;
         this.view = views.file;
-        this.backend = window.app?.services?.backend || window.backendService;
+        // âœ… this.backend initialisÃ© automatiquement par BaseController
         this.fileService = window.app?.services?.file;
         
         this.state = {
@@ -61,11 +67,11 @@ class FileController extends BaseController {
             }
         });
         
-        this.log('info', 'FileController', '✅ Events bound');
+        this.log('info', 'FileController', 'Ã¢Å“â€¦ Events bound');
     }
     
     async onBackendConnected() {
-        this.log('info', 'FileController', '✅ Backend connected');
+        this.log('info', 'FileController', 'Ã¢Å“â€¦ Backend connected');
         
         this.refreshFileList().catch(error => {
             this.log('warn', 'FileController', 'Initial file list failed:', error.message);
@@ -78,7 +84,7 @@ class FileController extends BaseController {
     
     onBackendDisconnected() {
         this.stopAutoRefresh();
-        this.log('warn', 'FileController', '⚠️ Backend disconnected');
+        this.log('warn', 'FileController', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
     }
     
     onFilesPageActive() {
@@ -93,7 +99,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * ✅ Liste fichiers - files.list
+     * Ã¢Å“â€¦ Liste fichiers - files.list
      */
     async listFiles(path = null) {
         try {
@@ -106,7 +112,7 @@ class FileController extends BaseController {
             
             this.state.isLoading = false;
             
-            // ✅ Extraction via response (BackendService fait déjà)
+            // Ã¢Å“â€¦ Extraction via response (BackendService fait dÃƒÂ©jÃƒÂ )
             const files = response.files || [];
             
             if (this.fileModel) {
@@ -117,7 +123,7 @@ class FileController extends BaseController {
             this.state.currentPath = targetPath;
             this.state.lastRefresh = Date.now();
             
-            this.log('info', 'FileController', `✅ Found ${files.length} files`);
+            this.log('info', 'FileController', `Ã¢Å“â€¦ Found ${files.length} files`);
             this.eventBus.emit('files:list-updated', { files, path: targetPath });
             
             return files;
@@ -129,7 +135,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * ✅ Lit fichier - files.read
+     * Ã¢Å“â€¦ Lit fichier - files.read
      */
     async readFile(filename) {
         try {
@@ -137,7 +143,7 @@ class FileController extends BaseController {
             
             const content = await this.backend.readFile(filename);
             
-            this.log('info', 'FileController', `✅ File read: ${filename}`);
+            this.log('info', 'FileController', `Ã¢Å“â€¦ File read: ${filename}`);
             this.eventBus.emit('file:read-complete', { filename, content });
             
             return content;
@@ -148,7 +154,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * ✅ Écrit fichier - files.write
+     * Ã¢Å“â€¦ Ãƒâ€°crit fichier - files.write
      */
     async writeFile(filename, content) {
         try {
@@ -156,7 +162,7 @@ class FileController extends BaseController {
             
             await this.backend.writeFile(filename, content);
             
-            this.log('info', 'FileController', `✅ File written: ${filename}`);
+            this.log('info', 'FileController', `Ã¢Å“â€¦ File written: ${filename}`);
             this.eventBus.emit('file:write-complete', { filename });
             
             await this.refreshFileList();
@@ -169,7 +175,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * ✅ Supprime fichier - files.delete
+     * Ã¢Å“â€¦ Supprime fichier - files.delete
      */
     async deleteFile(filename) {
         try {
@@ -190,7 +196,7 @@ class FileController extends BaseController {
                 this.fileModel.set('files', filtered);
             }
             
-            this.log('info', 'FileController', `✅ File deleted: ${filename}`);
+            this.log('info', 'FileController', `Ã¢Å“â€¦ File deleted: ${filename}`);
             this.eventBus.emit('file:delete-complete', { filename });
             
             await this.refreshFileList();
@@ -222,7 +228,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * ✅ CORRECTION: Upload via FileService (midi.import)
+     * Ã¢Å“â€¦ CORRECTION: Upload via FileService (midi.import)
      */
     async handleFileUpload(file) {
         try {
@@ -236,7 +242,7 @@ class FileController extends BaseController {
                 this.notifications.show('Upload', `Uploading ${file.name}...`, 'info', 2000);
             }
             
-            // ✅ Utiliser FileService qui gère midi.import
+            // Ã¢Å“â€¦ Utiliser FileService qui gÃƒÂ¨re midi.import
             let result;
             if (this.fileService) {
                 result = await this.fileService.uploadFile(file);
@@ -245,7 +251,7 @@ class FileController extends BaseController {
                 result = await this.backend.uploadFile(file);
             }
             
-            this.log('info', 'FileController', `✅ File uploaded: ${file.name}`);
+            this.log('info', 'FileController', `Ã¢Å“â€¦ File uploaded: ${file.name}`);
             
             if (this.notifications) {
                 this.notifications.show('Upload Complete', `${file.name} uploaded`, 'success', 3000);

@@ -1,32 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/views/RoutingView.js
-// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
-// Date: 2025-11-02
+// Version: v4.1.0 - SIGNATURE CORRIGÉE (HÉRITE DE BASEVIEW)
+// Date: 2025-11-04
 // ============================================================================
-// AMÃ‰LIORATIONS v4.0.0:
-// âœ… API v4.2.2: routing.* (addRoute, removeRoute, clearRoutes, listRoutes, enableRoute, disableRoute)
-// âœ… Matrice de routage interactive
-// âœ… Gestion enable/disable routes
+// CORRECTIONS v4.1.0:
+// ✅ CRITIQUE: RoutingView hérite maintenant de BaseView
+// ✅ Appel super(containerId, eventBus) au début du constructeur
+// ✅ Suppression réimplémentation manuelle de resolveContainer
+// ✅ Accès aux méthodes BaseView (render, update, show, hide, emit, etc.)
+// ============================================================================
+// AMÉLIORATIONS v4.0.0:
+// ✦ API v4.2.2: routing.* (addRoute, removeRoute, clearRoutes, listRoutes, enableRoute, disableRoute)
+// ✦ Matrice de routage interactive
+// ✦ Gestion enable/disable routes
 // ============================================================================
 
-class RoutingView {
-    constructor(container, eventBus) {
-        if (typeof container === 'string') {
-            this.container = document.getElementById(container) || document.querySelector(container);
-        } else if (container instanceof HTMLElement) {
-            this.container = container;
-        } else {
-            this.container = null;
-        }
+class RoutingView extends BaseView {
+    constructor(containerId, eventBus) {
+        // ✅ NOUVEAU: Appel super() pour hériter de BaseView
+        super(containerId, eventBus);
         
-        if (!this.container) {
-            console.error('[RoutingView] Container not found');
-        }
-        
-        this.eventBus = eventBus;
+        // ✅ this.container et this.eventBus déjà initialisés par BaseView
         this.logger = window.logger || console;
         
-        // Ã‰tat
+// État
         this.state = {
             routes: [],
             sources: [], // devices sources
@@ -54,7 +51,7 @@ class RoutingView {
         this.loadRoutes();
         this.loadDevices();
         
-        this.logger.info('[RoutingView] Initialized v4.0.0');
+        this.logger.info('[RoutingView] Initialized v4.0.1');
     }
 
     render() {
@@ -62,13 +59,13 @@ class RoutingView {
         
         this.container.innerHTML = `
             <div class="page-header">
-                <h1>ðŸ”€ Routage MIDI</h1>
+                <h1>🔀 Routage MIDI</h1>
                 <div class="header-actions">
                     <button class="btn-clear-all" data-action="clear-all">
-                        ðŸ—‘ï¸ Tout effacer
+                        🗑️ Tout effacer
                     </button>
                     <button class="btn-refresh" data-action="refresh">
-                        ðŸ”„ Actualiser
+                        🔄 Actualiser
                     </button>
                 </div>
             </div>
@@ -84,12 +81,12 @@ class RoutingView {
                 
                 <!-- Nouvelle route -->
                 <div class="routing-create">
-                    <h2>CrÃ©er une route</h2>
+                    <h2>Créer une route</h2>
                     <div class="create-form">
                         <div class="form-group">
                             <label>Source:</label>
                             <select id="sourceSelect" data-action="select-source">
-                                <option value="">-- SÃ©lectionner --</option>
+                                <option value="">-- Sélectionner --</option>
                                 ${this.state.sources.map(src => `
                                     <option value="${src.id}">${src.name}</option>
                                 `).join('')}
@@ -99,7 +96,7 @@ class RoutingView {
                         <div class="form-group">
                             <label>Destination:</label>
                             <select id="destinationSelect" data-action="select-destination">
-                                <option value="">-- SÃ©lectionner --</option>
+                                <option value="">-- Sélectionner --</option>
                                 ${this.state.destinations.map(dst => `
                                     <option value="${dst.id}">${dst.name}</option>
                                 `).join('')}
@@ -107,7 +104,7 @@ class RoutingView {
                         </div>
                         
                         <button class="btn-create-route" data-action="create-route">
-                            âž• CrÃ©er la route
+                            ➕ Créer la route
                         </button>
                     </div>
                 </div>
@@ -255,7 +252,7 @@ class RoutingView {
                                 <div class="matrix-cell ${isConnected ? 'connected' : ''} ${!isEnabled ? 'disabled' : ''}"
                                      data-source="${src.id}" 
                                      data-destination="${dst.id}">
-                                    ${isConnected ? (isEnabled ? 'âœ“' : 'âœ•') : ''}
+                                    ${isConnected ? (isEnabled ? '✓' : '●') : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -281,7 +278,7 @@ class RoutingView {
         if (routes.length === 0) {
             return `
                 <div class="routes-empty">
-                    <p>Aucune route configurÃ©e</p>
+                    <p>Aucune route configurée</p>
                 </div>
             `;
         }
@@ -303,16 +300,16 @@ class RoutingView {
                  data-enabled="${isEnabled}">
                 <div class="route-info">
                     <div class="route-source">${this.getDeviceName(route.source_id)}</div>
-                    <div class="route-arrow">â†’</div>
+                    <div class="route-arrow">→</div>
                     <div class="route-destination">${this.getDeviceName(route.destination_id)}</div>
                 </div>
                 <div class="route-actions">
                     <button class="btn-toggle" data-action="toggle-route" 
-                            title="${isEnabled ? 'DÃ©sactiver' : 'Activer'}">
-                        ${isEnabled ? 'â¸ï¸' : 'â–¶ï¸'}
+                            title="${isEnabled ? 'Désactiver' : 'Activer'}">
+                        ${isEnabled ? '⏸️' : '▶️'}
                     </button>
                     <button class="btn-delete" data-action="delete-route" title="Supprimer">
-                        ðŸ—‘ï¸
+                        🗑️
                     </button>
                 </div>
             </div>
@@ -334,7 +331,7 @@ class RoutingView {
         const destinationId = this.state.selectedDestination;
         
         if (!sourceId || !destinationId) {
-            alert('SÃ©lectionnez une source et une destination');
+            alert('Sélectionnez une source et une destination');
             return;
         }
         
@@ -348,7 +345,7 @@ class RoutingView {
     }
 
     async deleteRoute(routeId) {
-        // Parser routeId qui peut Ãªtre "source_destination"
+        // Parser routeId qui peut être "source_destination"
         const [sourceId, destinationId] = routeId.split('_');
         
         // API: routing.removeRoute

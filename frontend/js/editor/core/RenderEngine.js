@@ -2,37 +2,37 @@
 // Fichier: frontend/js/editor/core/RenderEngine.js
 // Version: v3.1.1 - PERFORMANCE OPTIMIZED + FIXED
 // Date: 2025-10-23
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.1:
-// ✓ Ajout de setVisualizer() pour compatibilité MidiVisualizer
-// ✓ Ajout de startRenderLoop() et stopRenderLoop() (alias)
-// ✓ Ajout de callback personnalisé pour render loop
+// âœ“ Ajout de setVisualizer() pour compatibilitÃ© MidiVisualizer
+// âœ“ Ajout de startRenderLoop() et stopRenderLoop() (alias)
+// âœ“ Ajout de callback personnalisÃ© pour render loop
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// ✓ FPS limité à 10 (au lieu de 60)
-// ✓ Anti-aliasing désactivé
-// ✓ Animations désactivées
-// ✓ Rendering optimisé (batch processing)
+// âœ“ FPS limitÃ© Ã  10 (au lieu de 60)
+// âœ“ Anti-aliasing dÃ©sactivÃ©
+// âœ“ Animations dÃ©sactivÃ©es
+// âœ“ Rendering optimisÃ© (batch processing)
 // ============================================================================
 
 class RenderEngine {
     constructor(container, eventBus, debugConsole) {
         this.container = container;
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.debugConsole = debugConsole;
         
-        // Référence au visualizer (ajouté pour compatibilité)
+        // RÃ©fÃ©rence au visualizer (ajoutÃ© pour compatibilitÃ©)
         this.visualizer = null;
         this.renderCallback = null;
         
-        // Configuration (OPTIMISÉ)
+        // Configuration (OPTIMISÃ‰)
         this.config = {
-            targetFPS: PerformanceConfig.rendering.targetFPS || 10,  // ✓ RÉDUIT À 10 fps
-            enableAntiAliasing: PerformanceConfig.rendering.enableAntiAliasing || false,  // ✓ DÉSACTIVÉ
+            targetFPS: PerformanceConfig.rendering.targetFPS || 10,  // âœ“ RÃ‰DUIT Ã€ 10 fps
+            enableAntiAliasing: PerformanceConfig.rendering.enableAntiAliasing || false,  // âœ“ DÃ‰SACTIVÃ‰
             maxVisibleNotes: PerformanceConfig.rendering.maxVisibleNotes || 500,
             updateInterval: PerformanceConfig.rendering.updateInterval || 100,
-            enableAnimations: PerformanceConfig.rendering.enableAnimations || false,  // ✓ DÉSACTIVÉ
+            enableAnimations: PerformanceConfig.rendering.enableAnimations || false,  // âœ“ DÃ‰SACTIVÃ‰
             renderBatchSize: PerformanceConfig.editor.renderBatchSize || 100
         };
         
@@ -41,17 +41,17 @@ class RenderEngine {
         this.ctx = null;
         this.width = 0;
         this.height = 0;
-        this.dpr = 1;  // Device Pixel Ratio (fixe à 1 pour performance)
+        this.dpr = 1;  // Device Pixel Ratio (fixe Ã  1 pour performance)
         
         // Animation loop
         this.animationFrameId = null;
         this.isRendering = false;
         this.lastFrameTime = 0;
-        this.frameInterval = 1000 / this.config.targetFPS;  // ✓ ~100ms entre frames
+        this.frameInterval = 1000 / this.config.targetFPS;  // âœ“ ~100ms entre frames
         this.frameCount = 0;
         this.fps = 0;
         
-        // État
+        // Ã‰tat
         this.needsRedraw = true;
         this.viewport = {
             startTime: 0,
@@ -70,7 +70,7 @@ class RenderEngine {
             pianoRoll: null
         };
         
-        // Données à rendre
+        // DonnÃ©es Ã  rendre
         this.data = {
             notes: [],
             selection: new Set(),
@@ -85,7 +85,7 @@ class RenderEngine {
             totalFrames: 0
         };
         
-        this.logDebug('render', '✓ RenderEngine initialized (performance mode)');
+        this.logDebug('render', 'âœ“ RenderEngine initialized (performance mode)');
         
         this.init();
     }
@@ -103,7 +103,7 @@ class RenderEngine {
     }
     
     createCanvas() {
-        // Récupérer ou créer canvas
+        // RÃ©cupÃ©rer ou crÃ©er canvas
         this.canvas = this.container.querySelector('canvas');
         
         if (!this.canvas) {
@@ -121,11 +121,11 @@ class RenderEngine {
             desynchronized: true  // Meilleure perf pour animations
         });
         
-        // ✓ DÉSACTIVER ANTI-ALIASING pour performance
+        // âœ“ DÃ‰SACTIVER ANTI-ALIASING pour performance
         if (!this.config.enableAntiAliasing) {
             this.ctx.imageSmoothingEnabled = false;
             
-            // Compatibilité navigateurs
+            // CompatibilitÃ© navigateurs
             if (this.ctx.webkitImageSmoothingEnabled !== undefined) {
                 this.ctx.webkitImageSmoothingEnabled = false;
             }
@@ -136,7 +136,7 @@ class RenderEngine {
                 this.ctx.msImageSmoothingEnabled = false;
             }
             
-            this.logDebug('render', '✓ Anti-aliasing disabled');
+            this.logDebug('render', 'âœ“ Anti-aliasing disabled');
         }
     }
     
@@ -148,7 +148,7 @@ class RenderEngine {
             height = rect.height;
         }
         
-        // ✓ Fixer DPR à 1 pour éviter suréchantillonnage
+        // âœ“ Fixer DPR Ã  1 pour Ã©viter surÃ©chantillonnage
         this.dpr = 1;
         
         this.width = width;
@@ -188,16 +188,16 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // VISUALIZER (AJOUTÉ pour compatibilité)
+    // VISUALIZER (AJOUTÃ‰ pour compatibilitÃ©)
     // ========================================================================
     
     /**
-     * Définit le visualizer parent
+     * DÃ©finit le visualizer parent
      * @param {MidiVisualizer} visualizer - Instance du visualizer
      */
     setVisualizer(visualizer) {
         this.visualizer = visualizer;
-        this.logDebug('render', '✓ Visualizer set');
+        this.logDebug('render', 'âœ“ Visualizer set');
     }
     
     // ========================================================================
@@ -212,12 +212,12 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // ANIMATION LOOP (OPTIMISÉ)
+    // ANIMATION LOOP (OPTIMISÃ‰)
     // ========================================================================
     
     /**
-     * Démarre la boucle de rendu
-     * @param {Function} callback - Callback optionnel à appeler à chaque frame
+     * DÃ©marre la boucle de rendu
+     * @param {Function} callback - Callback optionnel Ã  appeler Ã  chaque frame
      */
     startRenderLoop(callback) {
         if (callback) {
@@ -227,7 +227,7 @@ class RenderEngine {
     }
     
     /**
-     * Arrête la boucle de rendu
+     * ArrÃªte la boucle de rendu
      */
     stopRenderLoop() {
         this.stop();
@@ -263,16 +263,16 @@ class RenderEngine {
         const now = performance.now();
         const elapsed = now - this.lastFrameTime;
         
-        // ✓ LIMITER FPS en sautant des frames
+        // âœ“ LIMITER FPS en sautant des frames
         if (elapsed >= this.frameInterval) {
             // Enregistrer frame time
             const frameStart = now;
             
-            // Appeler le callback personnalisé si défini
+            // Appeler le callback personnalisÃ© si dÃ©fini
             if (this.renderCallback) {
                 this.renderCallback();
             } else if (this.needsRedraw) {
-                // Sinon, render par défaut
+                // Sinon, render par dÃ©faut
                 this.render();
                 this.needsRedraw = false;
             }
@@ -285,7 +285,7 @@ class RenderEngine {
             // FPS actuel
             this.fps = 1000 / elapsed;
             
-            // Frame droppée si trop lent
+            // Frame droppÃ©e si trop lent
             if (this.perfStats.renderTime > this.frameInterval) {
                 this.perfStats.droppedFrames++;
             }
@@ -327,7 +327,7 @@ class RenderEngine {
     }
     
     /**
-     * Alias pour compatibilité avec MidiVisualizer
+     * Alias pour compatibilitÃ© avec MidiVisualizer
      */
     clearCanvas() {
         this.clear();
@@ -341,13 +341,13 @@ class RenderEngine {
     
     renderNotes() {
         if (this.renderers.pianoRoll) {
-            // ✓ LIMITER nombre de notes visibles
+            // âœ“ LIMITER nombre de notes visibles
             const visibleNotes = this.getVisibleNotes();
             const limitedNotes = visibleNotes.slice(0, this.config.maxVisibleNotes);
             
             if (visibleNotes.length > this.config.maxVisibleNotes) {
                 this.logDebug('render', 
-                    `⚠️ ${visibleNotes.length} notes (showing ${this.config.maxVisibleNotes})`, 
+                    `âš ï¸ ${visibleNotes.length} notes (showing ${this.config.maxVisibleNotes})`, 
                     'warn'
                 );
             }
@@ -373,7 +373,7 @@ class RenderEngine {
     }
     
     renderOverlay() {
-        // Debug info si activé
+        // Debug info si activÃ©
         if (PerformanceConfig.debug.enableFPSCounter) {
             this.renderDebugInfo();
         }
@@ -395,7 +395,7 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // DONNÉES
+    // DONNÃ‰ES
     // ========================================================================
     
     setNotes(notes) {
@@ -438,7 +438,7 @@ class RenderEngine {
     }
     
     // ========================================================================
-    // COORDONNÉES
+    // COORDONNÃ‰ES
     // ========================================================================
     
     timeToX(time) {
@@ -498,7 +498,7 @@ class RenderEngine {
         } else if (window.logger && typeof window.logger.debug === 'function') {
             window.logger.debug('RenderEngine', message);
         }
-        // Silencieux si aucune méthode disponible
+        // Silencieux si aucune mÃ©thode disponible
     }
     
     // ========================================================================
@@ -515,7 +515,7 @@ class RenderEngine {
         this.canvas = null;
         this.ctx = null;
         
-        this.logDebug('render', '✓ RenderEngine destroyed');
+        this.logDebug('render', 'âœ“ RenderEngine destroyed');
     }
 }
 

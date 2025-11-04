@@ -1,19 +1,19 @@
 // ============================================================================
 // Fichier: frontend/js/services/FileService.js
-// Chemin réel: frontend/js/services/FileService.js
+// Chemin rÃ©el: frontend/js/services/FileService.js
 // Version: v4.2.2 - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// ✅ midi.import: {filename, content, base64}
-// ✅ response.data.files extraction
-// ✅ snake_case paramètres
+// âœ… midi.import: {filename, content, base64}
+// âœ… response.data.files extraction
+// âœ… snake_case paramÃ¨tres
 // ============================================================================
 
 class FileService {
     constructor(backendService, eventBus, logger) {
         this.backend = backendService;
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger || this.createFallbackLogger();
         
         this.fileCache = new Map();
@@ -49,7 +49,7 @@ class FileService {
             deletesCount: 0
         };
         
-        this.log('info', 'FileService', '✓ Service initialized (v4.2.2)');
+        this.log('info', 'FileService', 'âœ“ Service initialized (v4.2.2)');
         this._bindBackendEvents();
     }
     
@@ -109,7 +109,7 @@ class FileService {
             let filesData = [];
             if (this.backend && typeof this.backend.listFiles === 'function') {
                 const response = await this.backend.listFiles('/midi');
-                // ✅ Extraction via response.data
+                // âœ… Extraction via response.data
                 filesData = response.files || [];
             } else {
                 this.log('warn', 'FileService', 'Backend not available, using mock data');
@@ -209,7 +209,7 @@ class FileService {
     }
     
     /**
-     * ✅ CORRECTION: Upload avec midi.import {filename, content, base64}
+     * âœ… CORRECTION: Upload avec midi.import {filename, content, base64}
      */
     async uploadFile(file, progressCallback = null) {
         if (this.state.isUploading) {
@@ -235,7 +235,7 @@ class FileService {
                 new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), '')
             );
             
-            // ✅ CORRECTION: Utiliser midi.import avec nouveau format
+            // âœ… CORRECTION: Utiliser midi.import avec nouveau format
             let result;
             if (this.backend && typeof this.backend.importMidi === 'function') {
                 result = await this.backend.importMidi(

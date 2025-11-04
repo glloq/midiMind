@@ -1,44 +1,44 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/ValidationController.js
-// Projet: MidiMind v3.1.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.0 - OPTIMISÃ‰
+// Projet: MidiMind v3.1.0 - SystÃƒÆ’Ã‚Â¨me d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - OPTIMISÃƒÆ’Ã¢â‚¬Â°
 // Date: 2025-11-01
 // ============================================================================
 // Description:
-//   ContrÃ´leur de validation des donnÃ©es utilisateur.
-//   Fournit validation pour formulaires, paramÃ¨tres, fichiers, etc.
+//   ContrÃƒÆ’Ã‚Â´leur de validation des donnÃƒÆ’Ã‚Â©es utilisateur.
+//   Fournit validation pour formulaires, paramÃƒÆ’Ã‚Â¨tres, fichiers, etc.
 //
-// FonctionnalitÃ©s:
+// FonctionnalitÃƒÆ’Ã‚Â©s:
 //   - Validation formulaires (champs requis, formats)
-//   - Validation types de donnÃ©es (string, number, email, etc.)
+//   - Validation types de donnÃƒÆ’Ã‚Â©es (string, number, email, etc.)
 //   - Validation plages de valeurs (min, max, range)
 //   - Validation fichiers (extension, taille, type MIME)
-//   - Validation paramÃ¨tres systÃ¨me (audio, MIDI, rÃ©seau)
-//   - RÃ¨gles personnalisÃ©es (regex, callback)
+//   - Validation paramÃƒÆ’Ã‚Â¨tres systÃƒÆ’Ã‚Â¨me (audio, MIDI, rÃƒÆ’Ã‚Â©seau)
+//   - RÃƒÆ’Ã‚Â¨gles personnalisÃƒÆ’Ã‚Â©es (regex, callback)
 //   - Messages d'erreur personnalisables
-//   - Validation asynchrone (vÃ©rification backend)
-//   - VÃ©rification intÃ©gritÃ© systÃ¨me
+//   - Validation asynchrone (vÃƒÆ’Ã‚Â©rification backend)
+//   - VÃƒÆ’Ã‚Â©rification intÃƒÆ’Ã‚Â©gritÃƒÆ’Ã‚Â© systÃƒÆ’Ã‚Â¨me
 //
 // Architecture:
 //   ValidationController extends BaseController
 //   - Utilise Validator (utils/)
-//   - RÃ¨gles de validation rÃ©utilisables
-//   - Cache des rÃ©sultats de validation
+//   - RÃƒÆ’Ã‚Â¨gles de validation rÃƒÆ’Ã‚Â©utilisables
+//   - Cache des rÃƒÆ’Ã‚Â©sultats de validation
 //
 // MODIFICATIONS v3.1.0:
-//   âœ… Constructeur conforme Ã  BaseController
-//   âœ… Utilisation cohÃ©rente de subscribe() pour Ã©vÃ©nements
-//   âœ… RÃ¨gles de validation Ã©tendues
-//   âœ… Support validation asynchrone
-//   âœ… MÃ©thodes helper de BaseController
-//   âœ… Validation MIDI spÃ©cifique
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Constructeur conforme ÃƒÆ’Ã‚Â  BaseController
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Utilisation cohÃƒÆ’Ã‚Â©rente de subscribe() pour ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ RÃƒÆ’Ã‚Â¨gles de validation ÃƒÆ’Ã‚Â©tendues
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Support validation asynchrone
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ MÃƒÆ’Ã‚Â©thodes helper de BaseController
+//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Validation MIDI spÃƒÆ’Ã‚Â©cifique
 //
 // Auteur: MidiMind Team
 // ============================================================================
 
 class ValidationController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         // Validateurs
         this.validators = {};
@@ -49,7 +49,7 @@ class ValidationController extends BaseController {
         
         // Configuration
         this.config = {
-            ...this.config,  // HÃ©riter de BaseController
+            ...this.config,  // HÃƒÆ’Ã‚Â©riter de BaseController
             cacheEnabled: true,
             cacheExpiryMs: 60000,  // 1 minute
             strictMode: false,
@@ -69,7 +69,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * Initialisation du contrÃ´leur
+     * Initialisation du contrÃƒÆ’Ã‚Â´leur
      */
     onInitialize() {
         this.logDebug('info', 'Initializing validation controller...');
@@ -77,10 +77,10 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * Bind des Ã©vÃ©nements
+     * Bind des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
      */
     bindEvents() {
-        // Ã‰vÃ©nements de fichiers
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements de fichiers
         this.subscribe('file:before:add', (data) => {
             if (!this.validateFile(data.file)) {
                 this.emitEvent('file:validation:failed', data);
@@ -89,7 +89,7 @@ class ValidationController extends BaseController {
         
         this.subscribe('file:added', (data) => this.validateFile(data.file));
         
-        // Ã‰vÃ©nements de playlists
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements de playlists
         this.subscribe('playlist:before:create', (data) => {
             if (!this.validatePlaylist(data.playlist)) {
                 this.emitEvent('playlist:validation:failed', data);
@@ -98,7 +98,7 @@ class ValidationController extends BaseController {
         
         this.subscribe('playlist:added', (data) => this.validatePlaylist(data.playlist));
         
-        // Ã‰vÃ©nements d'instruments
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements d'instruments
         this.subscribe('instrument:before:connect', (data) => {
             if (!this.validateInstrument(data.instrument)) {
                 this.emitEvent('instrument:validation:failed', data);
@@ -107,7 +107,7 @@ class ValidationController extends BaseController {
         
         this.subscribe('instrument:connected', (data) => this.validateInstrument(data.instrument));
         
-        // Ã‰vÃ©nements systÃ¨me
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements systÃƒÆ’Ã‚Â¨me
         this.subscribe('system:check:integrity', () => this.checkSystemIntegrity());
         this.subscribe('validation:clear:cache', () => this.clearCache());
     }
@@ -120,19 +120,19 @@ class ValidationController extends BaseController {
         this.validators.file = {
             name: {
                 validator: (name) => name && name.trim().length > 0 && name.length <= 255,
-                message: 'Le nom du fichier doit contenir 1-255 caractÃ¨res'
+                message: 'Le nom du fichier doit contenir 1-255 caractÃƒÆ’Ã‚Â¨res'
             },
             size: {
                 validator: (size) => size && parseInt(size) > 0 && parseInt(size) < 100 * 1024 * 1024, // Max 100MB
-                message: 'La taille du fichier doit Ãªtre entre 1 et 100MB'
+                message: 'La taille du fichier doit ÃƒÆ’Ã‚Âªtre entre 1 et 100MB'
             },
             duration: {
                 validator: (duration) => !duration || (duration > 0 && duration < 7200), // Max 2 heures
-                message: 'La durÃ©e doit Ãªtre entre 0 et 2 heures'
+                message: 'La durÃƒÆ’Ã‚Â©e doit ÃƒÆ’Ã‚Âªtre entre 0 et 2 heures'
             },
             tempo: {
                 validator: (tempo) => !tempo || (tempo > 0 && tempo <= 300),
-                message: 'Le tempo doit Ãªtre entre 1 et 300 BPM'
+                message: 'Le tempo doit ÃƒÆ’Ã‚Âªtre entre 1 et 300 BPM'
             },
             tracks: {
                 validator: (tracks) => !tracks || (Array.isArray(tracks) && tracks.length > 0 && tracks.length <= 128),
@@ -140,7 +140,7 @@ class ValidationController extends BaseController {
             },
             format: {
                 validator: (format) => !format || ['mid', 'midi', 'smf'].includes(format.toLowerCase()),
-                message: 'Le format doit Ãªtre MIDI (.mid, .midi, .smf)'
+                message: 'Le format doit ÃƒÆ’Ã‚Âªtre MIDI (.mid, .midi, .smf)'
             }
         };
         
@@ -148,15 +148,15 @@ class ValidationController extends BaseController {
         this.validators.playlist = {
             name: {
                 validator: (name) => name && name.trim().length > 0 && name.length <= 100,
-                message: 'Le nom de la playlist doit contenir 1-100 caractÃ¨res'
+                message: 'Le nom de la playlist doit contenir 1-100 caractÃƒÆ’Ã‚Â¨res'
             },
             files: {
                 validator: (files) => Array.isArray(files),
-                message: 'La liste de fichiers doit Ãªtre un tableau'
+                message: 'La liste de fichiers doit ÃƒÆ’Ã‚Âªtre un tableau'
             },
             description: {
                 validator: (desc) => !desc || desc.length <= 500,
-                message: 'La description ne doit pas dÃ©passer 500 caractÃ¨res'
+                message: 'La description ne doit pas dÃƒÆ’Ã‚Â©passer 500 caractÃƒÆ’Ã‚Â¨res'
             }
         };
         
@@ -164,10 +164,10 @@ class ValidationController extends BaseController {
         this.validators.instrument = {
             name: {
                 validator: (name) => name && name.trim().length > 0 && name.length <= 100,
-                message: 'Le nom de l\'instrument doit contenir 1-100 caractÃ¨res'
+                message: 'Le nom de l\'instrument doit contenir 1-100 caractÃƒÆ’Ã‚Â¨res'
             },
             type: {
-                validator: (type) => !type || ['Cordes', 'Vents', 'Percussions', 'Clavier', 'Ã‰lectronique'].includes(type),
+                validator: (type) => !type || ['Cordes', 'Vents', 'Percussions', 'Clavier', 'ÃƒÆ’Ã¢â‚¬Â°lectronique'].includes(type),
                 message: 'Type d\'instrument invalide'
             },
             connection: {
@@ -176,11 +176,11 @@ class ValidationController extends BaseController {
             },
             latency: {
                 validator: (latency) => !latency || (latency >= 0 && latency <= 1000),
-                message: 'La latence doit Ãªtre entre 0 et 1000ms'
+                message: 'La latence doit ÃƒÆ’Ã‚Âªtre entre 0 et 1000ms'
             },
             noteRange: {
                 validator: (range) => !range || (range.min >= 0 && range.max <= 127 && range.min <= range.max),
-                message: 'La plage de notes doit Ãªtre entre 0-127 (MIDI standard)'
+                message: 'La plage de notes doit ÃƒÆ’Ã‚Âªtre entre 0-127 (MIDI standard)'
             }
         };
         
@@ -188,23 +188,23 @@ class ValidationController extends BaseController {
         this.validators.midi = {
             note: {
                 validator: (note) => Number.isInteger(note) && note >= 0 && note <= 127,
-                message: 'La note MIDI doit Ãªtre entre 0 et 127'
+                message: 'La note MIDI doit ÃƒÆ’Ã‚Âªtre entre 0 et 127'
             },
             velocity: {
                 validator: (velocity) => Number.isInteger(velocity) && velocity >= 0 && velocity <= 127,
-                message: 'La vÃ©locitÃ© doit Ãªtre entre 0 et 127'
+                message: 'La vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â© doit ÃƒÆ’Ã‚Âªtre entre 0 et 127'
             },
             channel: {
                 validator: (channel) => Number.isInteger(channel) && channel >= 0 && channel <= 15,
-                message: 'Le canal MIDI doit Ãªtre entre 0 et 15'
+                message: 'Le canal MIDI doit ÃƒÆ’Ã‚Âªtre entre 0 et 15'
             },
             cc: {
                 validator: (cc) => Number.isInteger(cc) && cc >= 0 && cc <= 127,
-                message: 'Le numÃ©ro de CC doit Ãªtre entre 0 et 127'
+                message: 'Le numÃƒÆ’Ã‚Â©ro de CC doit ÃƒÆ’Ã‚Âªtre entre 0 et 127'
             },
             program: {
                 validator: (program) => Number.isInteger(program) && program >= 0 && program <= 127,
-                message: 'Le numÃ©ro de programme doit Ãªtre entre 0 et 127'
+                message: 'Le numÃƒÆ’Ã‚Â©ro de programme doit ÃƒÆ’Ã‚Âªtre entre 0 et 127'
             }
         };
         
@@ -212,11 +212,11 @@ class ValidationController extends BaseController {
         this.validators.routing = {
             sourceId: {
                 validator: (id) => typeof id === 'number' && id >= 0,
-                message: 'L\'ID source doit Ãªtre un nombre positif'
+                message: 'L\'ID source doit ÃƒÆ’Ã‚Âªtre un nombre positif'
             },
             targetId: {
                 validator: (id) => typeof id === 'number' && id >= 0,
-                message: 'L\'ID cible doit Ãªtre un nombre positif'
+                message: 'L\'ID cible doit ÃƒÆ’Ã‚Âªtre un nombre positif'
             },
             channelMap: {
                 validator: (map) => !map || (typeof map === 'object' && Object.values(map).every(ch => ch >= 0 && ch <= 15)),
@@ -300,13 +300,13 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * MÃ©thode de validation gÃ©nÃ©rique
+     * MÃƒÆ’Ã‚Â©thode de validation gÃƒÆ’Ã‚Â©nÃƒÆ’Ã‚Â©rique
      */
     validate(data, validators, type = 'generic') {
         const errors = [];
         const warnings = [];
         
-        // VÃ©rifier le cache
+        // VÃƒÆ’Ã‚Â©rifier le cache
         if (this.config.cacheEnabled) {
             const cacheKey = this.getCacheKey(data, type);
             const cached = this.getCachedValidation(cacheKey);
@@ -338,7 +338,7 @@ class ValidationController extends BaseController {
             }
         }
         
-        // RÃ©sultat
+        // RÃƒÆ’Ã‚Â©sultat
         const isValid = errors.length === 0;
         
         if (isValid) {
@@ -351,9 +351,9 @@ class ValidationController extends BaseController {
             this.logDebug('warn', `Validation failed for ${type} ${name}: ${errors.join(', ')}`);
             
             // Notifier
-            this.notify('warning', `Validation Ã©chouÃ©e: ${errors[0]}`);
+            this.notify('warning', `Validation ÃƒÆ’Ã‚Â©chouÃƒÆ’Ã‚Â©e: ${errors[0]}`);
             
-            // Ã‰mettre Ã©vÃ©nement
+            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
             this.emitEvent('validation:failed', {
                 type,
                 data,
@@ -377,7 +377,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * Ajouter un validateur personnalisÃ©
+     * Ajouter un validateur personnalisÃƒÆ’Ã‚Â©
      */
     addCustomValidator(name, validator, message) {
         this.customValidators.set(name, {
@@ -388,7 +388,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * Supprimer un validateur personnalisÃ©
+     * Supprimer un validateur personnalisÃƒÆ’Ã‚Â©
      */
     removeCustomValidator(name) {
         this.customValidators.delete(name);
@@ -396,7 +396,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * Nettoyer/Sanitizer une entrÃ©e
+     * Nettoyer/Sanitizer une entrÃƒÆ’Ã‚Â©e
      */
     sanitizeInput(input, type = 'string') {
         if (!input) return '';
@@ -433,7 +433,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * VÃ©rifier l'intÃ©gritÃ© du systÃ¨me
+     * VÃƒÆ’Ã‚Â©rifier l'intÃƒÆ’Ã‚Â©gritÃƒÆ’Ã‚Â© du systÃƒÆ’Ã‚Â¨me
      */
     async checkSystemIntegrity() {
         this.logDebug('info', 'Checking system integrity...');
@@ -441,7 +441,7 @@ class ValidationController extends BaseController {
         const issues = [];
         
         try {
-            // VÃ©rifier les fichiers orphelins dans les playlists
+            // VÃƒÆ’Ã‚Â©rifier les fichiers orphelins dans les playlists
             const fileModel = this.getModel('file');
             const playlistModel = this.getModel('playlist');
             
@@ -464,7 +464,7 @@ class ValidationController extends BaseController {
                 });
             }
             
-            // VÃ©rifier les assignations d'instruments
+            // VÃƒÆ’Ã‚Â©rifier les assignations d'instruments
             const instrumentModel = this.getModel('instrument');
             
             if (fileModel && instrumentModel) {
@@ -486,7 +486,7 @@ class ValidationController extends BaseController {
                 });
             }
             
-            // VÃ©rifier les routes de routage
+            // VÃƒÆ’Ã‚Â©rifier les routes de routage
             const routingModel = this.getModel('routing');
             
             if (routingModel) {
@@ -507,7 +507,7 @@ class ValidationController extends BaseController {
             this.logDebug('error', 'Error checking system integrity:', error);
             issues.push({
                 type: 'check_error',
-                message: `Erreur lors de la vÃ©rification: ${error.message}`,
+                message: `Erreur lors de la vÃƒÆ’Ã‚Â©rification: ${error.message}`,
                 severity: 'error'
             });
         }
@@ -519,15 +519,15 @@ class ValidationController extends BaseController {
                 this.logDebug(issue.severity, issue.message);
             });
             
-            // Ã‰mettre Ã©vÃ©nement
+            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
             this.emitEvent('validation:integrity:issues', { issues });
             
             // Notifier
             const errorCount = issues.filter(i => i.severity === 'error').length;
             if (errorCount > 0) {
-                this.notify('error', `${errorCount} problÃ¨me(s) d'intÃ©gritÃ© dÃ©tectÃ©(s)`);
+                this.notify('error', `${errorCount} problÃƒÆ’Ã‚Â¨me(s) d'intÃƒÆ’Ã‚Â©gritÃƒÆ’Ã‚Â© dÃƒÆ’Ã‚Â©tectÃƒÆ’Ã‚Â©(s)`);
             } else {
-                this.notify('warning', `${issues.length} avertissement(s) d'intÃ©gritÃ©`);
+                this.notify('warning', `${issues.length} avertissement(s) d'intÃƒÆ’Ã‚Â©gritÃƒÆ’Ã‚Â©`);
             }
         } else {
             this.logDebug('info', 'System integrity check passed');
@@ -582,7 +582,7 @@ class ValidationController extends BaseController {
     }
     
     /**
-     * RÃ©initialiser les statistiques
+     * RÃƒÆ’Ã‚Â©initialiser les statistiques
      */
     resetStats() {
         this.stats = {

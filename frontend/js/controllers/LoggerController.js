@@ -1,213 +1,344 @@
 // ============================================================================
-// Fichier: frontend/js/controllers/LoggerController.js
-// Version: v1.0.0
+// Fichier: frontend/js/controllers/LatencyController.js
+// Version: v1.0.1 - FIXED BACKEND SIGNATURE
 // Date: 2025-10-28
 // ============================================================================
+// CORRECTIONS v1.0.1:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // Description:
-//   Contrôleur pour gérer le niveau de logging du backend
-//   - Configuration du niveau de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-//   - Synchronisation avec le Logger frontend
-//   - Interface de sélection du niveau
+//   ContrÃƒÂ´leur pour gÃƒÂ©rer la compensation de latence
+//   - Configuration compensation par instrument
+//   - Gestion offset global
+//   - Activation/dÃƒÂ©sactivation
+//   - Monitoring des latences
 // ============================================================================
 
-class LoggerController extends BaseController {
-    constructor(eventBus, backendService, logger = null, notifications = null, debugConsole = null) {
-        super(eventBus, {}, {}, notifications, debugConsole);
+class LatencyController extends BaseController {
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         this.backendService = backendService;
-        this.logger = logger || console;
+        this.latencyView = latencyView;
         
-        // État du logger
-        this.state.logger = {
-            backendLevel: 'INFO',
-            frontendLevel: 'INFO',
-            availableLevels: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        // Ãƒâ€°tat de la latence
+        this.state.latency = {
+            enabled: false,
+            globalOffset: 0,
+            instruments: [],
+            selectedInstrument: null
         };
         
         // Configuration
-        this.config.syncWithFrontend = true;
+        this.config.autoRefresh = true;
+        this.config.refreshInterval = 10000; // 10 secondes
+        
+        // Timer de rafraÃƒÂ®chissement
+        this.refreshTimer = null;
     }
     
     /**
-     * Initialisation personnalisée
+     * Initialisation personnalisÃƒÂ©e
      */
     onInitialize() {
-        this.logDebug('info', 'LoggerController initializing...');
+        this.logDebug('info', 'LatencyController initializing...');
         
-        // Charger le niveau actuel
-        this.loadBackendLogLevel();
+        // Charger les donnÃƒÂ©es initiales
+        this.loadLatencySettings();
+        
+        // DÃƒÂ©marrer le rafraÃƒÂ®chissement automatique si configurÃƒÂ©
+        if (this.config.autoRefresh) {
+            this.startAutoRefresh();
+        }
     }
     
     /**
-     * Liaison des événements
+     * Liaison des ÃƒÂ©vÃƒÂ©nements
      */
     bindEvents() {
-        // Événements de l'interface
-        this.subscribe('logger:set-level', (data) => this.setLogLevel(data.level));
-        this.subscribe('logger:get-level', () => this.loadBackendLogLevel());
-        this.subscribe('logger:sync-frontend', (data) => this.syncFrontendLevel(data.level));
+        // Ãƒâ€°vÃƒÂ©nements de la vue
+        this.subscribe('latency:enable', () => this.enableCompensation());
+        this.subscribe('latency:disable', () => this.disableCompensation());
+        this.subscribe('latency:set-global-offset', (data) => this.setGlobalOffset(data.offset));
+        this.subscribe('latency:set-compensation', (data) => {
+            this.setInstrumentCompensation(data.instrumentId, data.offset);
+        });
+        this.subscribe('latency:refresh', () => this.loadLatencySettings());
+        this.subscribe('latency:select-instrument', (data) => {
+            this.selectInstrument(data.instrumentId);
+        });
         
-        // Événements backend
+        // Ãƒâ€°vÃƒÂ©nements backend
         this.subscribe('backend:connected', () => {
-            this.loadBackendLogLevel();
+            this.loadLatencySettings();
         });
     }
     
     /**
-     * Charge le niveau de log actuel du backend
+     * Charge les paramÃƒÂ¨tres de latence
      */
-    async loadBackendLogLevel() {
-        return this.executeAction('loadBackendLogLevel', async () => {
+    async loadLatencySettings() {
+        return this.executeAction('loadLatencySettings', async () => {
             try {
-                const response = await this.backendService.sendCommand('logger.getLevel', {});
+                // Charger l'offset global
+                const globalResponse = await this.backendService.sendCommand('latency.getGlobalOffset', {});
                 
-                if (response.success) {
-                    this.state.logger.backendLevel = response.data.level || 'INFO';
-                    
-                    this.logDebug('info', `Backend log level: ${this.state.logger.backendLevel}`);
-                    
-                    this.emitEvent('logger:level:loaded', {
-                        level: this.state.logger.backendLevel
-                    });
-                    
-                    // Synchroniser avec le frontend si configuré
-                    if (this.config.syncWithFrontend) {
-                        this.syncFrontendLevel(this.state.logger.backendLevel);
-                    }
+                if (globalResponse.success) {
+                    this.state.latency.globalOffset = globalResponse.data.offset_ms || 0;
                 }
                 
-                return response;
+                // Charger la liste des instruments
+                const instrumentsResponse = await this.backendService.sendCommand('latency.listInstruments', {});
+                
+                if (instrumentsResponse.success) {
+                    this.state.latency.instruments = instrumentsResponse.data.instruments || [];
+                }
+                
+                // Mettre ÃƒÂ  jour la vue
+                this.updateView({
+                    globalOffset: this.state.latency.globalOffset,
+                    instruments: this.state.latency.instruments
+                });
+                
+                this.emitEvent('latency:settings:loaded', {
+                    globalOffset: this.state.latency.globalOffset,
+                    instruments: this.state.latency.instruments
+                });
+                
+                return {
+                    globalOffset: this.state.latency.globalOffset,
+                    instruments: this.state.latency.instruments
+                };
+                
             } catch (error) {
-                this.handleError('Erreur lors du chargement du niveau de log', error);
+                this.handleError('Erreur lors du chargement des paramÃƒÂ¨tres de latence', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Définit le niveau de log du backend
+     * Active la compensation de latence
      */
-    async setLogLevel(level) {
-        return this.executeAction('setLogLevel', async (data) => {
+    async enableCompensation() {
+        return this.executeAction('enableCompensation', async () => {
             try {
-                // Valider le niveau
-                if (!this.state.logger.availableLevels.includes(data.level)) {
-                    throw new Error(`Niveau de log invalide: ${data.level}`);
+                const response = await this.backendService.sendCommand('latency.enable', {});
+                
+                if (response.success) {
+                    this.state.latency.enabled = true;
+                    
+                    this.showNotification('Compensation de latence activÃƒÂ©e', 'success');
+                    
+                    this.updateView({
+                        enabled: true
+                    });
+                    
+                    this.emitEvent('latency:enabled');
                 }
                 
-                this.logDebug('info', `Setting backend log level to ${data.level}`);
+                return response;
+            } catch (error) {
+                this.handleError('Erreur lors de l\'activation de la compensation', error);
+                throw error;
+            }
+        });
+    }
+    
+    /**
+     * DÃƒÂ©sactive la compensation de latence
+     */
+    async disableCompensation() {
+        return this.executeAction('disableCompensation', async () => {
+            try {
+                const response = await this.backendService.sendCommand('latency.disable', {});
                 
-                const response = await this.backendService.sendCommand('logger.setLevel', {
-                    level: data.level
+                if (response.success) {
+                    this.state.latency.enabled = false;
+                    
+                    this.showNotification('Compensation de latence dÃƒÂ©sactivÃƒÂ©e', 'success');
+                    
+                    this.updateView({
+                        enabled: false
+                    });
+                    
+                    this.emitEvent('latency:disabled');
+                }
+                
+                return response;
+            } catch (error) {
+                this.handleError('Erreur lors de la dÃƒÂ©sactivation de la compensation', error);
+                throw error;
+            }
+        });
+    }
+    
+    /**
+     * DÃƒÂ©finit l'offset global
+     */
+    async setGlobalOffset(offsetMs) {
+        return this.executeAction('setGlobalOffset', async (data) => {
+            try {
+                const response = await this.backendService.sendCommand('latency.setGlobalOffset', {
+                    offset_ms: data.offsetMs
                 });
                 
                 if (response.success) {
-                    this.state.logger.backendLevel = data.level;
+                    this.state.latency.globalOffset = data.offsetMs;
                     
                     this.showNotification(
-                        `Niveau de log backend défini à ${data.level}`,
+                        `Offset global dÃƒÂ©fini ÃƒÂ  ${data.offsetMs.toFixed(1)} ms`,
                         'success'
                     );
                     
-                    this.emitEvent('logger:level:updated', {
-                        level: data.level
+                    this.updateView({
+                        globalOffset: data.offsetMs
                     });
                     
-                    // Synchroniser avec le frontend si configuré
-                    if (this.config.syncWithFrontend) {
-                        this.syncFrontendLevel(data.level);
-                    }
+                    this.emitEvent('latency:global-offset:updated', {
+                        offset: data.offsetMs
+                    });
                 }
                 
                 return response;
             } catch (error) {
-                this.handleError(`Erreur lors de la définition du niveau de log à ${level}`, error);
+                this.handleError('Erreur lors de la dÃƒÂ©finition de l\'offset global', error);
                 throw error;
             }
-        }, { level });
+        }, { offsetMs });
     }
     
     /**
-     * Synchronise le niveau de log avec le Logger frontend
+     * DÃƒÂ©finit la compensation pour un instrument
      */
-    syncFrontendLevel(level) {
-        this.state.logger.frontendLevel = level;
+    async setInstrumentCompensation(instrumentId, offsetMs) {
+        return this.executeAction('setInstrumentCompensation', async (data) => {
+            try {
+                const response = await this.backendService.sendCommand('latency.setCompensation', {
+                    instrument_id: data.instrumentId,
+                    offset_ms: data.offsetMs
+                });
+                
+                if (response.success) {
+                    // Mettre ÃƒÂ  jour l'instrument dans la liste
+                    const instrument = this.state.latency.instruments.find(
+                        i => i.instrument_id === data.instrumentId
+                    );
+                    
+                    if (instrument) {
+                        instrument.compensation_offset_us = data.offsetMs * 1000; // Convert ms to us
+                    }
+                    
+                    this.showNotification(
+                        `Compensation pour ${data.instrumentId} dÃƒÂ©finie ÃƒÂ  ${data.offsetMs.toFixed(1)} ms`,
+                        'success'
+                    );
+                    
+                    this.updateView({
+                        instruments: this.state.latency.instruments
+                    });
+                    
+                    this.emitEvent('latency:instrument:updated', {
+                        instrumentId: data.instrumentId,
+                        offset: data.offsetMs
+                    });
+                }
+                
+                return response;
+            } catch (error) {
+                this.handleError(
+                    `Erreur lors de la dÃƒÂ©finition de la compensation pour ${instrumentId}`,
+                    error
+                );
+                throw error;
+            }
+        }, { instrumentId, offsetMs });
+    }
+    
+    /**
+     * Obtient la compensation d'un instrument
+     */
+    async getInstrumentCompensation(instrumentId) {
+        return this.executeAction('getInstrumentCompensation', async (data) => {
+            try {
+                const response = await this.backendService.sendCommand('latency.getCompensation', {
+                    instrument_id: data.instrumentId
+                });
+                
+                if (response.success) {
+                    const offsetMs = (response.data.compensation_offset_us || 0) / 1000;
+                    
+                    this.emitEvent('latency:compensation:loaded', {
+                        instrumentId: data.instrumentId,
+                        offset: offsetMs
+                    });
+                    
+                    return offsetMs;
+                }
+                
+                return 0;
+            } catch (error) {
+                this.logDebug('error', `Erreur lors de la rÃƒÂ©cupÃƒÂ©ration de la compensation: ${error.message}`);
+                return 0;
+            }
+        }, { instrumentId });
+    }
+    
+    /**
+     * SÃƒÂ©lectionne un instrument
+     */
+    selectInstrument(instrumentId) {
+        this.state.latency.selectedInstrument = instrumentId;
         
-        // Si un Logger frontend est disponible, le synchroniser
-        if (this.logger && typeof this.logger.setLevel === 'function') {
-            this.logger.setLevel(level);
-            this.logDebug('info', `Frontend log level synchronized to ${level}`);
+        const instrument = this.state.latency.instruments.find(
+            i => i.instrument_id === instrumentId
+        );
+        
+        if (instrument) {
+            this.updateView({
+                selectedInstrument: instrument
+            });
+            
+            this.emitEvent('latency:instrument:selected', {
+                instrument
+            });
         }
+    }
+    
+    /**
+     * DÃƒÂ©marre le rafraÃƒÂ®chissement automatique
+     */
+    startAutoRefresh() {
+        this.stopAutoRefresh();
         
-        // Si window.logger global existe
-        if (typeof window !== 'undefined' && window.logger && typeof window.logger.setLevel === 'function') {
-            window.logger.setLevel(level);
-            this.logDebug('info', `Global Logger level synchronized to ${level}`);
+        this.refreshTimer = setInterval(() => {
+            this.loadLatencySettings();
+        }, this.config.refreshInterval);
+        
+        this.logDebug('info', 'Auto-refresh started');
+    }
+    
+    /**
+     * ArrÃƒÂªte le rafraÃƒÂ®chissement automatique
+     */
+    stopAutoRefresh() {
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+            this.logDebug('info', 'Auto-refresh stopped');
         }
-        
-        this.emitEvent('logger:frontend:synced', {
-            level
-        });
     }
     
     /**
-     * Obtient les niveaux de log disponibles
+     * Met ÃƒÂ  jour la vue
      */
-    getAvailableLevels() {
-        return [...this.state.logger.availableLevels];
-    }
-    
-    /**
-     * Obtient le niveau de log actuel
-     */
-    getCurrentLevel() {
-        return {
-            backend: this.state.logger.backendLevel,
-            frontend: this.state.logger.frontendLevel
-        };
-    }
-    
-    /**
-     * Vérifie si un niveau de log est valide
-     */
-    isValidLevel(level) {
-        return this.state.logger.availableLevels.includes(level);
-    }
-    
-    /**
-     * Obtient la priorité numérique d'un niveau
-     */
-    getLevelPriority(level) {
-        const priorities = {
-            'DEBUG': 0,
-            'INFO': 1,
-            'WARNING': 2,
-            'ERROR': 3,
-            'CRITICAL': 4
-        };
-        
-        return priorities[level] || 1;
-    }
-    
-    /**
-     * Compare deux niveaux de log
-     */
-    compareLevels(level1, level2) {
-        return this.getLevelPriority(level1) - this.getLevelPriority(level2);
-    }
-    
-    /**
-     * Active le mode debug (raccourci)
-     */
-    async enableDebugMode() {
-        return this.setLogLevel('DEBUG');
-    }
-    
-    /**
-     * Désactive le mode debug (raccourci)
-     */
-    async disableDebugMode() {
-        return this.setLogLevel('INFO');
+    updateView(data) {
+        if (this.latencyView && typeof this.latencyView.render === 'function') {
+            this.latencyView.render(data);
+        }
     }
     
     /**
@@ -222,58 +353,37 @@ class LoggerController extends BaseController {
     }
     
     /**
-     * Obtenir l'état actuel
+     * Obtenir l'ÃƒÂ©tat actuel
      */
-    getLoggerState() {
+    getLatencyState() {
         return {
-            ...this.state.logger,
-            isDebugMode: this.state.logger.backendLevel === 'DEBUG'
+            ...this.state.latency,
+            instrumentsCount: this.state.latency.instruments.length,
+            averageLatency: this.calculateAverageLatency()
         };
     }
     
     /**
-     * Crée une interface UI simple pour le changement de niveau
+     * Calcule la latence moyenne de tous les instruments
      */
-    createLevelSelectorUI(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            this.logDebug('error', `Container ${containerId} not found`);
-            return;
+    calculateAverageLatency() {
+        if (this.state.latency.instruments.length === 0) {
+            return 0;
         }
         
-        const html = `
-            <div class="logger-level-selector">
-                <label for="log-level-select">Niveau de Log Backend:</label>
-                <select id="log-level-select" class="form-control">
-                    ${this.state.logger.availableLevels.map(level => `
-                        <option value="${level}" ${level === this.state.logger.backendLevel ? 'selected' : ''}>
-                            ${level}
-                        </option>
-                    `).join('')}
-                </select>
-                <button id="apply-log-level" class="btn btn-primary">Appliquer</button>
-            </div>
-        `;
+        const sum = this.state.latency.instruments.reduce((acc, instrument) => {
+            return acc + (instrument.avg_latency_us || 0);
+        }, 0);
         
-        container.innerHTML = html;
-        
-        // Attacher les événements
-        const select = document.getElementById('log-level-select');
-        const button = document.getElementById('apply-log-level');
-        
-        if (button) {
-            button.addEventListener('click', () => {
-                const level = select.value;
-                this.setLogLevel(level);
-            });
-        }
-        
-        // Mettre à jour le sélecteur quand le niveau change
-        this.subscribe('logger:level:updated', (data) => {
-            if (select) {
-                select.value = data.level;
-            }
-        });
+        return sum / this.state.latency.instruments.length / 1000; // Convert to ms
+    }
+    
+    /**
+     * Nettoyage lors de la destruction
+     */
+    destroy() {
+        this.stopAutoRefresh();
+        super.destroy();
     }
 }
 
@@ -282,9 +392,9 @@ class LoggerController extends BaseController {
 // ============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = LoggerController;
+    module.exports = LatencyController;
 }
 
 if (typeof window !== 'undefined') {
-    window.loggerController = LoggerController;
+    window.LatencyController = LatencyController;
 }

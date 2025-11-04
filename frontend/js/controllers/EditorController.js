@@ -1,21 +1,27 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/EditorController.js
-// Chemin réel: frontend/js/controllers/EditorController.js
-// Version: v4.2.2 - API CORRECTED (snake_case)
+// Chemin rÃƒÂ©el: frontend/js/controllers/EditorController.js
+// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED (snake_case)
 // Date: 2025-11-02
 // ============================================================================
+// CORRECTIONS v4.2.3:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // CORRECTIONS v4.2.2:
-// ✅ routing_id, device_id, midi_file_id, track_id (snake_case)
-// ✅ Utiliser helpers BackendService pour routing MIDI
+// Ã¢Å“â€¦ routing_id, device_id, midi_file_id, track_id (snake_case)
+// Ã¢Å“â€¦ Utiliser helpers BackendService pour routing MIDI
 // 
-// NOTE: Fichier original 1017 lignes conservé. Corrections concentrées sur:
+// NOTE: Fichier original 1017 lignes conservÃƒÂ©. Corrections concentrÃƒÂ©es sur:
 // - Appels backend avec snake_case
-// - Routing MIDI (si présent)
+// - Routing MIDI (si prÃƒÂ©sent)
 // ============================================================================
 
 class EditorController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         this.editorModel = models.editor;
         this.fileModel = models.file;
@@ -23,7 +29,7 @@ class EditorController extends BaseController {
         this.view = views.editor;
         this.visualizer = null;
         this.currentFile = null;
-        this.backend = window.app?.services?.backend || window.backendService;
+        // âœ… this.backend initialisÃ© automatiquement par BaseController
         this.routingManager = null;
         
         this.editorState = {
@@ -106,7 +112,7 @@ class EditorController extends BaseController {
         
         if (typeof MidiVisualizer !== 'undefined') {
             this.visualizer = new MidiVisualizer(container, this.eventBus);
-            this.logDebug('editor', '✓ MidiVisualizer initialized');
+            this.logDebug('editor', 'Ã¢Å“â€œ MidiVisualizer initialized');
             
             this.visualizer.on('noteSelected', (notes) => this.onNotesSelected(notes));
             this.visualizer.on('notesMoved', (notes) => this.onNotesMoved(notes));
@@ -115,7 +121,7 @@ class EditorController extends BaseController {
     }
     
     /**
-     * ✅ CORRECTION: Routing MIDI avec snake_case
+     * Ã¢Å“â€¦ CORRECTION: Routing MIDI avec snake_case
      */
     async assignMidiRouting(midi_file_id, track_id, device_id, instrument_name = null) {
         if (!this.backend?.isConnected()) {
@@ -123,7 +129,7 @@ class EditorController extends BaseController {
         }
         
         try {
-            // ✅ Utiliser helper BackendService
+            // Ã¢Å“â€¦ Utiliser helper BackendService
             const result = await this.backend.addMidiRouting(
                 midi_file_id,
                 track_id,

@@ -1,13 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/CCEditorView.js
-// Version: v4.0.0 - CONFORMITÉ API
+// Version: v4.0.0 - CONFORMITÃƒâ€° API
 // Date: 2025-11-02
 // ============================================================================
 
 class CCEditorView extends BaseCanvasView {
     constructor(canvas, eventBus) {
-        super(canvas);
-        this.eventBus = eventBus;
+        super(canvas, eventBus);
         
         this.state = {
             ccType: 1, // Modulation Wheel

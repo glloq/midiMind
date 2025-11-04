@@ -1,24 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/LatencyController.js
-// Version: v1.0.0
+// Version: v1.0.1 - FIXED BACKEND SIGNATURE
 // Date: 2025-10-28
 // ============================================================================
+// CORRECTIONS v1.0.1:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // Description:
-//   Contrôleur pour gérer la compensation de latence
+//   ContrÃƒÂ´leur pour gÃƒÂ©rer la compensation de latence
 //   - Configuration compensation par instrument
 //   - Gestion offset global
-//   - Activation/désactivation
+//   - Activation/dÃƒÂ©sactivation
 //   - Monitoring des latences
 // ============================================================================
 
 class LatencyController extends BaseController {
-    constructor(eventBus, backendService, latencyView, notifications = null, debugConsole = null) {
-        super(eventBus, {}, { latencyView }, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         this.backendService = backendService;
         this.latencyView = latencyView;
         
-        // État de la latence
+        // Ãƒâ€°tat de la latence
         this.state.latency = {
             enabled: false,
             globalOffset: 0,
@@ -30,30 +36,30 @@ class LatencyController extends BaseController {
         this.config.autoRefresh = true;
         this.config.refreshInterval = 10000; // 10 secondes
         
-        // Timer de rafraîchissement
+        // Timer de rafraÃƒÂ®chissement
         this.refreshTimer = null;
     }
     
     /**
-     * Initialisation personnalisée
+     * Initialisation personnalisÃƒÂ©e
      */
     onInitialize() {
         this.logDebug('info', 'LatencyController initializing...');
         
-        // Charger les données initiales
+        // Charger les donnÃƒÂ©es initiales
         this.loadLatencySettings();
         
-        // Démarrer le rafraîchissement automatique si configuré
+        // DÃƒÂ©marrer le rafraÃƒÂ®chissement automatique si configurÃƒÂ©
         if (this.config.autoRefresh) {
             this.startAutoRefresh();
         }
     }
     
     /**
-     * Liaison des événements
+     * Liaison des ÃƒÂ©vÃƒÂ©nements
      */
     bindEvents() {
-        // Événements de la vue
+        // Ãƒâ€°vÃƒÂ©nements de la vue
         this.subscribe('latency:enable', () => this.enableCompensation());
         this.subscribe('latency:disable', () => this.disableCompensation());
         this.subscribe('latency:set-global-offset', (data) => this.setGlobalOffset(data.offset));
@@ -65,14 +71,14 @@ class LatencyController extends BaseController {
             this.selectInstrument(data.instrumentId);
         });
         
-        // Événements backend
+        // Ãƒâ€°vÃƒÂ©nements backend
         this.subscribe('backend:connected', () => {
             this.loadLatencySettings();
         });
     }
     
     /**
-     * Charge les paramètres de latence
+     * Charge les paramÃƒÂ¨tres de latence
      */
     async loadLatencySettings() {
         return this.executeAction('loadLatencySettings', async () => {
@@ -91,7 +97,7 @@ class LatencyController extends BaseController {
                     this.state.latency.instruments = instrumentsResponse.data.instruments || [];
                 }
                 
-                // Mettre à jour la vue
+                // Mettre ÃƒÂ  jour la vue
                 this.updateView({
                     globalOffset: this.state.latency.globalOffset,
                     instruments: this.state.latency.instruments
@@ -108,7 +114,7 @@ class LatencyController extends BaseController {
                 };
                 
             } catch (error) {
-                this.handleError('Erreur lors du chargement des paramètres de latence', error);
+                this.handleError('Erreur lors du chargement des paramÃƒÂ¨tres de latence', error);
                 throw error;
             }
         });
@@ -125,7 +131,7 @@ class LatencyController extends BaseController {
                 if (response.success) {
                     this.state.latency.enabled = true;
                     
-                    this.showNotification('Compensation de latence activée', 'success');
+                    this.showNotification('Compensation de latence activÃƒÂ©e', 'success');
                     
                     this.updateView({
                         enabled: true
@@ -143,7 +149,7 @@ class LatencyController extends BaseController {
     }
     
     /**
-     * Désactive la compensation de latence
+     * DÃƒÂ©sactive la compensation de latence
      */
     async disableCompensation() {
         return this.executeAction('disableCompensation', async () => {
@@ -153,7 +159,7 @@ class LatencyController extends BaseController {
                 if (response.success) {
                     this.state.latency.enabled = false;
                     
-                    this.showNotification('Compensation de latence désactivée', 'success');
+                    this.showNotification('Compensation de latence dÃƒÂ©sactivÃƒÂ©e', 'success');
                     
                     this.updateView({
                         enabled: false
@@ -164,14 +170,14 @@ class LatencyController extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError('Erreur lors de la désactivation de la compensation', error);
+                this.handleError('Erreur lors de la dÃƒÂ©sactivation de la compensation', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Définit l'offset global
+     * DÃƒÂ©finit l'offset global
      */
     async setGlobalOffset(offsetMs) {
         return this.executeAction('setGlobalOffset', async (data) => {
@@ -184,7 +190,7 @@ class LatencyController extends BaseController {
                     this.state.latency.globalOffset = data.offsetMs;
                     
                     this.showNotification(
-                        `Offset global défini à ${data.offsetMs.toFixed(1)} ms`,
+                        `Offset global dÃƒÂ©fini ÃƒÂ  ${data.offsetMs.toFixed(1)} ms`,
                         'success'
                     );
                     
@@ -199,14 +205,14 @@ class LatencyController extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError('Erreur lors de la définition de l\'offset global', error);
+                this.handleError('Erreur lors de la dÃƒÂ©finition de l\'offset global', error);
                 throw error;
             }
         }, { offsetMs });
     }
     
     /**
-     * Définit la compensation pour un instrument
+     * DÃƒÂ©finit la compensation pour un instrument
      */
     async setInstrumentCompensation(instrumentId, offsetMs) {
         return this.executeAction('setInstrumentCompensation', async (data) => {
@@ -217,7 +223,7 @@ class LatencyController extends BaseController {
                 });
                 
                 if (response.success) {
-                    // Mettre à jour l'instrument dans la liste
+                    // Mettre ÃƒÂ  jour l'instrument dans la liste
                     const instrument = this.state.latency.instruments.find(
                         i => i.instrument_id === data.instrumentId
                     );
@@ -227,7 +233,7 @@ class LatencyController extends BaseController {
                     }
                     
                     this.showNotification(
-                        `Compensation pour ${data.instrumentId} définie à ${data.offsetMs.toFixed(1)} ms`,
+                        `Compensation pour ${data.instrumentId} dÃƒÂ©finie ÃƒÂ  ${data.offsetMs.toFixed(1)} ms`,
                         'success'
                     );
                     
@@ -244,7 +250,7 @@ class LatencyController extends BaseController {
                 return response;
             } catch (error) {
                 this.handleError(
-                    `Erreur lors de la définition de la compensation pour ${instrumentId}`,
+                    `Erreur lors de la dÃƒÂ©finition de la compensation pour ${instrumentId}`,
                     error
                 );
                 throw error;
@@ -275,14 +281,14 @@ class LatencyController extends BaseController {
                 
                 return 0;
             } catch (error) {
-                this.logDebug('error', `Erreur lors de la récupération de la compensation: ${error.message}`);
+                this.logDebug('error', `Erreur lors de la rÃƒÂ©cupÃƒÂ©ration de la compensation: ${error.message}`);
                 return 0;
             }
         }, { instrumentId });
     }
     
     /**
-     * Sélectionne un instrument
+     * SÃƒÂ©lectionne un instrument
      */
     selectInstrument(instrumentId) {
         this.state.latency.selectedInstrument = instrumentId;
@@ -303,7 +309,7 @@ class LatencyController extends BaseController {
     }
     
     /**
-     * Démarre le rafraîchissement automatique
+     * DÃƒÂ©marre le rafraÃƒÂ®chissement automatique
      */
     startAutoRefresh() {
         this.stopAutoRefresh();
@@ -316,7 +322,7 @@ class LatencyController extends BaseController {
     }
     
     /**
-     * Arrête le rafraîchissement automatique
+     * ArrÃƒÂªte le rafraÃƒÂ®chissement automatique
      */
     stopAutoRefresh() {
         if (this.refreshTimer) {
@@ -327,7 +333,7 @@ class LatencyController extends BaseController {
     }
     
     /**
-     * Met à jour la vue
+     * Met ÃƒÂ  jour la vue
      */
     updateView(data) {
         if (this.latencyView && typeof this.latencyView.render === 'function') {
@@ -347,7 +353,7 @@ class LatencyController extends BaseController {
     }
     
     /**
-     * Obtenir l'état actuel
+     * Obtenir l'ÃƒÂ©tat actuel
      */
     getLatencyState() {
         return {

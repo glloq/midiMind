@@ -1,23 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/DataPersistenceController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/DataPersistenceController.js
-// Version: v3.5.0 - PERSISTANCE COMPLÃƒË†TE + SYNC BACKEND
+// Chemin rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©el: frontend/js/controllers/DataPersistenceController.js
+// Version: v3.5.1 - FIXED BACKEND SIGNATURE - PERSISTANCE COMPLÃƒÆ’Ã†â€™Ãƒâ€¹Ã¢â‚¬Â TE + SYNC BACKEND
 // Date: 2025-11-01
 // ============================================================================
-// AMÃƒâ€°LIORATIONS v3.5.0:
-// Ã¢Å“â€¦ Synchronisation automatique avec backend via API
-// Ã¢Å“â€¦ Support IndexedDB pour gros volumes
-// Ã¢Å“â€¦ Versionning et migration automatique
-// Ã¢Å“â€¦ Gestion conflits local vs backend
-// Ã¢Å“â€¦ Compression LZ rÃƒÂ©elle des donnÃƒÂ©es
-// Ã¢Å“â€¦ Backup/restore avec validation
-// Ã¢Å“â€¦ Sauvegarde incrÃƒÂ©mentale intelligente
-// Ã¢Å“â€¦ DÃƒÂ©tection changements pour optimisation
+// CORRECTIONS v3.5.1:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
+// AMÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°LIORATIONS v3.5.0:
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Synchronisation automatique avec backend via API
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Support IndexedDB pour gros volumes
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Versionning et migration automatique
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Gestion conflits local vs backend
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Compression LZ rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©elle des donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Backup/restore avec validation
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Sauvegarde incrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©mentale intelligente
+// ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tection changements pour optimisation
 // ============================================================================
 
 class DataPersistenceController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         // Configuration
         this.config = {
@@ -32,9 +38,9 @@ class DataPersistenceController extends BaseController {
         };
         
         // Backend
-        this.backend = window.backendService;
+        // âœ… this.backend initialisÃ© automatiquement par BaseController
         
-        // Ãƒâ€°tat de synchronisation
+        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat de synchronisation
         this.syncState = {
             lastSync: null,
             syncInProgress: false,
@@ -59,7 +65,7 @@ class DataPersistenceController extends BaseController {
         this.dbName = 'MidiMindDB';
         this.dbVersion = 1;
         
-        this.log('info', 'DataPersistenceController', 'Ã¢Å“â€¦ Initialized v3.5.0');
+        this.log('info', 'DataPersistenceController', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Initialized v3.5.0');
         
         this.initialize();
     }
@@ -68,12 +74,12 @@ class DataPersistenceController extends BaseController {
      * Initialisation
      */
     async initialize() {
-        // Initialiser IndexedDB si activÃƒÂ©
+        // Initialiser IndexedDB si activÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
         if (this.config.useIndexedDB) {
             await this.initIndexedDB();
         }
         
-        // Charger les donnÃƒÂ©es au dÃƒÂ©marrage
+        // Charger les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es au dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©marrage
         await this.loadData();
         
         // Configurer auto-save
@@ -82,12 +88,12 @@ class DataPersistenceController extends BaseController {
         // Configurer sync backend
         this.setupBackendSync();
         
-        // VÃƒÂ©rifier backend
+        // VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifier backend
         this.checkBackendAvailability();
     }
 
     /**
-     * Liaison des ÃƒÂ©vÃƒÂ©nements
+     * Liaison des ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements
      */
     bindEvents() {
         // Sauvegarder lors des changements importants
@@ -105,7 +111,7 @@ class DataPersistenceController extends BaseController {
         this.eventBus.on('routing:changed', () => this.markChanged('routing'));
         this.eventBus.on('state:changed', () => this.markChanged('state'));
         
-        // Ãƒâ€°vÃƒÂ©nements backend
+        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements backend
         this.eventBus.on('backend:connected', () => {
             this.checkBackendAvailability();
             this.syncWithBackend();
@@ -141,7 +147,7 @@ class DataPersistenceController extends BaseController {
             
             request.onsuccess = () => {
                 this.db = request.result;
-                this.log('info', 'DataPersistence', 'Ã¢Å“â€¦ IndexedDB ready');
+                this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ IndexedDB ready');
                 resolve(this.db);
             };
             
@@ -203,7 +209,7 @@ class DataPersistenceController extends BaseController {
     // ========================================================================
 
     /**
-     * Sauvegarde les donnÃƒÂ©es
+     * Sauvegarde les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     async saveData(options = {}) {
         const {
@@ -212,15 +218,15 @@ class DataPersistenceController extends BaseController {
         } = options;
         
         try {
-            // Collecter les donnÃƒÂ©es
+            // Collecter les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
             const data = this.collectData();
             
-            // CrÃƒÂ©er backup si demandÃƒÂ©
+            // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er backup si demandÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
             if (createBackup) {
                 await this.createBackup(data);
             }
             
-            // Compresser si activÃƒÂ©
+            // Compresser si activÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
             const finalData = this.config.useCompression 
                 ? this.compressData(data)
                 : JSON.stringify(data);
@@ -238,9 +244,9 @@ class DataPersistenceController extends BaseController {
             this.changeTracker.changedModels.clear();
             this.changeTracker.lastSave = Date.now();
             
-            this.log('debug', 'DataPersistence', 'Ã°Å¸â€™Â¾ Data saved');
+            this.log('debug', 'DataPersistence', 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¾ Data saved');
             
-            // Synchroniser avec backend si demandÃƒÂ©
+            // Synchroniser avec backend si demandÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
             if (sync && this.syncState.backendAvailable && this.syncState.autoSyncEnabled) {
                 await this.syncWithBackend();
             }
@@ -255,7 +261,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Charge les donnÃƒÂ©es
+     * Charge les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     async loadData() {
         try {
@@ -281,16 +287,16 @@ class DataPersistenceController extends BaseController {
                 return false;
             }
             
-            // Valider et migrer version si nÃƒÂ©cessaire
+            // Valider et migrer version si nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cessaire
             if (data.version !== this.config.version) {
                 data = await this.migrateData(data);
             }
             
-            // Restaurer les donnÃƒÂ©es dans les modÃƒÂ¨les
+            // Restaurer les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es dans les modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨les
             await this.restoreData(data);
             
-            this.log('info', 'DataPersistence', `Ã¢Å“â€¦ Data loaded (${this.formatDate(data.timestamp)})`);
-            this.notify('success', 'DonnÃƒÂ©es prÃƒÂ©cÃƒÂ©dentes restaurÃƒÂ©es');
+            this.log('info', 'DataPersistence', `ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Data loaded (${this.formatDate(data.timestamp)})`);
+            this.notify('success', 'DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dentes restaurÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es');
             
             this.eventBus.emit('persistence:loaded', { timestamp: data.timestamp });
             return true;
@@ -302,7 +308,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Collecte les donnÃƒÂ©es depuis les modÃƒÂ¨les
+     * Collecte les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es depuis les modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨les
      */
     collectData() {
         return {
@@ -319,7 +325,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Restaure les donnÃƒÂ©es dans les modÃƒÂ¨les
+     * Restaure les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es dans les modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨les
      */
     async restoreData(data) {
         const models = ['state', 'file', 'instrument', 'playlist', 'routing', 'playback', 'editor'];
@@ -331,17 +337,17 @@ class DataPersistenceController extends BaseController {
             }
         }
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nements de restauration
+        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements de restauration
         this.eventBus.emit('persistence:data_restored');
     }
 
     /**
-     * Migre les donnÃƒÂ©es d'une ancienne version
+     * Migre les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es d'une ancienne version
      */
     async migrateData(data) {
         this.log('info', 'DataPersistence', `Migrating from ${data.version} to ${this.config.version}`);
         
-        // Migrations spÃƒÂ©cifiques selon les versions
+        // Migrations spÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cifiques selon les versions
         if (data.version === '2.0.0') {
             // Migration 2.0.0 -> 3.0.0
             data.routing = data.routing || {};
@@ -358,7 +364,7 @@ class DataPersistenceController extends BaseController {
     // ========================================================================
 
     /**
-     * VÃƒÂ©rifie la disponibilitÃƒÂ© du backend
+     * VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifie la disponibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© du backend
      */
     async checkBackendAvailability() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -370,7 +376,7 @@ class DataPersistenceController extends BaseController {
             // Tester avec une commande simple
             await this.backend.sendCommand('system.ping');
             this.syncState.backendAvailable = true;
-            this.log('info', 'DataPersistence', 'Ã¢Å“â€¦ Backend available for sync');
+            this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Backend available for sync');
             return true;
         } catch (error) {
             this.syncState.backendAvailable = false;
@@ -411,10 +417,10 @@ class DataPersistenceController extends BaseController {
         this.syncState.syncInProgress = true;
         
         try {
-            // Collecter les donnÃƒÂ©es ÃƒÂ  synchroniser
+            // Collecter les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  synchroniser
             const data = this.collectData();
             
-            // CrÃƒÂ©er backup avant sync si configurÃƒÂ©
+            // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er backup avant sync si configurÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
             if (this.config.backupOnSync) {
                 await this.createBackup(data);
             }
@@ -429,7 +435,7 @@ class DataPersistenceController extends BaseController {
                 this.changeTracker.hasChanges = false;
                 this.changeTracker.changedModels.clear();
                 
-                this.log('info', 'DataPersistence', 'Ã¢Å“â€¦ Synced with backend');
+                this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Synced with backend');
                 this.eventBus.emit('persistence:synced', { timestamp: this.syncState.lastSync });
                 
                 return true;
@@ -448,7 +454,7 @@ class DataPersistenceController extends BaseController {
     // ========================================================================
 
     /**
-     * CrÃƒÂ©e un backup
+     * CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e un backup
      */
     async createBackup(data = null) {
         if (!this.db) return false;
@@ -470,7 +476,7 @@ class DataPersistenceController extends BaseController {
             // Nettoyer les vieux backups
             await this.cleanOldBackups();
             
-            this.log('debug', 'DataPersistence', 'Ã°Å¸â€™Â¾ Backup created');
+            this.log('debug', 'DataPersistence', 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¾ Backup created');
             return true;
             
         } catch (error) {
@@ -524,8 +530,8 @@ class DataPersistenceController extends BaseController {
                     }
                     
                     await this.restoreData(backup.data);
-                    this.notify('success', 'Backup restaurÃƒÂ©');
-                    this.log('info', 'DataPersistence', `Ã¢Å“â€¦ Backup ${backupId} restored`);
+                    this.notify('success', 'Backup restaurÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©');
+                    this.log('info', 'DataPersistence', `ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Backup ${backupId} restored`);
                     resolve(true);
                 };
                 
@@ -548,7 +554,7 @@ class DataPersistenceController extends BaseController {
             const backups = await this.listBackups();
             
             if (backups.length > this.config.maxBackups) {
-                // Trier par timestamp dÃƒÂ©croissant
+                // Trier par timestamp dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©croissant
                 backups.sort((a, b) => b.timestamp - a.timestamp);
                 
                 // Supprimer les plus anciens
@@ -573,7 +579,7 @@ class DataPersistenceController extends BaseController {
     // ========================================================================
 
     /**
-     * Exporte les donnÃƒÂ©es
+     * Exporte les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     exportData() {
         try {
@@ -589,8 +595,8 @@ class DataPersistenceController extends BaseController {
             a.click();
             URL.revokeObjectURL(url);
             
-            this.notify('success', 'Sauvegarde exportÃƒÂ©e');
-            this.log('info', 'DataPersistence', 'Ã°Å¸â€œÂ¤ Data exported');
+            this.notify('success', 'Sauvegarde exportÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e');
+            this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¤ Data exported');
             
         } catch (error) {
             this.handleError('Erreur export', error);
@@ -598,7 +604,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Importe les donnÃƒÂ©es
+     * Importe les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     importData(file) {
         try {
@@ -617,20 +623,20 @@ class DataPersistenceController extends BaseController {
                     const confirmed = await this.confirmImport(data);
                     if (!confirmed) return;
                     
-                    // CrÃƒÂ©er backup avant import
+                    // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er backup avant import
                     await this.createBackup();
                     
-                    // Restaurer les donnÃƒÂ©es
+                    // Restaurer les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
                     await this.restoreData(data);
                     
                     // Sauvegarder
                     await this.saveData({ sync: true });
                     
-                    // RafraÃƒÂ®chir l'interface
+                    // RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chir l'interface
                     this.eventBus.emit('persistence:imported');
                     
-                    this.notify('success', 'Sauvegarde importÃƒÂ©e');
-                    this.log('info', 'DataPersistence', 'Ã°Å¸â€œÂ¥ Data imported');
+                    this.notify('success', 'Sauvegarde importÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e');
+                    this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¥ Data imported');
                     
                 } catch (error) {
                     this.handleError('Fichier de sauvegarde invalide', error);
@@ -652,7 +658,7 @@ class DataPersistenceController extends BaseController {
         if (modalController) {
             return new Promise((resolve) => {
                 modalController.confirm(
-                    `Importer cette sauvegarde (${this.formatDate(data.timestamp)}) ?\nCela remplacera les donnÃƒÂ©es actuelles.`,
+                    `Importer cette sauvegarde (${this.formatDate(data.timestamp)}) ?\nCela remplacera les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es actuelles.`,
                     () => resolve(true),
                     { 
                         type: 'warning',
@@ -662,12 +668,12 @@ class DataPersistenceController extends BaseController {
                 );
             });
         } else {
-            return confirm(`Importer cette sauvegarde (${this.formatDate(data.timestamp)}) ?\nCela remplacera les donnÃƒÂ©es actuelles.`);
+            return confirm(`Importer cette sauvegarde (${this.formatDate(data.timestamp)}) ?\nCela remplacera les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es actuelles.`);
         }
     }
 
     /**
-     * Efface toutes les donnÃƒÂ©es
+     * Efface toutes les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     async clearData() {
         const modalController = window.app?.controllers?.modal;
@@ -675,12 +681,12 @@ class DataPersistenceController extends BaseController {
         const confirmed = modalController 
             ? await new Promise(resolve => {
                 modalController.confirm(
-                    'Supprimer toutes les donnÃƒÂ©es stockÃƒÂ©es ? Cette action est irrÃƒÂ©versible.',
+                    'Supprimer toutes les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es stockÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es ? Cette action est irrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©versible.',
                     () => resolve(true),
                     { type: 'warning' }
                 );
             })
-            : confirm('Supprimer toutes les donnÃƒÂ©es stockÃƒÂ©es ? Cette action est irrÃƒÂ©versible.');
+            : confirm('Supprimer toutes les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es stockÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es ? Cette action est irrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©versible.');
         
         if (!confirmed) return;
         
@@ -695,8 +701,8 @@ class DataPersistenceController extends BaseController {
                 transaction.objectStore('backups').clear();
             }
             
-            this.notify('info', 'DonnÃƒÂ©es supprimÃƒÂ©es');
-            this.log('info', 'DataPersistence', 'Ã°Å¸â€”â€˜Ã¯Â¸Â All data cleared');
+            this.notify('info', 'DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es supprimÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es');
+            this.log('info', 'DataPersistence', 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â All data cleared');
             
         } catch (error) {
             this.handleError('Erreur suppression', error);
@@ -708,7 +714,7 @@ class DataPersistenceController extends BaseController {
     // ========================================================================
 
     /**
-     * Marque un modÃƒÂ¨le comme modifiÃƒÂ©
+     * Marque un modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨le comme modifiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
      */
     markChanged(modelName) {
         this.changeTracker.hasChanges = true;
@@ -729,7 +735,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Compresse les donnÃƒÂ©es
+     * Compresse les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     compressData(data) {
         // Pour une vraie compression, utiliser LZ-String ou pako
@@ -738,7 +744,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * DÃƒÂ©compresse les donnÃƒÂ©es
+     * DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©compresse les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es
      */
     decompressData(data) {
         return JSON.parse(data);
@@ -752,7 +758,7 @@ class DataPersistenceController extends BaseController {
     }
 
     /**
-     * Obtient l'ÃƒÂ©tat de synchronisation
+     * Obtient l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de synchronisation
      */
     getSyncState() {
         return {

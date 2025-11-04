@@ -4,9 +4,9 @@
 // ============================================================================
 
 class LatencyView {
-    constructor(container, eventBus) {
-        this.container = typeof container === 'string' ? 
-            document.getElementById(container) : container;
+    constructor(containerId, eventBus) {
+        this.container = typeof containerId === 'string' ? 
+            document.getElementById(containerId) : containerId;
         this.eventBus = eventBus;
         
         this.state = {
@@ -27,7 +27,7 @@ class LatencyView {
         this.container.innerHTML = `
             <div class="latency-view">
                 <div class="latency-header">
-                    <h2>⏱️ Compensation de latence</h2>
+                    <h2>Ã¢ÂÂ±Ã¯Â¸Â Compensation de latence</h2>
                     <label>
                         <input type="checkbox" data-action="toggle-enabled" 
                                ${this.state.enabled ? 'checked' : ''} />

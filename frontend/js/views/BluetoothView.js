@@ -4,9 +4,9 @@
 // ============================================================================
 
 class BluetoothView {
-    constructor(container, eventBus) {
-        this.container = typeof container === 'string' ? 
-            document.getElementById(container) : container;
+    constructor(containerId, eventBus) {
+        this.container = typeof containerId === 'string' ? 
+            document.getElementById(containerId) : containerId;
         this.eventBus = eventBus;
         
         this.state = {
@@ -28,18 +28,18 @@ class BluetoothView {
         this.container.innerHTML = `
             <div class="bluetooth-view">
                 <div class="bt-header">
-                    <h2>📡 Bluetooth MIDI</h2>
+                    <h2>Ã°Å¸â€œÂ¡ Bluetooth MIDI</h2>
                     <button data-action="scan" ${this.state.scanning ? 'disabled' : ''}>
                         ${this.state.scanning ? 'Scan...' : 'Scanner'}
                     </button>
                 </div>
                 
                 <div class="bt-paired">
-                    <h3>Appareils appairés</h3>
+                    <h3>Appareils appairÃƒÂ©s</h3>
                     <div class="device-list">
                         ${this.state.pairedDevices.length > 0 ? 
                             this.state.pairedDevices.map(d => this.renderDevice(d, true)).join('') :
-                            '<p class="empty">Aucun appareil appairé</p>'}
+                            '<p class="empty">Aucun appareil appairÃƒÂ©</p>'}
                     </div>
                 </div>
                 
@@ -60,7 +60,7 @@ class BluetoothView {
             <div class="bt-device" data-device-id="${device.id}">
                 <div class="device-info">
                     <div class="device-name">${device.name}</div>
-                    <div class="device-address">${device.address || '—'}</div>
+                    <div class="device-address">${device.address || 'Ã¢â‚¬â€'}</div>
                     ${device.signal ? `<div class="device-signal">Signal: ${device.signal}%</div>` : ''}
                 </div>
                 <div class="device-actions">

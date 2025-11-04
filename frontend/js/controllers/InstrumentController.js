@@ -1,23 +1,29 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/InstrumentController.js
-// Chemin réel: frontend/js/controllers/InstrumentController.js
-// Version: v4.2.2 - API CORRECTED
+// Chemin rÃƒÂ©el: frontend/js/controllers/InstrumentController.js
+// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
+// CORRECTIONS v4.2.3:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // CORRECTIONS v4.2.2:
-// ✅ devices.scan pour count (pas devices.list)
-// ✅ response.data.devices extraction
-// ✅ device_id en snake_case
+// Ã¢Å“â€¦ devices.scan pour count (pas devices.list)
+// Ã¢Å“â€¦ response.data.devices extraction
+// Ã¢Å“â€¦ device_id en snake_case
 // ============================================================================
 
 class InstrumentController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
         
         this.logger = window.logger || console;
         this.model = models.instrument;
         this.view = views.instrument;
-        this.backend = window.app?.services?.backend || window.backendService;
+        // âœ… this.backend initialisÃ© automatiquement par BaseController
         
         this.devices = new Map();
         this.connectedDevices = new Set();
@@ -52,7 +58,7 @@ class InstrumentController extends BaseController {
         });
         this.eventBus.on('instruments:request_refresh', () => this.refreshDeviceList());
         
-        this.logger?.info?.('InstrumentController', '✓ Events bound');
+        this.logger?.info?.('InstrumentController', 'Ã¢Å“â€œ Events bound');
     }
 
     async initialize() {
@@ -64,7 +70,7 @@ class InstrumentController extends BaseController {
     }
 
     async onBackendConnected() {
-        this.logger?.info?.('InstrumentController', '✅ Backend connected');
+        this.logger?.info?.('InstrumentController', 'Ã¢Å“â€¦ Backend connected');
 
         this.scanDevices().catch(err => {
             this.log('warn', 'InstrumentController', 'Initial scan failed:', err.message);
@@ -77,7 +83,7 @@ class InstrumentController extends BaseController {
         this.getHotPlugStatus().then(status => {
             if (status?.enabled) {
                 this.hotPlugEnabled = true;
-                this.logger?.info?.('InstrumentController', '✅ Hot-plug enabled');
+                this.logger?.info?.('InstrumentController', 'Ã¢Å“â€¦ Hot-plug enabled');
             }
         }).catch(err => {
             this.log('warn', 'InstrumentController', 'Hot-plug status failed:', err.message);
@@ -85,14 +91,14 @@ class InstrumentController extends BaseController {
     }
 
     onBackendDisconnected() {
-        this.logger?.warn?.('InstrumentController', '⚠️ Backend disconnected');
+        this.logger?.warn?.('InstrumentController', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
         this.stopHotPlugMonitoring();
         this.connectedDevices.clear();
         this.refreshView();
     }
 
     /**
-     * ✅ CORRECTION: Utiliser devices.scan pour obtenir count
+     * Ã¢Å“â€¦ CORRECTION: Utiliser devices.scan pour obtenir count
      */
     async scanDevices(full_scan = false) {
         if (!this.backend) {
@@ -107,10 +113,10 @@ class InstrumentController extends BaseController {
         this.isScanning = true;
         
         try {
-            // ✅ CORRECTION: devices.scan retourne count
+            // Ã¢Å“â€¦ CORRECTION: devices.scan retourne count
             const response = await this.backend.scanDevices(full_scan);
             
-            // ✅ Extraction via response (déjà data dans BackendService)
+            // Ã¢Å“â€¦ Extraction via response (dÃƒÂ©jÃƒÂ  data dans BackendService)
             const devices = response.devices || [];
             const count = response.count || devices.length;
             
@@ -121,7 +127,7 @@ class InstrumentController extends BaseController {
             this.lastScanTime = Date.now();
             
             this.logger?.info?.('InstrumentController', 
-                `✓ Scan complete: ${count} devices found`);
+                `Ã¢Å“â€œ Scan complete: ${count} devices found`);
             
             this.eventBus.emit('instruments:scan_complete', { 
                 devices, 
@@ -142,7 +148,7 @@ class InstrumentController extends BaseController {
 
     async refreshDeviceList() {
         try {
-            // ✅ devices.list n'a pas de count
+            // Ã¢Å“â€¦ devices.list n'a pas de count
             const response = await this.backend.listDevices();
             const devices = response.devices || [];
             
@@ -181,7 +187,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * ✅ CORRECTION: device_id en snake_case
+     * Ã¢Å“â€¦ CORRECTION: device_id en snake_case
      */
     async connectDevice(device_id) {
         if (!this.backend) {

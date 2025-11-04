@@ -1,34 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
-// Date: 2025-11-02
+// Version: v4.1.0 - SIGNATURE CORRIGÉE (HÉRITE DE BASEVIEW)
+// Date: 2025-11-04
 // ============================================================================
-// AMÃ‰LIORATIONS v4.0.0:
-// âœ… API v4.2.2: devices.*, bluetooth.*
-// âœ… Ã‰vÃ©nements device:connected, device:disconnected
-// âœ… Hot-plug support (devices.startHotPlug, devices.stopHotPlug)
-// âœ… Bluetooth pairing et scanning
+// CORRECTIONS v4.1.0:
+// ✅ CRITIQUE: InstrumentView hérite maintenant de BaseView
+// ✅ Appel super(containerId, eventBus) au début du constructeur
+// ✅ Suppression réimplémentation manuelle de resolveContainer
+// ✅ Accès aux méthodes BaseView (render, update, show, hide, emit, etc.)
+// ============================================================================
+// AMÉLIORATIONS v4.0.0:
+// ✦ API v4.2.2: devices.*, bluetooth.*
+// ✦ Événements device:connected, device:disconnected
+// ✦ Hot-plug support (devices.startHotPlug, devices.stopHotPlug)
+// ✦ Bluetooth pairing et scanning
 // ============================================================================
 
-class InstrumentView {
-    constructor(container, eventBus) {
-        // Container
-        if (typeof container === 'string') {
-            this.container = document.getElementById(container) || document.querySelector(container);
-        } else if (container instanceof HTMLElement) {
-            this.container = container;
-        } else {
-            this.container = null;
-        }
+class InstrumentView extends BaseView {
+    constructor(containerId, eventBus) {
+        // ✅ NOUVEAU: Appel super() pour hériter de BaseView
+        super(containerId, eventBus);
         
-        if (!this.container) {
-            console.error('[InstrumentView] Container not found:', container);
-        }
-        
-        this.eventBus = eventBus;
+        // ✅ this.container et this.eventBus déjà initialisés par BaseView
         this.logger = window.logger || console;
         
-        // Ã‰tat
+// ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat
         this.state = {
             connectedDevices: [],
             availableDevices: [],
@@ -41,7 +37,7 @@ class InstrumentView {
             selectedDevice: null
         };
         
-        // Ã‰lÃ©ments DOM
+        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ments DOM
         this.elements = {};
     }
 
@@ -69,28 +65,28 @@ class InstrumentView {
         
         this.container.innerHTML = `
             <div class="page-header">
-                <h1>ðŸŽ¸ Gestion des Instruments</h1>
+                <h1>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸ Gestion des Instruments</h1>
                 <div class="header-actions">
                     <button class="btn-hotplug" id="btnToggleHotPlug" 
                             data-enabled="${this.state.hotPlugEnabled}">
-                        ${this.state.hotPlugEnabled ? 'ðŸ”Œ Hot-Plug ON' : 'ðŸ”Œ Hot-Plug OFF'}
+                        ${this.state.hotPlugEnabled ? 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ Hot-Plug ON' : 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ Hot-Plug OFF'}
                     </button>
                 </div>
             </div>
             
             <div class="instruments-layout">
-                <!-- Scan et dÃ©couverte -->
+                <!-- Scan et dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©couverte -->
                 <div class="instruments-discover">
                     <div class="section-header">
                         <h2>Rechercher et connecter</h2>
                         <div class="discover-controls">
                             <button class="btn-scan ${this.state.scanning.usb ? 'scanning' : ''}" 
                                     id="btnScanUSB" data-type="usb">
-                                ðŸ”Œ ${this.state.scanning.usb ? 'Scan...' : 'Scan USB'}
+                                ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ ${this.state.scanning.usb ? 'Scan...' : 'Scan USB'}
                             </button>
                             <button class="btn-scan ${this.state.scanning.bluetooth ? 'scanning' : ''}" 
                                     id="btnScanBluetooth" data-type="bluetooth">
-                                ðŸ“¡ ${this.state.scanning.bluetooth ? 'Scan...' : 'Scan Bluetooth'}
+                                ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¡ ${this.state.scanning.bluetooth ? 'Scan...' : 'Scan Bluetooth'}
                             </button>
                         </div>
                     </div>
@@ -105,12 +101,12 @@ class InstrumentView {
                     </div>
                 </div>
                 
-                <!-- Instruments connectÃ©s -->
+                <!-- Instruments connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s -->
                 <div class="instruments-connected">
                     <div class="section-header">
-                        <h2>Instruments connectÃ©s</h2>
+                        <h2>Instruments connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s</h2>
                         <button class="btn-disconnect-all" id="btnDisconnectAll">
-                            ðŸ”Œ Tout dÃ©connecter
+                            ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ Tout dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter
                         </button>
                     </div>
                     
@@ -153,7 +149,7 @@ class InstrumentView {
             this.elements.btnDisconnectAll.addEventListener('click', () => this.disconnectAll());
         }
         
-        // DÃ©lÃ©gation d'Ã©vÃ©nements
+        // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gation d'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements
         if (this.elements.devicesFound) {
             this.elements.devicesFound.addEventListener('click', (e) => this.handleAvailableDeviceAction(e));
         }
@@ -223,8 +219,8 @@ class InstrumentView {
         if (devices.length === 0) {
             return `
                 <div class="devices-empty">
-                    <div class="empty-icon">ðŸ”</div>
-                    <p>Aucun device trouvÃ©</p>
+                    <div class="empty-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â</div>
+                    <p>Aucun device trouvÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©</p>
                     <p class="text-muted">Cliquez sur Scan pour rechercher</p>
                 </div>
             `;
@@ -239,13 +235,13 @@ class InstrumentView {
 
     renderAvailableDeviceCard(device) {
         const typeIcons = {
-            0: 'â“', // Unknown
-            1: 'ðŸ”Œ', // USB
-            2: 'ðŸ“¡', // BLE
-            3: 'ðŸ’»'  // Virtual
+            0: 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ', // Unknown
+            1: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢', // USB
+            2: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¡', // BLE
+            3: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â»'  // Virtual
         };
         
-        const icon = typeIcons[device.type] || 'ðŸŽ¸';
+        const icon = typeIcons[device.type] || 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸';
         const typeName = ['Unknown', 'USB', 'Bluetooth', 'Virtual'][device.type] || 'Unknown';
         
         return `
@@ -280,8 +276,8 @@ class InstrumentView {
         if (devices.length === 0) {
             return `
                 <div class="devices-empty">
-                    <div class="empty-icon">ðŸŽ¸</div>
-                    <p>Aucun instrument connectÃ©</p>
+                    <div class="empty-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸</div>
+                    <p>Aucun instrument connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©</p>
                     <p class="text-muted">Connectez un device pour commencer</p>
                 </div>
             `;
@@ -296,13 +292,13 @@ class InstrumentView {
 
     renderConnectedDeviceCard(device) {
         const typeIcons = {
-            0: 'â“',
-            1: 'ðŸ”Œ',
-            2: 'ðŸ“¡',
-            3: 'ðŸ’»'
+            0: 'ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ',
+            1: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢',
+            2: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¡',
+            3: 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â»'
         };
         
-        const icon = typeIcons[device.type] || 'ðŸŽ¸';
+        const icon = typeIcons[device.type] || 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½Ãƒâ€šÃ‚Â¸';
         const typeName = ['Unknown', 'USB', 'Bluetooth', 'Virtual'][device.type] || 'Unknown';
         
         return `
@@ -311,14 +307,14 @@ class InstrumentView {
                 <div class="device-info">
                     <div class="device-name">${device.name}</div>
                     <div class="device-type">${typeName}</div>
-                    <div class="device-status connected">âœ“ ConnectÃ©</div>
+                    <div class="device-status connected">ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ ConnectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©</div>
                 </div>
                 <div class="device-actions">
                     <button class="btn-info" data-action="device-info">
-                        â„¹ï¸ Info
+                        ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â Info
                     </button>
                     <button class="btn-disconnect" data-action="disconnect-device">
-                        DÃ©connecter
+                        DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter
                     </button>
                 </div>
             </div>
@@ -344,7 +340,7 @@ class InstrumentView {
         
         return `
             <div class="bluetooth-section">
-                <h3>Devices Bluetooth appairÃ©s</h3>
+                <h3>Devices Bluetooth appairÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s</h3>
                 <div class="bluetooth-list">
                     ${devices.map(device => this.renderBluetoothDeviceCard(device)).join('')}
                 </div>
@@ -355,10 +351,10 @@ class InstrumentView {
     renderBluetoothDeviceCard(device) {
         return `
             <div class="device-card bluetooth" data-device-id="${device.id}">
-                <div class="device-icon">ðŸ“¡</div>
+                <div class="device-icon">ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¡</div>
                 <div class="device-info">
                     <div class="device-name">${device.name}</div>
-                    <div class="device-address">${device.address || 'â€”'}</div>
+                    <div class="device-address">${device.address || 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â'}</div>
                 </div>
                 <div class="device-actions">
                     <button class="btn-connect" data-action="connect-bluetooth">
@@ -479,7 +475,7 @@ class InstrumentView {
     }
 
     async disconnectAll() {
-        if (!confirm('DÃ©connecter tous les instruments ?')) return;
+        if (!confirm('DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connecter tous les instruments ?')) return;
         
         // Appel API: devices.disconnectAll
         if (this.eventBus) {
@@ -534,7 +530,7 @@ class InstrumentView {
     updateHotPlugButton() {
         if (this.elements.btnToggleHotPlug) {
             this.elements.btnToggleHotPlug.textContent = 
-                this.state.hotPlugEnabled ? 'ðŸ”Œ Hot-Plug ON' : 'ðŸ”Œ Hot-Plug OFF';
+                this.state.hotPlugEnabled ? 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ Hot-Plug ON' : 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬â„¢ Hot-Plug OFF';
             this.elements.btnToggleHotPlug.dataset.enabled = this.state.hotPlugEnabled;
         }
     }
@@ -554,7 +550,7 @@ class InstrumentView {
     }
 
     updateDevicesFromList(devices) {
-        // SÃ©parer connectÃ©s et disponibles
+        // SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©parer connectÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s et disponibles
         this.state.connectedDevices = devices.filter(d => d.status === 2); // Connected
         this.state.availableDevices = devices.filter(d => d.status !== 2 && d.available);
         

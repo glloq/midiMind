@@ -1,19 +1,19 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Chemin rÃƒÂ©el: frontend/js/services/BackendService.js
+// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/services/BackendService.js
 // Version: v4.2.2 - API COMPATIBLE (CORRECTED)
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// Ã¢Å“â€¦ Tous les paramÃƒÂ¨tres en snake_case
-// Ã¢Å“â€¦ midi.import: filename + content + base64
-// Ã¢Å“â€¦ RÃƒÂ©ponse: payload.data extraite correctement
-// Ã¢Å“â€¦ routing_id, device_id, midi_file_id, playlist_id
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Tous les paramÃƒÆ’Ã‚Â¨tres en snake_case
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ midi.import: filename + content + base64
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ RÃƒÆ’Ã‚Â©ponse: payload.data extraite correctement
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ routing_id, device_id, midi_file_id, playlist_id
 // ============================================================================
 
 class BackendService {
     constructor(url, eventBus, logger) {
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger || console;
         
         this.ws = null;
@@ -124,7 +124,7 @@ class BackendService {
         this.offlineMode = false;
         this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', 'Ã¢Å“â€œ Connected successfully');
+        this.logger.info('BackendService', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Connected successfully');
         this.eventBus.emit('backend:connected');
         
         this.startHeartbeat();
@@ -181,7 +181,7 @@ class BackendService {
         this.reconnectAttempts++;
         
         this.logger.info('BackendService', 
-            `Ã¢â€ Â» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
+            `ÃƒÂ¢Ã¢â‚¬Â Ã‚Â» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
         
         this.eventBus.emit('backend:reconnecting', {
             attempt: this.reconnectAttempts,
@@ -197,7 +197,7 @@ class BackendService {
     
     enterOfflineMode() {
         this.offlineMode = true;
-        this.logger.warn('BackendService', 'Ã¢Å¡Â Ã¯Â¸Â Entering offline mode');
+        this.logger.warn('BackendService', 'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
             timestamp: Date.now()
@@ -213,7 +213,7 @@ class BackendService {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', 'Ã°Å¸â€™â€” Heartbeat started');
+        this.logger.debug('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â‚¬â€ Heartbeat started');
     }
     
     async checkHeartbeat() {
@@ -223,10 +223,10 @@ class BackendService {
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `Ã¢Å“â€” Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+                `ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'Ã°Å¸â€™â‚¬ Connection dead, forcing reconnect');
+                this.logger.error('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â€šÂ¬ Connection dead, forcing reconnect');
                 this.forceReconnect('Heartbeat timeout - connection dead');
                 return;
             }
@@ -239,7 +239,7 @@ class BackendService {
         
         try {
             this.heartbeatPending = true;
-            this.logger.debug('BackendService', 'Ã°Å¸â€™â€” Sending heartbeat (system.ping)');
+            this.logger.debug('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â‚¬â€ Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
             await this.sendCommand('system.ping');
@@ -248,17 +248,17 @@ class BackendService {
             this.heartbeatPending = false;
             this.heartbeatFailures = 0;
             
-            this.logger.debug('BackendService', `Ã¢Å“â€œ Heartbeat OK (latency: ${latency}ms)`);
+            this.logger.debug('BackendService', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Heartbeat OK (latency: ${latency}ms)`);
             
         } catch (error) {
             this.heartbeatPending = false;
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `Ã¢Å¡Â Ã¯Â¸Â Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+                `ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'Ã°Å¸â€™â‚¬ Multiple heartbeat failures, forcing reconnect');
+                this.logger.error('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â€šÂ¬ Multiple heartbeat failures, forcing reconnect');
                 this.forceReconnect('Multiple heartbeat failures');
             }
         }
@@ -291,7 +291,7 @@ class BackendService {
     }
     
     /**
-     * Ã¢Å“â€¦ v4.2.2: Match sur payload.request_id
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ v4.2.2: Match sur payload.request_id
      */
     handleMessage(event) {
         try {
@@ -302,7 +302,7 @@ class BackendService {
             
             this.lastActivityTime = Date.now();
             
-            // ✅ FORMAT SIMPLE: Réponse avec id, success, data
+            // âœ… FORMAT SIMPLE: RÃ©ponse avec id, success, data
             if (data.hasOwnProperty('success')) {
                 const requestId = data.id;
                 
@@ -327,7 +327,7 @@ class BackendService {
                 }
             }
             
-            // Si data.event => Événement backend
+            // Si data.event => Ã‰vÃ©nement backend
             if (data.event) {
                 const eventName = data.event;
                 if (eventName) {
@@ -361,7 +361,7 @@ class BackendService {
     }
     
     /**
-     * Ã¢Å“â€¦ v4.2.2: Format conforme API v4.2.2
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ v4.2.2: Format conforme API v4.2.2
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -389,7 +389,7 @@ class BackendService {
                 },
                 timeoutTimer: timeoutTimer
             });
-            // ✅ FORMAT API SIMPLE (selon doc)
+            // âœ… FORMAT API SIMPLE (selon doc)
             const message = {
                 id: requestId,
                 command: command,
@@ -414,7 +414,7 @@ class BackendService {
                             .reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
                     
-                    // Ã¢Å“â€¦ midi.import avec content + base64
+                    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ midi.import avec content + base64
                     const response = await this.sendCommand('midi.import', {
                         filename: file.name,
                         content: base64Data,
@@ -433,7 +433,7 @@ class BackendService {
     }
     
     // ============================================================================
-    // SHORTCUTS API v4.2.2 - Ã¢Å“â€¦ TOUS EN snake_case
+    // SHORTCUTS API v4.2.2 - ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ TOUS EN snake_case
     // ============================================================================
     
     // === DEVICES ===
@@ -606,7 +606,7 @@ class BackendService {
         return this.sendCommand('midi.save', { filename, midi_json }); 
     }
     
-    // Ã¢Å“â€¦ CORRECTION MAJEURE: midi.import avec content + base64
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION MAJEURE: midi.import avec content + base64
     async importMidi(filename, content, base64 = true) { 
         return this.sendCommand('midi.import', { filename, content, base64 }); 
     }
@@ -623,7 +623,7 @@ class BackendService {
         return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
     }
     
-    // Ã¢Å“â€¦ MIDI ROUTING avec snake_case
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ MIDI ROUTING avec snake_case
     async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
         return this.sendCommand('midi.routing.add', { 
             midi_file_id, 

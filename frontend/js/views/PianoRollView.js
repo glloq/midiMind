@@ -1,8 +1,8 @@
 // ============================================================================
 // Fichier: frontend/js/views/PianoRollView.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.0
-// Date: 2025-10-14
+// Projet: MidiMind v3.1.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0
+// Date: 2025-11-04
 // ============================================================================
 // Description:
 //   Vue piano roll pour l'édition graphique des notes MIDI.
@@ -23,7 +23,7 @@
 //
 // Architecture:
 //   PianoRollView extends BaseCanvasView
-//   - CoordinateSystem : Conversions pixels ↔ temps/pitch
+//   - CoordinateSystem : Conversions pixels <-> temps/pitch
 //   - Viewport : Gestion zoom/pan
 //   - NoteRenderer : Rendu notes optimisé
 //   - GridRenderer : Grille et mesures
@@ -33,9 +33,13 @@
 
 
 class PianoRollView extends BaseCanvasView {
-    constructor(canvas, model) {
-        super(canvas);
-        this.model = model;
+    // ✅ CORRECTION: Signature conforme à BaseCanvasView (canvas, eventBus)
+    constructor(canvas, eventBus) {
+        super(canvas, eventBus);
+        
+        // Récupérer canvas depuis BaseCanvasView (déjà résolu)
+        // this.canvas et this.ctx sont déjà disponibles via super()
+        this.model = null; // Model sera fourni via setModel()
         
         // Configuration spécifique
         this.noteHeight = 12;
@@ -237,7 +241,7 @@ class PianoRollView extends BaseCanvasView {
             }
             
             // Poignée de redimensionnement (si sélectionnée)
-            if (isSelected && width > 10) {
+            if (isSelected && width > 20) {
                 this.ctx.fillStyle = '#fff';
                 this.ctx.fillRect(x + width - 4, y + height / 2 - 2, 4, 4);
             }
@@ -245,48 +249,70 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Dessine le rectangle de sélection
+     * Dessine la timeline avec mesures et temps
      */
-    drawSelectionRect() {
-        if (!this.selectionRect) return;
+    drawTimeRuler() {
+        const height = 30;
+        const { start, end } = this.model.state.viewport;
         
-        const { x, y, width, height } = this.selectionRect;
+        // Fond
+        this.ctx.fillStyle = '#1a1a1a';
+        this.ctx.fillRect(0, 0, this.width, height);
         
-        // Rectangle avec transparence
-        this.ctx.fillStyle = 'rgba(102, 126, 234, 0.2)';
-        this.ctx.fillRect(x, y, width, height);
+        // Marqueurs de mesure
+        this.ctx.strokeStyle = '#4a4a4a';
+        this.ctx.fillStyle = '#ccc';
+        this.ctx.font = '11px sans-serif';
+        this.ctx.textAlign = 'center';
         
-        // Bordure
-        this.ctx.strokeStyle = '#667eea';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, width, height);
-    }
-
-    /**
-     * Dessine le highlight de la note survolée
-     */
-    drawHoverHighlight(note) {
-        const x = this.timeToX(note.time);
-        const y = this.noteToY(note.note);
-        const width = note.duration * this.pixelsPerMs;
-        const height = this.noteHeight - 2;
+        const ticksPerBeat = 480;  // PPQ
+        const beatsPerMeasure = 4;
+        const measureInterval = ticksPerBeat * beatsPerMeasure;
         
-        this.ctx.strokeStyle = '#fff';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x - 1, y - 1, width + 2, height + 2);
+        const startMeasure = Math.floor(start / measureInterval);
+        const endMeasure = Math.ceil(end / measureInterval) + 1;
         
-        // Tooltip
-        this.showTooltip(note, x, y);
+        for (let measure = startMeasure; measure <= endMeasure; measure++) {
+            const time = measure * measureInterval;
+            const x = this.timeToX(time);
+            
+            if (x >= 0 && x <= this.width) {
+                // Ligne
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, height - 10);
+                this.ctx.lineTo(x, height);
+                this.ctx.stroke();
+                
+                // Numéro de mesure
+                const measureLabel = measure + 1;
+                this.ctx.fillText(measureLabel.toString(), x, 15);
+            }
+            
+            // Beats intermédiaires
+            for (let beat = 1; beat < beatsPerMeasure; beat++) {
+                const beatTime = time + (beat * ticksPerBeat);
+                const beatX = this.timeToX(beatTime);
+                
+                if (beatX >= 0 && beatX <= this.width) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(beatX, height - 5);
+                    this.ctx.lineTo(beatX, height);
+                    this.ctx.stroke();
+                }
+            }
+        }
     }
 
     /**
      * Dessine le playhead
      */
-    drawPlayhead(time) {
-        const x = this.timeToX(time);
+    drawPlayhead() {
+        if (!this.model || this.model.state.playbackTime === null) return;
+        
+        const x = this.timeToX(this.model.state.playbackTime);
         
         if (x >= 0 && x <= this.width) {
-            this.ctx.strokeStyle = '#e74c3c';
+            this.ctx.strokeStyle = '#ff0000';
             this.ctx.lineWidth = 2;
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
@@ -296,183 +322,123 @@ class PianoRollView extends BaseCanvasView {
     }
 
     /**
-     * Affiche un tooltip pour une note
-     */
-    showTooltip(note, x, y) {
-        const text = `${this.getNoteName(note.note)} | Vel: ${note.velocity} | Dur: ${note.duration}ms`;
-        
-        this.ctx.font = '12px sans-serif';
-        const metrics = this.ctx.measureText(text);
-        const padding = 6;
-        const tooltipWidth = metrics.width + padding * 2;
-        const tooltipHeight = 20;
-        
-        // Position du tooltip
-        let tooltipX = x;
-        let tooltipY = y - tooltipHeight - 5;
-        
-        // Ajuster si hors écran
-        if (tooltipX + tooltipWidth > this.width) {
-            tooltipX = this.width - tooltipWidth;
-        }
-        if (tooltipY < 0) {
-            tooltipY = y + this.noteHeight + 5;
-        }
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
-        
-        // Text
-        this.ctx.fillStyle = '#fff';
-        this.ctx.textAlign = 'left';
-        this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(text, tooltipX + padding, tooltipY + tooltipHeight / 2);
-    }
-
-    /**
-     * Attache les événements
-     */
-    attachEvents() {
-        this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-        this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
-        this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
-        this.canvas.addEventListener('mouseleave', () => this.onMouseLeave());
-        
-        window.addEventListener('resize', () => this.resize());
-    }
-
-    /**
      * Gestion du clic
      */
     onMouseDown(e) {
+        if (!this.canvas) return;
+        
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        const clickedNote = this.findNoteAt(x, y);
         const tool = this.model.state.currentTool;
+        const hoveredNote = this.findNoteAt(x, y);
         
-        switch (tool) {
-            case 'select':
-                if (clickedNote) {
-                    // Vérifier si on clique sur la poignée de redimensionnement
-                    if (this.isResizeHandle(clickedNote, x, y)) {
-                        this.resizingNote = clickedNote;
-                    } else {
-                        // Sélection de note
-                        if (e.shiftKey) {
-                            // Ajouter à la sélection
-                            this.model.selectNotes([clickedNote.id], true);
-                        } else if (!this.model.state.selectedNotes.has(clickedNote.id)) {
-                            // Nouvelle sélection
-                            this.model.selectNotes([clickedNote.id]);
-                        }
-                        
-                        this.isDragging = true;
-                        this.dragStart = { x, y };
-                    }
+        if (tool === 'select') {
+            if (hoveredNote) {
+                // Vérifier si on clique sur la poignée de resize
+                if (this.isResizeHandle(hoveredNote, x, y)) {
+                    this.resizingNote = hoveredNote;
+                    this.dragStart = { x, y, time: hoveredNote.time, duration: hoveredNote.duration };
                 } else {
-                    // Démarrer sélection rectangle
-                    this.isSelecting = true;
-                    this.selectionRect = { x, y, width: 0, height: 0 };
-                    
-                    if (!e.shiftKey) {
-                        this.model.clearSelection();
+                    // Déplacer la note
+                    if (!this.model.state.selectedNotes.has(hoveredNote.id)) {
+                        // Sélectionner si pas déjà sélectionnée
+                        this.model.selectNotes([hoveredNote.id], !e.shiftKey);
                     }
+                    this.isDragging = true;
+                    this.dragStart = { 
+                        x, 
+                        y, 
+                        time: this.xToTime(x),
+                        note: this.yToNote(y)
+                    };
                 }
-                break;
-                
-            case 'pencil':
-                if (!clickedNote) {
-                    // Créer une nouvelle note
-                    const time = this.xToTime(x);
-                    const note = this.yToNote(y);
-                    const duration = this.snapEnabled ? this.snapResolution : 500;
-                    
-                    this.model.addNote(time, note, 64, duration, 0);
-                }
-                break;
-                
-            case 'eraser':
-                if (clickedNote) {
-                    this.model.deleteNote(clickedNote.id);
-                }
-                break;
+            } else {
+                // Commencer une sélection rectangle
+                this.isSelecting = true;
+                this.selectionRect = { x, y, width: 0, height: 0 };
+            }
+        } else if (tool === 'pencil') {
+            // Ajouter une note
+            const time = this.xToTime(x);
+            const note = this.yToNote(y);
+            
+            const quantizedTime = this.snapEnabled 
+                ? Math.round(time / this.snapResolution) * this.snapResolution
+                : time;
+            
+            this.model.addNote({
+                time: quantizedTime,
+                note: Math.max(0, Math.min(127, note)),
+                duration: this.snapResolution,
+                velocity: 100,
+                channel: this.model.state.currentChannel
+            });
+        } else if (tool === 'eraser' && hoveredNote) {
+            // Supprimer la note
+            this.model.deleteNotes([hoveredNote.id]);
         }
         
         this.invalidate();
     }
 
     /**
-     * Gestion du mouvement de souris
+     * Gestion du déplacement
      */
     onMouseMove(e) {
+        if (!this.canvas) return;
+        
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // Mise à jour de la position du curseur dans la status bar
-        const time = Math.round(this.xToTime(x));
-        const note = this.yToNote(y);
-        const noteName = this.getNoteName(note);
-        
-        document.getElementById('cursorPosition').textContent = 
-            `Time: ${time}ms | Note: ${noteName}`;
-        
-        // Hover
+        // Mettre à jour la note survolée
         const hoveredNote = this.findNoteAt(x, y);
+        
         if (hoveredNote !== this.hoveredNote) {
             this.hoveredNote = hoveredNote;
             this.invalidate();
         }
         
-        // Drag
+        // Mise à jour du curseur
+        this.updateCursor(x, y, hoveredNote);
+        
+        // Gestion du drag
         if (this.isDragging && this.dragStart) {
-            const deltaX = x - this.dragStart.x;
-            const deltaY = y - this.dragStart.y;
+            const deltaTime = this.xToTime(x) - this.dragStart.time;
+            const deltaNotes = this.yToNote(y) - this.dragStart.note;
             
-            const deltaTime = Math.round(deltaX / this.pixelsPerMs);
-            const deltaNotes = -Math.round(deltaY / this.noteHeight);
+            this.moveSelectedNotes(deltaTime, deltaNotes);
+            this.dragStart.time = this.xToTime(x);
+            this.dragStart.note = this.yToNote(y);
             
-            if (Math.abs(deltaTime) >= 10 || Math.abs(deltaNotes) >= 1) {
-                // Déplacer les notes sélectionnées
-                this.moveSelectedNotes(deltaTime, deltaNotes);
-                this.dragStart = { x, y };
-            }
+            this.invalidate();
         }
         
-        // Resize
-        if (this.resizingNote) {
-            const noteX = this.timeToX(this.resizingNote.time);
-            const newDuration = Math.round((x - noteX) / this.pixelsPerMs);
+        // Gestion du resize
+        if (this.resizingNote && this.dragStart) {
+            const newTime = this.xToTime(x);
+            const newDuration = Math.max(this.snapResolution, newTime - this.resizingNote.time);
             
-            if (newDuration > 10) {
-                this.model.updateNote(this.resizingNote.id, {
-                    duration: this.snapEnabled 
-                        ? Math.round(newDuration / this.snapResolution) * this.snapResolution
-                        : newDuration
-                });
-            }
+            this.model.updateNote(this.resizingNote.id, {
+                duration: newDuration
+            });
+            
+            this.invalidate();
         }
         
-        // Sélection rectangle
+        // Gestion de la sélection rectangle
         if (this.isSelecting && this.selectionRect) {
             this.selectionRect.width = x - this.selectionRect.x;
             this.selectionRect.height = y - this.selectionRect.y;
             
-            // Sélectionner les notes dans le rectangle
-            this.selectNotesInRect();
             this.invalidate();
         }
-        
-        // Curseur
-        this.updateCursor(x, y, hoveredNote);
     }
 
     /**
-     * Gestion du relâchement de souris
+     * Gestion du relâchement
      */
     onMouseUp(e) {
         this.isDragging = false;
@@ -709,7 +675,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-    window.PianoRollView = PianoRollView;  // ← AJOUTÉ
+    window.PianoRollView = PianoRollView;
 }
 
 // Export par défaut

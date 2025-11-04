@@ -4,9 +4,9 @@
 // ============================================================================
 
 class PresetView {
-    constructor(container, eventBus) {
-        this.container = typeof container === 'string' ? 
-            document.getElementById(container) : container;
+    constructor(containerId, eventBus) {
+        this.container = typeof containerId === 'string' ? 
+            document.getElementById(containerId) : containerId;
         this.eventBus = eventBus;
         
         this.state = {
@@ -26,7 +26,7 @@ class PresetView {
         this.container.innerHTML = `
             <div class="preset-view">
                 <div class="preset-header">
-                    <h2>💾 Presets</h2>
+                    <h2>Ã°Å¸â€™Â¾ Presets</h2>
                     <button data-action="new">Nouveau preset</button>
                 </div>
                 

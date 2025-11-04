@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/views/VisualizerView.js
-// Version: v4.0.0 - CONFORMITÉ API
+// Version: v4.0.0 - CONFORMITÃƒÆ’Ã¢â‚¬Â° API
 // Date: 2025-11-02
 // ============================================================================
 
 class VisualizerView {
-    constructor(container, eventBus) {
-        if (typeof container === 'string') {
-            this.container = document.getElementById(container) || document.querySelector(container);
+    constructor(containerId, eventBus) {
+        if (typeof containerId === 'string') {
+            this.container = document.getElementById(containerId) || document.querySelector(containerId);
         } else {
-            this.container = container;
+            this.container = containerId;
         }
         
         this.eventBus = eventBus;
@@ -44,7 +44,7 @@ class VisualizerView {
                     </select>
                     <select data-action="color">
                         <option value="channel">Par canal</option>
-                        <option value="velocity">Par vélocité</option>
+                        <option value="velocity">Par vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â©</option>
                     </select>
                 </div>
                 <canvas id="visualizerCanvas"></canvas>

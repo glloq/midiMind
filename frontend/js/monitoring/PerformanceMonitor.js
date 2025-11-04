@@ -1,26 +1,26 @@
 // ============================================================================
 // Fichier: frontend/js/monitoring/PerformanceMonitor.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   Monitoring des performances de l'application en temps réel.
-//   Métriques FPS, latence, mémoire, render time, etc.
+//   Monitoring des performances de l'application en temps rÃ©el.
+//   MÃ©triques FPS, latence, mÃ©moire, render time, etc.
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Mesure FPS (frames per second)
-//   - Mesure latence MIDI (input → output)
-//   - Utilisation mémoire (heap size)
+//   - Mesure latence MIDI (input â†’ output)
+//   - Utilisation mÃ©moire (heap size)
 //   - Temps de rendu Canvas
-//   - Détection frame drops
-//   - Alertes automatiques (seuils dépassés)
-//   - Historique métriques (graphiques)
+//   - DÃ©tection frame drops
+//   - Alertes automatiques (seuils dÃ©passÃ©s)
+//   - Historique mÃ©triques (graphiques)
 //   - Export rapport performance
 //
 // Architecture:
 //   PerformanceMonitor (classe singleton)
-//   - Sampling périodique (requestAnimationFrame)
+//   - Sampling pÃ©riodique (requestAnimationFrame)
 //   - Buffer circulaire pour historique
 //   - Performance API navigateur
 //
@@ -31,30 +31,30 @@
  * @class PerformanceMonitor
  * @description Surveillance et analyse des performances frontend
  * 
- * Métriques suivies:
- * - Latence requêtes backend (ms)
- * - Latence événements EventBus (ms)
+ * MÃ©triques suivies:
+ * - Latence requÃªtes backend (ms)
+ * - Latence Ã©vÃ©nements EventBus (ms)
  * - FPS de rendu
- * - Utilisation mémoire
+ * - Utilisation mÃ©moire
  * - Temps de traitement
- * - Événements par seconde
+ * - Ã‰vÃ©nements par seconde
  */
 class PerformanceMonitor {
     constructor(eventBus, logger) {
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger;
         
         // Configuration
         this.config = {
             enabled: true,
             sampleInterval: 1000,      // 1 seconde
-            historySize: 100,          // 100 échantillons
+            historySize: 100,          // 100 Ã©chantillons
             latencyThresholdMs: 50,    // Alerte si > 50ms
             fpsThresholdLow: 30,       // Alerte si < 30 FPS
             memoryThresholdMb: 500     // Alerte si > 500 MB
         };
         
-        // Métriques en temps réel
+        // MÃ©triques en temps rÃ©el
         this.metrics = {
             // Latence
             latency: {
@@ -72,14 +72,14 @@ class PerformanceMonitor {
                 lastFrameTime: 0
             },
             
-            // Mémoire
+            // MÃ©moire
             memory: {
                 used: 0,
                 total: 0,
                 history: []
             },
             
-            // Événements
+            // Ã‰vÃ©nements
             events: {
                 processed: 0,
                 dropped: 0,
@@ -115,13 +115,13 @@ class PerformanceMonitor {
     init() {
         this.logger.info('PerformanceMonitor', 'Initializing Performance Monitor v3.0.0');
         
-        // Démarrer le monitoring
+        // DÃ©marrer le monitoring
         this.startMonitoring();
         
-        // Écouter les événements critiques
+        // Ã‰couter les Ã©vÃ©nements critiques
         this.setupEventListeners();
         
-        // Démarrer le compteur FPS
+        // DÃ©marrer le compteur FPS
         this.startFpsCounter();
     }
     
@@ -137,7 +137,7 @@ class PerformanceMonitor {
         
         // Mesurer latence EventBus
         this.eventBus.on('*', () => {
-            // Hook pour mesurer tous les événements
+            // Hook pour mesurer tous les Ã©vÃ©nements
         });
     }
     
@@ -172,13 +172,13 @@ class PerformanceMonitor {
     collectSample() {
         if (!this.config.enabled) return;
         
-        // Collecter métriques mémoire
+        // Collecter mÃ©triques mÃ©moire
         this.updateMemoryMetrics();
         
-        // Calculer taux d'événements
+        // Calculer taux d'Ã©vÃ©nements
         this.updateEventRate();
         
-        // Vérifier les seuils
+        // VÃ©rifier les seuils
         this.checkThresholds();
         
         // Nettoyer l'historique
@@ -190,7 +190,7 @@ class PerformanceMonitor {
     // ========================================================================
     
     /**
-     * Démarre une mesure de temps
+     * DÃ©marre une mesure de temps
      * @param {string} id - Identifiant unique de la mesure
      * @param {string} type - Type de mesure (backend, eventBus, render)
      */
@@ -220,7 +220,7 @@ class PerformanceMonitor {
         const endTime = performance.now();
         const latency = endTime - measurement.startTime;
         
-        // Enregistrer dans l'historique approprié
+        // Enregistrer dans l'historique appropriÃ©
         this.recordLatency(measurement.type, latency);
         
         // Supprimer la mesure
@@ -248,7 +248,7 @@ class PerformanceMonitor {
             history.shift();
         }
         
-        // Vérifier seuil
+        // VÃ©rifier seuil
         if (latency > this.config.latencyThresholdMs) {
             this.addAlert('latency', `High ${type} latency: ${latency.toFixed(2)}ms`, 'warning');
         }
@@ -256,9 +256,9 @@ class PerformanceMonitor {
     
     /**
      * Mesure une fonction
-     * @param {Function} fn - Fonction à mesurer
+     * @param {Function} fn - Fonction Ã  mesurer
      * @param {string} name - Nom de la mesure
-     * @returns {*} Résultat de la fonction
+     * @returns {*} RÃ©sultat de la fonction
      */
     async measureFunction(fn, name = 'anonymous') {
         const id = `func_${name}_${Date.now()}`;
@@ -307,7 +307,7 @@ class PerformanceMonitor {
                     this.metrics.fps.history.shift();
                 }
                 
-                // Vérifier seuil
+                // VÃ©rifier seuil
                 if (this.metrics.fps.current < this.config.fpsThresholdLow) {
                     this.addAlert('fps', `Low FPS: ${this.metrics.fps.current}`, 'warning');
                 }
@@ -324,7 +324,7 @@ class PerformanceMonitor {
     }
     
     // ========================================================================
-    // MÉMOIRE
+    // MÃ‰MOIRE
     // ========================================================================
     
     updateMemoryMetrics() {
@@ -349,24 +349,24 @@ class PerformanceMonitor {
             this.metrics.memory.history.shift();
         }
         
-        // Vérifier seuil
+        // VÃ©rifier seuil
         if (usedMb > this.config.memoryThresholdMb) {
             this.addAlert('memory', `High memory usage: ${usedMb.toFixed(2)} MB`, 'warning');
         }
     }
     
     // ========================================================================
-    // ÉVÉNEMENTS
+    // Ã‰VÃ‰NEMENTS
     // ========================================================================
     
     updateEventRate() {
-        // Récupérer stats EventBus
+        // RÃ©cupÃ©rer stats EventBus
         const eventBusMetrics = this.eventBus.getMetrics();
         
         this.metrics.events.processed = eventBusMetrics.eventsProcessed;
         this.metrics.events.dropped = eventBusMetrics.eventsDropped;
         
-        // Calculer rate (événements/seconde)
+        // Calculer rate (Ã©vÃ©nements/seconde)
         const history = this.metrics.events.history;
         if (history.length > 0) {
             const lastSample = history[history.length - 1];
@@ -402,7 +402,7 @@ class PerformanceMonitor {
         
         this.alerts.push(alert);
         
-        // Limiter à 50 alertes
+        // Limiter Ã  50 alertes
         if (this.alerts.length > 50) {
             this.alerts.shift();
         }
@@ -411,12 +411,12 @@ class PerformanceMonitor {
         const logMethod = level === 'error' ? 'error' : 'warn';
         this.logger[logMethod]('PerformanceMonitor', message);
         
-        // Émettre événement
+        // Ã‰mettre Ã©vÃ©nement
         this.eventBus.emitLow('performance:alert', alert);
     }
     
     checkThresholds() {
-        // Vérifier latence moyenne
+        // VÃ©rifier latence moyenne
         const avgBackendLatency = this.getAverageLatency('backend');
         if (avgBackendLatency > this.config.latencyThresholdMs) {
             this.addAlert('latency', 
@@ -441,7 +441,7 @@ class PerformanceMonitor {
     }
     
     /**
-     * Récupère toutes les métriques
+     * RÃ©cupÃ¨re toutes les mÃ©triques
      */
     getMetrics() {
         return {
@@ -479,7 +479,7 @@ class PerformanceMonitor {
     }
     
     /**
-     * Récupère un rapport formaté
+     * RÃ©cupÃ¨re un rapport formatÃ©
      */
     getReport() {
         const metrics = this.getMetrics();
@@ -512,7 +512,7 @@ Alerts: ${this.alerts.length}
     }
     
     cleanupHistory() {
-        // Supprimer les mesures non terminées anciennes (> 10s)
+        // Supprimer les mesures non terminÃ©es anciennes (> 10s)
         const now = performance.now();
         
         for (const [id, measurement] of this.measurements.entries()) {
@@ -525,7 +525,7 @@ Alerts: ${this.alerts.length}
     }
     
     /**
-     * Réinitialise toutes les métriques
+     * RÃ©initialise toutes les mÃ©triques
      */
     reset() {
         this.metrics = {
@@ -543,7 +543,7 @@ Alerts: ${this.alerts.length}
     }
     
     /**
-     * Affiche les métriques dans la console
+     * Affiche les mÃ©triques dans la console
      */
     logMetrics() {
         console.log(this.getReport());
@@ -572,7 +572,7 @@ window.PerformanceMonitor = PerformanceMonitor;
 // Initialisation
 const perfMonitor = new PerformanceMonitor(eventBus, logger);
 
-// Mesurer une opération
+// Mesurer une opÃ©ration
 perfMonitor.startMeasure('load_file', 'backend');
 await loadFile();
 const latency = perfMonitor.endMeasure('load_file');
@@ -584,7 +584,7 @@ const result = await perfMonitor.measureFunction(
     'complex_operation'
 );
 
-// Obtenir les métriques
+// Obtenir les mÃ©triques
 const metrics = perfMonitor.getMetrics();
 console.log('Backend latency:', metrics.latency.backend.average);
 console.log('FPS:', metrics.fps.current);
@@ -592,7 +592,7 @@ console.log('FPS:', metrics.fps.current);
 // Afficher un rapport
 perfMonitor.logMetrics();
 
-// Exporter les métriques
+// Exporter les mÃ©triques
 const json = perfMonitor.exportMetrics();
 */
 

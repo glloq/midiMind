@@ -4,9 +4,9 @@
 // ============================================================================
 
 class LoggerView {
-    constructor(container, eventBus) {
-        this.container = typeof container === 'string' ? 
-            document.getElementById(container) : container;
+    constructor(containerId, eventBus) {
+        this.container = typeof containerId === 'string' ? 
+            document.getElementById(containerId) : containerId;
         this.eventBus = eventBus;
         
         this.state = {
@@ -28,7 +28,7 @@ class LoggerView {
         this.container.innerHTML = `
             <div class="logger-view">
                 <div class="logger-header">
-                    <h2>📝 Logs système</h2>
+                    <h2>Ã°Å¸â€œÂ Logs systÃƒÂ¨me</h2>
                     <div class="logger-controls">
                         <select data-action="level">
                             <option value="debug" ${this.state.level === 'debug' ? 'selected' : ''}>Debug</option>

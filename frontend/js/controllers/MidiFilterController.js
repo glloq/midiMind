@@ -1,38 +1,38 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/MidiFilterController.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.1 - CORRECTION DOCUMENTATION
 // Date: 2025-10-29
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ Documentation corrigée - N'hérite PAS de BaseController
-// ✅ Architecture clarifiée - Standalone controller
+// âœ… Documentation corrigÃ©e - N'hÃ©rite PAS de BaseController
+// âœ… Architecture clarifiÃ©e - Standalone controller
 // ============================================================================
 // Description:
-//   Contrôleur de filtrage des messages MIDI en temps réel.
-//   Permet de filtrer par type de message, canal, vélocité, etc.
+//   ContrÃ´leur de filtrage des messages MIDI en temps rÃ©el.
+//   Permet de filtrer par type de message, canal, vÃ©locitÃ©, etc.
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Filtrage par type message (Note On/Off, CC, Program Change)
 //   - Filtrage par canal MIDI (1-16)
-//   - Filtrage par plage de vélocité
+//   - Filtrage par plage de vÃ©locitÃ©
 //   - Filtrage par plage de pitch
-//   - Filtres personnalisés (regex, callback)
+//   - Filtres personnalisÃ©s (regex, callback)
 //   - Presets de filtres sauvegardables
-//   - Statistiques de filtrage (messages bloqués/passés)
+//   - Statistiques de filtrage (messages bloquÃ©s/passÃ©s)
 //
 // Architecture:
 //   MidiFilterController - Standalone MIDI filter controller
-//   - Pipeline de filtres chainés
-//   - Cache de décisions de filtrage
-//   - Validation des règles de filtrage
-//   - Ne hérite PAS de BaseController (contrôleur léger)
+//   - Pipeline de filtres chainÃ©s
+//   - Cache de dÃ©cisions de filtrage
+//   - Validation des rÃ¨gles de filtrage
+//   - Ne hÃ©rite PAS de BaseController (contrÃ´leur lÃ©ger)
 //
 // Auteur: MidiMind Team
 // ============================================================================
 
 class MidiFilterController {
-    constructor(eventBus) {
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         this.eventBus = eventBus;
         
         // Filtres actifs
@@ -48,7 +48,7 @@ class MidiFilterController {
         };
 
         // Filtres par canal
-        this.channelFilters = new Set(); // Canaux dÃ©sactivÃ©s
+        this.channelFilters = new Set(); // Canaux dÃƒÂ©sactivÃƒÂ©s
 
         // Filtres par plage de notes
         this.noteRangeFilter = {
@@ -57,19 +57,19 @@ class MidiFilterController {
             max: 127
         };
 
-        // Filtres par vÃ©locitÃ©
+        // Filtres par vÃƒÂ©locitÃƒÂ©
         this.velocityFilter = {
             enabled: false,
             min: 1,
             max: 127
         };
 
-        // Filtres par CC spÃ©cifiques
-        this.ccFilters = new Set(); // CC Ã  filtrer
+        // Filtres par CC spÃƒÂ©cifiques
+        this.ccFilters = new Set(); // CC ÃƒÂ  filtrer
     }
 
     /**
-     * Active/dÃ©sactive un type de message
+     * Active/dÃƒÂ©sactive un type de message
      */
     setMessageTypeFilter(type, enabled) {
         if (type in this.filters) {
@@ -81,7 +81,7 @@ class MidiFilterController {
     }
 
     /**
-     * Active/dÃ©sactive un canal
+     * Active/dÃƒÂ©sactive un canal
      */
     setChannelFilter(channel, enabled) {
         if (enabled) {
@@ -93,7 +93,7 @@ class MidiFilterController {
     }
 
     /**
-     * DÃ©finit le filtre de plage de notes
+     * DÃƒÂ©finit le filtre de plage de notes
      */
     setNoteRangeFilter(enabled, min = 0, max = 127) {
         this.noteRangeFilter = {
@@ -105,7 +105,7 @@ class MidiFilterController {
     }
 
     /**
-     * DÃ©finit le filtre de vÃ©locitÃ©
+     * DÃƒÂ©finit le filtre de vÃƒÂ©locitÃƒÂ©
      */
     setVelocityFilter(enabled, min = 1, max = 127) {
         this.velocityFilter = {
@@ -117,7 +117,7 @@ class MidiFilterController {
     }
 
     /**
-     * Active/dÃ©sactive le filtrage d'un CC spÃ©cifique
+     * Active/dÃƒÂ©sactive le filtrage d'un CC spÃƒÂ©cifique
      */
     setCCFilter(ccNumber, enabled) {
         if (enabled) {
@@ -129,7 +129,7 @@ class MidiFilterController {
     }
 
     /**
-     * Filtre un Ã©vÃ©nement MIDI
+     * Filtre un ÃƒÂ©vÃƒÂ©nement MIDI
      */
     filterEvent(event) {
         // Filtre par type
@@ -151,7 +151,7 @@ class MidiFilterController {
                 }
             }
 
-            // Filtre par vÃ©locitÃ©
+            // Filtre par vÃƒÂ©locitÃƒÂ©
             if (event.type === 'noteOn' && this.velocityFilter.enabled) {
                 if (event.velocity < this.velocityFilter.min || 
                     event.velocity > this.velocityFilter.max) {
@@ -160,7 +160,7 @@ class MidiFilterController {
             }
         }
 
-        // Filtre par CC spÃ©cifique
+        // Filtre par CC spÃƒÂ©cifique
         if (event.type === 'cc' && this.ccFilters.has(event.controller)) {
             return false;
         }
@@ -169,14 +169,14 @@ class MidiFilterController {
     }
 
     /**
-     * Filtre une timeline complÃ¨te
+     * Filtre une timeline complÃƒÂ¨te
      */
     filterTimeline(timeline) {
         return timeline.filter(event => this.filterEvent(event));
     }
 
     /**
-     * RÃ©initialise tous les filtres
+     * RÃƒÂ©initialise tous les filtres
      */
     resetFilters() {
         this.filters = {
@@ -231,7 +231,7 @@ class MidiFilterController {
     }
 
     /**
-     * Ã‰met un Ã©vÃ©nement de changement de filtre
+     * Ãƒâ€°met un ÃƒÂ©vÃƒÂ©nement de changement de filtre
      */
     emitFilterChanged() {
         this.eventBus.emit('filter:changed', {
@@ -279,7 +279,7 @@ class MidiFilterController {
     }
 
     /**
-     * Obtient toutes les configurations sauvegardÃ©es
+     * Obtient toutes les configurations sauvegardÃƒÂ©es
      */
     getSavedConfigurations() {
         return JSON.parse(localStorage.getItem('midiFilterConfigs') || '[]');

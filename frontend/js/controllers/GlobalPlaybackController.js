@@ -26,7 +26,7 @@ class GlobalPlaybackController {
         return GlobalPlaybackController.instance;
     }
     
-    constructor(eventBus, backend, fileModel, logger) {
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         if (GlobalPlaybackController.instance) {
             return GlobalPlaybackController.instance;
         }

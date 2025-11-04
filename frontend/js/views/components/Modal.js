@@ -5,7 +5,7 @@
 
 class Modal {
     constructor(eventBus) {
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.container = null;
         this.isOpen = false;
     }

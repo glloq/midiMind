@@ -1,12 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/utils/Logger.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.1 - FIXED GLOBAL EXPOSURE
 // Date: 2025-10-22
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ Exposition globale explicite de la classe Logger
-// ✅ Vérification de disponibilité window
+// âœ… Exposition globale explicite de la classe Logger
+// âœ… VÃ©rification de disponibilitÃ© window
 // ============================================================================
 
 class Logger {
@@ -36,7 +36,7 @@ class Logger {
             timestampFormat: config.timestampFormat || 'HH:mm:ss.SSS'
         };
         
-        this.eventBus = config.eventBus || null;
+        this.eventBus = config.eventBus || window.eventBus || null;
         this.currentLevel = this._getLevelValue(this.config.level);
         this.history = [];
         this.stats = {
@@ -86,7 +86,7 @@ class Logger {
         
         const formatted = this._formatMessage(level, category, message, data);
         
-        // Ajouter à l'historique
+        // Ajouter Ã  l'historique
         this.history.push({
             level: levelName,
             category,
@@ -110,7 +110,7 @@ class Logger {
             console[consoleMethod](`%c${formatted}`, `color: ${color}`);
         }
         
-        // Émettre événement
+        // Ã‰mettre Ã©vÃ©nement
         if (this.config.enableEventBus && this.eventBus) {
             this.eventBus.emit('log', {
                 level: levelName,
@@ -162,7 +162,7 @@ class Logger {
 // ============================================================================
 if (typeof window !== 'undefined') {
     window.logger = Logger;
-    console.log('✓ Logger class exposed globally');
+    console.log('âœ“ Logger class exposed globally');
 }
 window.logger = Logger;
 // ============================================================================

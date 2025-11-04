@@ -2,20 +2,20 @@
 // Fichier: frontend/js/services/StorageService.js
 // Version: v3.0.1 - LOGGER PROTECTION
 // Date: 2025-10-30
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// ✅ CRITIQUE: Protection complète contre logger undefined
-// ✅ Fallback sur console si logger non disponible
-// ✅ Vérification avant CHAQUE appel logger
+// âœ… CRITIQUE: Protection complÃ¨te contre logger undefined
+// âœ… Fallback sur console si logger non disponible
+// âœ… VÃ©rification avant CHAQUE appel logger
 // ============================================================================
 
 class StorageService {
     constructor(eventBus, logger) {
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger || console;
         
-        // Préfixe pour toutes les clés
+        // PrÃ©fixe pour toutes les clÃ©s
         this.prefix = 'midiMind_';
         
         // Configuration
@@ -31,7 +31,7 @@ class StorageService {
         // Timer d'auto-sauvegarde
         this.autoSaveTimer = null;
         
-        // Cache mémoire pour optimisation
+        // Cache mÃ©moire pour optimisation
         this.memoryCache = new Map();
         
         // Statistiques
@@ -52,29 +52,29 @@ class StorageService {
     initialize() {
         this.log('info', 'StorageService', 'Initializing storage service...');
         
-        // Vérifier la disponibilité du localStorage
+        // VÃ©rifier la disponibilitÃ© du localStorage
         if (!this.isStorageAvailable()) {
             this.log('error', 'StorageService', 'LocalStorage is not available');
             return;
         }
         
-        // Migrer les données si nécessaire
+        // Migrer les donnÃ©es si nÃ©cessaire
         this.migrateData();
         
-        // Calculer l'espace utilisé
+        // Calculer l'espace utilisÃ©
         this.calculateStorageUsage();
         
-        // Démarrer l'auto-sauvegarde
+        // DÃ©marrer l'auto-sauvegarde
         if (this.config.autoSave) {
             this.startAutoSave();
         }
         
-        // Écouter les événements
+        // Ã‰couter les Ã©vÃ©nements
         this.bindEvents();
     }
     
     /**
-     * Log sécurisé
+     * Log sÃ©curisÃ©
      */
     log(level, ...args) {
         if (this.logger && typeof this.logger[level] === 'function') {
@@ -85,12 +85,12 @@ class StorageService {
     }
     
     bindEvents() {
-        // Sauvegarder avant fermeture de la fenêtre
+        // Sauvegarder avant fermeture de la fenÃªtre
         window.addEventListener('beforeunload', () => {
             this.saveAll();
         });
         
-        // Écouter les changements d'état importants
+        // Ã‰couter les changements d'Ã©tat importants
         if (this.eventBus) {
             this.eventBus.on('state:changed', (data) => {
                 if (this.config.autoSave) {
@@ -105,7 +105,7 @@ class StorageService {
     }
     
     // ========================================================================
-    // OPÉRATIONS DE BASE
+    // OPÃ‰RATIONS DE BASE
     // ========================================================================
     
     /**
@@ -115,7 +115,7 @@ class StorageService {
         try {
             const fullKey = this.prefix + key;
             
-            // Préparer les données
+            // PrÃ©parer les donnÃ©es
             const data = {
                 value: value,
                 timestamp: Date.now(),
@@ -123,14 +123,14 @@ class StorageService {
                 compressed: false
             };
             
-            // Compression si activée et données volumineuses
+            // Compression si activÃ©e et donnÃ©es volumineuses
             let serialized = JSON.stringify(data);
             if (this.config.compressionEnabled && serialized.length > 1024) {
                 serialized = this.compress(serialized);
                 data.compressed = true;
             }
             
-            // Vérifier la taille
+            // VÃ©rifier la taille
             if (serialized.length > this.config.maxStorageSize) {
                 throw new Error('Data too large for storage');
             }
@@ -138,13 +138,13 @@ class StorageService {
             // Sauvegarder
             localStorage.setItem(fullKey, serialized);
             
-            // Mettre à jour le cache mémoire
+            // Mettre Ã  jour le cache mÃ©moire
             this.memoryCache.set(key, value);
             
             this.stats.writes++;
             this.log('debug', 'StorageService', `Saved: ${key}`);
             
-            // Émettre un événement
+            // Ã‰mettre un Ã©vÃ©nement
             if (this.eventBus) {
                 this.eventBus.emit('storage:saved', { key, size: serialized.length });
             }
@@ -155,10 +155,10 @@ class StorageService {
             this.stats.errors++;
             this.log('error', 'StorageService', `Failed to save ${key}:`, error);
             
-            // Essayer de libérer de l'espace si quota dépassé
+            // Essayer de libÃ©rer de l'espace si quota dÃ©passÃ©
             if (error.name === 'QuotaExceededError') {
                 this.cleanupOldData();
-                // Réessayer une fois
+                // RÃ©essayer une fois
                 try {
                     localStorage.setItem(this.prefix + key, JSON.stringify(value));
                     return true;
@@ -176,7 +176,7 @@ class StorageService {
      */
     load(key, defaultValue = null) {
         try {
-            // Vérifier le cache mémoire d'abord
+            // VÃ©rifier le cache mÃ©moire d'abord
             if (this.memoryCache.has(key)) {
                 this.stats.reads++;
                 return this.memoryCache.get(key);
@@ -189,17 +189,17 @@ class StorageService {
                 return defaultValue;
             }
             
-            // Décompresser si nécessaire
+            // DÃ©compresser si nÃ©cessaire
             let parsed;
             try {
                 parsed = JSON.parse(stored);
             } catch (e) {
-                // Données peut-être compressées
+                // DonnÃ©es peut-Ãªtre compressÃ©es
                 const decompressed = this.decompress(stored);
                 parsed = JSON.parse(decompressed);
             }
             
-            // Vérifier la version
+            // VÃ©rifier la version
             if (parsed.version && parsed.version !== this.config.version) {
                 this.log('warn', 'StorageService', `Version mismatch for ${key}`);
             }
@@ -238,39 +238,39 @@ class StorageService {
     }
     
     /**
-     * Vérifier si une clé existe
+     * VÃ©rifier si une clÃ© existe
      */
     exists(key) {
         return localStorage.getItem(this.prefix + key) !== null;
     }
     
     // ========================================================================
-    // OPÉRATIONS SPÉCIFIQUES
+    // OPÃ‰RATIONS SPÃ‰CIFIQUES
     // ========================================================================
     
     /**
-     * Sauvegarder l'état global de l'application
+     * Sauvegarder l'Ã©tat global de l'application
      */
     saveState(state) {
         return this.save('appState', state);
     }
     
     /**
-     * Charger l'état global de l'application
+     * Charger l'Ã©tat global de l'application
      */
     loadState() {
         return this.load('appState', {});
     }
     
     /**
-     * Sauvegarder les préférences utilisateur
+     * Sauvegarder les prÃ©fÃ©rences utilisateur
      */
     savePreferences(preferences) {
         return this.save('preferences', preferences);
     }
     
     /**
-     * Charger les préférences utilisateur
+     * Charger les prÃ©fÃ©rences utilisateur
      */
     loadPreferences() {
         return this.load('preferences', {});
@@ -300,7 +300,7 @@ class StorageService {
     }
     
     autoSave() {
-        // Sauvegarder l'état actuel si disponible
+        // Sauvegarder l'Ã©tat actuel si disponible
         if (window.app && window.app.getState) {
             const state = window.app.getState();
             this.saveState(state);
@@ -310,7 +310,7 @@ class StorageService {
     }
     
     /**
-     * Sauvegarder toutes les données en mémoire
+     * Sauvegarder toutes les donnÃ©es en mÃ©moire
      */
     saveAll() {
         let saved = 0;
@@ -330,7 +330,7 @@ class StorageService {
     // ========================================================================
     
     compress(str) {
-        // Implémentation simple - pour vraie compression utiliser pako
+        // ImplÃ©mentation simple - pour vraie compression utiliser pako
         return str;
     }
     
@@ -400,7 +400,7 @@ class StorageService {
             }
         }
         
-        // Trier par ancienneté
+        // Trier par anciennetÃ©
         items.sort((a, b) => a.timestamp - b.timestamp);
         
         // Supprimer les 25% plus anciens
@@ -421,7 +421,7 @@ class StorageService {
         const currentVersion = localStorage.getItem(versionKey);
         
         if (!currentVersion) {
-            // Première installation
+            // PremiÃ¨re installation
             localStorage.setItem(versionKey, this.config.version);
             return;
         }

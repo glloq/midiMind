@@ -1,23 +1,28 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/RoutingController.js
-// Chemin rÃ©el: frontend/js/controllers/RoutingController.js
-// Version: v4.2.2 - API CORRECTED (CRITICAL FIXES)
+// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/controllers/RoutingController.js
+// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED (CRITICAL FIXES)
 // Date: 2025-11-02
 // ============================================================================
+// CORRECTIONS v4.2.3:
+// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
+// âœ… Fix: super() appelle BaseController avec backend
+// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ============================================================================
+// ============================================================================
 // CORRECTIONS v4.2.2 CRITIQUES:
-// âœ… routing_id (pas id)
-// âœ… source_id, dest_id, device_id (snake_case)
-// âœ… route_id pour enable/disable
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ routing_id (pas id)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ source_id, dest_id, device_id (snake_case)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ route_id pour enable/disable
 // 
-// NOTE: Fichier simplifiÃ© - Contient uniquement les corrections critiques API.
-// Les fonctionnalitÃ©s avancÃ©es (transformations, presets) nÃ©cessitent adaptation complÃ¨te.
+// NOTE: Fichier simplifiÃƒÆ’Ã‚Â© - Contient uniquement les corrections critiques API.
+// Les fonctionnalitÃƒÆ’Ã‚Â©s avancÃƒÆ’Ã‚Â©es (transformations, presets) nÃƒÆ’Ã‚Â©cessitent adaptation complÃƒÆ’Ã‚Â¨te.
 // ============================================================================
 
 class RoutingController extends BaseController {
-    constructor(eventBus, models, views, notifications, debugConsole) {
-        super(eventBus, models, views, notifications, debugConsole);
-        
-        this.backend = window.app?.services?.backend || window.backendService;
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
+        // âœ… this.backend initialisÃ© automatiquement par BaseController
         this.logger = window.logger || console;
         this.model = models.routing;
         this.view = views.routing;
@@ -44,7 +49,7 @@ class RoutingController extends BaseController {
     }
     
     async initialize() {
-        // ✅ FIX: Initialiser localState si appelé avant fin du constructor
+        // Ã¢Å“â€¦ FIX: Initialiser localState si appelÃƒÂ© avant fin du constructor
         if (!this.localState) {
             this.localState = {
                 isInitialized: false,
@@ -67,7 +72,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * âœ… CORRECTION: Charge routes depuis backend
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: Charge routes depuis backend
      */
     async loadRoutes() {
         if (!this.backend?.isConnected()) return;
@@ -91,7 +96,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * âœ… CORRECTION: Ajoute route avec source_id, dest_id
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: Ajoute route avec source_id, dest_id
      */
     async addRoute(params) {
         const { source_id, dest_id, filters = {} } = params;
@@ -105,7 +110,7 @@ class RoutingController extends BaseController {
             
             await this.loadRoutes();
             
-            this.notifications?.success('Route added', `Route ${source_id} â†’ ${dest_id}`);
+            this.notifications?.success('Route added', `Route ${source_id} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${dest_id}`);
             
             return response;
             
@@ -117,7 +122,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * âœ… CORRECTION: Utilise route_id
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: Utilise route_id
      */
     async removeRoute(route_id) {
         if (!this.backend?.isConnected()) {
@@ -139,7 +144,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * âœ… CORRECTION: Active route avec route_id
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: Active route avec route_id
      */
     async enableRoute(route_id) {
         if (!this.backend?.isConnected()) {
@@ -161,7 +166,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * âœ… CORRECTION: DÃ©sactive route avec route_id
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: DÃƒÆ’Ã‚Â©sactive route avec route_id
      */
     async disableRoute(route_id) {
         if (!this.backend?.isConnected()) {

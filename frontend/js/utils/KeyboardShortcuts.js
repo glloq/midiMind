@@ -1,6 +1,6 @@
 // ============================================================================
 // Fichier: frontend/js/utils/KeyboardShortcuts.js
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
@@ -8,16 +8,16 @@
 //   Gestionnaire global des raccourcis clavier de l'application.
 //   Support Ctrl, Shift, Alt, combinaisons complexes.
 //
-// Fonctionnalités:
+// FonctionnalitÃ©s:
 //   - Enregistrement raccourcis (key + modifiers)
 //   - Contextes (global, editor, playlist)
-//   - Désactivation temporaire
-//   - Conflits détectés automatiquement
+//   - DÃ©sactivation temporaire
+//   - Conflits dÃ©tectÃ©s automatiquement
 //   - Help modal (Ctrl+?) avec tous raccourcis
 //   - Personnalisation utilisateur
-//   - Sauvegarde préférences
+//   - Sauvegarde prÃ©fÃ©rences
 //
-// Raccourcis par défaut:
+// Raccourcis par dÃ©faut:
 //   - Ctrl+S : Save
 //   - Ctrl+Z/Y : Undo/Redo
 //   - Space : Play/Pause
@@ -27,7 +27,7 @@
 //
 // Architecture:
 //   KeyboardShortcuts (classe singleton)
-//   - Map de raccourcis (key combo → callback)
+//   - Map de raccourcis (key combo â†’ callback)
 //   - Event listener global (keydown)
 //   - Priority system (prevent conflicts)
 //
@@ -36,13 +36,13 @@
 
 class KeyboardShortcuts {
     constructor(eventBus, logger) {
-        this.eventBus = eventBus;
+        this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger;
         
-        // Map des raccourcis enregistrés
+        // Map des raccourcis enregistrÃ©s
         this.shortcuts = new Map();
         
-        // État des touches modificatrices
+        // Ã‰tat des touches modificatrices
         this.modifiers = {
             ctrl: false,
             shift: false,
@@ -59,7 +59,7 @@ class KeyboardShortcuts {
             debugMode: false
         };
         
-        // Raccourcis par défaut
+        // Raccourcis par dÃ©faut
         this.defaultShortcuts = {
             // Lecture
             'space': {
@@ -100,7 +100,7 @@ class KeyboardShortcuts {
             },
             'home': {
                 action: 'playback:seek-start',
-                description: 'Début'
+                description: 'DÃ©but'
             },
             'end': {
                 action: 'playback:seek-end',
@@ -158,7 +158,7 @@ class KeyboardShortcuts {
             },
             'ctrl+5': {
                 action: 'navigation:system',
-                description: 'Système'
+                description: 'SystÃ¨me'
             },
             
             // Fichiers
@@ -176,11 +176,11 @@ class KeyboardShortcuts {
             },
             'delete': {
                 action: 'file:delete-selected',
-                description: 'Supprimer sélection'
+                description: 'Supprimer sÃ©lection'
             },
             'ctrl+a': {
                 action: 'file:select-all',
-                description: 'Tout sélectionner'
+                description: 'Tout sÃ©lectionner'
             },
             
             // Playlist
@@ -194,15 +194,15 @@ class KeyboardShortcuts {
             },
             'shift+n': {
                 action: 'playlist:previous',
-                description: 'Précédent'
+                description: 'PrÃ©cÃ©dent'
             },
             'r': {
                 action: 'playlist:repeat',
-                description: 'Répéter'
+                description: 'RÃ©pÃ©ter'
             },
             'shift+r': {
                 action: 'playlist:shuffle',
-                description: 'Aléatoire'
+                description: 'AlÃ©atoire'
             },
             
             // Routage
@@ -222,7 +222,7 @@ class KeyboardShortcuts {
             // Interface
             'f11': {
                 action: 'ui:fullscreen',
-                description: 'Plein écran'
+                description: 'Plein Ã©cran'
             },
             'ctrl+d': {
                 action: 'ui:toggle-debug',
@@ -252,11 +252,11 @@ class KeyboardShortcuts {
             },
             'f3': {
                 action: 'search:next',
-                description: 'Résultat suivant'
+                description: 'RÃ©sultat suivant'
             },
             'shift+f3': {
                 action: 'search:previous',
-                description: 'Résultat précédent'
+                description: 'RÃ©sultat prÃ©cÃ©dent'
             },
             
             // Aide
@@ -287,13 +287,13 @@ class KeyboardShortcuts {
     init() {
         this.logger.info('KeyboardShortcuts', 'Initializing keyboard shortcuts...');
         
-        // Enregistrer les raccourcis par défaut
+        // Enregistrer les raccourcis par dÃ©faut
         this.registerDefaultShortcuts();
         
-        // Attacher les événements
+        // Attacher les Ã©vÃ©nements
         this.attachEvents();
         
-        // Écouter les changements de configuration
+        // Ã‰couter les changements de configuration
         this.eventBus.on('shortcuts:enable', () => this.enable());
         this.eventBus.on('shortcuts:disable', () => this.disable());
         this.eventBus.on('shortcuts:register', (data) => this.register(data.key, data.action, data.options));
@@ -301,7 +301,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Enregistrer les raccourcis par défaut
+     * Enregistrer les raccourcis par dÃ©faut
      */
     registerDefaultShortcuts() {
         Object.entries(this.defaultShortcuts).forEach(([key, config]) => {
@@ -316,7 +316,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Attacher les événements clavier
+     * Attacher les Ã©vÃ©nements clavier
      */
     attachEvents() {
         // Keydown
@@ -330,18 +330,18 @@ class KeyboardShortcuts {
     }
     
     // ========================================================================
-    // GESTION DES ÉVÉNEMENTS
+    // GESTION DES Ã‰VÃ‰NEMENTS
     // ========================================================================
     
     /**
-     * Gérer l'appui sur une touche
+     * GÃ©rer l'appui sur une touche
      */
     handleKeyDown(event) {
         if (!this.config.enabled) return;
         
         this.stats.totalPressed++;
         
-        // Mettre à jour les modificateurs
+        // Mettre Ã  jour les modificateurs
         this.updateModifiers(event);
         
         // Ignorer si dans un input/textarea (sauf si global)
@@ -365,7 +365,7 @@ class KeyboardShortcuts {
         const shortcut = this.shortcuts.get(keyCombo.toLowerCase());
         
         if (shortcut) {
-            // Empêcher l'action par défaut si configuré
+            // EmpÃªcher l'action par dÃ©faut si configurÃ©
             if (this.config.preventDefault) {
                 event.preventDefault();
             }
@@ -374,21 +374,21 @@ class KeyboardShortcuts {
                 event.stopPropagation();
             }
             
-            // Exécuter l'action
+            // ExÃ©cuter l'action
             this.executeShortcut(shortcut, event);
         }
     }
     
     /**
-     * Gérer le relâchement d'une touche
+     * GÃ©rer le relÃ¢chement d'une touche
      */
     handleKeyUp(event) {
-        // Mettre à jour les modificateurs
+        // Mettre Ã  jour les modificateurs
         this.updateModifiers(event);
     }
     
     /**
-     * Mettre à jour l'état des modificateurs
+     * Mettre Ã  jour l'Ã©tat des modificateurs
      */
     updateModifiers(event) {
         this.modifiers.ctrl = event.ctrlKey;
@@ -398,7 +398,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Réinitialiser les modificateurs
+     * RÃ©initialiser les modificateurs
      */
     resetModifiers() {
         this.modifiers = {
@@ -410,11 +410,11 @@ class KeyboardShortcuts {
     }
     
     // ========================================================================
-    // EXÉCUTION DES RACCOURCIS
+    // EXÃ‰CUTION DES RACCOURCIS
     // ========================================================================
     
     /**
-     * Exécuter un raccourci
+     * ExÃ©cuter un raccourci
      */
     executeShortcut(shortcut, event) {
         this.stats.shortcutsTriggered++;
@@ -422,14 +422,14 @@ class KeyboardShortcuts {
         
         this.logger.debug('KeyboardShortcuts', `Executing shortcut: ${shortcut.action}`);
         
-        // Émettre l'événement avec les paramètres
+        // Ã‰mettre l'Ã©vÃ©nement avec les paramÃ¨tres
         this.eventBus.emit(shortcut.action, {
             ...shortcut.params,
             event: event,
             shortcut: shortcut
         });
         
-        // Callback personnalisé si défini
+        // Callback personnalisÃ© si dÃ©fini
         if (shortcut.callback && typeof shortcut.callback === 'function') {
             shortcut.callback(event, shortcut.params);
         }
@@ -451,7 +451,7 @@ class KeyboardShortcuts {
     /**
      * Enregistrer un nouveau raccourci
      * @param {string} key - Combinaison de touches (ex: "ctrl+s", "shift+enter")
-     * @param {string|Function} action - Action à exécuter ou callback
+     * @param {string|Function} action - Action Ã  exÃ©cuter ou callback
      * @param {Object} options - Options du raccourci
      */
     register(key, action, options = {}) {
@@ -468,7 +468,7 @@ class KeyboardShortcuts {
             enabled: options.enabled !== false
         };
         
-        // Vérifier les conflits
+        // VÃ©rifier les conflits
         if (this.shortcuts.has(normalizedKey) && !options.override) {
             this.logger.warn('KeyboardShortcuts', 
                 `Shortcut ${normalizedKey} already registered. Use override option to replace.`);
@@ -483,7 +483,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Désenregistrer un raccourci
+     * DÃ©senregistrer un raccourci
      * @param {string} key - Combinaison de touches
      */
     unregister(key) {
@@ -499,7 +499,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Activer/Désactiver un raccourci
+     * Activer/DÃ©sactiver un raccourci
      */
     toggleShortcut(key, enabled) {
         const normalizedKey = this.normalizeKey(key);
@@ -514,7 +514,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Obtenir tous les raccourcis enregistrés
+     * Obtenir tous les raccourcis enregistrÃ©s
      */
     getShortcuts() {
         return Array.from(this.shortcuts.entries()).map(([key, shortcut]) => ({
@@ -524,7 +524,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Obtenir les raccourcis par catégorie
+     * Obtenir les raccourcis par catÃ©gorie
      */
     getShortcutsByCategory() {
         const categories = {};
@@ -546,7 +546,7 @@ class KeyboardShortcuts {
     }
     
     // ========================================================================
-    // ACTIVATION/DÉSACTIVATION
+    // ACTIVATION/DÃ‰SACTIVATION
     // ========================================================================
     
     /**
@@ -559,7 +559,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Désactiver les raccourcis clavier
+     * DÃ©sactiver les raccourcis clavier
      */
     disable() {
         this.config.enabled = false;
@@ -568,7 +568,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Basculer l'état des raccourcis
+     * Basculer l'Ã©tat des raccourcis
      */
     toggle() {
         if (this.config.enabled) {
@@ -583,7 +583,7 @@ class KeyboardShortcuts {
     // ========================================================================
     
     /**
-     * Obtenir la combinaison de touches depuis un événement
+     * Obtenir la combinaison de touches depuis un Ã©vÃ©nement
      */
     getKeyCombo(event) {
         const parts = [];
@@ -604,7 +604,7 @@ class KeyboardShortcuts {
      * Obtenir le nom de la touche
      */
     getKeyName(event) {
-        // Touches spéciales
+        // Touches spÃ©ciales
         const specialKeys = {
             ' ': 'space',
             'Enter': 'enter',
@@ -623,7 +623,7 @@ class KeyboardShortcuts {
             'Insert': 'insert'
         };
         
-        // Vérifier les touches spéciales
+        // VÃ©rifier les touches spÃ©ciales
         if (specialKeys[event.key]) {
             return specialKeys[event.key];
         }
@@ -643,7 +643,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Normaliser une clé de raccourci
+     * Normaliser une clÃ© de raccourci
      */
     normalizeKey(key) {
         return key.toLowerCase()
@@ -667,7 +667,7 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Vérifier si l'élément cible est un input
+     * VÃ©rifier si l'Ã©lÃ©ment cible est un input
      */
     isInInput(element) {
         const tagName = element.tagName.toLowerCase();
@@ -703,7 +703,7 @@ class KeyboardShortcuts {
         
         html += '</div>';
         
-        // Émettre l'événement pour afficher l'aide
+        // Ã‰mettre l'Ã©vÃ©nement pour afficher l'aide
         this.eventBus.emit('modal:show', {
             title: 'Raccourcis clavier',
             content: html,
@@ -712,22 +712,22 @@ class KeyboardShortcuts {
     }
     
     /**
-     * Formater le nom de catégorie
+     * Formater le nom de catÃ©gorie
      */
     formatCategoryName(category) {
         const names = {
-            'playback': '▶️ Lecture',
-            'volume': '🔊 Volume',
-            'tempo': '⏱️ Tempo',
-            'navigation': '🧭 Navigation',
-            'file': '📁 Fichiers',
-            'playlist': '📋 Playlist',
-            'routing': '🔀 Routage',
-            'ui': '🖼️ Interface',
-            'edit': '✏️ Édition',
-            'search': '🔍 Recherche',
-            'help': '❓ Aide',
-            'other': '📌 Autres'
+            'playback': 'â–¶ï¸ Lecture',
+            'volume': 'ðŸ”Š Volume',
+            'tempo': 'â±ï¸ Tempo',
+            'navigation': 'ðŸ§­ Navigation',
+            'file': 'ðŸ“ Fichiers',
+            'playlist': 'ðŸ“‹ Playlist',
+            'routing': 'ðŸ”€ Routage',
+            'ui': 'ðŸ–¼ï¸ Interface',
+            'edit': 'âœï¸ Ã‰dition',
+            'search': 'ðŸ” Recherche',
+            'help': 'â“ Aide',
+            'other': 'ðŸ“Œ Autres'
         };
         
         return names[category] || category;
@@ -746,12 +746,12 @@ class KeyboardShortcuts {
                     case 'shift': return 'Shift';
                     case 'alt': return 'Alt';
                     case 'space': return 'Espace';
-                    case 'enter': return 'Entrée';
-                    case 'escape': return 'Échap';
-                    case 'arrowup': return '↑';
-                    case 'arrowdown': return '↓';
-                    case 'arrowleft': return '←';
-                    case 'arrowright': return '→';
+                    case 'enter': return 'EntrÃ©e';
+                    case 'escape': return 'Ã‰chap';
+                    case 'arrowup': return 'â†‘';
+                    case 'arrowdown': return 'â†“';
+                    case 'arrowleft': return 'â†';
+                    case 'arrowright': return 'â†’';
                     default: return part.toUpperCase();
                 }
             })
