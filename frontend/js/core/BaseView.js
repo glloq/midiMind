@@ -1,11 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseView.js
-// Version: v3.2.1 - FIXED LOG METHOD
-// Date: 2025-11-02
+// Version: v3.3.0 - FIXED LOG METHOD
+// Date: 2025-11-04
 // ============================================================================
 // CORRECTIONS v3.2.1:
-// Ã¢Å“â€¦ Ajout mÃƒÂ©thode log() manquante (flexible signature)
-// Ã¢Å“â€¦ Compatible avec FileView et autres vues
+// CORRECTIONS v3.3.0:
+// ✦ Ajout méthode async init() pour compatibilité avec FileView/KeyboardView
+// ✦ Hook onInit() pour initialisation asynchrone
+// ============================================================================
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ajout mÃƒÆ’Ã‚Â©thode log() manquante (flexible signature)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Compatible avec FileView et autres vues
 // ============================================================================
 
 /**
@@ -15,14 +19,14 @@
 class BaseView {
     /**
      * Constructeur de la vue de base
-     * @param {string|HTMLElement} containerId - ID du conteneur ou ÃƒÂ©lÃƒÂ©ment DOM
-     * @param {EventBus} eventBus - Bus d'ÃƒÂ©vÃƒÂ©nements global
+     * @param {string|HTMLElement} containerId - ID du conteneur ou ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment DOM
+     * @param {EventBus} eventBus - Bus d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements global
      */
     constructor(containerId, eventBus) {
-        // RÃƒÂ©soudre le conteneur
+        // RÃƒÆ’Ã‚Â©soudre le conteneur
         this.container = this.resolveContainer(containerId);
         
-        // Ã¢Å“â€¦ CRITIQUE: EventBus avec fallback robuste
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: EventBus avec fallback robuste
         this.eventBus = eventBus || window.eventBus || null;
         
         // Validation EventBus
@@ -33,12 +37,12 @@ class BaseView {
         // Formatter (utilise global si disponible)
         this.formatter = window.Formatter || null;
         
-        // Template et donnÃƒÂ©es
-        this.template = ''; // Template HTML de base (ÃƒÂ  surcharger)
-        this.data = {}; // DonnÃƒÂ©es actuelles de la vue
-        this.previousData = {}; // DonnÃƒÂ©es prÃƒÂ©cÃƒÂ©dentes pour comparaison
+        // Template et donnÃƒÆ’Ã‚Â©es
+        this.template = ''; // Template HTML de base (ÃƒÆ’Ã‚Â  surcharger)
+        this.data = {}; // DonnÃƒÆ’Ã‚Â©es actuelles de la vue
+        this.previousData = {}; // DonnÃƒÆ’Ã‚Â©es prÃƒÆ’Ã‚Â©cÃƒÆ’Ã‚Â©dentes pour comparaison
         
-        // Ãƒâ€°tat de la vue
+        // ÃƒÆ’Ã¢â‚¬Â°tat de la vue
         this.state = {
             isVisible: false,
             isRendered: false,
@@ -56,7 +60,7 @@ class BaseView {
             name: this.constructor.name
         };
         
-        // Gestionnaires d'ÃƒÂ©vÃƒÂ©nements
+        // Gestionnaires d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
         this.eventHandlers = new Map();
         this.domEventListeners = [];
         
@@ -64,7 +68,7 @@ class BaseView {
         this.renderCache = new Map();
         this.renderQueue = null;
         
-        // Ãƒâ€°lÃƒÂ©ments DOM cachÃƒÂ©s pour performance
+        // ÃƒÆ’Ã¢â‚¬Â°lÃƒÆ’Ã‚Â©ments DOM cachÃƒÆ’Ã‚Â©s pour performance
         this.elements = {};
         
         // Hooks de cycle de vie
@@ -79,7 +83,7 @@ class BaseView {
             afterDestroy: []
         };
         
-        // Logger par dÃƒÂ©faut
+        // Logger par dÃƒÆ’Ã‚Â©faut
         this.logger = window.logger || console;
     }
     
@@ -96,7 +100,7 @@ class BaseView {
             return;
         }
         
-        // Hook personnalisÃƒÂ©
+        // Hook personnalisÃƒÆ’Ã‚Â©
         if (typeof this.onInitialize === 'function') {
             this.onInitialize();
         }
@@ -108,13 +112,29 @@ class BaseView {
     }
     
     /**
-     * RÃƒÂ©sout le conteneur DOM
-     * @param {string|HTMLElement} containerId - ID ou ÃƒÂ©lÃƒÂ©ment
+     * Méthode init() async pour compatibilité
+     * Alias de initialize() mais async pour les vues qui en ont besoin
+     */
+    async init() {
+        // Appeler initialize() si elle existe
+        if (typeof this.initialize === 'function' && this.initialize !== this.init) {
+            this.initialize();
+        }
+        
+        // Hook pour initialisation async
+        if (typeof this.onInit === 'function') {
+            await this.onInit();
+        }
+    }
+    
+    /**
+     * RÃƒÆ’Ã‚Â©sout le conteneur DOM
+     * @param {string|HTMLElement} containerId - ID ou ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment
      * @returns {HTMLElement|null}
      */
     resolveContainer(containerId) {
         if (typeof containerId === 'string') {
-            // ID ou sÃƒÂ©lecteur
+            // ID ou sÃƒÆ’Ã‚Â©lecteur
             let element = document.getElementById(containerId);
             if (!element) {
                 element = document.querySelector(containerId);
@@ -127,7 +147,7 @@ class BaseView {
     }
     
     /**
-     * DÃƒÂ©truit la vue
+     * DÃƒÆ’Ã‚Â©truit la vue
      */
     destroy() {
         if (this.state.isDestroyed) {
@@ -136,7 +156,7 @@ class BaseView {
         
         this.runHooks('beforeDestroy');
         
-        // Nettoyer les ÃƒÂ©vÃƒÂ©nements DOM
+        // Nettoyer les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM
         this.removeAllEventListeners();
         
         // Nettoyer les event handlers
@@ -150,7 +170,7 @@ class BaseView {
         // Nettoyer le cache
         this.renderCache.clear();
         
-        // Hook personnalisÃƒÂ©
+        // Hook personnalisÃƒÆ’Ã‚Â©
         if (typeof this.onDestroy === 'function') {
             this.onDestroy();
         }
@@ -167,7 +187,7 @@ class BaseView {
     
     /**
      * Rend la vue
-     * @param {Object} data - DonnÃƒÂ©es ÃƒÂ  rendre
+     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es ÃƒÆ’Ã‚Â  rendre
      * @param {Object} options - Options de rendu
      */
     render(data = null, options = {}) {
@@ -181,18 +201,18 @@ class BaseView {
             return;
         }
         
-        // Mettre ÃƒÂ  jour les donnÃƒÂ©es
+        // Mettre ÃƒÆ’Ã‚Â  jour les donnÃƒÆ’Ã‚Â©es
         if (data) {
             this.previousData = { ...this.data };
             this.data = { ...this.data, ...data };
         }
         
-        // VÃƒÂ©rifier si re-rendu nÃƒÂ©cessaire
+        // VÃƒÆ’Ã‚Â©rifier si re-rendu nÃƒÆ’Ã‚Â©cessaire
         if (!options.force && this.config.trackChanges && !this.shouldRerender(data)) {
             return;
         }
         
-        // Debounce si configurÃƒÂ©
+        // Debounce si configurÃƒÆ’Ã‚Â©
         if (this.config.debounceRender > 0 && !options.immediate) {
             this.debounceRender(data, options);
             return;
@@ -204,7 +224,7 @@ class BaseView {
             // Construire le template
             const html = this.buildTemplate();
             
-            // Sanitize si configurÃƒÂ©
+            // Sanitize si configurÃƒÆ’Ã‚Â©
             const sanitized = this.config.sanitizeHTML 
                 ? this.sanitizeHTML(html) 
                 : html;
@@ -212,10 +232,10 @@ class BaseView {
             // Injecter dans le DOM
             this.container.innerHTML = sanitized;
             
-            // Cacher ÃƒÂ©lÃƒÂ©ments DOM
+            // Cacher ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM
             this.cacheElements();
             
-            // Attacher ÃƒÂ©vÃƒÂ©nements
+            // Attacher ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
             this.attachEvents();
             
             this.state.isRendered = true;
@@ -223,12 +243,12 @@ class BaseView {
             
             this.runHooks('afterRender');
             
-            // Hook personnalisÃƒÂ©
+            // Hook personnalisÃƒÆ’Ã‚Â©
             if (typeof this.onRender === 'function') {
                 this.onRender();
             }
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
             this.emit('view:rendered', {
                 view: this.config.name,
                 data: this.data
@@ -244,13 +264,13 @@ class BaseView {
      * @returns {string} HTML
      */
     buildTemplate() {
-        // Ãƒâ‚¬ surcharger dans les classes filles
+        // ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
         return this.template || '<div>No template defined</div>';
     }
     
     /**
-     * VÃƒÂ©rifie si un re-rendu est nÃƒÂ©cessaire
-     * @param {Object} newData - Nouvelles donnÃƒÂ©es
+     * VÃƒÆ’Ã‚Â©rifie si un re-rendu est nÃƒÆ’Ã‚Â©cessaire
+     * @param {Object} newData - Nouvelles donnÃƒÆ’Ã‚Â©es
      * @returns {boolean}
      */
     shouldRerender(newData) {
@@ -260,7 +280,7 @@ class BaseView {
     
     /**
      * Debounce du rendu
-     * @param {Object} data - DonnÃƒÂ©es
+     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es
      * @param {Object} options - Options
      */
     debounceRender(data, options) {
@@ -275,14 +295,14 @@ class BaseView {
     }
     
     /**
-     * Met ÃƒÂ  jour des donnÃƒÂ©es spÃƒÂ©cifiques sans re-rendu complet
-     * @param {Object} updates - Mises ÃƒÂ  jour
+     * Met ÃƒÆ’Ã‚Â  jour des donnÃƒÆ’Ã‚Â©es spÃƒÆ’Ã‚Â©cifiques sans re-rendu complet
+     * @param {Object} updates - Mises ÃƒÆ’Ã‚Â  jour
      */
     update(updates) {
         this.previousData = { ...this.data };
         this.data = { ...this.data, ...updates };
         
-        // Hook pour mise ÃƒÂ  jour personnalisÃƒÂ©e
+        // Hook pour mise ÃƒÆ’Ã‚Â  jour personnalisÃƒÆ’Ã‚Â©e
         if (typeof this.onUpdate === 'function') {
             this.onUpdate(updates);
         }
@@ -319,7 +339,7 @@ class BaseView {
         
         this.state.isVisible = true;
         
-        // Hook personnalisÃƒÂ©
+        // Hook personnalisÃƒÆ’Ã‚Â©
         if (typeof this.onShow === 'function') {
             this.onShow();
         }
@@ -348,7 +368,7 @@ class BaseView {
         
         this.state.isVisible = false;
         
-        // Hook personnalisÃƒÂ©
+        // Hook personnalisÃƒÆ’Ã‚Â©
         if (typeof this.onHide === 'function') {
             this.onHide();
         }
@@ -372,21 +392,21 @@ class BaseView {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS DOM
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS DOM
     // ========================================================================
     
     /**
-     * Attache les ÃƒÂ©vÃƒÂ©nements DOM
-     * Ãƒâ‚¬ surcharger dans les classes filles
+     * Attache les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM
+     * ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
      */
     attachEvents() {
-        // Ãƒâ‚¬ implÃƒÂ©menter dans les classes filles
+        // ÃƒÆ’Ã¢â€šÂ¬ implÃƒÆ’Ã‚Â©menter dans les classes filles
     }
     
     /**
      * Ajoute un event listener DOM
-     * @param {HTMLElement|string} element - Ãƒâ€°lÃƒÂ©ment ou sÃƒÂ©lecteur
-     * @param {string} event - Type d'ÃƒÂ©vÃƒÂ©nement
+     * @param {HTMLElement|string} element - ÃƒÆ’Ã¢â‚¬Â°lÃƒÆ’Ã‚Â©ment ou sÃƒÆ’Ã‚Â©lecteur
+     * @param {string} event - Type d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
      * @param {Function} handler - Gestionnaire
      * @param {Object} options - Options
      */
@@ -402,7 +422,7 @@ class BaseView {
         
         el.addEventListener(event, handler, options);
         
-        // Garder rÃƒÂ©fÃƒÂ©rence pour nettoyage
+        // Garder rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rence pour nettoyage
         this.domEventListeners.push({
             element: el,
             event,
@@ -412,9 +432,9 @@ class BaseView {
     }
     
     /**
-     * Ajoute un event listener avec dÃƒÂ©lÃƒÂ©gation
-     * @param {string} selector - SÃƒÂ©lecteur CSS
-     * @param {string} event - Type d'ÃƒÂ©vÃƒÂ©nement
+     * Ajoute un event listener avec dÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©gation
+     * @param {string} selector - SÃƒÆ’Ã‚Â©lecteur CSS
+     * @param {string} event - Type d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
      * @param {Function} handler - Gestionnaire
      */
     addDelegatedListener(selector, event, handler) {
@@ -445,13 +465,13 @@ class BaseView {
     }
     
     // ========================================================================
-    // Ãƒâ€°VÃƒâ€°NEMENTS EVENTBUS
+    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS EVENTBUS
     // ========================================================================
     
     /**
-     * Ãƒâ€°met un ÃƒÂ©vÃƒÂ©nement via EventBus
-     * @param {string} eventName - Nom de l'ÃƒÂ©vÃƒÂ©nement
-     * @param {*} data - DonnÃƒÂ©es
+     * ÃƒÆ’Ã¢â‚¬Â°met un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement via EventBus
+     * @param {string} eventName - Nom de l'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+     * @param {*} data - DonnÃƒÆ’Ã‚Â©es
      */
     emit(eventName, data) {
         if (this.eventBus && typeof this.eventBus.emit === 'function') {
@@ -460,8 +480,8 @@ class BaseView {
     }
     
     /**
-     * Ãƒâ€°coute un ÃƒÂ©vÃƒÂ©nement via EventBus
-     * @param {string} eventName - Nom de l'ÃƒÂ©vÃƒÂ©nement
+     * ÃƒÆ’Ã¢â‚¬Â°coute un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement via EventBus
+     * @param {string} eventName - Nom de l'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
      * @param {Function} handler - Gestionnaire
      */
     on(eventName, handler) {
@@ -472,22 +492,22 @@ class BaseView {
     }
     
     // ========================================================================
-    // CACHE D'Ãƒâ€°LÃƒâ€°MENTS
+    // CACHE D'ÃƒÆ’Ã¢â‚¬Â°LÃƒÆ’Ã¢â‚¬Â°MENTS
     // ========================================================================
     
     /**
-     * Cache des ÃƒÂ©lÃƒÂ©ments DOM pour accÃƒÂ¨s rapide
-     * Ãƒâ‚¬ surcharger dans les classes filles
+     * Cache des ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM pour accÃƒÆ’Ã‚Â¨s rapide
+     * ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
      */
     cacheElements() {
-        // Ãƒâ‚¬ implÃƒÂ©menter dans les classes filles
+        // ÃƒÆ’Ã¢â€šÂ¬ implÃƒÆ’Ã‚Â©menter dans les classes filles
         // Exemple:
         // this.elements.button = this.container.querySelector('.btn');
     }
     
     /**
-     * Obtient un ÃƒÂ©lÃƒÂ©ment cachÃƒÂ©
-     * @param {string} name - Nom de l'ÃƒÂ©lÃƒÂ©ment
+     * Obtient un ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment cachÃƒÆ’Ã‚Â©
+     * @param {string} name - Nom de l'ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment
      * @returns {HTMLElement|null}
      */
     getElement(name) {
@@ -510,7 +530,7 @@ class BaseView {
     }
     
     /**
-     * ExÃƒÂ©cute les hooks d'un ÃƒÂ©vÃƒÂ©nement
+     * ExÃƒÆ’Ã‚Â©cute les hooks d'un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
      * @param {string} hookName - Nom du hook
      */
     runHooks(hookName) {
@@ -530,7 +550,7 @@ class BaseView {
     // ========================================================================
     
     /**
-     * MÃƒÂ©thode de logging flexible
+     * MÃƒÆ’Ã‚Â©thode de logging flexible
      * Supporte plusieurs signatures:
      * - log(level, message)
      * - log(level, source, message)
@@ -539,7 +559,7 @@ class BaseView {
     log(level, ...args) {
         if (!this.logger) return;
         
-        // Si logger a une mÃƒÂ©thode pour ce niveau, l'utiliser directement
+        // Si logger a une mÃƒÆ’Ã‚Â©thode pour ce niveau, l'utiliser directement
         if (typeof this.logger[level] === 'function') {
             this.logger[level](...args);
         } else {
@@ -569,8 +589,8 @@ class BaseView {
     }
     
     /**
-     * Formate une durÃƒÂ©e
-     * @param {number} ms - DurÃƒÂ©e en millisecondes
+     * Formate une durÃƒÆ’Ã‚Â©e
+     * @param {number} ms - DurÃƒÆ’Ã‚Â©e en millisecondes
      * @returns {string}
      */
     formatDuration(ms) {
@@ -609,7 +629,7 @@ class BaseView {
     }
     
     /**
-     * Ãƒâ€°chappe le HTML
+     * ÃƒÆ’Ã¢â‚¬Â°chappe le HTML
      * @param {string} text - Texte
      * @returns {string}
      */
@@ -625,7 +645,7 @@ class BaseView {
      * @returns {string}
      */
     sanitizeHTML(html) {
-        // Sanitization basique - ÃƒÂ  amÃƒÂ©liorer selon les besoins
+        // Sanitization basique - ÃƒÆ’Ã‚Â  amÃƒÆ’Ã‚Â©liorer selon les besoins
         return html;
     }
     
@@ -657,7 +677,7 @@ class BaseView {
     }
     
     /**
-     * Obtient une valeur imbriquÃƒÂ©e
+     * Obtient une valeur imbriquÃƒÆ’Ã‚Â©e
      * @param {Object} obj - Objet
      * @param {string} path - Chemin (ex: 'user.name')
      * @returns {*}
@@ -667,9 +687,9 @@ class BaseView {
     }
     
     /**
-     * GÃƒÂ¨re les erreurs de rendu
+     * GÃƒÆ’Ã‚Â¨re les erreurs de rendu
      * @param {Error} error - Erreur
-     * @param {Object} data - DonnÃƒÂ©es
+     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es
      */
     handleRenderError(error, data) {
         console.error(`[${this.config.name}] Render error:`, error);
@@ -702,7 +722,7 @@ class BaseView {
     }
     
     /**
-     * Obtient l'ÃƒÂ©tat de la vue
+     * Obtient l'ÃƒÆ’Ã‚Â©tat de la vue
      * @returns {Object}
      */
     getState() {
