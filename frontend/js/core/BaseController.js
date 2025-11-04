@@ -288,6 +288,25 @@ class BaseController {
     }
 
     /**
+     * Méthodes de logging raccourcies
+     */
+    logDebug(...args) {
+        this.log('debug', this.constructor.name, ...args);
+    }
+
+    logInfo(...args) {
+        this.log('info', this.constructor.name, ...args);
+    }
+
+    logWarn(...args) {
+        this.log('warn', this.constructor.name, ...args);
+    }
+
+    logError(...args) {
+        this.log('error', this.constructor.name, ...args);
+    }
+
+    /**
      * Validation d'entrée
      */
     validate(data, validatorName) {
