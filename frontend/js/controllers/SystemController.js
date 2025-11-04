@@ -1,21 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/SystemController.js
-// Version: v3.2.1 - FIXED BACKEND SIGNATURE - IMPLÃƒÆ’Ã¢â‚¬Â°MENTATION API COMPLÃƒÆ’Ã‹â€ TE
-// Date: 2025-11-01
+// Version: v3.3.0 - BACKEND NULL SAFETY
+// Date: 2025-11-04
 // ============================================================================
+// CORRECTIONS v3.3.0:
+// ✅ CRITIQUE: Ajout vérifications backend avant tous les appels
+// ✅ CRITIQUE: Utilisation méthodes withBackend() et isBackendReady()
+// ✅ Gestion mode offline avec messages appropriés
+// ✅ Protection complète contre backend null/undefined
+//
 // CORRECTIONS v3.2.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
-// ============================================================================
-// ============================================================================
-// CORRECTIONS v3.2.0:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Toutes les commandes system.* implÃƒÆ’Ã‚Â©mentÃƒÆ’Ã‚Â©es
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Toutes les commandes devices.* implÃƒÆ’Ã‚Â©mentÃƒÆ’Ã‚Â©es  
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Gestion ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements backend temps rÃƒÆ’Ã‚Â©el
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Monitoring systÃƒÆ’Ã‚Â¨me automatique
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTIONS v4.0.0: CompatibilitÃƒÆ’Ã‚Â© API v4.0.0
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Gestion hot-plug devices
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 
 class SystemController extends BaseController {
@@ -26,9 +23,8 @@ class SystemController extends BaseController {
         this.systemModel = models.system || models.state;
         this.instrumentModel = models.instrument;
         this.view = views.system;
-        this.backend = backend || window.app?.services?.backend || window.backendService;
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat systÃƒÆ’Ã‚Â¨me
+        // État système
         this.state = {
             ...this.state,
             backendConnected: false,
@@ -53,7 +49,7 @@ class SystemController extends BaseController {
     }
     
     // ========================================================================
-    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS
+    // ÉVÉNEMENTS
     // ========================================================================
     
     bindEvents() {
@@ -61,7 +57,7 @@ class SystemController extends BaseController {
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
         
-        // Devices (ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements backend)
+        // Devices (événements backend)
         this.eventBus.on('backend:event:device_connected', (data) => {
             this.handleDeviceConnected(data);
         });
@@ -81,34 +77,37 @@ class SystemController extends BaseController {
             }
         });
         
-        this.log('info', 'SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Events bound');
+        this.log('info', 'SystemController', '✦ Events bound');
     }
     
     async onBackendConnected() {
         this.state.backendConnected = true;
-        this.log('info', 'SystemController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Backend connected');
+        this.log('info', 'SystemController', '✦ Backend connected');
         
         try {
-            // Charger infos systÃƒÆ’Ã‚Â¨me
+            // Charger infos système
             await this.refreshSystemInfo();
             
             // Scanner devices
             await this.scanDevices();
             
-            // DÃƒÆ’Ã‚Â©marrer monitoring si page active
+            // Démarrer monitoring si page active
             const currentPage = this.systemModel?.get('currentPage');
             if (currentPage === 'system') {
                 this.startMonitoring();
             }
         } catch (error) {
-            this.log('error', 'SystemController', 'Initialization failed:', error);
+            // Silencieux si offline
+            if (!error.offline) {
+                this.log('error', 'SystemController', 'Initialization failed:', error);
+            }
         }
     }
     
     onBackendDisconnected() {
         this.state.backendConnected = false;
         this.stopMonitoring();
-        this.log('warn', 'SystemController', 'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Backend disconnected');
+        this.log('warn', 'SystemController', '⚠️ Backend disconnected');
     }
     
     // ========================================================================
@@ -119,103 +118,115 @@ class SystemController extends BaseController {
      * Obtient la version du backend
      */
     async getVersion() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success !== false) {
-                return response.data || response;
-            }
-            throw new Error(response.message || 'Failed to get version');
-        } catch (error) {
-            this.log('error', 'SystemController', 'getVersion failed:', error);
-            throw error;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                
+                if (response.success !== false) {
+                    return response.data || response;
+                }
+                throw new Error(response.message || 'Failed to get version');
+            },
+            'get version',
+            null
+        );
     }
     
     /**
-     * Obtient les infos systÃƒÆ’Ã‚Â¨me
+     * Obtient les infos système
      */
     async getInfo() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success !== false) {
-                return response.data || response;
-            }
-            throw new Error(response.message || 'Failed to get info');
-        } catch (error) {
-            this.log('error', 'SystemController', 'getInfo failed:', error);
-            throw error;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                
+                if (response.success !== false) {
+                    return response.data || response;
+                }
+                throw new Error(response.message || 'Failed to get info');
+            },
+            'get info',
+            null
+        );
     }
     
     /**
      * Obtient l'uptime
      */
     async getUptime() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success !== false) {
-                return response.data || response;
-            }
-            throw new Error(response.message || 'Failed to get uptime');
-        } catch (error) {
-            this.log('error', 'SystemController', 'getUptime failed:', error);
-            throw error;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                
+                if (response.success !== false) {
+                    return response.data?.uptime || response.uptime || 0;
+                }
+                throw new Error(response.message || 'Failed to get uptime');
+            },
+            'get uptime',
+            0
+        );
     }
     
     /**
-     * Obtient l'utilisation mÃƒÆ’Ã‚Â©moire
+     * Obtient l'usage mémoire
      */
     async getMemory() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success !== false) {
-                return response.data || response;
-            }
-            throw new Error(response.message || 'Failed to get memory');
-        } catch (error) {
-            this.log('error', 'SystemController', 'getMemory failed:', error);
-            throw error;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                
+                if (response.success !== false) {
+                    return response.data?.memory || response.memory || null;
+                }
+                throw new Error(response.message || 'Failed to get memory');
+            },
+            'get memory',
+            null
+        );
     }
     
     /**
-     * Obtient l'utilisation disque
+     * Obtient l'usage disque
      */
     async getDisk() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            
-            if (response.success !== false) {
-                return response.data || response;
-            }
-            throw new Error(response.message || 'Failed to get disk');
-        } catch (error) {
-            this.log('error', 'SystemController', 'getDisk failed:', error);
-            throw error;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                
+                if (response.success !== false) {
+                    return response.data?.disk || response.disk || null;
+                }
+                throw new Error(response.message || 'Failed to get disk');
+            },
+            'get disk',
+            null
+        );
     }
     
     /**
      * Ping le backend
      */
     async ping() {
-        try {
-            const response = await this.backend.sendCommand('system.info', {});
-            return response.success !== false;
-        } catch (error) {
-            return false;
-        }
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('system.info', {});
+                return response.success !== false;
+            },
+            'ping',
+            false
+        );
     }
     
     /**
-     * RafraÃƒÆ’Ã‚Â®chit toutes les infos systÃƒÆ’Ã‚Â¨me
+     * Rafraîchit toutes les infos système
      */
     async refreshSystemInfo() {
+        // Ne rien faire si backend non disponible
+        if (!this.isBackendReady()) {
+            return null;
+        }
+        
         try {
             const [version, info, uptime, memory, disk] = await Promise.allSettled([
                 this.getVersion(),
@@ -234,17 +245,20 @@ class SystemController extends BaseController {
                 lastUpdate: Date.now()
             };
             
-            // Mettre ÃƒÆ’Ã‚Â  jour le model
+            // Mettre à jour le model
             if (this.systemModel) {
                 this.systemModel.set('systemInfo', systemInfo);
             }
             
-            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+            // Émettre événement
             this.eventBus.emit('system:info-updated', systemInfo);
             
             return systemInfo;
         } catch (error) {
-            this.log('error', 'SystemController', 'refreshSystemInfo failed:', error);
+            // Silencieux si offline
+            if (!error.offline) {
+                this.log('error', 'SystemController', 'refreshSystemInfo failed:', error);
+            }
             throw error;
         }
     }
@@ -257,145 +271,149 @@ class SystemController extends BaseController {
      * Liste tous les devices MIDI
      */
     async listDevices() {
-        try {
-            const response = await this.backend.sendCommand('devices.list', {});
-            
-            if (response.success !== false) {
-                const devices = response.data?.devices || response.devices || [];
+        return this.withBackend(
+            async () => {
+                const response = await this.backend.sendCommand('devices.list', {});
                 
-                this.state.devicesCount = devices.length;
-                
-                // Mettre ÃƒÆ’Ã‚Â  jour le model instrument
-                if (this.instrumentModel && devices.length > 0) {
-                    this.instrumentModel.instruments.clear();
-                    devices.forEach(device => {
-                        this.instrumentModel.instruments.set(device.id, device);
-                    });
+                if (response.success !== false) {
+                    const devices = response.data?.devices || response.devices || [];
                     
-                    this.instrumentModel.state.totalInstruments = devices.length;
-                    this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
+                    this.state.devicesCount = devices.length;
+                    
+                    // Mettre à jour le model instrument
+                    if (this.instrumentModel && devices.length > 0) {
+                        this.instrumentModel.instruments.clear();
+                        devices.forEach(device => {
+                            this.instrumentModel.instruments.set(device.id, device);
+                        });
+                        
+                        this.instrumentModel.state.totalInstruments = devices.length;
+                        this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
+                    }
+                    
+                    this.eventBus.emit('devices:list-updated', { devices });
+                    
+                    return devices;
                 }
-                
-                this.eventBus.emit('devices:list-updated', { devices });
-                
-                return devices;
-            }
-            throw new Error(response.message || 'Failed to list devices');
-        } catch (error) {
-            this.log('error', 'SystemController', 'listDevices failed:', error);
-            throw error;
-        }
+                throw new Error(response.message || 'Failed to list devices');
+            },
+            'list devices',
+            []
+        );
     }
     
     /**
      * Scanne les devices disponibles
      */
     async scanDevices() {
-        try {
-            this.log('info', 'SystemController', 'Scanning devices...');
-            
-            const response = await this.backend.sendCommand('devices.list', {});
-            
-            if (response.success !== false) {
-                const devices = response.data?.devices || response.devices || [];
+        return this.withBackend(
+            async () => {
+                this.log('info', 'SystemController', 'Scanning devices...');
                 
-                this.state.devicesCount = devices.length;
-                this.state.lastScan = Date.now();
+                const response = await this.backend.sendCommand('devices.list', {});
                 
-                // Mettre ÃƒÆ’Ã‚Â  jour le model instrument
-                if (this.instrumentModel && devices.length > 0) {
-                    this.instrumentModel.instruments.clear();
-                    devices.forEach(device => {
-                        this.instrumentModel.instruments.set(device.id, device);
-                    });
+                if (response.success !== false) {
+                    const devices = response.data?.devices || response.devices || [];
                     
-                    this.instrumentModel.state.totalInstruments = devices.length;
-                    this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
-                    this.instrumentModel.state.lastScan = Date.now();
+                    this.state.devicesCount = devices.length;
+                    this.state.lastScan = Date.now();
+                    
+                    // Mettre à jour le model instrument
+                    if (this.instrumentModel && devices.length > 0) {
+                        this.instrumentModel.instruments.clear();
+                        devices.forEach(device => {
+                            this.instrumentModel.instruments.set(device.id, device);
+                        });
+                        
+                        this.instrumentModel.state.totalInstruments = devices.length;
+                        this.instrumentModel.state.connectedCount = devices.filter(d => d.connected).length;
+                        this.instrumentModel.state.lastScan = Date.now();
+                    }
+                    
+                    this.log('info', 'SystemController', `✦ Found ${devices.length} devices`);
+                    this.eventBus.emit('devices:scan-complete', { devices });
+                    
+                    return devices;
                 }
-                
-                this.log('info', 'SystemController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Found ${devices.length} devices`);
-                this.eventBus.emit('devices:scan-complete', { devices });
-                
-                return devices;
-            }
-            throw new Error(response.message || 'Scan failed');
-        } catch (error) {
-            this.log('error', 'SystemController', 'scanDevices failed:', error);
-            throw error;
-        }
+                throw new Error(response.message || 'Scan failed');
+            },
+            'scan devices',
+            []
+        );
     }
     
     /**
      * Connecte un device
      */
     async connectDevice(deviceId) {
-        try {
-            this.log('info', 'SystemController', `Connecting device: ${deviceId}`);
-            
-            const response = await this.backend.sendCommand('devices.connect', {
-                device_id: deviceId
-            });
-            
-            if (response.success !== false) {
-                // Mettre ÃƒÆ’Ã‚Â  jour le model
-                if (this.instrumentModel) {
-                    const device = this.instrumentModel.instruments.get(deviceId);
-                    if (device) {
-                        device.connected = true;
-                        this.instrumentModel.instruments.set(deviceId, device);
-                        this.instrumentModel.state.connectedCount++;
+        return this.withBackend(
+            async () => {
+                this.log('info', 'SystemController', `Connecting device: ${deviceId}`);
+                
+                const response = await this.backend.sendCommand('devices.connect', {
+                    device_id: deviceId
+                });
+                
+                if (response.success !== false) {
+                    // Mettre à jour le model
+                    if (this.instrumentModel) {
+                        const device = this.instrumentModel.instruments.get(deviceId);
+                        if (device) {
+                            device.connected = true;
+                            this.instrumentModel.instruments.set(deviceId, device);
+                            this.instrumentModel.state.connectedCount++;
+                        }
                     }
+                    
+                    this.log('info', 'SystemController', `✦ Device connected: ${deviceId}`);
+                    this.eventBus.emit('devices:connected', { deviceId });
+                    
+                    return true;
                 }
-                
-                this.log('info', 'SystemController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Device connected: ${deviceId}`);
-                this.eventBus.emit('devices:connected', { deviceId });
-                
-                return true;
-            }
-            throw new Error(response.message || 'Connection failed');
-        } catch (error) {
-            this.log('error', 'SystemController', 'connectDevice failed:', error);
-            throw error;
-        }
+                throw new Error(response.message || 'Connection failed');
+            },
+            'connect device',
+            false
+        );
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©connecte un device
+     * Déconnecte un device
      */
     async disconnectDevice(deviceId) {
-        try {
-            this.log('info', 'SystemController', `Disconnecting device: ${deviceId}`);
-            
-            const response = await this.backend.sendCommand('devices.disconnect', {
-                device_id: deviceId
-            });
-            
-            if (response.success !== false) {
-                // Mettre ÃƒÆ’Ã‚Â  jour le model
-                if (this.instrumentModel) {
-                    const device = this.instrumentModel.instruments.get(deviceId);
-                    if (device) {
-                        device.connected = false;
-                        this.instrumentModel.instruments.set(deviceId, device);
-                        this.instrumentModel.state.connectedCount = Math.max(0, this.instrumentModel.state.connectedCount - 1);
+        return this.withBackend(
+            async () => {
+                this.log('info', 'SystemController', `Disconnecting device: ${deviceId}`);
+                
+                const response = await this.backend.sendCommand('devices.disconnect', {
+                    device_id: deviceId
+                });
+                
+                if (response.success !== false) {
+                    // Mettre à jour le model
+                    if (this.instrumentModel) {
+                        const device = this.instrumentModel.instruments.get(deviceId);
+                        if (device) {
+                            device.connected = false;
+                            this.instrumentModel.instruments.set(deviceId, device);
+                            this.instrumentModel.state.connectedCount = Math.max(0, this.instrumentModel.state.connectedCount - 1);
+                        }
                     }
+                    
+                    this.log('info', 'SystemController', `✦ Device disconnected: ${deviceId}`);
+                    this.eventBus.emit('devices:disconnected', { deviceId });
+                    
+                    return true;
                 }
-                
-                this.log('info', 'SystemController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â Device disconnected: ${deviceId}`);
-                this.eventBus.emit('devices:disconnected', { deviceId });
-                
-                return true;
-            }
-            throw new Error(response.message || 'Disconnection failed');
-        } catch (error) {
-            this.log('error', 'SystemController', 'disconnectDevice failed:', error);
-            throw error;
-        }
+                throw new Error(response.message || 'Disconnection failed');
+            },
+            'disconnect device',
+            false
+        );
     }
     
     // ========================================================================
-    // GESTION ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS BACKEND
+    // GESTION ÉVÉNEMENTS BACKEND
     // ========================================================================
     
     handleDeviceConnected(data) {
@@ -411,8 +429,12 @@ class SystemController extends BaseController {
             );
         }
         
-        // RafraÃƒÆ’Ã‚Â®chir liste
-        this.listDevices();
+        // Rafraîchir liste
+        this.listDevices().catch(err => {
+            if (!err.offline) {
+                this.log('error', 'SystemController', 'Failed to refresh devices:', err);
+            }
+        });
     }
     
     handleDeviceDisconnected(data) {
@@ -428,12 +450,16 @@ class SystemController extends BaseController {
             );
         }
         
-        // RafraÃƒÆ’Ã‚Â®chir liste
-        this.listDevices();
+        // Rafraîchir liste
+        this.listDevices().catch(err => {
+            if (!err.offline) {
+                this.log('error', 'SystemController', 'Failed to refresh devices:', err);
+            }
+        });
     }
     
     handleMidiMessage(data) {
-        // ÃƒÆ’Ã¢â‚¬Â°mettre pour visualisation
+        // Émettre pour visualisation
         this.eventBus.emit('midi:message', data);
     }
     
@@ -443,28 +469,61 @@ class SystemController extends BaseController {
     
     startMonitoring() {
         if (this.statsTimer || this.devicesTimer) {
-            return; // DÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â  dÃƒÆ’Ã‚Â©marrÃƒÆ’Ã‚Â©
+            return; // Déjà démarré
+        }
+        
+        // Vérifier backend avant de démarrer
+        if (!this.isBackendReady()) {
+            this.log('info', 'SystemController', 'Monitoring skipped - backend not ready');
+            return;
         }
         
         this.log('info', 'SystemController', 'Starting monitoring...');
         
-        // Stats systÃƒÆ’Ã‚Â¨me
+        // Stats système
         this.statsTimer = setInterval(() => {
+            // Vérifier backend avant chaque update
+            if (!this.isBackendReady()) {
+                this.stopMonitoring();
+                return;
+            }
+            
             this.refreshSystemInfo().catch(err => {
-                this.log('error', 'SystemController', 'Stats update failed:', err);
+                // Silencieux si offline
+                if (!err.offline) {
+                    this.log('error', 'SystemController', 'Stats update failed:', err);
+                }
             });
         }, this.config.statsUpdateInterval);
         
         // Devices
         this.devicesTimer = setInterval(() => {
+            // Vérifier backend avant chaque update
+            if (!this.isBackendReady()) {
+                this.stopMonitoring();
+                return;
+            }
+            
             this.listDevices().catch(err => {
-                this.log('error', 'SystemController', 'Devices update failed:', err);
+                // Silencieux si offline
+                if (!err.offline) {
+                    this.log('error', 'SystemController', 'Devices update failed:', err);
+                }
             });
         }, this.config.autoRefreshInterval);
         
-        // Premier refresh immÃƒÆ’Ã‚Â©diat
-        this.refreshSystemInfo();
-        this.listDevices();
+        // Premier refresh immédiat
+        this.refreshSystemInfo().catch(err => {
+            if (!err.offline) {
+                this.log('error', 'SystemController', 'Initial refresh failed:', err);
+            }
+        });
+        
+        this.listDevices().catch(err => {
+            if (!err.offline) {
+                this.log('error', 'SystemController', 'Initial devices list failed:', err);
+            }
+        });
     }
     
     stopMonitoring() {
