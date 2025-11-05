@@ -1,34 +1,34 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/SearchController.js
-// Projet: MidiMind v3.1.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.0 - OPTIMISÃƒâ€°
+// Projet: MidiMind v3.1.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - OPTIMISÉ
 // Date: 2025-11-01
 // ============================================================================
 // Description:
-//   ContrÃƒÂ´leur de recherche pour fichiers MIDI, playlists, et instruments.
-//   Fournit indexation, recherche floue, et rÃƒÂ©sultats triÃƒÂ©s par pertinence.
+//   Contrôleur de recherche pour fichiers MIDI, playlists, et instruments.
+//   Fournit indexation, recherche floue, et résultats triés par pertinence.
 //
-// FonctionnalitÃƒÂ©s:
+// Fonctionnalités:
 //   - Indexation automatique des fichiers et playlists
 //   - Recherche par nom, description, tags
 //   - Recherche floue (fuzzy matching)
 //   - Tri par score de pertinence
-//   - Cache des rÃƒÂ©sultats
-//   - RÃƒÂ©indexation incrÃƒÂ©mentale
+//   - Cache des résultats
+//   - Réindexation incrémentale
 //   - Statistiques d'utilisation
 //
 // Architecture:
 //   SearchController extends BaseController
 //   - Index Map pour performance
 //   - Scoring personnalisable
-//   - Ãƒâ€°vÃƒÂ©nements temps rÃƒÂ©el
+//   - Événements temps réel
 //
 // MODIFICATIONS v3.1.0:
-//   Ã¢Å“â€¦ Constructeur conforme ÃƒÂ  BaseController
-//   Ã¢Å“â€¦ Utilisation cohÃƒÂ©rente de subscribe() pour ÃƒÂ©vÃƒÂ©nements
+//   ✓ Constructeur conforme à BaseController
+//   Ã¢Å“â€¦ Utilisation cohérente de subscribe() pour événements
 //   Ã¢Å“â€¦ Gestion robuste de l'indexation
 //   Ã¢Å“â€¦ Optimisation des algorithmes de recherche
-//   Ã¢Å“â€¦ MÃƒÂ©thodes helper de BaseController
+//   Ã¢Å“â€¦ Méthodes helper de BaseController
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -43,14 +43,14 @@ class SearchController extends BaseController {
         this.playlistIndex = new Map();
         this.instrumentIndex = new Map();
         
-        // RÃƒÂ©sultats et cache
+        // Résultats et cache
         this.lastQuery = '';
         this.lastResults = [];
         this.resultCache = new Map();
         
         // Configuration
         this.config = {
-            ...this.config,  // HÃƒÂ©riter de BaseController
+            ...this.config,  // Hériter de BaseController
             minQueryLength: 2,
             maxResults: 50,
             fuzzySearch: true,
@@ -70,19 +70,19 @@ class SearchController extends BaseController {
     }
     
     /**
-     * Initialisation du contrÃƒÂ´leur
+     * Initialisation du contrôleur
      */
     onInitialize() {
         this.logDebug('info', 'Initializing search controller...');
         
-        // Charger les donnÃƒÂ©es initiales si disponibles
+        // Charger les données initiales si disponibles
         this.loadInitialData();
         
         this.logDebug('info', 'Search controller initialized');
     }
     
     /**
-     * Charger les donnÃƒÂ©es initiales
+     * Charger les données initiales
      */
     loadInitialData() {
         try {
@@ -115,10 +115,10 @@ class SearchController extends BaseController {
     }
     
     /**
-     * Bind des ÃƒÂ©vÃƒÂ©nements
+     * Bind des événements
      */
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements de fichiers
+        // Événements de fichiers
         this.subscribe('file:loaded', (data) => this.indexFile(data.file || data));
         this.subscribe('file:updated', (data) => this.updateFileIndex(data.file || data));
         this.subscribe('file:deleted', (data) => this.removeFromIndex(data.fileId || data.id || data));
@@ -128,17 +128,17 @@ class SearchController extends BaseController {
             }
         });
         
-        // Ãƒâ€°vÃƒÂ©nements de playlists
+        // Événements de playlists
         this.subscribe('playlist:created', (data) => this.indexPlaylist(data.playlist || data));
         this.subscribe('playlist:updated', (data) => this.indexPlaylist(data.playlist || data));
         this.subscribe('playlist:deleted', (data) => this.removePlaylistFromIndex(data.playlistId || data.id || data));
         
-        // Ãƒâ€°vÃƒÂ©nements d'instruments
+        // Événements d'instruments
         this.subscribe('instrument:connected', (data) => this.indexInstrument(data.instrument || data));
         this.subscribe('instrument:updated', (data) => this.indexInstrument(data.instrument || data));
         this.subscribe('instrument:disconnected', (data) => this.removeInstrumentFromIndex(data.instrumentId || data.id || data));
         
-        // Ãƒâ€°vÃƒÂ©nements de recherche
+        // Événements de recherche
         this.subscribe('search:query', (data) => {
             if (data.query) {
                 this.search(data.query, data.options);
@@ -165,7 +165,7 @@ class SearchController extends BaseController {
         const opts = { ...this.config, ...options };
         const normalizedQuery = opts.caseSensitive ? query : query.toLowerCase();
         
-        // VÃƒÂ©rifier le cache
+        // Vérifier le cache
         if (this.config.cacheEnabled) {
             const cached = this.getCachedResults(normalizedQuery);
             if (cached) {
@@ -180,12 +180,12 @@ class SearchController extends BaseController {
         this.lastQuery = query;
         this.lastResults = [];
         
-        // Recherche dans les diffÃƒÂ©rents index
+        // Recherche dans les différents index
         const fileResults = this.searchFiles(normalizedQuery, opts);
         const playlistResults = this.searchPlaylists(normalizedQuery, opts);
         const instrumentResults = this.searchInstruments(normalizedQuery, opts);
         
-        // Combiner et trier les rÃƒÂ©sultats
+        // Combiner et trier les résultats
         this.lastResults = [
             ...fileResults,
             ...playlistResults,
@@ -203,7 +203,7 @@ class SearchController extends BaseController {
         const searchTime = Date.now() - startTime;
         this.updateSearchStats(searchTime);
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         this.emitEvent('search:results', {
             query,
             results: this.lastResults,
@@ -292,11 +292,11 @@ class SearchController extends BaseController {
                     String(item[field]) : 
                     String(item[field]).toLowerCase();
                 
-                // Match exact - score le plus ÃƒÂ©levÃƒÂ©
+                // Match exact - score le plus élevé
                 if (fieldValue === query) {
                     score += 100;
                 }
-                // Commence par - trÃƒÂ¨s pertinent
+                // Commence par - très pertinent
                 else if (fieldValue.startsWith(query)) {
                     score += 50;
                 }
@@ -304,7 +304,7 @@ class SearchController extends BaseController {
                 else if (fieldValue.includes(query)) {
                     score += 25;
                 }
-                // Recherche floue si activÃƒÂ©e - peu pertinent
+                // Recherche floue si activée - peu pertinent
                 else if (options.fuzzySearch && this.fuzzyMatch(query, fieldValue)) {
                     score += 10;
                 }
@@ -426,7 +426,7 @@ class SearchController extends BaseController {
     }
     
     /**
-     * Mise ÃƒÂ  jour de l'index d'un fichier
+     * Mise à jour de l'index d'un fichier
      */
     updateFileIndex(file) {
         this.indexFile(file);
@@ -463,7 +463,7 @@ class SearchController extends BaseController {
     }
     
     /**
-     * RÃƒÂ©indexation complÃƒÂ¨te
+     * Réindexation complète
      */
     reindexAll(files = [], playlists = [], instruments = []) {
         this.logDebug('info', 'Reindexing all content...');
@@ -474,14 +474,14 @@ class SearchController extends BaseController {
         this.instrumentIndex.clear();
         this.clearCache();
         
-        // RÃƒÂ©indexer
+        // Réindexer
         files.forEach(file => this.indexFile(file));
         playlists.forEach(playlist => this.indexPlaylist(playlist));
         instruments.forEach(instrument => this.indexInstrument(instrument));
         
         this.logDebug('info', `Reindexed ${files.length} files, ${playlists.length} playlists, ${instruments.length} instruments`);
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         this.emitEvent('search:reindexed', {
             fileCount: files.length,
             playlistCount: playlists.length,
@@ -508,7 +508,7 @@ class SearchController extends BaseController {
     cacheResults(query, results) {
         // Limiter la taille du cache
         if (this.resultCache.size >= this.config.cacheMaxSize) {
-            // Supprimer l'entrÃƒÂ©e la plus ancienne
+            // Supprimer l'entrée la plus ancienne
             const firstKey = this.resultCache.keys().next().value;
             this.resultCache.delete(firstKey);
         }
@@ -525,7 +525,7 @@ class SearchController extends BaseController {
     }
     
     /**
-     * Mise ÃƒÂ  jour des statistiques
+     * Mise à jour des statistiques
      */
     updateSearchStats(searchTime) {
         this.stats.totalSearches++;
@@ -549,7 +549,7 @@ class SearchController extends BaseController {
     }
     
     /**
-     * Obtenir les derniers rÃƒÂ©sultats
+     * Obtenir les derniers résultats
      */
     getLastResults() {
         return {

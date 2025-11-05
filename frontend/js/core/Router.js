@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Router.js
-// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.1.1 - FIX INITIALIZATION
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v3.1.1:
-// âœ… CRITIQUE: Initialisation diffÃ©rÃ©e (ne charge pas de route avant enregistrement)
-// âœ… CRITIQUE: Ã‰mission d'Ã©vÃ©nements 'route-changed'
-// âœ… Fix: Meilleure gestion des routes non trouvÃ©es
-// âœ… MÃ©thode startRouting() pour dÃ©marrer aprÃ¨s enregistrement des routes
+// Ã¢Å“â€¦ CRITIQUE: Initialisation diffÃƒÂ©rÃƒÂ©e (ne charge pas de route avant enregistrement)
+// Ã¢Å“â€¦ CRITIQUE: Ãƒâ€°mission d'ÃƒÂ©vÃƒÂ©nements 'route-changed'
+// Ã¢Å“â€¦ Fix: Meilleure gestion des routes non trouvÃƒÂ©es
+// Ã¢Å“â€¦ MÃƒÂ©thode startRouting() pour dÃƒÂ©marrer aprÃƒÂ¨s enregistrement des routes
 // ============================================================================
 
 class Router {
@@ -22,7 +22,7 @@ class Router {
             ...config
         };
         
-        // Routes enregistrÃ©es
+        // Routes enregistrÃƒÂ©es
         this.routes = new Map();
         
         // Route actuelle
@@ -39,13 +39,13 @@ class Router {
         // Cache des vues
         this.viewCache = new Map();
         
-        // Ã‰tat
+        // Ãƒâ€°tat
         this.state = {
             isNavigating: false,
             history: [],
             params: {},
             query: {},
-            started: false  // Nouveau: indique si le routing a dÃ©marrÃ©
+            started: false  // Nouveau: indique si le routing a dÃƒÂ©marrÃƒÂ©
         };
         
         // Event listeners
@@ -60,7 +60,7 @@ class Router {
     // ========================================================================
     
     init() {
-        // Ã‰couter les changements d'URL
+        // Ãƒâ€°couter les changements d'URL
         if (this.config.mode === 'history') {
             // Mode History API
             window.addEventListener('popstate', (e) => this.handlePopState(e));
@@ -73,12 +73,12 @@ class Router {
         }
         
         // NE PAS charger la route initiale automatiquement
-        // Elle sera chargÃ©e aprÃ¨s l'enregistrement des routes via startRouting()
+        // Elle sera chargÃƒÂ©e aprÃƒÂ¨s l'enregistrement des routes via startRouting()
     }
     
     /**
-     * DÃ©marre le routing (aprÃ¨s enregistrement des routes)
-     * Ã€ appeler explicitement aprÃ¨s avoir enregistrÃ© toutes les routes
+     * DÃƒÂ©marre le routing (aprÃƒÂ¨s enregistrement des routes)
+     * Ãƒâ‚¬ appeler explicitement aprÃƒÂ¨s avoir enregistrÃƒÂ© toutes les routes
      */
     startRouting() {
         if (this.state.started) {
@@ -104,7 +104,7 @@ class Router {
     
     /**
      * Enregistrer une route
-     * @param {string} path - Chemin de la route (peut contenir des paramÃ¨tres)
+     * @param {string} path - Chemin de la route (peut contenir des paramÃƒÂ¨tres)
      * @param {Object} config - Configuration de la route
      */
     route(path, config) {
@@ -154,8 +154,8 @@ class Router {
     
     /**
      * Configuration rapide des routes API
-     * Configure les routes pour les nouvelles fonctionnalitÃ©s
-     * @param {Object} controllers - Objet contenant les contrÃ´leurs
+     * Configure les routes pour les nouvelles fonctionnalitÃƒÂ©s
+     * @param {Object} controllers - Objet contenant les contrÃƒÂ´leurs
      * @param {Object} views - Objet contenant les vues
      */
     configureApiRoutes(controllers = {}, views = {}) {
@@ -185,7 +185,7 @@ class Router {
                 path: '/network',
                 controller: controllers.network,
                 view: views.network,
-                title: 'RÃ©seau - MidiMind',
+                title: 'RÃƒÂ©seau - MidiMind',
                 meta: { requiresFeature: 'network' }
             },
             {
@@ -212,7 +212,7 @@ class Router {
      * @param {Object} options - Options de navigation
      */
     async navigateTo(path, options = {}) {
-        // VÃ©rifier si dÃ©jÃ  en navigation
+        // VÃƒÂ©rifier si dÃƒÂ©jÃƒÂ  en navigation
         if (this.state.isNavigating && !options.force) {
             return false;
         }
@@ -233,30 +233,30 @@ class Router {
                     await this.loadRoute(notFoundRoute, normalizedPath, options);
                 } else {
                     console.warn(`Router: Route not found: ${normalizedPath}`);
-                    // Si pas de route 404 dÃ©finie, ne pas Ã©chouer silencieusement
-                    // Ã‰mettre un Ã©vÃ©nement pour que NavigationController puisse gÃ©rer
+                    // Si pas de route 404 dÃƒÂ©finie, ne pas ÃƒÂ©chouer silencieusement
+                    // Ãƒâ€°mettre un ÃƒÂ©vÃƒÂ©nement pour que NavigationController puisse gÃƒÂ©rer
                     this.emit('route-not-found', { path: normalizedPath });
                 }
                 return false;
             }
             
-            // Extraire les paramÃ¨tres
+            // Extraire les paramÃƒÂ¨tres
             const params = this.extractParams(matchedRoute, normalizedPath);
             const query = this.extractQuery(normalizedPath);
             
-            // Mettre Ã  jour l'Ã©tat
+            // Mettre ÃƒÂ  jour l'ÃƒÂ©tat
             this.state.params = params;
             this.state.query = query;
             
             // Charger la route
             await this.loadRoute(matchedRoute.route, normalizedPath, options);
             
-            // Mettre Ã  jour l'URL si nÃ©cessaire
+            // Mettre ÃƒÂ  jour l'URL si nÃƒÂ©cessaire
             if (!options.skipPushState) {
                 this.updateURL(normalizedPath, options.replace);
             }
             
-            // Ã‰mettre Ã©vÃ©nement de changement de route
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement de changement de route
             this.emit('route-changed', {
                 path: normalizedPath,
                 route: matchedRoute.route,
@@ -276,10 +276,10 @@ class Router {
      * Charger une route
      */
     async loadRoute(route, path, options = {}) {
-        // Sauvegarder la route prÃ©cÃ©dente
+        // Sauvegarder la route prÃƒÂ©cÃƒÂ©dente
         this.previousRoute = this.currentRoute;
         
-        // ExÃ©cuter les hooks beforeLeave de la route prÃ©cÃ©dente
+        // ExÃƒÂ©cuter les hooks beforeLeave de la route prÃƒÂ©cÃƒÂ©dente
         if (this.previousRoute && this.previousRoute.beforeLeave) {
             const canLeave = await this.executeHook(this.previousRoute.beforeLeave, this.previousRoute);
             if (canLeave === false) {
@@ -287,7 +287,7 @@ class Router {
             }
         }
         
-        // ExÃ©cuter les middlewares
+        // ExÃƒÂ©cuter les middlewares
         for (const middleware of this.middlewares) {
             const result = await middleware(route, this.previousRoute);
             if (result === false) {
@@ -295,7 +295,7 @@ class Router {
             }
         }
         
-        // ExÃ©cuter les beforeHooks globaux
+        // ExÃƒÂ©cuter les beforeHooks globaux
         for (const hook of this.beforeHooks) {
             const result = await hook(route, this.previousRoute);
             if (result === false) {
@@ -303,7 +303,7 @@ class Router {
             }
         }
         
-        // ExÃ©cuter le beforeEnter de la nouvelle route
+        // ExÃƒÂ©cuter le beforeEnter de la nouvelle route
         if (route.beforeEnter) {
             const canEnter = await this.executeHook(route.beforeEnter, route);
             if (canEnter === false) {
@@ -311,7 +311,7 @@ class Router {
             }
         }
         
-        // Transition si activÃ©e
+        // Transition si activÃƒÂ©e
         if (this.config.useTransitions && !options.skipTransition) {
             await this.transitionOut();
         }
@@ -319,7 +319,7 @@ class Router {
         // Charger le composant/vue
         await this.loadComponent(route);
         
-        // Mettre Ã  jour le titre
+        // Mettre ÃƒÂ  jour le titre
         if (route.title) {
             document.title = typeof route.title === 'function' 
                 ? route.title(this.state.params, this.state.query)
@@ -337,7 +337,7 @@ class Router {
             });
         }
         
-        // Transition d'entrÃ©e
+        // Transition d'entrÃƒÂ©e
         if (this.config.useTransitions && !options.skipTransition) {
             await this.transitionIn();
         }
@@ -345,12 +345,12 @@ class Router {
         // Route actuelle
         this.currentRoute = route;
         
-        // ExÃ©cuter les afterHooks
+        // ExÃƒÂ©cuter les afterHooks
         for (const hook of this.afterHooks) {
             await hook(route, this.previousRoute);
         }
         
-        // Ã‰mettre l'Ã©vÃ©nement de changement
+        // Ãƒâ€°mettre l'ÃƒÂ©vÃƒÂ©nement de changement
         this.emit('after-route-change', {
             current: route,
             previous: this.previousRoute
@@ -363,12 +363,12 @@ class Router {
      * Charger un composant
      */
     async loadComponent(route) {
-        // Rien Ã  faire ici dans notre cas
-        // La navigation est gÃ©rÃ©e par NavigationController via les Ã©vÃ©nements
+        // Rien ÃƒÂ  faire ici dans notre cas
+        // La navigation est gÃƒÂ©rÃƒÂ©e par NavigationController via les ÃƒÂ©vÃƒÂ©nements
     }
     
     /**
-     * ExÃ©cuter un hook
+     * ExÃƒÂ©cuter un hook
      */
     async executeHook(hook, context) {
         try {
@@ -381,48 +381,48 @@ class Router {
     }
     
     // ========================================================================
-    // GESTIONNAIRES D'Ã‰VÃ‰NEMENTS
+    // GESTIONNAIRES D'Ãƒâ€°VÃƒâ€°NEMENTS
     // ========================================================================
     
     /**
-     * GÃ©rer les changements de hash
+     * GÃƒÂ©rer les changements de hash
      */
     handleHashChange() {
-        if (!this.state.started) return; // Ne rien faire si pas encore dÃ©marrÃ©
+        if (!this.state.started) return; // Ne rien faire si pas encore dÃƒÂ©marrÃƒÂ©
         
         const path = this.getCurrentPath();
         this.navigateTo(path, { skipPushState: true });
     }
     
     /**
-     * GÃ©rer popstate
+     * GÃƒÂ©rer popstate
      */
     handlePopState(event) {
-        if (!this.state.started) return; // Ne rien faire si pas encore dÃ©marrÃ©
+        if (!this.state.started) return; // Ne rien faire si pas encore dÃƒÂ©marrÃƒÂ©
         
         const path = this.getCurrentPath();
         this.navigateTo(path, { skipPushState: true });
     }
     
     /**
-     * GÃ©rer les clics sur les liens
+     * GÃƒÂ©rer les clics sur les liens
      */
     handleLinkClick(event) {
-        if (!this.state.started) return; // Ne rien faire si pas encore dÃ©marrÃ©
+        if (!this.state.started) return; // Ne rien faire si pas encore dÃƒÂ©marrÃƒÂ©
         
         // Trouver le lien le plus proche
         const link = event.target.closest('a');
         
         if (!link) return;
         
-        // VÃ©rifier si c'est un lien interne
+        // VÃƒÂ©rifier si c'est un lien interne
         if (link.host !== window.location.host) return;
         
-        // VÃ©rifier si c'est un lien vers une route
+        // VÃƒÂ©rifier si c'est un lien vers une route
         const href = link.getAttribute('href');
         if (!href || href.startsWith('http') || href.startsWith('//')) return;
         
-        // EmpÃªcher le comportement par dÃ©faut
+        // EmpÃƒÂªcher le comportement par dÃƒÂ©faut
         event.preventDefault();
         
         // Naviguer vers la route
@@ -438,7 +438,7 @@ class Router {
     // ========================================================================
     
     /**
-     * Aller Ã  la page prÃ©cÃ©dente
+     * Aller ÃƒÂ  la page prÃƒÂ©cÃƒÂ©dente
      */
     back() {
         if (this.config.mode === 'history') {
@@ -452,7 +452,7 @@ class Router {
     }
     
     /**
-     * Aller Ã  la page suivante
+     * Aller ÃƒÂ  la page suivante
      */
     forward() {
         if (this.config.mode === 'history') {
@@ -490,7 +490,7 @@ class Router {
     }
     
     /**
-     * Transition d'entrÃ©e
+     * Transition d'entrÃƒÂ©e
      */
     async transitionIn() {
         const container = this.getContainer();
@@ -509,7 +509,7 @@ class Router {
     }
     
     /**
-     * Attendre un dÃ©lai
+     * Attendre un dÃƒÂ©lai
      */
     wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -536,7 +536,7 @@ class Router {
         if (this.config.mode === 'history') {
             let path = window.location.pathname;
             
-            // Retirer le root si nÃ©cessaire
+            // Retirer le root si nÃƒÂ©cessaire
             if (this.config.root !== '/') {
                 path = path.replace(this.config.root, '');
             }
@@ -548,7 +548,7 @@ class Router {
     }
     
     /**
-     * Mettre Ã  jour l'URL
+     * Mettre ÃƒÂ  jour l'URL
      */
     updateURL(path, replace = false) {
         if (this.config.mode === 'history') {
@@ -580,7 +580,7 @@ class Router {
             path = path.slice(0, -1);
         }
         
-        // Assurer que Ã§a commence par /
+        // Assurer que ÃƒÂ§a commence par /
         if (!path.startsWith('/')) {
             path = '/' + path;
         }
@@ -592,7 +592,7 @@ class Router {
      * Convertir un path pattern en regex
      */
     pathToRegex(path) {
-        // Remplacer les paramÃ¨tres :param par des groupes de capture
+        // Remplacer les paramÃƒÂ¨tres :param par des groupes de capture
         const pattern = path
             .replace(/\//g, '\\/')
             .replace(/:(\w+)/g, '(?<$1>[^/]+)')
@@ -628,7 +628,7 @@ class Router {
     }
     
     /**
-     * Extraire les paramÃ¨tres
+     * Extraire les paramÃƒÂ¨tres
      */
     extractParams(matchedRoute, path) {
         const match = path.match(matchedRoute.route.pattern);
@@ -658,7 +658,7 @@ class Router {
     // ========================================================================
     
     /**
-     * Ã‰couter un Ã©vÃ©nement
+     * Ãƒâ€°couter un ÃƒÂ©vÃƒÂ©nement
      */
     on(event, callback) {
         if (!this.listeners.has(event)) {
@@ -670,7 +670,7 @@ class Router {
     }
     
     /**
-     * Retirer un Ã©couteur
+     * Retirer un ÃƒÂ©couteur
      */
     off(event, callback) {
         if (!this.listeners.has(event)) return this;
@@ -686,7 +686,7 @@ class Router {
     }
     
     /**
-     * Ã‰mettre un Ã©vÃ©nement
+     * Ãƒâ€°mettre un ÃƒÂ©vÃƒÂ©nement
      */
     emit(event, data) {
         if (!this.listeners.has(event)) return;
@@ -707,7 +707,7 @@ class Router {
     }
     
     /**
-     * Obtenir les paramÃ¨tres
+     * Obtenir les paramÃƒÂ¨tres
      */
     getParams() {
         return this.state.params;

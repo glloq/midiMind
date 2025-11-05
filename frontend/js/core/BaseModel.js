@@ -1,13 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseModel.js
-// Chemin rÃƒÂ©el: frontend/js/core/BaseModel.js
-// Version: v3.2.0 - SIGNATURE COHÃƒâ€°RENTE
-// Date: 2025-10-31
+// Chemin réel: frontend/js/core/BaseModel.js
+// Version: v3.3.0 - EVENTBUS FALLBACK FIX
+// Date: 2025-11-05
 // ============================================================================
+// CORRECTIONS v3.3.0:
+// ✅ CRITIQUE: Fallback EventBus minimal au lieu de null
+// ✅ Prévention des erreurs "Cannot read property 'emit' of null"
+// ✅ Mode dégradé gracieux si EventBus manquant
+//
 // CORRECTIONS v3.2.0:
-// Ã¢Å“â€¦ CRITIQUE: Signature cohÃƒÂ©rente (eventBus, backend, logger, initialData, options)
-// Ã¢Å“â€¦ Support backward compatible (initialData, options)
-// Ã¢Å“â€¦ Fallbacks robustes pour tous les services
+// ✓ CRITIQUE: Signature cohérente (eventBus, backend, logger, initialData, options)
+// ✓ Support backward compatible (initialData, options)
+// ✓ Fallbacks robustes pour tous les services
 // ============================================================================
 
 class BaseModel {
@@ -22,15 +27,34 @@ class BaseModel {
             eventBus = null;
         }
         
-        // Services avec fallbacks
-        this.eventBus = eventBus || window.eventBus || null;
+        // ✅ CORRECTION v3.3.0: Services avec fallbacks
+        this.eventBus = eventBus || window.eventBus;
+        
+        // ✅ CRITIQUE: Si EventBus toujours absent, créer fallback minimal
+        if (!this.eventBus) {
+            console.warn(
+                `[${this.constructor.name}] EventBus not found - creating minimal fallback. ` +
+                `Check that EventBus is initialized in main.js before Application.`
+            );
+            
+            // Créer un EventBus minimal fonctionnel
+            this.eventBus = {
+                on: () => () => {},      // Retourne une fonction de désinscription vide
+                once: () => () => {},    // Retourne une fonction de désinscription vide
+                emit: () => {},          // Ne fait rien
+                off: () => {},           // Ne fait rien
+                _isFallback: true        // Marqueur pour identification
+            };
+        }
+        
+        // Backend et Logger avec fallbacks
         this.backend = backend || window.backendService || window.app?.services?.backend || null;
         this.logger = logger || this.createFallbackLogger();
         
-        // DonnÃƒÂ©es du modÃƒÂ¨le
+        // Données du modèle
         this.data = { ...initialData };
         
-        // MÃƒÂ©tadonnÃƒÂ©es
+        // Métadonnées
         this.meta = {
             initialized: false,
             dirty: false,
@@ -50,7 +74,7 @@ class BaseModel {
             ...options
         };
         
-        // RÃƒÂ¨gles de validation
+        // Règles de validation
         this.validationRules = {};
         
         // Historique
@@ -82,7 +106,7 @@ class BaseModel {
     }
     
     // ========================================================================
-    // GESTION DES DONNÃƒâ€°ES
+    // GESTION DES DONNÉES
     // ========================================================================
     
     get(path, defaultValue = null) {
@@ -385,25 +409,25 @@ class BaseModel {
     }
     
     on(event, callback) {
-        if (this.eventBus) {
+        if (this.eventBus && !this.eventBus._isFallback) {
             this.eventBus.on(`${this.config.eventPrefix}:${event}`, callback);
         }
     }
     
     once(event, callback) {
-        if (this.eventBus) {
+        if (this.eventBus && !this.eventBus._isFallback) {
             this.eventBus.once(`${this.config.eventPrefix}:${event}`, callback);
         }
     }
     
     off(event, callback) {
-        if (this.eventBus) {
+        if (this.eventBus && !this.eventBus._isFallback) {
             this.eventBus.off(`${this.config.eventPrefix}:${event}`, callback);
         }
     }
     
     emit(event, data) {
-        if (this.eventBus) {
+        if (this.eventBus && !this.eventBus._isFallback) {
             this.eventBus.emit(`${this.config.eventPrefix}:${event}`, data);
         }
     }

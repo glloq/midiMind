@@ -257,36 +257,43 @@ const PlaylistImportExport = {
         const content = await this.readFileContent(file);
         
         // Parser selon le format
-        let playlistData;
+        let parsedData;
         
         switch (format) {
             case 'm3u':
             case 'm3u8':
-                playlistData = this.parseM3U(content);
+                parsedData = this.parseM3U(content);
                 break;
             
             case 'pls':
-                playlistData = this.parsePLS(content);
+                parsedData = this.parsePLS(content);
                 break;
             
             case 'xspf':
-                playlistData = this.parseXSPF(content);
+                parsedData = this.parseXSPF(content);
                 break;
             
             case 'json':
-                playlistData = this.parseJSON(content);
+                parsedData = this.parseJSON(content);
                 break;
             
             default:
-                throw new Error(`Cannot parse format: ${format}`);
+                throw new Error(`Unsupported format: ${format}`);
         }
         
-        // Résoudre les IDs de fichiers
-        playlistData.fileIds = await this.resolveFileIds(playlistData.files);
+        // Résoudre les IDs de fichiers depuis les paths
+        const fileIds = await this.resolveFileIds(parsedData.files);
         
-        this.logInfo('playlist', `✓ Imported ${playlistData.fileIds.length} files`);
+        // Créer la playlist
+        const playlist = {
+            name: parsedData.name,
+            description: parsedData.description,
+            files: fileIds
+        };
         
-        return playlistData;
+        this.logInfo('playlist', `✓ Imported ${fileIds.length} files`);
+        
+        return playlist;
     },
 
     /**
@@ -294,38 +301,62 @@ const PlaylistImportExport = {
      * @private
      */
     parseM3U(content) {
-        const lines = content.split('\n').map(line => line.trim());
+        const lines = content.split('\n').map(line => line.trim()).filter(line => line);
         
         let name = 'Imported Playlist';
         let description = '';
         const files = [];
         
-        let currentFile = {};
+        let currentFile = null;
         
         for (const line of lines) {
-            if (!line || line.startsWith('#')) {
-                // Directives M3U
-                if (line.startsWith('#PLAYLIST:')) {
-                    name = line.substring(10).trim();
-                }
-                else if (line.startsWith('#EXTENC:')) {
-                    description = line.substring(8).trim();
-                }
-                else if (line.startsWith('#EXTINF:')) {
-                    // #EXTINF:duration,Artist - Title
-                    const match = line.match(/#EXTINF:(-?\d+),(.+)/);
-                    if (match) {
-                        currentFile.duration = parseInt(match[1]) * 1000; // En ms
-                        currentFile.title = match[2].trim();
-                    }
+            // #EXTM3U
+            if (line.startsWith('#EXTM3U')) {
+                continue;
+            }
+            
+            // #PLAYLIST:name
+            if (line.startsWith('#PLAYLIST:')) {
+                name = line.substring(10).trim();
+                continue;
+            }
+            
+            // #EXTENC:description
+            if (line.startsWith('#EXTENC:')) {
+                description = line.substring(8).trim();
+                continue;
+            }
+            
+            // #EXTINF:duration,title
+            if (line.startsWith('#EXTINF:')) {
+                const info = line.substring(8);
+                const commaIndex = info.indexOf(',');
+                
+                if (commaIndex !== -1) {
+                    const duration = parseInt(info.substring(0, commaIndex)) || 0;
+                    const title = info.substring(commaIndex + 1).trim();
+                    
+                    currentFile = {
+                        title: title,
+                        duration: duration * 1000 // Convert to ms
+                    };
                 }
                 continue;
             }
             
-            // Ligne de chemin de fichier
-            currentFile.path = line;
-            files.push({ ...currentFile });
-            currentFile = {};
+            // Commentaire
+            if (line.startsWith('#')) {
+                continue;
+            }
+            
+            // Path de fichier
+            if (line) {
+                files.push({
+                    path: line,
+                    ...currentFile
+                });
+                currentFile = null;
+            }
         }
         
         return { name, description, files };
@@ -336,40 +367,55 @@ const PlaylistImportExport = {
      * @private
      */
     parsePLS(content) {
-        const lines = content.split('\n').map(line => line.trim());
+        const lines = content.split('\n').map(line => line.trim()).filter(line => line);
         
         let name = 'Imported Playlist';
-        const filesMap = {};
+        const fileMap = new Map();
         
         for (const line of lines) {
-            if (!line || line.startsWith('[')) continue;
+            // [playlist]
+            if (line === '[playlist]') continue;
             
+            // PlaylistName=name
             if (line.startsWith('PlaylistName=')) {
                 name = line.substring(13);
                 continue;
             }
             
-            const match = line.match(/^(File|Title|Length)(\d+)=(.+)$/);
-            if (!match) continue;
-            
-            const [, field, num, value] = match;
-            
-            if (!filesMap[num]) {
-                filesMap[num] = {};
+            // File1=path
+            const fileMatch = line.match(/^File(\d+)=(.+)$/);
+            if (fileMatch) {
+                const num = parseInt(fileMatch[1]);
+                if (!fileMap.has(num)) {
+                    fileMap.set(num, {});
+                }
+                fileMap.get(num).path = fileMatch[2];
+                continue;
             }
             
-            if (field === 'File') {
-                filesMap[num].path = value;
+            // Title1=title
+            const titleMatch = line.match(/^Title(\d+)=(.+)$/);
+            if (titleMatch) {
+                const num = parseInt(titleMatch[1]);
+                if (!fileMap.has(num)) {
+                    fileMap.set(num, {});
+                }
+                fileMap.get(num).title = titleMatch[2];
+                continue;
             }
-            else if (field === 'Title') {
-                filesMap[num].title = value;
-            }
-            else if (field === 'Length') {
-                filesMap[num].duration = parseInt(value) * 1000; // En ms
+            
+            // Length1=duration
+            const lengthMatch = line.match(/^Length(\d+)=(\d+)$/);
+            if (lengthMatch) {
+                const num = parseInt(lengthMatch[1]);
+                if (!fileMap.has(num)) {
+                    fileMap.set(num, {});
+                }
+                fileMap.get(num).duration = parseInt(lengthMatch[2]) * 1000; // Convert to ms
             }
         }
         
-        const files = Object.values(filesMap).filter(f => f.path);
+        const files = Array.from(fileMap.values());
         
         return { name, description: '', files };
     },
@@ -382,14 +428,15 @@ const PlaylistImportExport = {
         const parser = new DOMParser();
         const doc = parser.parseFromString(content, 'text/xml');
         
-        // Vérifier erreurs de parsing
-        if (doc.querySelector('parsererror')) {
+        // Vérifier erreur de parsing
+        const parserError = doc.querySelector('parsererror');
+        if (parserError) {
             throw new Error('Invalid XSPF XML');
         }
         
         const playlist = doc.querySelector('playlist');
         if (!playlist) {
-            throw new Error('Missing <playlist> element');
+            throw new Error('Invalid XSPF structure');
         }
         
         const name = this.getXmlText(playlist, 'title') || 'Imported Playlist';

@@ -26,7 +26,7 @@ class PresetView {
         this.container.innerHTML = `
             <div class="preset-view">
                 <div class="preset-header">
-                    <h2>Ã°Å¸â€™Â¾ Presets</h2>
+                    <h2>💾 Presets</h2>
                     <button data-action="new">Nouveau preset</button>
                 </div>
                 

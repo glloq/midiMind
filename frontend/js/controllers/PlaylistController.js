@@ -1,18 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaylistController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/PlaylistController.js
+// Chemin réel: frontend/js/controllers/PlaylistController.js
 // Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.3:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✓ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✓ Fix: super() appelle BaseController avec backend
+// ✓ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// Ã¢Å“â€¦ playlist_id, item_id, new_order (snake_case)
-// Ã¢Å“â€¦ Utiliser helpers BackendService
+// • playlist_id, item_id, new_order (snake_case)
+// • Utiliser helpers BackendService
 // ============================================================================
 
 class PlaylistController extends BaseController {
@@ -23,7 +23,7 @@ class PlaylistController extends BaseController {
         this.playlistModel = models?.playlist || null;
         this.fileModel = models?.file || null;
         this.view = views?.playlist || null;
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✓ this.backend initialisé automatiquement par BaseController
         this.logger = window.logger || console;
         
         this.state = {
@@ -74,7 +74,7 @@ class PlaylistController extends BaseController {
             errors: 0
         };
         
-        this.logDebug('playlist', 'Ã°Å¸Å½Âµ PlaylistController v4.2.2 initialized');
+        this.logDebug('playlist', '🎵 PlaylistController v4.2.2 initialized');
     }
     
     initialize() {
@@ -131,7 +131,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: playlist_id
+     * • CORRECTION: playlist_id
      */
     async loadPlaylist(playlist_id) {
         if (!playlist_id) {
@@ -211,7 +211,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: playlist_id, filename, order
+     * • CORRECTION: playlist_id, filename, order
      */
     async addFileToPlaylist(playlist_id, filename, order = null) {
         try {
@@ -254,7 +254,7 @@ class PlaylistController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: new_order (snake_case)
+     * • CORRECTION: new_order (snake_case)
      */
     async reorderPlaylist(playlist_id, item_id, new_order) {
         try {

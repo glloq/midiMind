@@ -4,15 +4,15 @@
 // Date: 2025-10-28
 // ============================================================================
 // CORRECTIONS v1.0.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // Description:
-//   ContrÃƒÂ´leur pour gÃƒÂ©rer les pÃƒÂ©riphÃƒÂ©riques Bluetooth BLE
-//   - Scan des pÃƒÂ©riphÃƒÂ©riques disponibles
-//   - Appairage/dÃƒÂ©sappairage
+//   Contrôleur pour gérer les périphériques Bluetooth BLE
+//   - Scan des périphériques disponibles
+//   - Appairage/désappairage
 //   - Configuration Bluetooth
 //   - Monitoring des signaux
 // ============================================================================
@@ -24,7 +24,7 @@ class BluetoothController extends BaseController {
         this.backendService = backendService;
         this.bluetoothView = bluetoothView;
         
-        // Ãƒâ€°tat du Bluetooth
+        // État du Bluetooth
         this.state.bluetooth = {
             enabled: false,
             scanning: false,
@@ -43,7 +43,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Initialisation personnalisÃƒÂ©e
+     * Initialisation personnalisée
      */
     onInitialize() {
         this.logDebug('info', 'BluetoothController initializing...');
@@ -53,10 +53,10 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Liaison des ÃƒÂ©vÃƒÂ©nements
+     * Liaison des événements
      */
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements de la vue
+        // Événements de la vue
         this.subscribe('bluetooth:scan', () => this.scanDevices());
         this.subscribe('bluetooth:pair', (data) => this.pairDevice(data.address, data.pin));
         this.subscribe('bluetooth:unpair', (data) => this.unpairDevice(data.address));
@@ -65,7 +65,7 @@ class BluetoothController extends BaseController {
         this.subscribe('bluetooth:refresh-paired', () => this.listPairedDevices());
         this.subscribe('bluetooth:refresh-signal', (data) => this.getSignalStrength(data.deviceId));
         
-        // Ãƒâ€°vÃƒÂ©nements backend
+        // Événements backend
         this.subscribe('backend:connected', () => {
             this.loadBluetoothStatus();
             this.listPairedDevices();
@@ -114,7 +114,7 @@ class BluetoothController extends BaseController {
                     this.state.bluetooth.enabled = data.enabled;
                     
                     this.showNotification(
-                        data.enabled ? 'Bluetooth activÃƒÂ©' : 'Bluetooth dÃƒÂ©sactivÃƒÂ©',
+                        data.enabled ? 'Bluetooth activé' : 'Bluetooth désactivé',
                         'success'
                     );
                     
@@ -134,7 +134,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Scanner les pÃƒÂ©riphÃƒÂ©riques BLE disponibles
+     * Scanner les périphériques BLE disponibles
      */
     async scanDevices(duration = null, filter = null) {
         if (this.state.bluetooth.scanning) {
@@ -163,7 +163,7 @@ class BluetoothController extends BaseController {
                     });
                     
                     this.showNotification(
-                        `${this.state.bluetooth.devices.length} pÃƒÂ©riphÃƒÂ©rique(s) trouvÃƒÂ©(s)`,
+                        `${this.state.bluetooth.devices.length} périphérique(s) trouvé(s)`,
                         'success'
                     );
                     
@@ -185,7 +185,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Appairer un pÃƒÂ©riphÃƒÂ©rique
+     * Appairer un périphérique
      */
     async pairDevice(address, pin = '') {
         return this.executeAction('pairDevice', async (data) => {
@@ -199,11 +199,11 @@ class BluetoothController extends BaseController {
                 
                 if (response.success) {
                     this.showNotification(
-                        `PÃƒÂ©riphÃƒÂ©rique ${data.address} appairÃƒÂ© avec succÃƒÂ¨s`,
+                        `Périphérique ${data.address} appairé avec succès`,
                         'success'
                     );
                     
-                    // RafraÃƒÂ®chir la liste des pÃƒÂ©riphÃƒÂ©riques appairÃƒÂ©s
+                    // Rafraîchir la liste des périphériques appairés
                     await this.listPairedDevices();
                     
                     this.emitEvent('bluetooth:device:paired', {
@@ -220,12 +220,12 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * DÃƒÂ©sappairer un pÃƒÂ©riphÃƒÂ©rique
+     * Désappairer un périphérique
      */
     async unpairDevice(address) {
         return this.executeAction('unpairDevice', async (data) => {
             try {
-                this.showNotification(`DÃƒÂ©sappairage de ${data.address}...`, 'info');
+                this.showNotification(`Désappairage de ${data.address}...`, 'info');
                 
                 const response = await this.backendService.sendCommand('bluetooth.unpair', {
                     address: data.address
@@ -233,11 +233,11 @@ class BluetoothController extends BaseController {
                 
                 if (response.success) {
                     this.showNotification(
-                        `PÃƒÂ©riphÃƒÂ©rique ${data.address} dÃƒÂ©sappairÃƒÂ©`,
+                        `Périphérique ${data.address} désappairé`,
                         'success'
                     );
                     
-                    // RafraÃƒÂ®chir la liste des pÃƒÂ©riphÃƒÂ©riques appairÃƒÂ©s
+                    // Rafraîchir la liste des périphériques appairés
                     await this.listPairedDevices();
                     
                     this.emitEvent('bluetooth:device:unpaired', {
@@ -247,14 +247,14 @@ class BluetoothController extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError(`Erreur lors du dÃƒÂ©sappairage de ${address}`, error);
+                this.handleError(`Erreur lors du désappairage de ${address}`, error);
                 throw error;
             }
         }, { address });
     }
     
     /**
-     * Oublier un pÃƒÂ©riphÃƒÂ©rique
+     * Oublier un périphérique
      */
     async forgetDevice(address) {
         return this.executeAction('forgetDevice', async (data) => {
@@ -267,11 +267,11 @@ class BluetoothController extends BaseController {
                 
                 if (response.success) {
                     this.showNotification(
-                        `PÃƒÂ©riphÃƒÂ©rique ${data.address} oubliÃƒÂ©`,
+                        `Périphérique ${data.address} oublié`,
                         'success'
                     );
                     
-                    // RafraÃƒÂ®chir la liste des pÃƒÂ©riphÃƒÂ©riques appairÃƒÂ©s
+                    // Rafraîchir la liste des périphériques appairés
                     await this.listPairedDevices();
                     
                     this.emitEvent('bluetooth:device:forgotten', {
@@ -288,7 +288,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Liste les pÃƒÂ©riphÃƒÂ©riques appairÃƒÂ©s
+     * Liste les périphériques appairés
      */
     async listPairedDevices() {
         return this.executeAction('listPairedDevices', async () => {
@@ -309,14 +309,14 @@ class BluetoothController extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError('Erreur lors du chargement des pÃƒÂ©riphÃƒÂ©riques appairÃƒÂ©s', error);
+                this.handleError('Erreur lors du chargement des périphériques appairés', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Obtenir l'intensitÃƒÂ© du signal d'un pÃƒÂ©riphÃƒÂ©rique
+     * Obtenir l'intensité du signal d'un périphérique
      */
     async getSignalStrength(deviceId) {
         return this.executeAction('getSignalStrength', async (data) => {
@@ -328,7 +328,7 @@ class BluetoothController extends BaseController {
                 if (response.success) {
                     const rssi = response.data.rssi || 0;
                     
-                    // Mettre ÃƒÂ  jour le pÃƒÂ©riphÃƒÂ©rique dans la liste
+                    // Mettre à jour le périphérique dans la liste
                     const device = this.state.bluetooth.devices.find(d => d.id === data.deviceId);
                     if (device) {
                         device.rssi = rssi;
@@ -346,14 +346,14 @@ class BluetoothController extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.logDebug('error', `Erreur lors de la rÃƒÂ©cupÃƒÂ©ration du signal: ${error.message}`);
+                this.logDebug('error', `Erreur lors de la récupération du signal: ${error.message}`);
                 throw error;
             }
         }, { deviceId });
     }
     
     /**
-     * DÃƒÂ©marrer le monitoring des signaux
+     * Démarrer le monitoring des signaux
      */
     startSignalMonitoring() {
         this.stopSignalMonitoring();
@@ -372,7 +372,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * ArrÃƒÂªter le monitoring des signaux
+     * Arrêter le monitoring des signaux
      */
     stopSignalMonitoring() {
         if (this.signalTimer) {
@@ -383,7 +383,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Met ÃƒÂ  jour la vue
+     * Met à jour la vue
      */
     updateView(data) {
         if (this.bluetoothView && typeof this.bluetoothView.render === 'function') {
@@ -403,7 +403,7 @@ class BluetoothController extends BaseController {
     }
     
     /**
-     * Obtenir l'ÃƒÂ©tat actuel
+     * Obtenir l'état actuel
      */
     getBluetoothState() {
         return {

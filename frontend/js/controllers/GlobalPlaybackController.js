@@ -1,17 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/GlobalPlaybackController.js
-// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/controllers/GlobalPlaybackController.js
-// Version: v3.3.0 - API BACKEND CORRIGÃƒÆ’Ã¢â‚¬Â°E
+// Chemin réel: frontend/js/controllers/GlobalPlaybackController.js
+// Version: v3.3.0 - API BACKEND CORRIGÉE
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.3.0:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Utilise sendCommand() au lieu de send()
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Format API cohÃƒÆ’Ã‚Â©rent avec documentation backend
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements temps rÃƒÆ’Ã‚Â©el amÃƒÆ’Ã‚Â©liorÃƒÆ’Ã‚Â©e
-// âœ… CORRECTIONS v4.0.0: CompatibilitÃ© API v4.0.0
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Synchronisation backend optimisÃƒÆ’Ã‚Â©e
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion erreurs robuste
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Support ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements playback_position, playback_finished
+// ✓ CRITIQUE: Utilise sendCommand() au lieu de send()
+// ✓ Format API cohérent avec documentation backend
+// ✓ Gestion événements temps réel améliorée
+// ✅ CORRECTIONS v4.0.0: Compatibilité API v4.0.0
+// ✓ Synchronisation backend optimisée
+// ✓ Gestion erreurs robuste
+// ✓ Support événements playback_position, playback_finished
 // ============================================================================
 
 class GlobalPlaybackController {
@@ -36,7 +36,7 @@ class GlobalPlaybackController {
         this.fileModel = fileModel;
         this.logger = logger || this.createFallbackLogger();
         
-        // CrÃƒÆ’Ã‚Â©er le modÃƒÆ’Ã‚Â¨le de playback
+        // Créer le modèle de playback
         this.playbackModel = new PlaybackModel(eventBus, backend, this.logger);
         this.playbackModel.config.interpolationEnabled = true;
         
@@ -62,7 +62,7 @@ class GlobalPlaybackController {
         // Routing MIDI
         this.routing = new Map();
         
-        // MÃƒÆ’Ã‚Â©tronome
+        // Métronome
         this.metronome = {
             enabled: false,
             volume: 80,
@@ -96,7 +96,7 @@ class GlobalPlaybackController {
             enableBackendSync: true
         };
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat interne
+        // État interne
         this.state = {
             isPlaying: false,
             isPaused: false,
@@ -106,7 +106,7 @@ class GlobalPlaybackController {
             volume: 100
         };
         
-        this.log('info', 'GlobalPlaybackController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Initialized v3.3.0');
+        this.log('info', 'GlobalPlaybackController', '✓ Initialized v3.3.0');
         
         this.connectPlaybackModelEvents();
         this.connectBackendEvents();
@@ -134,11 +134,11 @@ class GlobalPlaybackController {
     }
     
     // ========================================================================
-    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS
+    // ÉVÉNEMENTS
     // ========================================================================
     
     /**
-     * Connecte les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements du modÃƒÆ’Ã‚Â¨le de playback
+     * Connecte les événements du modèle de playback
      */
     connectPlaybackModelEvents() {
         if (!this.eventBus) return;
@@ -167,35 +167,35 @@ class GlobalPlaybackController {
     }
     
     /**
-     * Connecte les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements du backend
+     * Connecte les événements du backend
      */
     connectBackendEvents() {
         if (!this.eventBus) return;
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nement playback_position du backend
+        // Événement playback_position du backend
         this.eventBus.on('backend:event:playback_position', (data) => {
             this.handleBackendPosition(data);
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nement playback_finished du backend
+        // Événement playback_finished du backend
         this.eventBus.on('backend:event:playback_finished', (data) => {
             this.handlePlaybackEnded();
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nement playback_started du backend
+        // Événement playback_started du backend
         this.eventBus.on('backend:event:playback_started', (data) => {
             this.state.isPlaying = true;
             this.state.isPaused = false;
             this.stats.startTime = Date.now();
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nement playback_paused du backend
+        // Événement playback_paused du backend
         this.eventBus.on('backend:event:playback_paused', (data) => {
             this.state.isPlaying = false;
             this.state.isPaused = true;
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nement playback_stopped du backend
+        // Événement playback_stopped du backend
         this.eventBus.on('backend:event:playback_stopped', (data) => {
             this.state.isPlaying = false;
             this.state.isPaused = false;
@@ -204,7 +204,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * GÃƒÆ’Ã‚Â¨re la mise ÃƒÆ’Ã‚Â  jour de position depuis le backend
+     * Gère la mise à jour de position depuis le backend
      */
     handleBackendPosition(data) {
         if (data.position !== undefined) {
@@ -240,7 +240,7 @@ class GlobalPlaybackController {
             return;
         }
         
-        // Synchronisation pÃƒÆ’Ã‚Â©riodique
+        // Synchronisation périodique
         if (this.config.enableBackendSync) {
             setInterval(() => {
                 if (this.state.isPlaying && this.backend.isConnected()) {
@@ -251,7 +251,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * Synchronise l'ÃƒÆ’Ã‚Â©tat avec le backend
+     * Synchronise l'état avec le backend
      */
     async syncWithBackend() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -259,16 +259,16 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand() avec format API correct
+            // ✓ NOUVEAU: Utilise sendCommand() avec format API correct
             const response = await this.backend.sendCommand('playback.getStatus');
             
             if (response && response.status) {
-                // Mettre ÃƒÆ’Ã‚Â  jour l'ÃƒÆ’Ã‚Â©tat local
+                // Mettre à jour l'état local
                 this.state.currentPosition = response.status.position || 0;
                 this.state.duration = response.status.duration || 0;
                 this.state.tempo = response.status.tempo || 120;
                 
-                // Mettre ÃƒÆ’Ã‚Â  jour le modÃƒÆ’Ã‚Â¨le
+                // Mettre à jour le modèle
                 this.playbackModel.updateFromBackend(response.status);
             }
         } catch (error) {
@@ -290,7 +290,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand() avec format API correct
+            // ✓ NOUVEAU: Utilise sendCommand() avec format API correct
             const response = await this.backend.sendCommand('playback.load', { 
                 filename: filename 
             });
@@ -302,11 +302,11 @@ class GlobalPlaybackController {
                 this.currentFile.duration = response.duration || 0;
                 this.state.duration = response.duration || 0;
                 
-                // Charger dans le modÃƒÆ’Ã‚Â¨le
+                // Charger dans le modèle
                 await this.playbackModel.load(filename);
                 
                 this.stats.filesPlayed++;
-                this.log('info', 'GlobalPlayback', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Loaded: ${filename}`);
+                this.log('info', 'GlobalPlayback', `✓ Loaded: ${filename}`);
                 
                 this.eventBus.emit('globalPlayback:fileLoaded', {
                     filename,
@@ -327,7 +327,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©marre la lecture
+     * Démarre la lecture
      */
     async play() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -336,7 +336,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand()
+            // ✓ NOUVEAU: Utilise sendCommand()
             const response = await this.backend.sendCommand('playback.play');
             
             if (response) {
@@ -346,7 +346,7 @@ class GlobalPlaybackController {
                 
                 await this.playbackModel.play();
                 
-                this.log('info', 'GlobalPlayback', 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â Playing');
+                this.log('info', 'GlobalPlayback', '▶️ Playing');
                 return true;
             }
         } catch (error) {
@@ -365,7 +365,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand()
+            // ✓ NOUVEAU: Utilise sendCommand()
             const response = await this.backend.sendCommand('playback.pause');
             
             if (response) {
@@ -374,7 +374,7 @@ class GlobalPlaybackController {
                 
                 await this.playbackModel.pause();
                 
-                this.log('info', 'GlobalPlayback', 'ÃƒÂ¢Ã‚ÂÃ‚Â¸ÃƒÂ¯Ã‚Â¸Ã‚Â Paused');
+                this.log('info', 'GlobalPlayback', '⏸️ Paused');
                 return true;
             }
         } catch (error) {
@@ -385,7 +385,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * ArrÃƒÆ’Ã‚Âªte la lecture
+     * Arrête la lecture
      */
     async stop() {
         if (!this.backend || !this.backend.isConnected()) {
@@ -398,7 +398,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand()
+            // ✓ NOUVEAU: Utilise sendCommand()
             const response = await this.backend.sendCommand('playback.stop');
             
             if (response) {
@@ -409,7 +409,7 @@ class GlobalPlaybackController {
                 
                 await this.playbackModel.stop();
                 
-                this.log('info', 'GlobalPlayback', 'ÃƒÂ¢Ã‚ÂÃ‚Â¹ÃƒÂ¯Ã‚Â¸Ã‚Â Stopped');
+                this.log('info', 'GlobalPlayback', '⏹️ Stopped');
                 return true;
             }
         } catch (error) {
@@ -420,7 +420,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * Se dÃƒÆ’Ã‚Â©place ÃƒÆ’Ã‚Â  une position
+     * Se déplace à une position
      */
     async seek(position) {
         if (!this.backend || !this.backend.isConnected()) {
@@ -428,7 +428,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand()
+            // ✓ NOUVEAU: Utilise sendCommand()
             const response = await this.backend.sendCommand('playback.seek', { 
                 position: position 
             });
@@ -439,7 +439,7 @@ class GlobalPlaybackController {
                 
                 await this.playbackModel.seek(position);
                 
-                this.log('debug', 'GlobalPlayback', `ÃƒÂ¢Ã‚ÂÃ‚Â© Seek to ${position.toFixed(2)}s`);
+                this.log('debug', 'GlobalPlayback', `⏩ Seek to ${position.toFixed(2)}s`);
                 return true;
             }
         } catch (error) {
@@ -458,7 +458,7 @@ class GlobalPlaybackController {
         }
         
         try {
-            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Utilise sendCommand()
+            // ✓ NOUVEAU: Utilise sendCommand()
             const response = await this.backend.sendCommand('playback.setTempo', { 
                 tempo: tempo 
             });
@@ -469,7 +469,7 @@ class GlobalPlaybackController {
                 
                 await this.playbackModel.setTempo(tempo);
                 
-                this.log('debug', 'GlobalPlayback', `ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Âµ Tempo set to ${tempo} BPM`);
+                this.log('debug', 'GlobalPlayback', `🎵 Tempo set to ${tempo} BPM`);
                 return true;
             }
         } catch (error) {
@@ -484,7 +484,7 @@ class GlobalPlaybackController {
     // ========================================================================
     
     /**
-     * GÃƒÆ’Ã‚Â¨re la fin de lecture
+     * Gère la fin de lecture
      */
     async handlePlaybackEnded() {
         this.log('debug', 'GlobalPlayback', 'Playback ended');
@@ -511,7 +511,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * Passe ÃƒÆ’Ã‚Â  la piste suivante
+     * Passe à la piste suivante
      */
     async nextTrack() {
         if (this.playlist.files.length === 0) return false;
@@ -542,7 +542,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * Passe ÃƒÆ’Ã‚Â  la piste prÃƒÆ’Ã‚Â©cÃƒÆ’Ã‚Â©dente
+     * Passe à la piste précédente
      */
     async previousTrack() {
         if (this.playlist.files.length === 0) return false;
@@ -573,7 +573,7 @@ class GlobalPlaybackController {
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©finit la playlist
+     * Définit la playlist
      */
     setPlaylist(files) {
         this.playlist.files = files;

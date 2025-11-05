@@ -1,6 +1,6 @@
 // ============================================================================
 // Fichier: frontend/js/views/VisualizerView.js
-// Version: v4.0.0 - CONFORMITÃƒÆ’Ã¢â‚¬Â° API
+// Version: v4.0.0 - CONFORMITÉ API
 // Date: 2025-11-02
 // ============================================================================
 
@@ -44,7 +44,7 @@ class VisualizerView {
                     </select>
                     <select data-action="color">
                         <option value="channel">Par canal</option>
-                        <option value="velocity">Par vÃƒÆ’Ã‚Â©locitÃƒÆ’Ã‚Â©</option>
+                        <option value="velocity">Par vélocité</option>
                     </select>
                 </div>
                 <canvas id="visualizerCanvas"></canvas>

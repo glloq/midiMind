@@ -1,25 +1,25 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/DebugController.js
-// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/controllers/DebugController.js
-// Version: v3.6.1 - FIXED BACKEND SIGNATURE - API CONFORMITÃƒâ€° DOCUMENTATION_FRONTEND
+// Chemin réel: frontend/js/controllers/DebugController.js
+// Version: v3.6.1 - FIXED BACKEND SIGNATURE - API CONFORMITÉ DOCUMENTATION_FRONTEND
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.6.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
-// AMÃƒÆ’Ã¢â‚¬Â°LIORATIONS v3.5.0:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Collecte mÃƒÆ’Ã‚Â©triques systÃƒÆ’Ã‚Â¨me complÃƒÆ’Ã‚Â¨te
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Monitoring performances en temps rÃƒÆ’Ã‚Â©el
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Diagnostic rÃƒÆ’Ã‚Â©seau et MIDI
-// âœ… CORRECTIONS v4.0.0: CompatibilitÃ© API v4.0.0
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Export logs avec filtrage
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Affichage ÃƒÆ’Ã‚Â©tat systÃƒÆ’Ã‚Â¨me dÃƒÆ’Ã‚Â©taillÃƒÆ’Ã‚Â©
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ DÃƒÆ’Ã‚Â©tection problÃƒÆ’Ã‚Â¨mes automatique
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Suggestions diagnostic
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Graphiques performances
+// AMÉLIORATIONS v3.5.0:
+// ✓ Collecte métriques système complète
+// ✓ Monitoring performances en temps réel
+// ✓ Diagnostic réseau et MIDI
+// ✅ CORRECTIONS v4.0.0: Compatibilité API v4.0.0
+// ✓ Export logs avec filtrage
+// ✓ Affichage état système détaillé
+// ✓ Détection problèmes automatique
+// ✓ Suggestions diagnostic
+// ✓ Graphiques performances
 // ============================================================================
 
 class DebugController extends BaseController {
@@ -27,18 +27,18 @@ class DebugController extends BaseController {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
         // Backend
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✅ this.backend initialisé automatiquement par BaseController
         
         // Configuration
         this.config = {
             metricsInterval: 1000, // 1 seconde
             maxLogEntries: 1000,
-            maxMetricsHistory: 60, // 60 ÃƒÆ’Ã‚Â©chantillons
+            maxMetricsHistory: 60, // 60 échantillons
             autoDetectIssues: true,
             enablePerformanceMonitoring: true
         };
         
-        // MÃƒÆ’Ã‚Â©triques systÃƒÆ’Ã‚Â¨me
+        // Métriques système
         this.metrics = {
             cpu: [],
             memory: [],
@@ -59,7 +59,7 @@ class DebugController extends BaseController {
             renders: 0
         };
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat systÃƒÆ’Ã‚Â¨me
+        // État système
         this.systemState = {
             backendConnected: false,
             midiDevicesCount: 0,
@@ -79,7 +79,7 @@ class DebugController extends BaseController {
             error: true
         };
         
-        // Issues dÃƒÆ’Ã‚Â©tectÃƒÆ’Ã‚Â©es
+        // Issues détectées
         this.detectedIssues = [];
         
         // Performance monitoring
@@ -93,7 +93,7 @@ class DebugController extends BaseController {
         // Timers
         this.metricsTimer = null;
         
-        this.log('info', 'DebugController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Initialized v3.5.0');
+        this.log('info', 'DebugController', '✓ Initialized v3.5.0');
         
         this.initialize();
     }
@@ -109,7 +109,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Liaison des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Liaison des événements
      */
     bindEvents() {
         // Toggle debug panel
@@ -121,7 +121,7 @@ class DebugController extends BaseController {
             this.log('debug', 'DebugController', `Debug panel ${data.active ? 'opened' : 'closed'}`);
         });
         
-        // Collecte d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements pour mÃƒÆ’Ã‚Â©triques
+        // Collecte d'événements pour métriques
         this.eventBus.on('*', (eventName, data) => {
             this.trackEvent(eventName, data);
         });
@@ -153,7 +153,7 @@ class DebugController extends BaseController {
             this.counters.renders++;
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat backend
+        // État backend
         this.eventBus.on('backend:connected', () => {
             this.systemState.backendConnected = true;
             this.updateSystemState();
@@ -172,11 +172,11 @@ class DebugController extends BaseController {
     }
 
     // ========================================================================
-    // MÃƒÆ’Ã¢â‚¬Â°TRIQUES
+    // MÉTRIQUES
     // ========================================================================
 
     /**
-     * Configure la collecte de mÃƒÆ’Ã‚Â©triques
+     * Configure la collecte de métriques
      */
     setupMetricsCollection() {
         if (!this.config.metricsInterval) return;
@@ -187,7 +187,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Collecte les mÃƒÆ’Ã‚Â©triques
+     * Collecte les métriques
      */
     async collectMetrics() {
         const now = Date.now();
@@ -196,7 +196,7 @@ class DebugController extends BaseController {
         const fps = this.calculateFPS();
         this.addMetric('fps', fps);
         
-        // MÃƒÆ’Ã‚Â©moire
+        // Mémoire
         if (performance.memory) {
             const memoryMB = performance.memory.usedJSHeapSize / 1048576;
             this.systemState.memoryUsage = memoryMB;
@@ -211,7 +211,7 @@ class DebugController extends BaseController {
             }
         }
         
-        // Taux d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements (events/sec)
+        // Taux d'événements (events/sec)
         const eventRate = this.counters.events / (this.config.metricsInterval / 1000);
         this.addMetric('eventRate', eventRate);
         this.counters.events = 0; // Reset
@@ -220,22 +220,22 @@ class DebugController extends BaseController {
         const apiCallsRate = this.counters.apiCalls / (this.config.metricsInterval / 1000);
         this.addMetric('apiCalls', apiCallsRate);
         
-        // DÃƒÆ’Ã‚Â©tection automatique de problÃƒÆ’Ã‚Â¨mes
+        // Détection automatique de problèmes
         if (this.config.autoDetectIssues) {
             this.detectIssues();
         }
         
-        // Mettre ÃƒÆ’Ã‚Â  jour l'affichage si le panel est ouvert
+        // Mettre à jour l'affichage si le panel est ouvert
         if (this.debugConsole && this.debugConsole.isOpen) {
             this.updateDebugDisplay();
         }
     }
 
     /**
-     * Collecte les mÃƒÆ’Ã‚Â©triques initiales
+     * Collecte les métriques initiales
      */
     async collectInitialMetrics() {
-        // Collecter infos systÃƒÆ’Ã‚Â¨me
+        // Collecter infos système
         this.systemState.filesLoaded = this.getModel('file')?.data?.files?.length || 0;
         
         // Devices MIDI
@@ -252,7 +252,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Ajoute une mÃƒÆ’Ã‚Â©trique
+     * Ajoute une métrique
      */
     addMetric(name, value) {
         if (!this.metrics[name]) {
@@ -333,10 +333,10 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Configure le tracking d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Configure le tracking d'événements
      */
     setupEventTracking() {
-        // Wrapper l'emit pour compter les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+        // Wrapper l'emit pour compter les événements
         if (this.eventBus) {
             const originalEmit = this.eventBus.emit.bind(this.eventBus);
             this.eventBus.emit = (eventName, ...args) => {
@@ -347,10 +347,10 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Track un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+     * Track un événement
      */
     trackEvent(eventName, data) {
-        // Ne pas logger les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements de mÃƒÆ’Ã‚Â©triques pour ÃƒÆ’Ã‚Â©viter les boucles
+        // Ne pas logger les événements de métriques pour éviter les boucles
         if (eventName.startsWith('debug:') || eventName.startsWith('metrics:')) {
             return;
         }
@@ -359,11 +359,11 @@ class DebugController extends BaseController {
     }
 
     // ========================================================================
-    // DÃƒÆ’Ã¢â‚¬Â°TECTION PROBLÃƒÆ’Ã‹â€ MES
+    // DÉTECTION PROBLÈMES
     // ========================================================================
 
     /**
-     * DÃƒÆ’Ã‚Â©tecte les problÃƒÆ’Ã‚Â¨mes automatiquement
+     * Détecte les problèmes automatiquement
      */
     detectIssues() {
         const issues = [];
@@ -380,7 +380,7 @@ class DebugController extends BaseController {
             });
         }
         
-        // MÃƒÆ’Ã‚Â©moire haute
+        // Mémoire haute
         const avgMemory = this.getAverageMetric('memory');
         if (avgMemory > 200) { // > 200MB
             issues.push({
@@ -392,7 +392,7 @@ class DebugController extends BaseController {
             });
         }
         
-        // Latence ÃƒÆ’Ã‚Â©levÃƒÆ’Ã‚Â©e
+        // Latence élevée
         const avgLatency = this.getAverageMetric('latency');
         if (avgLatency > 100) { // > 100ms
             issues.push({
@@ -415,7 +415,7 @@ class DebugController extends BaseController {
             });
         }
         
-        // Backend dÃƒÆ’Ã‚Â©connectÃƒÆ’Ã‚Â©
+        // Backend déconnecté
         if (!this.systemState.backendConnected) {
             issues.push({
                 type: 'error',
@@ -428,11 +428,11 @@ class DebugController extends BaseController {
         
         // Ajouter les nouveaux issues
         issues.forEach(issue => {
-            // ÃƒÆ’Ã¢â‚¬Â°viter les doublons
+            // Éviter les doublons
             const exists = this.detectedIssues.some(i => 
                 i.category === issue.category && 
                 i.message === issue.message &&
-                (Date.now() - i.timestamp) < 60000 // Dans la derniÃƒÆ’Ã‚Â¨re minute
+                (Date.now() - i.timestamp) < 60000 // Dans la dernière minute
             );
             
             if (!exists) {
@@ -448,7 +448,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Obtient la moyenne d'une mÃƒÆ’Ã‚Â©trique
+     * Obtient la moyenne d'une métrique
      */
     getAverageMetric(name) {
         const metric = this.metrics[name];
@@ -480,7 +480,7 @@ class DebugController extends BaseController {
             this.logs.shift();
         }
         
-        // Envoyer au debugConsole si prÃƒÆ’Ã‚Â©sent
+        // Envoyer au debugConsole si présent
         if (this.debugConsole && typeof this.debugConsole.log === 'function') {
             this.debugConsole.log(level, message, data);
         }
@@ -517,8 +517,8 @@ class DebugController extends BaseController {
             a.click();
             URL.revokeObjectURL(url);
             
-            this.notify('success', 'Logs exportÃƒÆ’Ã‚Â©s');
-            this.log('info', 'DebugController', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ Logs exported');
+            this.notify('success', 'Logs exportés');
+            this.log('info', 'DebugController', '📤 Logs exported');
             
         } catch (error) {
             this.handleError('Erreur export logs', error);
@@ -544,7 +544,7 @@ class DebugController extends BaseController {
             this.debugConsole.clear();
         }
         
-        this.log('info', 'DebugController', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬ËœÃƒÂ¯Ã‚Â¸Ã‚Â Logs cleared');
+        this.log('info', 'DebugController', '🗑️ Logs cleared');
     }
 
     // ========================================================================
@@ -575,7 +575,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'affichage du debug panel
+     * Met à jour l'affichage du debug panel
      */
     updateDebugDisplay() {
         if (!this.debugConsole || !this.debugConsole.isOpen) return;
@@ -592,7 +592,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Met ÃƒÆ’Ã‚Â  jour l'ÃƒÆ’Ã‚Â©tat systÃƒÆ’Ã‚Â¨me
+     * Met à jour l'état système
      */
     updateSystemState() {
         this.systemState.lastUpdate = Date.now();
@@ -604,7 +604,7 @@ class DebugController extends BaseController {
     // ========================================================================
 
     /**
-     * Obtient un rÃƒÆ’Ã‚Â©sumÃƒÆ’Ã‚Â© des mÃƒÆ’Ã‚Â©triques
+     * Obtient un résumé des métriques
      */
     getMetricsSummary() {
         const summary = {};
@@ -632,7 +632,7 @@ class DebugController extends BaseController {
     }
 
     /**
-     * Obtient l'ÃƒÆ’Ã‚Â©tat complet du systÃƒÆ’Ã‚Â¨me
+     * Obtient l'état complet du système
      */
     getSystemState() {
         return {

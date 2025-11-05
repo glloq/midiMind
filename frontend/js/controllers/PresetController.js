@@ -4,13 +4,13 @@
 // Date: 2025-10-28
 // ============================================================================
 // CORRECTIONS v1.0.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // Description:
-//   ContrÃƒÂ´leur pour gÃƒÂ©rer les presets de configuration
+//   Contrôleur pour gérer les presets de configuration
 //   - Liste et chargement des presets
 //   - Sauvegarde de la configuration actuelle
 //   - Suppression et export de presets
@@ -24,7 +24,7 @@ class PresetController extends BaseController {
         this.backendService = backendService;
         this.presetView = presetView;
         
-        // Ãƒâ€°tat des presets
+        // État des presets
         this.state.presets = {
             list: [],
             current: null,
@@ -36,7 +36,7 @@ class PresetController extends BaseController {
     }
     
     /**
-     * Initialisation personnalisÃƒÂ©e
+     * Initialisation personnalisée
      */
     onInitialize() {
         this.logDebug('info', 'PresetController initializing...');
@@ -48,10 +48,10 @@ class PresetController extends BaseController {
     }
     
     /**
-     * Liaison des ÃƒÂ©vÃƒÂ©nements
+     * Liaison des événements
      */
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements de la vue
+        // Événements de la vue
         this.subscribe('preset:list', () => this.loadPresetsList());
         this.subscribe('preset:load', (data) => this.loadPreset(data.id));
         this.subscribe('preset:save', (data) => this.savePreset(data.preset));
@@ -60,7 +60,7 @@ class PresetController extends BaseController {
         this.subscribe('preset:select', (data) => this.selectPreset(data.id));
         this.subscribe('preset:create-new', (data) => this.createNewPreset(data));
         
-        // Ãƒâ€°vÃƒÂ©nements backend
+        // Événements backend
         this.subscribe('backend:connected', () => {
             this.loadPresetsList();
         });
@@ -110,16 +110,16 @@ class PresetController extends BaseController {
                     this.state.presets.current = response.data.preset || null;
                     
                     this.showNotification(
-                        `Preset "${response.data.preset?.metadata?.name || data.id}" chargÃƒÂ© avec succÃƒÂ¨s`,
+                        `Preset "${response.data.preset?.metadata?.name || data.id}" chargé avec succès`,
                         'success'
                     );
                     
-                    // Ãƒâ€°mettre un ÃƒÂ©vÃƒÂ©nement pour que les autres contrÃƒÂ´leurs puissent rÃƒÂ©agir
+                    // Émettre un événement pour que les autres contrôleurs puissent réagir
                     this.emitEvent('preset:loaded', {
                         preset: this.state.presets.current
                     });
                     
-                    // RafraÃƒÂ®chir la liste pour mettre ÃƒÂ  jour l'ÃƒÂ©tat actuel
+                    // Rafraîchir la liste pour mettre à jour l'état actuel
                     await this.loadPresetsList();
                 }
                 
@@ -153,7 +153,7 @@ class PresetController extends BaseController {
                     const presetName = data.preset.metadata?.name || presetId;
                     
                     this.showNotification(
-                        `Preset "${presetName}" sauvegardÃƒÂ© avec succÃƒÂ¨s`,
+                        `Preset "${presetName}" sauvegardé avec succès`,
                         'success'
                     );
                     
@@ -162,7 +162,7 @@ class PresetController extends BaseController {
                         preset: data.preset
                     });
                     
-                    // RafraÃƒÂ®chir la liste
+                    // Rafraîchir la liste
                     await this.loadPresetsList();
                 }
                 
@@ -184,7 +184,7 @@ class PresetController extends BaseController {
                 const presetName = preset?.metadata?.name || data.id;
                 
                 // Demander confirmation
-                if (!confirm(`ÃƒÅ tes-vous sÃƒÂ»r de vouloir supprimer le preset "${presetName}" ?`)) {
+                if (!confirm(`Êtes-vous sûr de vouloir supprimer le preset "${presetName}" ?`)) {
                     return { success: false, cancelled: true };
                 }
                 
@@ -196,7 +196,7 @@ class PresetController extends BaseController {
                 
                 if (response.success) {
                     this.showNotification(
-                        `Preset "${presetName}" supprimÃƒÂ©`,
+                        `Preset "${presetName}" supprimé`,
                         'success'
                     );
                     
@@ -240,7 +240,7 @@ class PresetController extends BaseController {
                     const presetName = preset?.metadata?.name || data.id;
                     
                     this.showNotification(
-                        `Preset "${presetName}" exportÃƒÂ© vers ${data.filepath}`,
+                        `Preset "${presetName}" exporté vers ${data.filepath}`,
                         'success'
                     );
                     
@@ -259,7 +259,7 @@ class PresetController extends BaseController {
     }
     
     /**
-     * SÃƒÂ©lectionne un preset
+     * Sélectionne un preset
      */
     selectPreset(presetId) {
         const preset = this.state.presets.list.find(p => p.id === presetId);
@@ -278,7 +278,7 @@ class PresetController extends BaseController {
     }
     
     /**
-     * CrÃƒÂ©e un nouveau preset ÃƒÂ  partir de la configuration actuelle
+     * Crée un nouveau preset à partir de la configuration actuelle
      */
     async createNewPreset(metadata) {
         return this.executeAction('createNewPreset', async (data) => {
@@ -292,8 +292,8 @@ class PresetController extends BaseController {
                 const description = data.description || prompt('Description (optionnel):') || '';
                 
                 // Construire le preset avec la configuration actuelle
-                // Note: Cette partie devrait rÃƒÂ©cupÃƒÂ©rer la configuration actuelle
-                // des routes et pÃƒÂ©riphÃƒÂ©riques depuis les autres contrÃƒÂ´leurs
+                // Note: Cette partie devrait récupérer la configuration actuelle
+                // des routes et périphériques depuis les autres contrôleurs
                 const preset = {
                     metadata: {
                         name,
@@ -309,7 +309,7 @@ class PresetController extends BaseController {
                 return await this.savePreset(preset);
                 
             } catch (error) {
-                this.handleError('Erreur lors de la crÃƒÂ©ation du preset', error);
+                this.handleError('Erreur lors de la création du preset', error);
                 throw error;
             }
         }, metadata);
@@ -324,7 +324,7 @@ class PresetController extends BaseController {
             return false;
         }
         
-        // VÃƒÂ©rifier la prÃƒÂ©sence des champs requis
+        // Vérifier la présence des champs requis
         if (!preset.metadata || typeof preset.metadata !== 'object') {
             this.logDebug('error', 'Preset must have metadata object');
             return false;
@@ -335,13 +335,13 @@ class PresetController extends BaseController {
             return false;
         }
         
-        // VÃƒÂ©rifier les routes (optionnel mais doit ÃƒÂªtre un tableau si prÃƒÂ©sent)
+        // Vérifier les routes (optionnel mais doit être un tableau si présent)
         if (preset.routes && !Array.isArray(preset.routes)) {
             this.logDebug('error', 'Preset routes must be an array');
             return false;
         }
         
-        // VÃƒÂ©rifier les paramÃƒÂ¨tres des pÃƒÂ©riphÃƒÂ©riques (optionnel mais doit ÃƒÂªtre un objet si prÃƒÂ©sent)
+        // Vérifier les paramètres des périphériques (optionnel mais doit être un objet si présent)
         if (preset.deviceSettings && typeof preset.deviceSettings !== 'object') {
             this.logDebug('error', 'Preset deviceSettings must be an object');
             return false;
@@ -351,7 +351,7 @@ class PresetController extends BaseController {
     }
     
     /**
-     * Met ÃƒÂ  jour la vue
+     * Met à jour la vue
      */
     updateView(data) {
         if (this.presetView && typeof this.presetView.render === 'function') {
@@ -371,7 +371,7 @@ class PresetController extends BaseController {
     }
     
     /**
-     * Obtenir l'ÃƒÂ©tat actuel
+     * Obtenir l'état actuel
      */
     getPresetsState() {
         return {

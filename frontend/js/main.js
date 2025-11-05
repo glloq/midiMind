@@ -1,9 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/main.js
-// Version: v3.2.0 - FIXED INTERFACE DISPLAY
-// Date: 2025-10-22
-// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
+// Version: v3.3.0 - EVENTBUS GLOBAL INITIALIZATION FIX
+// Date: 2025-11-05
+// Projet: MidiMind v3.1 - Système d'Orchestration MIDI
 // ============================================================================
+// MODIFICATIONS v3.3.0:
+// ✅ CRITIQUE: Initialisation EventBus GLOBAL avant Application
+// ✅ Vérification EventBus après initialisation
+// ✅ Fix du problème "EventBus is null"
+//
 // MODIFICATIONS v3.2.0:
 // ✅ Ajout d'un timeout pour forcer l'affichage si l'init bloque
 // ✅ Affichage de l'interface même si l'initialisation est incomplète
@@ -52,7 +57,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 2: VÉRIFIER APPLICATION CLASS
+        // ÉTAPE 2: VÉRIFIER ET INITIALISER EVENTBUS GLOBAL
+        // =====================================================================
+        
+        if (typeof EventBus === 'undefined') {
+            throw new Error('EventBus class not loaded. Check index.html script order.');
+        }
+        
+        // ✅ CRITIQUE: Créer EventBus GLOBAL avant tout le reste
+        if (!window.eventBus) {
+            window.eventBus = new EventBus();
+            console.log('✔ EventBus initialized globally');
+        } else {
+            console.log('✔ EventBus already exists (reusing existing instance)');
+        }
+        
+        // Vérification de sécurité
+        if (!window.eventBus || typeof window.eventBus.emit !== 'function') {
+            throw new Error('EventBus initialization failed - invalid instance');
+        }
+        
+        console.log('✔ EventBus verified:', {
+            hasOn: typeof window.eventBus.on === 'function',
+            hasEmit: typeof window.eventBus.emit === 'function',
+            hasOff: typeof window.eventBus.off === 'function'
+        });
+        
+        // =====================================================================
+        // ÉTAPE 3: VÉRIFIER APPLICATION CLASS
         // =====================================================================
         
         if (typeof Application === 'undefined') {
@@ -60,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 3: CRÉER INSTANCE APPLICATION
+        // ÉTAPE 4: CRÉER INSTANCE APPLICATION
         // =====================================================================
         
         const app = new Application();
@@ -69,8 +101,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.app = app;
         console.log('✔ Application instance created');
         
+        // Vérification supplémentaire EventBus
+        if (!window.eventBus) {
+            console.error('❌ CRITICAL: EventBus was lost during Application initialization!');
+            throw new Error('EventBus disappeared after Application creation');
+        }
+        
         // =====================================================================
-        // ÉTAPE 4: VÉRIFIER MÉTHODE INIT
+        // ÉTAPE 5: VÉRIFIER MÉTHODE INIT
         // =====================================================================
         
         if (typeof app.init !== 'function') {
@@ -78,13 +116,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 5: AFFICHER LOADING INDICATOR
+        // ÉTAPE 6: AFFICHER LOADING INDICATOR
         // =====================================================================
         
         showLoadingIndicator();
         
         // =====================================================================
-        // ÉTAPE 6: INITIALISER L'APPLICATION AVEC TIMEOUT
+        // ÉTAPE 7: INITIALISER L'APPLICATION AVEC TIMEOUT
         // =====================================================================
         
         console.log('⚙️ Initializing application...');
@@ -107,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 forceShowInterface();
             } else {
                 // =====================================================================
-                // ÉTAPE 7: AFFICHER L'INTERFACE & MASQUER LOADING
+                // ÉTAPE 8: AFFICHER L'INTERFACE & MASQUER LOADING
                 // =====================================================================
                 
                 hideLoadingIndicator();
@@ -155,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 8: AFFICHER INFO PERFORMANCE EN CONSOLE
+        // ÉTAPE 9: AFFICHER INFO PERFORMANCE EN CONSOLE
         // =====================================================================
         
         displayPerformanceInfo();
@@ -172,142 +210,103 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // =============================================================================
-// FONCTION: FORCER L'AFFICHAGE DE L'INTERFACE
-// =============================================================================
-
-function forceShowInterface() {
-    console.log('🔧 Forcing interface display...');
-    
-    hideLoadingIndicator();
-    
-    // Afficher l'élément #app
-    const appElement = document.getElementById('app');
-    if (appElement) {
-        appElement.style.display = 'block';
-        console.log('✔ Interface forcibly displayed');
-    } else {
-        console.error('❌ Cannot find #app element');
-    }
-    
-    // Afficher la page home par défaut
-    const homePage = document.getElementById('home');
-    if (homePage) {
-        homePage.style.display = 'block';
-        homePage.classList.add('active');
-    }
-    
-    // Initialiser au moins la navigation de base
-    if (window.app && !window.app.state.initialized) {
-        try {
-            // Navigation manuelle minimale
-            window.addEventListener('hashchange', handleBasicNavigation);
-            handleBasicNavigation();
-            console.log('✔ Basic navigation initialized');
-        } catch (e) {
-            console.error('Failed to initialize basic navigation:', e);
-        }
-    }
-}
-
-// =============================================================================
-// NAVIGATION DE BASE (fallback si l'app ne s'initialise pas)
-// =============================================================================
-
-function handleBasicNavigation() {
-    const hash = window.location.hash.slice(1) || 'home';
-    const page = hash.split('/')[0];
-    
-    console.log('🔍 Basic navigation to:', page);
-    
-    // Masquer toutes les pages
-    const pages = ['home', 'editor', 'routing', 'keyboard', 'instruments', 'system'];
-    pages.forEach(p => {
-        const element = document.getElementById(p);
-        if (element) {
-            element.style.display = 'none';
-            element.classList.remove('active');
-        }
-    });
-    
-    // Afficher la page demandée
-    const pageElement = document.getElementById(page);
-    if (pageElement) {
-        pageElement.style.display = 'block';
-        pageElement.classList.add('active');
-    }
-    
-    // Mettre à jour les liens de navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.page === page) {
-            item.classList.add('active');
-        }
-    });
-}
-
-// =============================================================================
-// FONCTION: AFFICHER L'INDICATEUR DE CHARGEMENT
+// UTILITAIRES D'INTERFACE
 // =============================================================================
 
 function showLoadingIndicator() {
-    const loading = document.getElementById('loading-indicator');
-    if (loading) {
-        loading.style.display = 'flex';
+    const loadingEl = document.getElementById('loading-indicator');
+    if (loadingEl) {
+        loadingEl.style.display = 'flex';
     }
 }
-
-// =============================================================================
-// FONCTION: MASQUER L'INDICATEUR DE CHARGEMENT
-// =============================================================================
 
 function hideLoadingIndicator() {
-    const loading = document.getElementById('loading-indicator');
-    if (loading) {
-        loading.style.display = 'none';
+    const loadingEl = document.getElementById('loading-indicator');
+    if (loadingEl) {
+        loadingEl.style.display = 'none';
     }
 }
 
-// =============================================================================
-// FONCTION: AFFICHER UN MESSAGE D'ERREUR
-// =============================================================================
+/**
+ * Force l'affichage de l'interface même en cas d'erreur
+ */
+function forceShowInterface() {
+    console.log('🔧 Forcing interface display...');
+    
+    // Masquer loading
+    hideLoadingIndicator();
+    
+    // Afficher #app
+    const appElement = document.getElementById('app');
+    if (appElement) {
+        appElement.style.display = 'block';
+        console.log('✔ Interface forcefully displayed');
+    } else {
+        console.error('❌ Cannot find #app element');
+    }
+}
 
+/**
+ * Affiche un message d'erreur à l'utilisateur
+ */
 function showErrorMessage(message) {
-    // Créer un élément d'erreur si nécessaire
-    let errorBox = document.getElementById('init-error-box');
-    if (!errorBox) {
-        errorBox = document.createElement('div');
-        errorBox.id = 'init-error-box';
-        errorBox.style.cssText = `
+    // Créer un élément d'erreur si pas déjà présent
+    let errorEl = document.getElementById('startup-error');
+    
+    if (!errorEl) {
+        errorEl = document.createElement('div');
+        errorEl.id = 'startup-error';
+        errorEl.style.cssText = `
             position: fixed;
-            top: 20px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            background: #f44336;
+            transform: translate(-50%, -50%);
+            background: #ff4444;
             color: white;
-            padding: 15px 25px;
+            padding: 20px 30px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 10000;
             max-width: 500px;
+            text-align: center;
             font-family: system-ui, -apple-system, sans-serif;
         `;
-        document.body.appendChild(errorBox);
+        document.body.appendChild(errorEl);
     }
     
-    errorBox.innerHTML = `
-        <strong>⚠️ Erreur</strong><br>
-        ${message}
-        <br><br>
-        <small>Ouvrez la console (F12) pour plus de détails</small>
+    errorEl.innerHTML = `
+        <h3 style="margin-top: 0;">⚠️ Erreur de Démarrage</h3>
+        <p>${message}</p>
+        <button onclick="location.reload()" style="
+            background: white;
+            color: #ff4444;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        ">Recharger</button>
+        <button onclick="document.getElementById('startup-error').remove()" style="
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-left: 10px;
+        ">Continuer</button>
     `;
 }
 
-// =============================================================================
-// FONCTION: AFFICHER INFO PERFORMANCE
-// =============================================================================
-
+/**
+ * Affiche les informations de performance dans la console
+ */
 function displayPerformanceInfo() {
-    if (typeof PerformanceConfig === 'undefined') return;
+    if (typeof PerformanceConfig === 'undefined') {
+        return;
+    }
     
     const info = `
 ╔══════════════════════════════════════════════════════╗
@@ -341,6 +340,7 @@ function displayPerformanceInfo() {
 ║                                                      ║
 ║  💡 Tips:                                            ║
 ║  • Utilisez window.app pour accéder à l'application ║
+║  • Utilisez window.eventBus pour l'EventBus global  ║
 ║  • Utilisez window.PerformanceConfig pour config    ║
 ║  • Pressez F12 pour ouvrir DevTools                 ║
 ║                                                      ║
@@ -472,6 +472,22 @@ window.debugUtils = {
      */
     forceShowInterface() {
         forceShowInterface();
+    },
+    
+    /**
+     * Vérifie l'état d'EventBus
+     */
+    checkEventBus() {
+        console.group('🔌 EventBus Status');
+        console.log('Exists:', !!window.eventBus);
+        console.log('Type:', typeof window.eventBus);
+        if (window.eventBus) {
+            console.log('Has emit:', typeof window.eventBus.emit === 'function');
+            console.log('Has on:', typeof window.eventBus.on === 'function');
+            console.log('Has off:', typeof window.eventBus.off === 'function');
+            console.log('Listeners count:', Object.keys(window.eventBus.listeners || {}).length);
+        }
+        console.groupEnd();
     }
 };
 
@@ -482,3 +498,4 @@ console.log('   • showPerformanceStats()');
 console.log('   • togglePerformanceMode()');
 console.log('   • forceGC()');
 console.log('   • forceShowInterface()');
+console.log('   • checkEventBus()');

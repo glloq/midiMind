@@ -1,30 +1,30 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/ModalController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/ModalController.js
-// Version: v3.4.1 - FIXED BACKEND SIGNATURE - AMÃƒâ€°LIORATIONS NOTIFICATIONS & VALIDATIONS
+// Chemin réel: frontend/js/controllers/ModalController.js
+// Version: v3.4.1 - FIXED BACKEND SIGNATURE - AMÉLIORATIONS NOTIFICATIONS & VALIDATIONS
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.4.1:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
-// AMÃƒâ€°LIORATIONS v3.4.0:
-// Ã¢Å“â€¦ Meilleure intÃƒÂ©gration NotificationManager
-// Ã¢Å“â€¦ Validation formulaires robuste
-// Ã¢Å“â€¦ MÃƒÂ©thodes helper pour modales communes
-// Ã¢Å“â€¦ Gestion erreurs amÃƒÂ©liorÃƒÂ©e
-// Ã¢Å“â€¦ Feedback utilisateur optimisÃƒÂ©
-// Ã¢Å“â€¦ Support formulaires asynchrones
+// AMÉLIORATIONS v3.4.0:
+// ✓ Meilleure intégration NotificationManager
+// ✓ Validation formulaires robuste
+// ✓ Méthodes helper pour modales communes
+// ✓ Gestion erreurs améliorée
+// ✓ Feedback utilisateur optimisé
+// ✓ Support formulaires asynchrones
 // ============================================================================
 
 class ModalController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // RÃƒÂ©fÃƒÂ©rence au backend
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // Référence au backend
+        // ✅ this.backend initialisé automatiquement par BaseController
         
         // Registre des modales disponibles
         this.modals = {
@@ -44,7 +44,7 @@ class ModalController extends BaseController {
             },
             playlistEditor: {
                 id: 'playlistEditorModal',
-                title: 'Ãƒâ€°diteur de playlist',
+                title: 'Éditeur de playlist',
                 size: 'large',
                 closable: true,
                 backdrop: true
@@ -58,7 +58,7 @@ class ModalController extends BaseController {
             },
             systemConfig: {
                 id: 'systemConfigModal',
-                title: 'Configuration systÃƒÂ¨me',
+                title: 'Configuration système',
                 size: 'extra-large',
                 closable: true,
                 backdrop: true
@@ -86,10 +86,10 @@ class ModalController extends BaseController {
             }
         };
 
-        // Ãƒâ€°tat interne
+        // État interne
         this._draggedPlaylistItem = null;
         
-        // Ãƒâ€°tat des modales
+        // État des modales
         this.modalState = {
             activeModals: new Set(),
             modalStack: [],
@@ -114,11 +114,11 @@ class ModalController extends BaseController {
         this.pendingActions = new Map();
         
         this.initializeModals();
-        this.log('info', 'ModalController', 'Ã¢Å“â€¦ Initialized v3.4.0');
+        this.log('info', 'ModalController', '✓ Initialized v3.4.0');
     }
 
     /**
-     * Configuration des ÃƒÂ©vÃƒÂ©nements
+     * Configuration des événements
      */
     bindEvents() {
         this.eventBus.on('modal:open', (data) => {
@@ -144,17 +144,17 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Initialise le systÃƒÂ¨me de modales
+     * Initialise le système de modales
      */
     initializeModals() {
         this.createModalContainers();
         this.setupGlobalEvents();
         this.setupValidationRules();
-        this.log('debug', 'ModalController', 'SystÃƒÂ¨me de modales initialisÃƒÂ©');
+        this.log('debug', 'ModalController', 'Système de modales initialisé');
     }
 
     /**
-     * Configure les rÃƒÂ¨gles de validation par dÃƒÂ©faut
+     * Configure les règles de validation par défaut
      */
     setupValidationRules() {
         // Validation nom de playlist
@@ -163,7 +163,7 @@ class ModalController extends BaseController {
             minLength: 1,
             maxLength: 100,
             pattern: /^[a-zA-Z0-9\s\-_]+$/,
-            message: 'Le nom doit contenir entre 1 et 100 caractÃƒÂ¨res alphanumÃƒÂ©riques'
+            message: 'Le nom doit contenir entre 1 et 100 caractères alphanumériques'
         });
         
         // Validation nom de fichier
@@ -178,12 +178,12 @@ class ModalController extends BaseController {
             required: true,
             min: 20,
             max: 300,
-            message: 'Le tempo doit ÃƒÂªtre entre 20 et 300 BPM'
+            message: 'Le tempo doit être entre 20 et 300 BPM'
         });
     }
 
     /**
-     * CrÃƒÂ©e les conteneurs HTML
+     * Crée les conteneurs HTML
      */
     createModalContainers() {
         const existingContainer = document.getElementById('modal-container');
@@ -198,7 +198,7 @@ class ModalController extends BaseController {
     }
 
     /**
-     * Configure les ÃƒÂ©vÃƒÂ©nements globaux
+     * Configure les événements globaux
      */
     setupGlobalEvents() {
         document.addEventListener('keydown', (event) => {
@@ -229,7 +229,7 @@ class ModalController extends BaseController {
         }
         
         if (this.modalState.activeModals.has(modalId)) {
-            this.log('debug', 'ModalController', `Modale dÃƒÂ©jÃƒÂ  ouverte: ${modalId}`);
+            this.log('debug', 'ModalController', `Modale déjà ouverte: ${modalId}`);
             return false;
         }
         
@@ -289,7 +289,7 @@ class ModalController extends BaseController {
                 }
                 
                 this.eventBus.emit('modal:closed', { modalId });
-                this.log('debug', 'ModalController', `Modale fermÃƒÂ©e: ${modalId}`);
+                this.log('debug', 'ModalController', `Modale fermée: ${modalId}`);
                 return true;
             } catch (error) {
                 this.handleError('Erreur fermeture modale', error);
@@ -318,7 +318,7 @@ class ModalController extends BaseController {
     }
 
     // ========================================================================
-    // MODALES SPÃƒâ€°CIALISÃƒâ€°ES (HELPERS)
+    // MODALES SPÉCIALISÉES (HELPERS)
     // ========================================================================
 
     /**
@@ -330,89 +330,74 @@ class ModalController extends BaseController {
             callback,
             confirmText: options.confirmText || 'Confirmer',
             cancelText: options.cancelText || 'Annuler',
-            type: options.type || 'warning'
+            confirmClass: options.confirmClass || 'btn-primary',
+            cancelClass: options.cancelClass || 'btn-secondary'
         };
         
-        return this.open('confirmation', confirmOptions);
+        this.pendingActions.set('confirmation', confirmOptions);
+        this.open('confirmation', confirmOptions);
     }
 
     /**
      * Affiche une modale d'information
      */
-    alert(title, message, options = {}) {
-        const alertOptions = {
-            title,
+    inform(message, options = {}) {
+        this.open('information', {
             message,
-            type: options.type || 'info',
             okText: options.okText || 'OK'
-        };
-        
-        return this.open('information', alertOptions);
+        });
     }
 
     /**
      * Affiche une modale d'erreur
      */
-    error(error, exception = null, options = {}) {
-        const errorOptions = {
+    showError(error, exception = null, options = {}) {
+        this.open('error', {
             error,
             exception,
             showDetails: options.showDetails || false,
             okText: options.okText || 'Fermer'
-        };
-        
-        this.notify('error', error);
-        return this.open('error', errorOptions);
+        });
     }
 
     /**
-     * Modale d'ÃƒÂ©dition de playlist avec validation
+     * Gère la confirmation (appelé depuis le HTML)
+     */
+    handleConfirm() {
+        const action = this.pendingActions.get('confirmation');
+        if (action && action.callback) {
+            action.callback();
+        }
+        this.pendingActions.delete('confirmation');
+        this.close('confirmation');
+    }
+
+    /**
+     * Ouvre l'éditeur de playlist
      */
     async openPlaylistEditor(playlistId = null) {
-        return this.open('playlistEditor', { playlistId });
-    }
-
-    /**
-     * Modale de crÃƒÂ©ation de playlist simplifiÃƒÂ©e
-     */
-    async promptCreatePlaylist() {
-        const name = prompt('Nom de la playlist:');
-        if (!name) return null;
-        
-        // Valider le nom
-        const validation = this.validate('playlistName', name);
-        if (!validation.valid) {
-            this.notify('error', validation.message);
-            return null;
-        }
-        
         try {
-            const playlistModel = this.getModel('playlist');
-            const playlist = playlistModel.createPlaylist(name);
+            const options = { playlistId };
             
-            this.notify('success', `Playlist "${name}" crÃƒÂ©ÃƒÂ©e`);
-            this.eventBus.emit('playlist:created', { playlist });
+            if (playlistId) {
+                // Charger les données de la playlist
+                const playlist = await this.loadPlaylist(playlistId);
+                options.playlist = playlist;
+            }
             
-            return playlist;
+            await this.open('playlistEditor', options);
         } catch (error) {
-            this.handleError('Erreur crÃƒÂ©ation playlist', error);
-            return null;
+            this.handleError('Erreur ouverture éditeur de playlist', error);
+            this.showError('Impossible d\'ouvrir l\'éditeur de playlist', error);
         }
     }
 
     /**
-     * Modale de confirmation de suppression
+     * Charge une playlist
      */
-    async confirmDelete(itemType, itemName, onConfirm) {
-        return this.confirm(
-            `ÃƒÅ tes-vous sÃƒÂ»r de vouloir supprimer ${itemType} "${itemName}" ?`,
-            onConfirm,
-            {
-                type: 'warning',
-                confirmText: 'Supprimer',
-                cancelText: 'Annuler'
-            }
-        );
+    async loadPlaylist(playlistId) {
+        // À implémenter selon le système de persistance
+        return { id: playlistId, name: 'Ma Playlist', files: [] };
     }
 
     // ========================================================================
@@ -420,69 +405,83 @@ class ModalController extends BaseController {
     // ========================================================================
 
     /**
-     * Valide une valeur selon une rÃƒÂ¨gle
+     * Valide un formulaire
      */
-    validate(ruleName, value) {
-        const rule = this.validationRules.get(ruleName);
-        if (!rule) {
-            return { valid: true };
-        }
-        
-        // Required
-        if (rule.required && (!value || value.trim() === '')) {
-            return { valid: false, message: 'Ce champ est requis' };
-        }
-        
-        // MinLength
-        if (rule.minLength && value.length < rule.minLength) {
-            return { valid: false, message: `Minimum ${rule.minLength} caractÃƒÂ¨res` };
-        }
-        
-        // MaxLength
-        if (rule.maxLength && value.length > rule.maxLength) {
-            return { valid: false, message: `Maximum ${rule.maxLength} caractÃƒÂ¨res` };
-        }
-        
-        // Pattern
-        if (rule.pattern && !rule.pattern.test(value)) {
-            return { valid: false, message: rule.message || 'Format invalide' };
-        }
-        
-        // Min/Max (nombres)
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue)) {
-            if (rule.min !== undefined && numValue < rule.min) {
-                return { valid: false, message: `Minimum: ${rule.min}` };
-            }
-            if (rule.max !== undefined && numValue > rule.max) {
-                return { valid: false, message: `Maximum: ${rule.max}` };
-            }
-        }
-        
-        return { valid: true };
-    }
-
-    /**
-     * Valide un formulaire complet
-     */
-    validateForm(formElement) {
+    validateForm(formElement, rules = null) {
         const errors = new Map();
         const inputs = formElement.querySelectorAll('[data-validate]');
         
         inputs.forEach(input => {
-            const ruleName = input.getAttribute('data-validate');
-            const value = input.value;
-            const validation = this.validate(ruleName, value);
+            const fieldName = input.getAttribute('data-validate');
+            const rule = rules ? rules.get(fieldName) : this.validationRules.get(fieldName);
             
-            if (!validation.valid) {
-                errors.set(input.name, validation.message);
-                this.showFieldError(input, validation.message);
+            if (!rule) return;
+            
+            const value = input.value;
+            const error = this.validateField(value, rule);
+            
+            if (error) {
+                errors.set(fieldName, error);
+                this.showFieldError(input, error);
             } else {
                 this.clearFieldError(input);
             }
         });
         
         return { valid: errors.size === 0, errors };
+    }
+
+    /**
+     * Valide un champ individuel
+     */
+    validateField(value, rule) {
+        // Required
+        if (rule.required && (!value || value.trim() === '')) {
+            return rule.message || 'Ce champ est requis';
+        }
+        
+        // Min length
+        if (rule.minLength && value.length < rule.minLength) {
+            return rule.message || `Minimum ${rule.minLength} caractères`;
+        }
+        
+        // Max length
+        if (rule.maxLength && value.length > rule.maxLength) {
+            return rule.message || `Maximum ${rule.maxLength} caractères`;
+        }
+        
+        // Pattern
+        if (rule.pattern && !rule.pattern.test(value)) {
+            return rule.message || 'Format invalide';
+        }
+        
+        // Numeric min
+        if (rule.min !== undefined && Number(value) < rule.min) {
+            return rule.message || `Valeur minimum: ${rule.min}`;
+        }
+        
+        // Numeric max
+        if (rule.max !== undefined && Number(value) > rule.max) {
+            return rule.message || `Valeur maximum: ${rule.max}`;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Valide un formulaire de manière asynchrone
+     */
+    async validateFormAsync(formElement, rules = null) {
+        const syncResult = this.validateForm(formElement, rules);
+        
+        if (!syncResult.valid) {
+            return syncResult;
+        }
+        
+        // Validations asynchrones (ex: vérifier si un nom existe déjà)
+        // À implémenter selon les besoins
+        
+        return { valid: syncResult.errors.size === 0, errors: syncResult.errors };
     }
 
     /**
@@ -514,7 +513,7 @@ class ModalController extends BaseController {
     }
 
     // ========================================================================
-    // GÃƒâ€°NÃƒâ€°RATION DE CONTENU (stubs - ÃƒÂ  implÃƒÂ©menter selon besoins)
+    // GÉNÉRATION DE CONTENU (stubs - à implémenter selon besoins)
     // ========================================================================
 
     async generateModalContent(modalId, options) {
@@ -581,7 +580,7 @@ class ModalController extends BaseController {
                 <p class="error-message">${options.error}</p>
                 ${options.exception && options.showDetails ? `
                     <details class="error-details">
-                        <summary>DÃƒÂ©tails techniques</summary>
+                        <summary>Détails techniques</summary>
                         <pre>${options.exception.stack || options.exception.message}</pre>
                     </details>
                 ` : ''}
@@ -595,12 +594,12 @@ class ModalController extends BaseController {
     }
 
     buildDefaultContent(modalId, options) {
-        return `<div>Contenu par dÃƒÂ©faut pour ${modalId}</div>`;
+        return `<div>Contenu par défaut pour ${modalId}</div>`;
     }
 
     buildAllModalsHTML() {
         return `
-            <!-- Les modales sont crÃƒÂ©ÃƒÂ©es dynamiquement selon les besoins -->
+            <!-- Les modales sont créées dynamiquement selon les besoins -->
             <div id="channelModal" class="modal"></div>
             <div id="instrumentConfigModal" class="modal"></div>
             <div id="playlistEditorModal" class="modal"></div>
@@ -622,7 +621,7 @@ class ModalController extends BaseController {
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>${title}</h3>
-                    <button class="modal-close" onclick="app.modalController.closeTopModal()">Ã¢Å“â€¢</button>
+                    <button class="modal-close" onclick="app.modalController.closeTopModal()">✕</button>
                 </div>
                 <div class="modal-body">${content}</div>
             </div>
@@ -670,7 +669,7 @@ class ModalController extends BaseController {
     }
 
     handleTabKey(event) {
-        // Focus trap - ÃƒÂ  implÃƒÂ©menter si nÃƒÂ©cessaire
+        // Focus trap - à implémenter si nécessaire
     }
 
     invalidateCache(modalIds) {

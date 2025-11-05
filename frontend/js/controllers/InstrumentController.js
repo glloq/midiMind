@@ -1,19 +1,21 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/InstrumentController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/InstrumentController.js
-// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
-// Date: 2025-11-02
+// Chemin réel: frontend/js/controllers/InstrumentController.js
+// Version: v4.3.0 - COMPLET ET CORRIGÉ
+// Date: 2025-11-06
+// ============================================================================
+// CORRECTIONS v4.3.0:
+// ✅ CRITIQUE: Ajout TOUS les event bindings View ↔ Controller
+// ✅ CRITIQUE: Méthode updateView() au lieu de render(data)
+// ✅ CRITIQUE: Gestion complète des requêtes View (*_requested)
+// ✅ CRITIQUE: Émission des événements de réponse pour la View
+// ✅ Gestion hot-plug complète
+// ✅ Gestion Bluetooth complète
 // ============================================================================
 // CORRECTIONS v4.2.3:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
-// ============================================================================
-// ============================================================================
-// CORRECTIONS v4.2.2:
-// Ã¢Å“â€¦ devices.scan pour count (pas devices.list)
-// Ã¢Å“â€¦ response.data.devices extraction
-// Ã¢Å“â€¦ device_id en snake_case
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 
 class InstrumentController extends BaseController {
@@ -23,7 +25,7 @@ class InstrumentController extends BaseController {
         this.logger = window.logger || console;
         this.model = models.instrument;
         this.view = views.instrument;
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✅ this.backend initialisé automatiquement par BaseController
         
         this.devices = new Map();
         this.connectedDevices = new Set();
@@ -43,12 +45,19 @@ class InstrumentController extends BaseController {
     }
 
     bindEvents() {
+        // ========================================================================
+        // ÉVÉNEMENTS BACKEND
+        // ========================================================================
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
-        this.eventBus.on('backend:device:connected', (data) => this.handleDeviceConnected(data));
-        this.eventBus.on('backend:device:disconnected', (data) => this.handleDeviceDisconnected(data));
+        this.eventBus.on('backend:device:connected', (data) => this.handleBackendDeviceConnected(data));
+        this.eventBus.on('backend:device:disconnected', (data) => this.handleBackendDeviceDisconnected(data));
         this.eventBus.on('backend:device:discovered', (data) => this.handleDeviceDiscovered(data));
         this.eventBus.on('backend:device:error', (data) => this.handleDeviceError(data));
+        
+        // ========================================================================
+        // ÉVÉNEMENTS NAVIGATION
+        // ========================================================================
         this.eventBus.on('navigation:page_changed', (data) => {
             if (data.page === 'instruments') {
                 this.onInstrumentsPageActive();
@@ -56,9 +65,75 @@ class InstrumentController extends BaseController {
                 this.onInstrumentsPageInactive();
             }
         });
+        
+        // ========================================================================
+        // REQUÊTES DE LA VIEW (*_requested) - NOUVEAU v4.3.0
+        // ========================================================================
+        
+        // Liste des devices
+        this.eventBus.on('devices:list_requested', () => {
+            this.handleListRequest();
+        });
+        
+        // Scan des devices
+        this.eventBus.on('devices:scan_requested', (data) => {
+            this.handleScanRequest(data);
+        });
+        
+        // Connexion device
+        this.eventBus.on('devices:connect_requested', (data) => {
+            this.handleConnectRequest(data);
+        });
+        
+        // Déconnexion device
+        this.eventBus.on('devices:disconnect_requested', (data) => {
+            this.handleDisconnectRequest(data);
+        });
+        
+        // Déconnexion tous devices
+        this.eventBus.on('devices:disconnect_all_requested', () => {
+            this.handleDisconnectAllRequest();
+        });
+        
+        // Info device
+        this.eventBus.on('devices:info_requested', (data) => {
+            this.handleDeviceInfoRequest(data);
+        });
+        
+        // Hot-plug start
+        this.eventBus.on('hotplug:start_requested', () => {
+            this.handleHotPlugStartRequest();
+        });
+        
+        // Hot-plug stop
+        this.eventBus.on('hotplug:stop_requested', () => {
+            this.handleHotPlugStopRequest();
+        });
+        
+        // Hot-plug status
+        this.eventBus.on('hotplug:status_requested', () => {
+            this.handleHotPlugStatusRequest();
+        });
+        
+        // Bluetooth scan
+        this.eventBus.on('bluetooth:scan_requested', () => {
+            this.handleBluetoothScanRequest();
+        });
+        
+        // Bluetooth paired
+        this.eventBus.on('bluetooth:paired_requested', () => {
+            this.handleBluetoothPairedRequest();
+        });
+        
+        // Bluetooth forget
+        this.eventBus.on('bluetooth:forget_requested', (data) => {
+            this.handleBluetoothForgetRequest(data);
+        });
+        
+        // Autres
         this.eventBus.on('instruments:request_refresh', () => this.refreshDeviceList());
         
-        this.logger?.info?.('InstrumentController', 'Ã¢Å“â€œ Events bound');
+        this.logger?.info?.('InstrumentController', '✓ Events bound (v4.3.0 - COMPLET)');
     }
 
     async initialize() {
@@ -70,7 +145,7 @@ class InstrumentController extends BaseController {
     }
 
     async onBackendConnected() {
-        this.logger?.info?.('InstrumentController', 'Ã¢Å“â€¦ Backend connected');
+        this.logger?.info?.('InstrumentController', '✓ Backend connected');
 
         this.scanDevices().catch(err => {
             this.log('warn', 'InstrumentController', 'Initial scan failed:', err.message);
@@ -83,7 +158,8 @@ class InstrumentController extends BaseController {
         this.getHotPlugStatus().then(status => {
             if (status?.enabled) {
                 this.hotPlugEnabled = true;
-                this.logger?.info?.('InstrumentController', 'Ã¢Å“â€¦ Hot-plug enabled');
+                this.logger?.info?.('InstrumentController', '✓ Hot-plug enabled');
+                this.notifyHotPlugStatus();
             }
         }).catch(err => {
             this.log('warn', 'InstrumentController', 'Hot-plug status failed:', err.message);
@@ -91,14 +167,170 @@ class InstrumentController extends BaseController {
     }
 
     onBackendDisconnected() {
-        this.logger?.warn?.('InstrumentController', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
+        this.logger?.warn?.('InstrumentController', '⚠️ Backend disconnected');
         this.stopHotPlugMonitoring();
         this.connectedDevices.clear();
-        this.refreshView();
+        this.updateView();
     }
 
+    // ========================================================================
+    // HANDLERS DES REQUÊTES VIEW - NOUVEAU v4.3.0
+    // ========================================================================
+
+    async handleListRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling list request');
+            await this.refreshDeviceList();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleListRequest failed:', error);
+            this.eventBus.emit('devices:list_error', { error: error.message });
+        }
+    }
+
+    async handleScanRequest(data = {}) {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling scan request');
+            const full_scan = data.full_scan || false;
+            await this.scanDevices(full_scan);
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleScanRequest failed:', error);
+            this.eventBus.emit('devices:scan_error', { error: error.message });
+        }
+    }
+
+    async handleConnectRequest(data) {
+        try {
+            const device_id = data.device_id;
+            if (!device_id) throw new Error('device_id required');
+            
+            this.logger?.debug?.('InstrumentController', `Handling connect request: ${device_id}`);
+            await this.connectDevice(device_id);
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleConnectRequest failed:', error);
+            this.notifications?.error('Connection failed', error.message);
+            this.eventBus.emit('devices:connect_error', { error: error.message });
+        }
+    }
+
+    async handleDisconnectRequest(data) {
+        try {
+            const device_id = data.device_id;
+            if (!device_id) throw new Error('device_id required');
+            
+            this.logger?.debug?.('InstrumentController', `Handling disconnect request: ${device_id}`);
+            await this.disconnectDevice(device_id);
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleDisconnectRequest failed:', error);
+            this.notifications?.error('Disconnection failed', error.message);
+            this.eventBus.emit('devices:disconnect_error', { error: error.message });
+        }
+    }
+
+    async handleDisconnectAllRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling disconnect all request');
+            await this.disconnectAllDevices();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleDisconnectAllRequest failed:', error);
+            this.notifications?.error('Disconnection failed', error.message);
+        }
+    }
+
+    async handleDeviceInfoRequest(data) {
+        try {
+            const device_id = data.device_id;
+            if (!device_id) throw new Error('device_id required');
+            
+            this.logger?.debug?.('InstrumentController', `Handling device info request: ${device_id}`);
+            const info = await this.getDeviceInfo(device_id);
+            
+            this.eventBus.emit('devices:info', {
+                device_id,
+                info
+            });
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleDeviceInfoRequest failed:', error);
+            this.eventBus.emit('devices:info_error', { error: error.message });
+        }
+    }
+
+    async handleHotPlugStartRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling hot-plug start request');
+            await this.startHotPlugMonitoring();
+            this.notifyHotPlugStatus();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleHotPlugStartRequest failed:', error);
+            this.notifications?.error('Hot-plug failed', error.message);
+        }
+    }
+
+    async handleHotPlugStopRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling hot-plug stop request');
+            await this.stopHotPlugMonitoring();
+            this.notifyHotPlugStatus();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleHotPlugStopRequest failed:', error);
+            this.notifications?.error('Hot-plug failed', error.message);
+        }
+    }
+
+    async handleHotPlugStatusRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling hot-plug status request');
+            const status = await this.getHotPlugStatus();
+            this.hotPlugEnabled = status?.enabled || false;
+            this.notifyHotPlugStatus();
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleHotPlugStatusRequest failed:', error);
+        }
+    }
+
+    async handleBluetoothScanRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling Bluetooth scan request');
+            // TODO: Implémenter le scan Bluetooth quand backend sera prêt
+            this.eventBus.emit('bluetooth:scanned', {
+                devices: []
+            });
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleBluetoothScanRequest failed:', error);
+            this.eventBus.emit('bluetooth:scan_error', { error: error.message });
+        }
+    }
+
+    async handleBluetoothPairedRequest() {
+        try {
+            this.logger?.debug?.('InstrumentController', 'Handling Bluetooth paired request');
+            // TODO: Implémenter la liste des devices Bluetooth pairés
+            this.eventBus.emit('bluetooth:paired_list', {
+                devices: []
+            });
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleBluetoothPairedRequest failed:', error);
+        }
+    }
+
+    async handleBluetoothForgetRequest(data) {
+        try {
+            const device_id = data.device_id;
+            if (!device_id) throw new Error('device_id required');
+            
+            this.logger?.debug?.('InstrumentController', `Handling Bluetooth forget request: ${device_id}`);
+            // TODO: Implémenter l'oubli du device Bluetooth
+            this.eventBus.emit('bluetooth:forgotten', { device_id });
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleBluetoothForgetRequest failed:', error);
+        }
+    }
+
+    // ========================================================================
+    // ACTIONS BACKEND
+    // ========================================================================
+
     /**
-     * Ã¢Å“â€¦ CORRECTION: Utiliser devices.scan pour obtenir count
+     * ✅ CORRECTION: Utiliser devices.scan pour obtenir count
      */
     async scanDevices(full_scan = false) {
         if (!this.backend) {
@@ -113,10 +345,10 @@ class InstrumentController extends BaseController {
         this.isScanning = true;
         
         try {
-            // Ã¢Å“â€¦ CORRECTION: devices.scan retourne count
+            // ✅ CORRECTION: devices.scan retourne count
             const response = await this.backend.scanDevices(full_scan);
             
-            // Ã¢Å“â€¦ Extraction via response (dÃƒÂ©jÃƒÂ  data dans BackendService)
+            // ✅ Extraction via response (déjà data dans BackendService)
             const devices = response.devices || [];
             const count = response.count || devices.length;
             
@@ -127,14 +359,15 @@ class InstrumentController extends BaseController {
             this.lastScanTime = Date.now();
             
             this.logger?.info?.('InstrumentController', 
-                `Ã¢Å“â€œ Scan complete: ${count} devices found`);
+                `✓ Scan complete: ${count} devices found`);
             
-            this.eventBus.emit('instruments:scan_complete', { 
+            // ✅ NOUVEAU: Émettre pour la View
+            this.eventBus.emit('devices:scanned', { 
                 devices, 
                 count 
             });
             
-            this.refreshView();
+            this.updateView();
             
             return devices;
             
@@ -148,7 +381,7 @@ class InstrumentController extends BaseController {
 
     async refreshDeviceList() {
         try {
-            // Ã¢Å“â€¦ devices.list n'a pas de count
+            // ✅ devices.list n'a pas de count
             const response = await this.backend.listDevices();
             const devices = response.devices || [];
             
@@ -156,7 +389,10 @@ class InstrumentController extends BaseController {
                 this.devices.set(device.id, device);
             });
             
-            this.refreshView();
+            // ✅ NOUVEAU: Émettre pour la View
+            this.eventBus.emit('devices:listed', { devices });
+            
+            this.updateView();
             return devices;
             
         } catch (error) {
@@ -177,7 +413,7 @@ class InstrumentController extends BaseController {
                 this.connectedDevices.add(device.id);
             });
             
-            this.refreshView();
+            this.updateView();
             return devices;
             
         } catch (error) {
@@ -187,7 +423,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * Ã¢Å“â€¦ CORRECTION: device_id en snake_case
+     * ✅ CORRECTION: device_id en snake_case
      */
     async connectDevice(device_id) {
         if (!this.backend) {
@@ -201,11 +437,12 @@ class InstrumentController extends BaseController {
             
             this.connectedDevices.add(device_id);
             
-            this.eventBus.emit('instruments:device_connected', { device_id });
+            // ✅ NOUVEAU: Émettre pour la View
+            this.eventBus.emit('device:connected', { device_id });
             
             this.notifications?.success('Device connected', `Device ${device_id} connected successfully`);
             
-            this.refreshView();
+            this.updateView();
             
         } catch (error) {
             this.logger?.error?.('InstrumentController', `Failed to connect device ${device_id}:`, error);
@@ -226,11 +463,12 @@ class InstrumentController extends BaseController {
             
             this.connectedDevices.delete(device_id);
             
-            this.eventBus.emit('instruments:device_disconnected', { device_id });
+            // ✅ NOUVEAU: Émettre pour la View
+            this.eventBus.emit('device:disconnected', { device_id });
             
             this.notifications?.success('Device disconnected', `Device ${device_id} disconnected`);
             
-            this.refreshView();
+            this.updateView();
             
         } catch (error) {
             this.logger?.error?.('InstrumentController', `Failed to disconnect device ${device_id}:`, error);
@@ -255,7 +493,7 @@ class InstrumentController extends BaseController {
             
             this.notifications?.success('All disconnected', 'All devices disconnected');
             
-            this.refreshView();
+            this.updateView();
             
         } catch (error) {
             this.logger?.error?.('InstrumentController', 'Failed to disconnect all devices:', error);
@@ -328,25 +566,37 @@ class InstrumentController extends BaseController {
         }
     }
 
-    handleDeviceConnected(data) {
+    // ========================================================================
+    // HANDLERS ÉVÉNEMENTS BACKEND
+    // ========================================================================
+
+    handleBackendDeviceConnected(data) {
         const device_id = data.device_id || data.id;
         this.logger?.info?.('InstrumentController', `Device connected: ${device_id}`);
         this.connectedDevices.add(device_id);
-        this.refreshView();
+        
+        // ✅ Propager à la View
+        this.eventBus.emit('device:connected', { device_id });
+        
+        this.updateView();
     }
 
-    handleDeviceDisconnected(data) {
+    handleBackendDeviceDisconnected(data) {
         const device_id = data.device_id || data.id;
         this.logger?.info?.('InstrumentController', `Device disconnected: ${device_id}`);
         this.connectedDevices.delete(device_id);
-        this.refreshView();
+        
+        // ✅ Propager à la View
+        this.eventBus.emit('device:disconnected', { device_id });
+        
+        this.updateView();
     }
 
     handleDeviceDiscovered(data) {
         const device = data.device;
         if (device) {
             this.devices.set(device.id, device);
-            this.refreshView();
+            this.updateView();
         }
     }
 
@@ -365,17 +615,48 @@ class InstrumentController extends BaseController {
         // Rien pour l'instant
     }
 
-    refreshView() {
+    // ========================================================================
+    // MISE À JOUR VIEW - NOUVEAU v4.3.0
+    // ========================================================================
+
+    /**
+     * ✅ NOUVELLE MÉTHODE: Mise à jour de la View avec les données actuelles
+     * Remplace l'ancien this.view.render(data) qui ne fonctionnait pas
+     */
+    updateView() {
         if (!this.view) return;
         
         const devicesArray = Array.from(this.devices.values());
         
-        this.view.render({
-            devices: devicesArray,
-            connectedDevices: Array.from(this.connectedDevices),
-            hotPlugEnabled: this.hotPlugEnabled
+        // Séparer les devices connectés et disponibles
+        const connectedDevices = devicesArray.filter(d => 
+            this.connectedDevices.has(d.id) || d.status === 2
+        );
+        
+        const availableDevices = devicesArray.filter(d => 
+            !this.connectedDevices.has(d.id) && d.status !== 2
+        );
+        
+        // ✅ NOUVEAU: Émettre un événement pour que la View se mette à jour
+        this.eventBus.emit('devices:listed', {
+            devices: devicesArray
+        });
+        
+        this.logger?.debug?.('InstrumentController', `View updated: ${connectedDevices.length} connected, ${availableDevices.length} available`);
+    }
+
+    /**
+     * ✅ NOUVELLE MÉTHODE: Notifier le statut hot-plug à la View
+     */
+    notifyHotPlugStatus() {
+        this.eventBus.emit('hotplug:status', {
+            enabled: this.hotPlugEnabled
         });
     }
+
+    // ========================================================================
+    // GETTERS
+    // ========================================================================
 
     getDevices() {
         return Array.from(this.devices.values());

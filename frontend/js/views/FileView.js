@@ -1,13 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
 // Date: 2025-11-02
 // ============================================================================
-// AMÃ‰LIORATIONS v4.0.0:
-// âœ… ConformitÃ© API v4.2.2 (files.list, files.read, files.write, files.delete)
-// âœ… Gestion rÃ©ponses {success: true, data: {...}}
-// âœ… Upload et gestion fichiers MIDI
-// âœ… PrÃ©visualisation et mÃ©tadonnÃ©es
+// AMÉLIORATIONS v4.0.0:
+// ✅ Conformité API v4.2.2 (files.list, files.read, files.write, files.delete)
+// ✅ Gestion réponses {success: true, data: {...}}
+// ✅ Upload et gestion fichiers MIDI
+// ✅ Prévisualisation et métadonnées
 // ============================================================================
 
 class FileView extends BaseView {
@@ -16,7 +16,7 @@ class FileView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // Ã‰tat spÃ©cifique Ã  la vue
+        // État spécifique à la vue
         this.viewState = {
             files: [],
             selectedFile: null,
@@ -27,7 +27,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', 'FileView', 'âœ… FileView v4.0.0 initialized (API-compliant)');
+        this.log('info', 'FileView', '✅ FileView v4.0.0 initialized (API-compliant)');
     }
     
     // ========================================================================
@@ -40,18 +40,18 @@ class FileView extends BaseView {
         return `
             <div class="file-view-container">
                 <div class="page-header">
-                    <h1>ðŸ“ Fichiers MIDI</h1>
+                    <h1>📁 Fichiers MIDI</h1>
                     <div class="header-actions">
                         <button class="btn-upload" data-action="upload-file">
-                            ðŸ“¤ Upload
+                            📤 Upload
                         </button>
                         <button class="btn-refresh" data-action="refresh-files">
-                            ðŸ”„ Actualiser
+                            🔄 Actualiser
                         </button>
                     </div>
                 </div>
                 
-                <!-- Barre de contrÃ´le -->
+                <!-- Barre de contrôle -->
                 <div class="files-toolbar">
                     <div class="files-path">
                         <span class="path-label">Dossier:</span>
@@ -71,7 +71,7 @@ class FileView extends BaseView {
                             <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
                         </select>
                         <button class="btn-sort-order" data-action="toggle-sort-order">
-                            ${state.sortOrder === 'asc' ? 'â†‘' : 'â†“'}
+                            ${state.sortOrder === 'asc' ? '↑' : '↓'}
                         </button>
                     </div>
                     
@@ -87,7 +87,7 @@ class FileView extends BaseView {
                     </div>
                 </div>
                 
-                <!-- Panneau de dÃ©tails -->
+                <!-- Panneau de détails -->
                 <div class="file-details" id="fileDetails">
                     ${state.selectedFile ? this.renderFileDetails(state.selectedFile) : this.renderNoSelection()}
                 </div>
@@ -115,9 +115,9 @@ class FileView extends BaseView {
         if (files.length === 0) {
             return `
                 <div class="files-empty">
-                    <div class="empty-icon">ðŸ“‚</div>
-                    <p>Aucun fichier MIDI trouvÃ©</p>
-                    <p class="text-muted">Uploadez des fichiers ou vÃ©rifiez le chemin</p>
+                    <div class="empty-icon">📂</div>
+                    <p>Aucun fichier MIDI trouvé</p>
+                    <p class="text-muted">Uploadez des fichiers ou vérifiez le chemin</p>
                 </div>
             `;
         }
@@ -133,31 +133,31 @@ class FileView extends BaseView {
         const isSelected = selectedFile && 
                           (selectedFile.path === file.path || selectedFile.name === file.name);
         
-        const size = file.size ? this.formatFileSize(file.size) : 'â€”';
+        const size = file.size ? this.formatFileSize(file.size) : '—';
         const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : 'â€”';
+        const dateStr = date ? this.formatDate(date) : '—';
         
         return `
             <div class="file-card ${isSelected ? 'selected' : ''}" 
                  data-file-path="${file.path || file.name}">
-                <div class="file-icon">ðŸŽµ</div>
+                <div class="file-icon">🎵</div>
                 <div class="file-info">
                     <div class="file-name" title="${file.name}">${file.name}</div>
                     <div class="file-meta">
                         <span class="file-size">${size}</span>
-                        <span>â€¢</span>
+                        <span>•</span>
                         <span class="file-date">${dateStr}</span>
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-icon" data-action="select-file" title="SÃ©lectionner">
-                        ðŸ“‹
+                    <button class="btn-icon" data-action="select-file" title="Sélectionner">
+                        📋
                     </button>
                     <button class="btn-icon" data-action="play-file" title="Lire">
-                        â–¶
+                        ▶
                     </button>
                     <button class="btn-icon" data-action="delete-file" title="Supprimer">
-                        ðŸ—‘ï¸
+                        🗑️
                     </button>
                 </div>
             </div>
@@ -165,17 +165,17 @@ class FileView extends BaseView {
     }
     
     renderFileDetails(file) {
-        const size = file.size ? this.formatFileSize(file.size) : 'â€”';
+        const size = file.size ? this.formatFileSize(file.size) : '—';
         const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : 'â€”';
+        const dateStr = date ? this.formatDate(date) : '—';
         
         return `
             <div class="details-header">
-                <h3>DÃ©tails du fichier</h3>
-                <button class="btn-close" data-action="close-details">âœ•</button>
+                <h3>Détails du fichier</h3>
+                <button class="btn-close" data-action="close-details">✕</button>
             </div>
             <div class="details-content">
-                <div class="detail-icon">ðŸŽµ</div>
+                <div class="detail-icon">🎵</div>
                 <div class="detail-name">${file.name}</div>
                 
                 <div class="details-section">
@@ -198,13 +198,13 @@ class FileView extends BaseView {
                 
                 <div class="details-actions">
                     <button class="btn-primary" data-action="load-file">
-                        ðŸ“‚ Charger dans l'Ã©diteur
+                        📂 Charger dans l'éditeur
                     </button>
                     <button class="btn-secondary" data-action="play-file">
-                        â–¶ Lire
+                        ▶ Lire
                     </button>
                     <button class="btn-danger" data-action="delete-file">
-                        ðŸ—‘ï¸ Supprimer
+                        🗑️ Supprimer
                     </button>
                 </div>
             </div>
@@ -217,19 +217,19 @@ class FileView extends BaseView {
                 <h4>Informations MIDI</h4>
                 <div class="detail-row">
                     <span class="detail-label">Format:</span>
-                    <span class="detail-value">${midiInfo.format || 'â€”'}</span>
+                    <span class="detail-value">${midiInfo.format || '—'}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Pistes:</span>
-                    <span class="detail-value">${midiInfo.tracks || 'â€”'}</span>
+                    <span class="detail-value">${midiInfo.tracks || '—'}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Tempo:</span>
-                    <span class="detail-value">${midiInfo.tempo || 'â€”'} BPM</span>
+                    <span class="detail-value">${midiInfo.tempo || '—'} BPM</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">DurÃ©e:</span>
-                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : 'â€”'}</span>
+                    <span class="detail-label">Durée:</span>
+                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : '—'}</span>
                 </div>
             </div>
         `;
@@ -238,9 +238,9 @@ class FileView extends BaseView {
     renderNoSelection() {
         return `
             <div class="details-empty">
-                <div class="empty-icon">ðŸ“„</div>
-                <p>SÃ©lectionnez un fichier</p>
-                <p class="text-muted">Les dÃ©tails s'afficheront ici</p>
+                <div class="empty-icon">📄</div>
+                <p>Sélectionnez un fichier</p>
+                <p class="text-muted">Les détails s'afficheront ici</p>
             </div>
         `;
     }
@@ -254,7 +254,7 @@ class FileView extends BaseView {
         
         if (!this.container) return;
         
-        // DÃ©lÃ©gation d'Ã©vÃ©nements
+        // Délégation d'événements
         this.container.addEventListener('click', (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
             if (!action) return;
@@ -322,26 +322,26 @@ class FileView extends BaseView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        // files:listed - rÃ©ponse de files.list
+        // files:listed - réponse de files.list
         this.eventBus.on('files:listed', (data) => {
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
             this.render();
         });
         
-        // files:loaded - rÃ©ponse de files.read
+        // files:loaded - réponse de files.read
         this.eventBus.on('file:loaded', (data) => {
-            // Fichier chargÃ© avec succÃ¨s
+            // Fichier chargé avec succès
             this.log('info', 'FileView', `File loaded: ${data.path}`);
         });
         
-        // files:deleted - rÃ©ponse de files.delete
+        // files:deleted - réponse de files.delete
         this.eventBus.on('file:deleted', (data) => {
             this.log('info', 'FileView', `File deleted: ${data.path}`);
             this.handleRefresh();
         });
         
-        // files:uploaded - rÃ©ponse de files.write
+        // files:uploaded - réponse de files.write
         this.eventBus.on('file:uploaded', (data) => {
             this.log('info', 'FileView', `File uploaded: ${data.path}`);
             this.handleRefresh();
@@ -360,7 +360,7 @@ class FileView extends BaseView {
     // ========================================================================
     
     handleUpload() {
-        // CrÃ©er un input file
+        // Créer un input file
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.mid,.midi';
@@ -374,7 +374,7 @@ class FileView extends BaseView {
                     const arrayBuffer = await file.arrayBuffer();
                     const base64 = this.arrayBufferToBase64(arrayBuffer);
                     
-                    // Ã‰mettre event pour upload via files.write API
+                    // Émettre event pour upload via files.write API
                     this.eventBus.emit('file:upload_requested', {
                         file_path: `${this.viewState.currentPath}/${file.name}`,
                         content: base64,
@@ -410,7 +410,7 @@ class FileView extends BaseView {
             this.viewState.selectedFile = file;
             this.render();
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Émettre événement
             if (this.eventBus) {
                 this.eventBus.emit('file:selected', { file });
             }
@@ -431,7 +431,7 @@ class FileView extends BaseView {
         
         const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
         
-        // Demander chargement dans l'Ã©diteur via files.read puis conversion
+        // Demander chargement dans l'éditeur via files.read puis conversion
         if (this.eventBus) {
             this.eventBus.emit('file:load_editor_requested', {
                 file_path: filePath
@@ -450,7 +450,7 @@ class FileView extends BaseView {
             });
         }
         
-        // Clear selection si c'est le fichier sÃ©lectionnÃ©
+        // Clear selection si c'est le fichier sélectionné
         if (this.viewState.selectedFile && 
             (this.viewState.selectedFile.path === filePath || 
              this.viewState.selectedFile.name === filePath)) {

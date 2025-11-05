@@ -1,35 +1,35 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PerformanceController.js
-// Projet: MidiMind v3.1.0 - SystÃƒÆ’Ã‚Â¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.0 - OPTIMISÃƒÆ’Ã¢â‚¬Â°
+// Projet: MidiMind v3.1.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.1.0 - OPTIMISÉ
 // Date: 2025-11-01
 // ============================================================================
 // Description:
-//   ContrÃƒÆ’Ã‚Â´leur de monitoring et optimisation des performances de l'application.
-//   Mesure FPS, latence, utilisation mÃƒÆ’Ã‚Â©moire, et dÃƒÆ’Ã‚Â©clenche alertes si dÃƒÆ’Ã‚Â©gradation.
+//   Contrôleur de monitoring et optimisation des performances de l'application.
+//   Mesure FPS, latence, utilisation mémoire, et déclenche alertes si dégradation.
 //
-// FonctionnalitÃƒÆ’Ã‚Â©s:
-//   - Monitoring FPS temps rÃƒÆ’Ã‚Â©el
-//   - Mesure latence MIDI (input ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ output)
-//   - Utilisation mÃƒÆ’Ã‚Â©moire (heap size)
+// Fonctionnalités:
+//   - Monitoring FPS temps réel
+//   - Mesure latence MIDI (input → output)
+//   - Utilisation mémoire (heap size)
 //   - Temps de rendu Canvas
-//   - DÃƒÆ’Ã‚Â©tection ralentissements (frame drops)
-//   - Alertes automatiques si seuils dÃƒÆ’Ã‚Â©passÃƒÆ’Ã‚Â©s
+//   - Détection ralentissements (frame drops)
+//   - Alertes automatiques si seuils dépassés
 //   - Logs de performance
 //   - Suggestions d'optimisation
 //
 // Architecture:
 //   PerformanceController extends BaseController
 //   - Utilise PerformanceMonitor (utils/)
-//   - Sampling pÃƒÆ’Ã‚Â©riodique (requestAnimationFrame)
-//   - Historique mÃƒÆ’Ã‚Â©triques (buffer circulaire)
+//   - Sampling périodique (requestAnimationFrame)
+//   - Historique métriques (buffer circulaire)
 //
 // MODIFICATIONS v3.1.0:
-//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Constructeur conforme ÃƒÆ’Ã‚Â  BaseController
-//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Utilisation cohÃƒÆ’Ã‚Â©rente de subscribe() pour ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
-//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion robuste des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements backend
-//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Optimisation de la collecte de mÃƒÆ’Ã‚Â©triques
-//   ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ MÃƒÆ’Ã‚Â©thodes helper de BaseController
+//   ✓ Constructeur conforme à BaseController
+//   ✓ Utilisation cohérente de subscribe() pour événements
+//   ✓ Gestion robuste des événements backend
+//   ✓ Optimisation de la collecte de métriques
+//   ✓ Méthodes helper de BaseController
 //
 // Auteur: MidiMind Team
 // ============================================================================
@@ -38,7 +38,7 @@ class PerformanceController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // MÃƒÆ’Ã‚Â©triques de performance
+        // Métriques de performance
         this.metrics = {
             renderTimes: [],
             eventCounts: {},
@@ -50,7 +50,7 @@ class PerformanceController extends BaseController {
         
         // Configuration
         this.config = {
-            ...this.config,  // HÃƒÆ’Ã‚Â©riter de BaseController
+            ...this.config,  // Hériter de BaseController
             monitoringInterval: 10000,     // 10 secondes
             cleanupInterval: 60000,         // 1 minute
             maxRenderSamples: 100,
@@ -61,14 +61,14 @@ class PerformanceController extends BaseController {
             maxEventTypes: 100
         };
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat
+        // État
         this.isMonitoring = false;
         this.monitoringTimer = null;
         this.cleanupTimer = null;
     }
     
     /**
-     * Initialisation du contrÃƒÆ’Ã‚Â´leur
+     * Initialisation du contrôleur
      */
     onInitialize() {
         this.logDebug('info', 'Initializing performance controller...');
@@ -77,15 +77,15 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Bind des ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Bind des événements
      */
     bindEvents() {
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements de rendu
+        // Événements de rendu
         this.subscribe('view:rendered', (data) => {
             this.recordRenderTime(data.view, Date.now());
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements backend pour mesurer latence
+        // Événements backend pour mesurer latence
         this.subscribe('backend:command:sent', (data) => {
             this.recordCommandStart(data.id, data.command);
         });
@@ -94,17 +94,17 @@ class PerformanceController extends BaseController {
             this.recordCommandEnd(data.id);
         });
         
-        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements systÃƒÆ’Ã‚Â¨me
+        // Événements système
         this.subscribe('system:memory:warning', () => {
             this.handleMemoryWarning();
         });
         
-        // Intercepter tous les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements pour compter (avec prÃƒÆ’Ã‚Â©caution)
+        // Intercepter tous les événements pour compter (avec précaution)
         this.interceptEventBus();
     }
     
     /**
-     * Intercepter l'EventBus pour compter les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+     * Intercepter l'EventBus pour compter les événements
      */
     interceptEventBus() {
         if (this.eventBus && typeof this.eventBus.emit === 'function') {
@@ -135,14 +135,14 @@ class PerformanceController extends BaseController {
             this.metrics.renderTimes = this.metrics.renderTimes.slice(-this.config.maxRenderSamples);
         }
         
-        // Avertir si temps de rendu ÃƒÆ’Ã‚Â©levÃƒÆ’Ã‚Â©
+        // Avertir si temps de rendu élevé
         if (duration > this.config.warnRenderTime) {
             this.logDebug('warn', `Slow render detected: ${view} took ${duration.toFixed(1)}ms`);
         }
     }
     
     /**
-     * Enregistrer le dÃƒÆ’Ã‚Â©but d'une commande
+     * Enregistrer le début d'une commande
      */
     recordCommandStart(id, command) {
         if (!this.commandTimings) {
@@ -178,26 +178,26 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Enregistrer un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+     * Enregistrer un événement
      */
     recordEvent(event) {
         this.metrics.eventCounts[event] = (this.metrics.eventCounts[event] || 0) + 1;
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©marrer le monitoring
+     * Démarrer le monitoring
      */
     startMonitoring() {
         if (this.isMonitoring) return;
         
         this.isMonitoring = true;
         
-        // Monitoring pÃƒÆ’Ã‚Â©riodique
+        // Monitoring périodique
         this.monitoringTimer = setInterval(() => {
             this.collectMetrics();
         }, this.config.monitoringInterval);
         
-        // Nettoyage pÃƒÆ’Ã‚Â©riodique
+        // Nettoyage périodique
         this.cleanupTimer = setInterval(() => {
             this.cleanupMetrics();
         }, this.config.cleanupInterval);
@@ -206,7 +206,7 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * ArrÃƒÆ’Ã‚Âªter le monitoring
+     * Arrêter le monitoring
      */
     stopMonitoring() {
         if (!this.isMonitoring) return;
@@ -227,10 +227,10 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Collecter les mÃƒÆ’Ã‚Â©triques
+     * Collecter les métriques
      */
     collectMetrics() {
-        // MÃƒÆ’Ã‚Â©moire
+        // Mémoire
         if (performance.memory) {
             const memory = performance.memory;
             this.metrics.memoryUsage.push({
@@ -240,21 +240,21 @@ class PerformanceController extends BaseController {
                 limit: memory.jsHeapSizeLimit
             });
             
-            // Garder seulement les N derniÃƒÆ’Ã‚Â¨res mesures
+            // Garder seulement les N dernières mesures
             if (this.metrics.memoryUsage.length > this.config.maxMemorySamples) {
                 this.metrics.memoryUsage = this.metrics.memoryUsage.slice(-this.config.maxMemorySamples);
             }
         }
         
-        // DÃƒÆ’Ã‚Â©tecter les problÃƒÆ’Ã‚Â¨mes de performance
+        // Détecter les problèmes de performance
         this.detectPerformanceIssues();
     }
     
     /**
-     * DÃƒÆ’Ã‚Â©tecter les problÃƒÆ’Ã‚Â¨mes de performance
+     * Détecter les problèmes de performance
      */
     detectPerformanceIssues() {
-        // VÃƒÆ’Ã‚Â©rifier les temps de rendu
+        // Vérifier les temps de rendu
         if (this.metrics.renderTimes.length > 0) {
             const recentRenders = this.metrics.renderTimes.slice(-10);
             const avgRenderTime = recentRenders.reduce((sum, r) => sum + r.duration, 0) / recentRenders.length;
@@ -269,7 +269,7 @@ class PerformanceController extends BaseController {
             }
         }
         
-        // VÃƒÆ’Ã‚Â©rifier l'usage mÃƒÆ’Ã‚Â©moire
+        // Vérifier l'usage mémoire
         if (this.metrics.memoryUsage.length > 0) {
             const lastMemory = this.metrics.memoryUsage[this.metrics.memoryUsage.length - 1];
             const usageRatio = lastMemory.used / lastMemory.total;
@@ -284,7 +284,7 @@ class PerformanceController extends BaseController {
             }
         }
         
-        // VÃƒÆ’Ã‚Â©rifier les latences de commandes
+        // Vérifier les latences de commandes
         if (this.metrics.commandLatencies.length > 0) {
             const recentLatencies = this.metrics.commandLatencies.slice(-10);
             const avgLatency = recentLatencies.reduce((sum, l) => sum + l.latency, 0) / recentLatencies.length;
@@ -296,7 +296,7 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã‚Â©rer un avertissement mÃƒÆ’Ã‚Â©moire
+     * Gérer un avertissement mémoire
      */
     handleMemoryWarning() {
         this.logDebug('warn', 'Memory warning received, attempting optimization...');
@@ -315,7 +315,7 @@ class PerformanceController extends BaseController {
             ? recentRenders.reduce((sum, r) => sum + r.duration, 0) / recentRenders.length 
             : 0;
         
-        // Top ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
+        // Top événements
         const topEvents = Object.entries(this.metrics.eventCounts)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5);
@@ -342,7 +342,7 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Obtenir la tendance mÃƒÆ’Ã‚Â©moire
+     * Obtenir la tendance mémoire
      */
     getMemoryTrend() {
         if (this.metrics.memoryUsage.length < 2) return 'Insufficient';
@@ -362,7 +362,7 @@ class PerformanceController extends BaseController {
     optimizePerformance() {
         this.logDebug('info', 'Optimizing performance...');
         
-        // Nettoyer les mÃƒÆ’Ã‚Â©triques anciennes
+        // Nettoyer les métriques anciennes
         this.cleanupMetrics();
         
         // Forcer le garbage collection si disponible
@@ -371,7 +371,7 @@ class PerformanceController extends BaseController {
             this.logDebug('info', 'Garbage collection forced');
         }
         
-        // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+        // Émettre événement
         this.emitEvent('performance:optimized');
         
         this.logDebug('info', 'Performance optimization completed');
@@ -379,18 +379,18 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Nettoyer les mÃƒÆ’Ã‚Â©triques anciennes
+     * Nettoyer les métriques anciennes
      */
     cleanupMetrics() {
         const now = Date.now();
         const oneHourAgo = now - 3600000;
         
-        // Nettoyer les anciennes donnÃƒÆ’Ã‚Â©es
+        // Nettoyer les anciennes données
         this.metrics.renderTimes = this.metrics.renderTimes.filter(r => r.time > oneHourAgo);
         this.metrics.memoryUsage = this.metrics.memoryUsage.filter(m => m.time > oneHourAgo);
         this.metrics.commandLatencies = this.metrics.commandLatencies.filter(l => l.time > oneHourAgo);
         
-        // RÃƒÆ’Ã‚Â©initialiser les compteurs d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements si trop nombreux
+        // Réinitialiser les compteurs d'événements si trop nombreux
         if (Object.keys(this.metrics.eventCounts).length > this.config.maxEventTypes) {
             // Garder seulement les top 50
             const topEvents = Object.entries(this.metrics.eventCounts)
@@ -403,7 +403,7 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * Formater une durÃƒÆ’Ã‚Â©e
+     * Formater une durée
      */
     formatDuration(seconds) {
         const hours = Math.floor(seconds / 3600);
@@ -436,7 +436,7 @@ class PerformanceController extends BaseController {
     }
     
     /**
-     * RÃƒÆ’Ã‚Â©initialiser les mÃƒÆ’Ã‚Â©triques
+     * Réinitialiser les métriques
      */
     resetMetrics() {
         this.metrics = {

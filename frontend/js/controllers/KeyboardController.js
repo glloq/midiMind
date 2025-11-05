@@ -1,24 +1,24 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/KeyboardController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/KeyboardController.js
+// Chemin réel: frontend/js/controllers/KeyboardController.js
 // Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.3:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✓ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✓ Fix: super() appelle BaseController avec backend
+// ✓ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// Ã¢Å“â€¦ device_id (pas instrument) pour midi.sendNoteOn/Off
-// Ã¢Å“â€¦ Utiliser helpers BackendService
+// • device_id (pas instrument) pour midi.sendNoteOn/Off
+// • Utiliser helpers BackendService
 // ============================================================================
 
 class KeyboardController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✓ this.backend initialisé automatiquement par BaseController
         
         this.mode = PerformanceConfig?.keyboard?.mode || 'monitor';
         this.enableRecording = false;
@@ -41,7 +41,7 @@ class KeyboardController extends BaseController {
             errors: 0
         };
         
-        this.logDebug('keyboard', `Ã¢Å“â€œ KeyboardController v4.2.2 (mode: ${this.mode})`);
+        this.logDebug('keyboard', `✓ KeyboardController v4.2.2 (mode: ${this.mode})`);
     }
     
     async initialize() {
@@ -143,7 +143,7 @@ class KeyboardController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: device_id, note, velocity, channel
+     * • CORRECTION: device_id, note, velocity, channel
      */
     sendNoteOn(noteNumber, velocity = null, channel = 0) {
         if (!this.selectedDevice) {
@@ -169,7 +169,7 @@ class KeyboardController extends BaseController {
         });
         
         if (this.enablePlayback && this.backend?.isConnected()) {
-            // Ã¢Å“â€¦ Utiliser helper BackendService
+            // • Utiliser helper BackendService
             this.backend.sendNoteOn(
                 this.selectedDevice,
                 mappedNote,
@@ -201,7 +201,7 @@ class KeyboardController extends BaseController {
         this.activeNotes.delete(noteNumber);
         
         if (this.enablePlayback && this.backend?.isConnected()) {
-            // Ã¢Å“â€¦ Utiliser helper BackendService
+            // • Utiliser helper BackendService
             this.backend.sendNoteOff(
                 this.selectedDevice,
                 mappedNote,

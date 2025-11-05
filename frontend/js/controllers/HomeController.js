@@ -4,27 +4,27 @@
 // Date: 2025-11-01
 // ============================================================================
 // Description:
-//   ContrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´leur de la page d'accueil - VERSION COMPLETE
-//   Fusion de BaseController (v3.1.0) + Toutes fonctionnalitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s (v3.0.1)
+//   Contrôleur de la page d'accueil - VERSION COMPLETE
+//   Fusion de BaseController (v3.1.0) + Toutes fonctionnalités (v3.0.1)
 //
 // CORRECTIONS v3.2.1:
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ CRITIQUE: Fix double initialisation (BaseController.autoInitialize + Application.init())
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Ajout flag _dataLoaded pour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©viter chargement multiple
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Ajout flag _viewRendered pour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©viter rendu multiple
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode init() appelle onInitialize si pas encore initialisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ loadInitialData() protÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e contre appels multiples
+//   • CRITIQUE: Fix double initialisation (BaseController.autoInitialize + Application.init())
+//   • Ajout flag _dataLoaded pour éviter chargement multiple
+//   • Ajout flag _viewRendered pour éviter rendu multiple
+//   • méthode init() appelle onInitialize si pas encore initialisé
+//   • loadInitialData() protégée contre appels multiples
 //
 // CORRECTIONS v3.2.0:
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ HÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rite de BaseController
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Utilise models/views/notifications
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©serve TOUTES les fonctionnalitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s de v3.0.1
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Ajout destroy() complet
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Gestion playlists complÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨te (manage, edit, delete, load)
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Gestion routing complÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨te (auto-route, presets)
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Gestion fichiers complÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨te (upload, refresh)
-//   ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ IntÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gration backend v3.0
+//   • Hérite de BaseController
+//   • Utilise models/views/notifications
+//   • Préserve TOUTES les fonctionnalités de v3.0.1
+//   • Ajout destroy() complet
+//   • Gestion playlists complète (manage, edit, delete, load)
+//   • Gestion routing complète (auto-route, presets)
+//   • Gestion fichiers complète (upload, refresh)
+//   • Intégration backend v3.0
 //
-// FonctionnalitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s:
+// Fonctionnalités:
 //   - Playback (play, pause, stop, seek, tempo)
 //   - Playlists (create, edit, delete, load, manage)
 //   - Routing (assign, auto-route, presets)
@@ -36,24 +36,24 @@ class HomeController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ ModÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨les
+        // • Modèles
         this.playbackModel = models?.playback || null;
         this.routingModel = models?.routing || null;
         this.fileModel = models?.file || null;
         this.playlistModel = models?.playlist || null;
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Vue
+        // • Vue
         this.homeView = views?.home || null;
-        this.view = views?.home || null; // Alias pour compatibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
+        this.view = views?.home || null; // Alias pour compatibilité
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rences aux autres controllers
+        // • Références aux autres controllers
         this.playbackController = null;
         this.playlistController = null;
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Backend
-        // Ã¢Å“â€¦ this.backend initialisÃƒÂ© automatiquement par BaseController
+        // • Backend
+        // ✓ this.backend initialisé automatiquement par BaseController
         
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat du contrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â´leur home
+        // État du contrôleur home
         this.homeState = {
             currentFile: null,
             playbackState: 'stopped', // stopped, playing, paused
@@ -61,7 +61,7 @@ class HomeController extends BaseController {
             isPlaying: false
         };
         
-        // Aliases pour compatibilitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© avec ancien code
+        // Aliases pour compatibilité avec ancien code
         this.currentFile = null;
         this.playbackState = 'stopped';
         this.currentTime = 0;
@@ -70,11 +70,11 @@ class HomeController extends BaseController {
         // Timer pour position
         this.playbackTimer = null;
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOUVEAU: Flags pour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©viter double initialisation
+        // • NOUVEAU: Flags pour éviter double initialisation
         this._dataLoaded = false;
         this._viewRendered = false;
         
-        // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ NOTE: BaseController appelle automatiquement initialize() via autoInitialize
+        // • NOTE: BaseController appelle automatiquement initialize() via autoInitialize
         // qui appelle onInitialize() puis bindEvents()
     }
     
@@ -83,14 +83,14 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Hook d'initialisation personnalisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e
+     * Hook d'initialisation personnalisée
      * Override de BaseController.onInitialize()
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ APPELE AUTOMATIQUEMENT par BaseController.initialize()
+     * • APPELE AUTOMATIQUEMENT par BaseController.initialize()
      */
     onInitialize() {
         this.logInfo( 'HomeController.onInitialize() - v3.2.1');
         
-        // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cupÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rer rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rence aux controllers
+        // Récupérer référence aux controllers
         if (window.app && window.app.controllers) {
             this.playbackController = window.app.controllers.playback;
             this.playlistController = window.app.controllers.playlist;
@@ -104,7 +104,7 @@ class HomeController extends BaseController {
             this.playlistController = window.playlistController;
         }
         
-        // VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifier dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©pendances
+        // Vérifier dépendances
         if (!this.backend) {
             this.logWarn( 'BackendService not available');
             if (this.notifications) {
@@ -124,22 +124,22 @@ class HomeController extends BaseController {
             this._viewRendered = true;
         }
         
-        // Charger donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es initiales (si pas encore chargÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es)
+        // Charger données initiales (si pas encore chargées)
         if (!this._dataLoaded) {
             this.loadInitialData();
         }
         
-        this.logInfo( 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ HomeController.onInitialize() complete');
+        this.logInfo( '✓ HomeController.onInitialize() complete');
     }
     
     /**
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©thode init() publique appelÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e par Application.js
-     * PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vient la double initialisation grÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ce aux flags
+     * • Méthode init() publique appelée par Application.js
+     * Prévient la double initialisation grâce aux flags
      */
     init() {
         this.logInfo( 'HomeController.init() called by Application');
         
-        // Si dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  initialisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© par BaseController, juste rendre la vue
+        // Si déjà initialisé par BaseController, juste rendre la vue
         if (this.state.isInitialized) {
             this.logInfo( 'Already initialized, just rendering view');
             
@@ -152,7 +152,7 @@ class HomeController extends BaseController {
                 }
             }
             
-            // Charger donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es si pas encore fait
+            // Charger données si pas encore fait
             if (!this._dataLoaded) {
                 this.loadInitialData();
             }
@@ -160,17 +160,17 @@ class HomeController extends BaseController {
             return;
         }
         
-        // Sinon, initialiser complÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨tement
+        // Sinon, initialiser complètement
         this.logInfo( 'Not yet initialized, calling onInitialize');
         this.onInitialize();
     }
     
     /**
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Charge les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es initiales
-     * ProtÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©gÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e contre les appels multiples
+     * • Charge les données initiales
+     * Protégée contre les appels multiples
      */
     loadInitialData() {
-        // ProtÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ger contre double chargement
+        // Protéger contre double chargement
         if (this._dataLoaded) {
             this.logInfo( 'Data already loaded, skipping');
             return;
@@ -179,7 +179,7 @@ class HomeController extends BaseController {
         this.logInfo( 'Loading initial data...');
         
         try {
-            // Charger fichiers rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cents
+            // Charger fichiers récents
             if (this.fileModel) {
                 const recentFiles = this.fileModel.get?.('recentFiles') || [];
                 this.logInfo( `Loaded ${recentFiles.length} recent files`);
@@ -191,9 +191,9 @@ class HomeController extends BaseController {
                 this.logInfo( `Loaded ${playlists.length} playlists`);
             }
             
-            // Marquer comme chargÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
+            // Marquer comme chargé
             this._dataLoaded = true;
-            this.logInfo( 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Initial data loaded');
+            this.logInfo( '✓ Initial data loaded');
             
         } catch (error) {
             this.handleError('Failed to load initial data', error);
@@ -201,9 +201,9 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Binding des ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nements
+     * Binding des événements
      * Override de BaseController.bindEvents()
-     * ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ APPELE AUTOMATIQUEMENT par BaseController.initialize()
+     * • APPELE AUTOMATIQUEMENT par BaseController.initialize()
      */
     bindEvents() {
         this.logInfo( 'Binding home events...');
@@ -323,7 +323,7 @@ class HomeController extends BaseController {
         this.subscribe('backend:connected', () => this.onBackendConnected());
         this.subscribe('backend:disconnected', () => this.onBackendDisconnected());
         
-        this.logInfo( 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Events bound');
+        this.logInfo( '✓ Events bound');
     }
     
     /**
@@ -333,7 +333,7 @@ class HomeController extends BaseController {
     destroy() {
         this.logInfo( 'Destroying HomeController...');
         
-        // 1. ArrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªter timers
+        // 1. Arrêter timers
         this.stopProgressTimer();
         
         // 2. Cleanup state
@@ -352,7 +352,7 @@ class HomeController extends BaseController {
         // 4. Appeler parent
         super.destroy();
         
-        this.logInfo( 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ HomeController destroyed');
+        this.logInfo( '✓ HomeController destroyed');
     }
     
     // ========================================================================
@@ -360,8 +360,8 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lection d'un fichier
-     * @param {Object} data - DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es du fichier
+     * Gère la sélection d'un fichier
+     * @param {Object} data - Données du fichier
      */
     async handleFileSelected(data) {
         this.logInfo( 'File selected', data);
@@ -378,8 +378,8 @@ class HomeController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re le chargement d'un fichier
-     * @param {Object} data - DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es du fichier
+     * Gère le chargement d'un fichier
+     * @param {Object} data - Données du fichier
      */
     handleFileLoaded(data) {
         this.logInfo( 'File loaded', data);
@@ -387,12 +387,12 @@ class HomeController extends BaseController {
         this.currentFile = data.file;
         this.homeState.currentFile = data.file;
         
-        // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la vue
+        // Mettre à jour la vue
         if (this.view && this.view.updateCurrentFile) {
             this.view.updateCurrentFile(data.file);
         }
         
-        // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour le modÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨le
+        // Mettre à jour le modèle
         if (this.fileModel && this.fileModel.set) {
             this.fileModel.set('currentFile', data.file);
         }
@@ -408,14 +408,14 @@ class HomeController extends BaseController {
         this.logInfo( `Loading file: ${fileId}`);
         
         try {
-            // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cupÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rer le fichier
+            // Récupérer le fichier
             const file = await this.fileModel?.get?.(fileId);
             
             if (!file) {
                 throw new Error('File not found');
             }
             
-            // Convertir en MidiJSON si nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cessaire
+            // Convertir en MidiJSON si nécessaire
             if (!file.midiJson) {
                 if (typeof MidiJsonConverter !== 'undefined') {
                     const converter = new MidiJsonConverter();
@@ -431,7 +431,7 @@ class HomeController extends BaseController {
             this.currentFile = file;
             this.homeState.currentFile = file;
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la vue
+            // Mettre à jour la vue
             if (this.view && this.view.updateCurrentFile) {
                 this.view.updateCurrentFile(file);
             }
@@ -441,7 +441,7 @@ class HomeController extends BaseController {
                 this.routingModel.setCurrentFile(file);
             }
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les canaux
+            // Mettre à jour les canaux
             if (file.midiJson) {
                 const channels = file.midiJson.channels || [];
                 const instruments = window.instrumentModel?.getAll?.() || [];
@@ -462,7 +462,7 @@ class HomeController extends BaseController {
             this.emitEvent('file:loaded', { file });
             
             this.showSuccess(`File loaded: ${file.name}`);
-            this.logInfo( `ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ File loaded: ${file.name}`);
+            this.logInfo( `✓ File loaded: ${file.name}`);
         }
         catch (error) {
             this.handleError('Load file failed', error);
@@ -471,7 +471,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chit la liste des fichiers
+     * Rafraîchit la liste des fichiers
      */
     async refreshFiles() {
         this.logInfo( 'Refreshing files...');
@@ -497,7 +497,7 @@ class HomeController extends BaseController {
     uploadFile() {
         this.logInfo( 'Upload file requested');
         
-        // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er un input file temporaire
+        // Créer un input file temporaire
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.mid,.midi';
@@ -529,7 +529,7 @@ class HomeController extends BaseController {
                 
                 this.showSuccess(`File "${file.name}" uploaded`);
                 
-                // RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chir la liste
+                // Rafraîchir la liste
                 await this.refreshFiles();
                 
                 // Charger le fichier
@@ -547,7 +547,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * SÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©lectionne le premier fichier
+     * Sélectionne le premier fichier
      */
     async selectFirstFile() {
         try {
@@ -613,7 +613,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * ArrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªte la lecture
+     * Arrête la lecture
      */
     async stop() {
         this.logInfo( 'Stop requested');
@@ -657,7 +657,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Fichier prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dent
+     * Fichier précédent
      */
     async previous() {
         this.logInfo( 'Previous requested');
@@ -711,7 +711,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©finit le tempo
+     * Définit le tempo
      * @param {number} percent - Tempo en pourcentage (0-200%)
      */
     async setTempo(percent) {
@@ -726,7 +726,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la fin de lecture
+     * Gère la fin de lecture
      */
     async onPlaybackEnded() {
         this.logInfo( 'Playback ended');
@@ -754,8 +754,8 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat de lecture depuis le backend
-     * @param {Object} data - ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat playback
+     * Met à jour l'état de lecture depuis le backend
+     * @param {Object} data - État playback
      */
     updatePlaybackState(data) {
         this.logInfo( 'Playback state updated', data);
@@ -782,7 +782,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la position de lecture depuis le backend
+     * Met à jour la position de lecture depuis le backend
      * @param {Object} data - {position: number}
      */
     updatePlaybackPosition(data) {
@@ -798,8 +798,8 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Assigne un instrument ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  un canal
-     * @param {number} channel - NumÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro de canal
+     * Assigne un instrument à un canal
+     * @param {number} channel - Numéro de canal
      * @param {string} instrumentId - ID de l'instrument
      */
     async assignInstrument(channel, instrumentId) {
@@ -816,7 +816,7 @@ class HomeController extends BaseController {
                 }
             }
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'affichage
+            // Mettre à jour l'affichage
             this.updateRoutingDisplay();
             
             // Appliquer au playback controller
@@ -980,7 +980,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour l'affichage du routing
+     * Met à jour l'affichage du routing
      */
     updateRoutingDisplay() {
         this.logInfo( 'Updating routing display');
@@ -997,7 +997,7 @@ class HomeController extends BaseController {
                 }
             }
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les statistiques
+            // Mettre à jour les statistiques
             if (this.routingModel && this.routingModel.getGlobalCompatibility) {
                 const stats = this.routingModel.getGlobalCompatibility();
                 
@@ -1012,8 +1012,8 @@ class HomeController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re l'activation d'une route
-     * @param {Object} data - DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es de la route
+     * Gère l'activation d'une route
+     * @param {Object} data - Données de la route
      */
     handleRoutingEnabled(data) {
         this.logInfo( 'Route enabled', data);
@@ -1022,8 +1022,8 @@ class HomeController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sactivation d'une route
-     * @param {Object} data - DonnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es de la route
+     * Gère la désactivation d'une route
+     * @param {Object} data - Données de la route
      */
     handleRoutingDisabled(data) {
         this.logInfo( 'Route disabled', data);
@@ -1036,26 +1036,26 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la playlist - Ouvre l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur de playlist
+     * Gère la playlist - Ouvre l'éditeur de playlist
      */
     managePlaylist() {
         this.logInfo( 'Manage playlist requested');
         
-        // VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifier que ModalController est disponible
+        // Vérifier que ModalController est disponible
         if (!window.app || !window.app.modalController) {
             this.logDebug('error', 'ModalController not available');
             this.showNotification('Modal system not initialized');
             return;
         }
         
-        // VÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rifier que PlaylistController est disponible
+        // Vérifier que PlaylistController est disponible
         if (!this.playlistController) {
             this.logDebug('error', 'PlaylistController not available');
             this.showNotification('Playlist system not initialized');
             return;
         }
         
-        // DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©terminer le mode: ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dition ou crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ation
+        // Déterminer le mode: édition ou création
         const currentPlaylist = this.playlistController.state?.currentPlaylist;
         
         if (currentPlaylist) {
@@ -1066,7 +1066,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Ouvre l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur pour crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er une nouvelle playlist
+     * Ouvre l'éditeur pour créer une nouvelle playlist
      */
     createNewPlaylist() {
         this.logInfo( 'Create new playlist requested');
@@ -1084,7 +1084,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°dite la playlist courante
+     * Édite la playlist courante
      */
     editCurrentPlaylist() {
         this.logInfo( 'Edit current playlist requested');
@@ -1109,7 +1109,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°dite une playlist spÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cifique par son ID
+     * Édite une playlist spécifique par son ID
      * @param {string} playlistId - ID de la playlist
      */
     editPlaylist(playlistId) {
@@ -1134,7 +1134,7 @@ class HomeController extends BaseController {
     
     /**
      * Supprime une playlist avec confirmation
-     * @param {string} playlistId - ID de la playlist ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  supprimer
+     * @param {string} playlistId - ID de la playlist à supprimer
      */
     async deletePlaylist(playlistId) {
         this.logInfo( `Delete playlist: ${playlistId}`);
@@ -1150,7 +1150,7 @@ class HomeController extends BaseController {
         }
         
         try {
-            // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cupÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rer les infos de la playlist pour le message de confirmation
+            // Récupérer les infos de la playlist pour le message de confirmation
             const playlistModel = this.playlistController.playlistModel;
             const playlist = playlistModel?.getPlaylist?.(playlistId);
             
@@ -1162,7 +1162,7 @@ class HomeController extends BaseController {
             // Demander confirmation
             const confirmed = confirm(
                 `Voulez-vous vraiment supprimer la playlist "${playlist.name}" ?\n\n` +
-                `Cette action est irrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©versible.`
+                `Cette action est irréversible.`
             );
             
             if (!confirmed) {
@@ -1175,9 +1175,9 @@ class HomeController extends BaseController {
                 const success = await this.playlistController.deletePlaylist(playlistId);
                 
                 if (success) {
-                    this.showSuccess(`Playlist "${playlist.name}" supprimÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e`);
+                    this.showSuccess(`Playlist "${playlist.name}" supprimée`);
                 } else {
-                    this.showNotification('ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°chec de la suppression');
+                    this.showNotification('Échec de la suppression');
                 }
             }
         }
@@ -1228,7 +1228,7 @@ class HomeController extends BaseController {
                 await this.loadFile(firstFileId);
                 
                 this.logInfo( 'First file loaded, ready to play');
-                this.showSuccess(`Playlist "${playlist.name}" chargÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e`);
+                this.showSuccess(`Playlist "${playlist.name}" chargée`);
             } else {
                 this.showInfo('Playlist vide');
             }
@@ -1240,7 +1240,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Ajoute rapidement un fichier ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la playlist courante
+     * Ajoute rapidement un fichier à la playlist courante
      * @param {string} fileId - ID du fichier
      */
     async quickAddToPlaylist(fileId) {
@@ -1254,10 +1254,10 @@ class HomeController extends BaseController {
         const currentPlaylist = this.playlistController.state?.currentPlaylist;
         
         if (!currentPlaylist) {
-            // Pas de playlist courante - proposer d'en crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er une
+            // Pas de playlist courante - proposer d'en créer une
             const createNew = confirm(
                 'Aucune playlist active.\n\n' +
-                'Voulez-vous crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er une nouvelle playlist ?'
+                'Voulez-vous créer une nouvelle playlist ?'
             );
             
             if (createNew) {
@@ -1267,14 +1267,14 @@ class HomeController extends BaseController {
         }
         
         try {
-            // Ajouter ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  la playlist courante
+            // Ajouter à la playlist courante
             if (this.playlistController.addFileToPlaylist) {
                 const success = await this.playlistController.addFileToPlaylist(currentPlaylist.id, fileId);
                 
                 if (success) {
                     const file = this.fileModel?.getFileById?.(fileId) || this.fileModel?.get?.(fileId);
                     const fileName = file?.name || file?.filename || 'fichier';
-                    this.showSuccess(`"${fileName}" ajoutÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â© ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  "${currentPlaylist.name}"`);
+                    this.showSuccess(`"${fileName}" ajouté à "${currentPlaylist.name}"`);
                 }
             }
         }
@@ -1285,7 +1285,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e une nouvelle playlist avec un fichier initial
+     * Crée une nouvelle playlist avec un fichier initial
      * @param {string} fileId - ID du fichier
      */
     async createNewPlaylistWithFile(fileId) {
@@ -1305,12 +1305,12 @@ class HomeController extends BaseController {
         }
         
         try {
-            // CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©er la playlist avec le fichier
+            // Créer la playlist avec le fichier
             if (this.playlistController.createPlaylist) {
                 const playlist = await this.playlistController.createPlaylist(playlistName.trim(), [fileId]);
                 
                 if (playlist) {
-                    this.showSuccess(`Playlist "${playlist.name}" crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e`);
+                    this.showSuccess(`Playlist "${playlist.name}" créée`);
                     
                     // Charger la nouvelle playlist
                     if (this.playlistController.loadPlaylist) {
@@ -1321,7 +1321,7 @@ class HomeController extends BaseController {
         }
         catch (error) {
             this.handleError('Create playlist with file failed', error);
-            this.showNotification('Erreur lors de la crÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ation');
+            this.showNotification('Erreur lors de la création');
         }
     }
     
@@ -1330,9 +1330,9 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Active/dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©sactive un canal dans le visualizer
-     * @param {number} channel - NumÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro de canal
-     * @param {boolean} enabled - ActivÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©
+     * Active/désactive un canal dans le visualizer
+     * @param {number} channel - Numéro de canal
+     * @param {boolean} enabled - Activé
      */
     toggleChannel(channel, enabled) {
         this.logInfo( `Toggle channel ${channel}: ${enabled}`);
@@ -1343,9 +1343,9 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Obtient les notes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  venir
+     * Obtient les notes à venir
      * @param {number} currentTime - Temps actuel en ms
-     * @returns {Array} Notes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  venir
+     * @returns {Array} Notes à venir
      */
     getUpcomingNotes(currentTime) {
         if (!this.currentFile || !this.currentFile.midiJson) {
@@ -1373,13 +1373,13 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©marre le timer de progression
+     * Démarre le timer de progression
      */
     startProgressTimer() {
         this.stopProgressTimer();
         
         this.playbackTimer = setInterval(() => {
-            this.currentTime += 100; // IncrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ment de 100ms
+            this.currentTime += 100; // Incrément de 100ms
             this.homeState.currentTime += 100;
             
             if (this.currentFile) {
@@ -1387,14 +1387,14 @@ class HomeController extends BaseController {
                     this.view.updateProgress(this.currentTime, this.currentFile.duration);
                 }
                 
-                // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour les notes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  venir
+                // Mettre à jour les notes à venir
                 const upcomingNotes = this.getUpcomingNotes(this.currentTime);
                 if (this.view && this.view.updateNotePreview) {
                     this.view.updateNotePreview(upcomingNotes);
                 }
             }
             
-            // ArrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªter si on dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©passe la durÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e
+            // Arrêter si on dépasse la durée
             if (this.currentFile && this.currentTime >= this.currentFile.duration) {
                 this.onPlaybackEnded();
             }
@@ -1404,7 +1404,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * ArrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªte le timer de progression
+     * Arrête le timer de progression
      */
     stopProgressTimer() {
         if (this.playbackTimer) {
@@ -1419,7 +1419,7 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Ouvre l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur MIDI
+     * Ouvre l'éditeur MIDI
      */
     openEditor() {
         this.logInfo( 'Open editor requested');
@@ -1429,10 +1429,10 @@ class HomeController extends BaseController {
             return;
         }
         
-        // Sauvegarder l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat actuel
+        // Sauvegarder l'état actuel
         this.pause();
         
-        // Naviguer vers l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©diteur
+        // Naviguer vers l'éditeur
         window.location.hash = '#editor';
         
         // L'EditorController prendra le relais
@@ -1442,7 +1442,7 @@ class HomeController extends BaseController {
     }
     
     /**
-     * Ouvre les rÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©glages
+     * Ouvre les réglages
      */
     openSettings() {
         this.logInfo( 'Open settings requested');
@@ -1454,13 +1454,13 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Met ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la vue
+     * Met à jour la vue
      */
     updateView() {
         try {
             if (!this.view) return;
             
-            // PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©parer les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es pour la vue
+            // Préparer les données pour la vue
             const viewData = {
                 currentFile: this.currentFile,
                 playbackState: this.playbackState,
@@ -1470,7 +1470,7 @@ class HomeController extends BaseController {
                 routes: this.routingModel ? (this.routingModel.getRoutes?.() || []) : []
             };
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour la vue
+            // Mettre à jour la vue
             if (this.view.update) {
                 this.view.update(viewData);
             }
@@ -1485,7 +1485,7 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la connexion au backend
+     * Gère la connexion au backend
      */
     onBackendConnected() {
         this.logInfo( 'Backend connected');
@@ -1494,12 +1494,12 @@ class HomeController extends BaseController {
     }
     
     /**
-     * GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨re la dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©connexion du backend
+     * Gère la déconnexion du backend
      */
     onBackendDisconnected() {
         this.logInfo( 'Backend disconnected');
         
-        // ArrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªter lecture
+        // Arrêter lecture
         this.isPlaying = false;
         this.playbackState = 'stopped';
         this.homeState.isPlaying = false;
@@ -1512,13 +1512,13 @@ class HomeController extends BaseController {
     }
     
     /**
-     * RafraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â®chit les donnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©es depuis le backend
+     * Rafraîchit les données depuis le backend
      */
     async refreshData() {
         this.logInfo( 'Refreshing data...');
         
         try {
-            // RÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cupÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rer ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat playback
+            // Récupérer état playback
             if (this.backend) {
                 const playbackStatus = await this.backend.sendCommand('playback.getStatus', {});
                 
@@ -1527,10 +1527,10 @@ class HomeController extends BaseController {
                 }
             }
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour routing
+            // Mettre à jour routing
             this.updateRoutingDisplay();
             
-            // Mettre ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â  jour vue
+            // Mettre à jour vue
             this.updateView();
         }
         catch (error) {
@@ -1543,9 +1543,9 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Calcule la durÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e totale de fichiers
+     * Calcule la durée totale de fichiers
      * @param {Array} files - Liste de fichiers
-     * @returns {number} DurÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e totale en ms
+     * @returns {number} Durée totale en ms
      */
     calculateTotalDuration(files) {
         if (!files || !Array.isArray(files)) return 0;
@@ -1573,8 +1573,8 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Retourne l'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©tat actuel
-     * @returns {Object} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°tat
+     * Retourne l'état actuel
+     * @returns {Object} État
      */
     getState() {
         return {

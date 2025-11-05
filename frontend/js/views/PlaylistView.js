@@ -1,12 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/PlaylistView.js
-// Version: v4.0.0 - CONFORMITÃ‰ API DOCUMENTATION
+// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
 // Date: 2025-11-02
 // ============================================================================
-// AMÃ‰LIORATIONS v4.0.0:
-// âœ… API v4.2.2: playlist.* (create, delete, update, list, get, addItem, removeItem, reorder, setLoop)
-// âœ… Drag & drop pour rÃ©organiser
-// âœ… Gestion loop
+// AMÉLIORATIONS v4.0.0:
+// ✅ API v4.2.2: playlist.* (create, delete, update, list, get, addItem, removeItem, reorder, setLoop)
+// ✅ Drag & drop pour réorganiser
+// ✅ Gestion loop
 // ============================================================================
 
 class PlaylistView extends BaseView {
@@ -15,7 +15,7 @@ class PlaylistView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // Ã‰tat
+        // État
         this.viewState = {
             playlists: [],
             selectedPlaylist: null,
@@ -24,7 +24,7 @@ class PlaylistView extends BaseView {
             draggedItem: null
         };
         
-        this.log('info', 'PlaylistView', 'âœ… PlaylistView v4.0.0 initialized');
+        this.log('info', 'PlaylistView', '✅ PlaylistView v4.0.0 initialized');
     }
     
     // ========================================================================
@@ -37,10 +37,10 @@ class PlaylistView extends BaseView {
         return `
             <div class="playlist-view-container">
                 <div class="page-header">
-                    <h1>ðŸŽµ Playlists</h1>
+                    <h1>🎵 Playlists</h1>
                     <div class="header-actions">
                         <button class="btn-create" data-action="create-playlist">
-                            âž• Nouvelle Playlist
+                            ➕ Nouvelle Playlist
                         </button>
                     </div>
                 </div>
@@ -77,7 +77,7 @@ class PlaylistView extends BaseView {
                 <div class="playlists-empty">
                     <p>Aucune playlist</p>
                     <button class="btn-create-first" data-action="create-playlist">
-                        âž• CrÃ©er
+                        ➕ Créer
                     </button>
                 </div>
             `;
@@ -97,14 +97,14 @@ class PlaylistView extends BaseView {
         return `
             <div class="playlist-item ${isSelected ? 'selected' : ''}" 
                  data-playlist-id="${playlist.id}">
-                <div class="playlist-icon">ðŸ“‹</div>
+                <div class="playlist-icon">📋</div>
                 <div class="playlist-info">
                     <div class="playlist-name">${playlist.name}</div>
                     <div class="playlist-count">${itemCount} morceaux</div>
                 </div>
                 <div class="playlist-actions">
-                    <button class="btn-icon" data-action="select-playlist" title="Voir">ðŸ‘ï¸</button>
-                    <button class="btn-icon" data-action="delete-playlist" title="Supprimer">ðŸ—‘ï¸</button>
+                    <button class="btn-icon" data-action="select-playlist" title="Voir">👁️</button>
+                    <button class="btn-icon" data-action="delete-playlist" title="Supprimer">🗑️</button>
                 </div>
             </div>
         `;
@@ -121,15 +121,15 @@ class PlaylistView extends BaseView {
                            value="${pl.name}" data-action="rename-playlist" />
                     <span class="playlist-loop ${pl.loop ? 'active' : ''}" 
                           data-action="toggle-loop">
-                        ðŸ” Loop ${pl.loop ? 'ON' : 'OFF'}
+                        🔁 Loop ${pl.loop ? 'ON' : 'OFF'}
                     </span>
                 </div>
                 <div class="playlist-actions">
                     <button class="btn-play-all" data-action="play-playlist">
-                        â–¶ Lire tout
+                        ▶ Lire tout
                     </button>
                     <button class="btn-add-files" data-action="add-files">
-                        âž• Ajouter des fichiers
+                        ➕ Ajouter des fichiers
                     </button>
                 </div>
             </div>
@@ -156,15 +156,15 @@ class PlaylistView extends BaseView {
                  data-item-id="${item.id}" 
                  data-index="${index}"
                  draggable="true">
-                <div class="item-drag">â˜°</div>
+                <div class="item-drag">☰</div>
                 <div class="item-order">${index + 1}</div>
                 <div class="item-info">
-                    <div class="item-name">${item.file_path || item.name || 'â€”'}</div>
-                    <div class="item-duration">${item.duration ? this.formatDuration(item.duration) : 'â€”'}</div>
+                    <div class="item-name">${item.file_path || item.name || '—'}</div>
+                    <div class="item-duration">${item.duration ? this.formatDuration(item.duration) : '—'}</div>
                 </div>
                 <div class="item-actions">
-                    <button class="btn-icon" data-action="play-item" title="Lire">â–¶</button>
-                    <button class="btn-icon" data-action="remove-item" title="Retirer">âœ•</button>
+                    <button class="btn-icon" data-action="play-item" title="Lire">▶</button>
+                    <button class="btn-icon" data-action="remove-item" title="Retirer">✕</button>
                 </div>
             </div>
         `;
@@ -173,10 +173,10 @@ class PlaylistView extends BaseView {
     renderEmptyPlaylist() {
         return `
             <div class="playlist-empty">
-                <div class="empty-icon">ðŸŽµ</div>
+                <div class="empty-icon">🎵</div>
                 <p>Playlist vide</p>
                 <button class="btn-add-files" data-action="add-files">
-                    âž• Ajouter des fichiers
+                    ➕ Ajouter des fichiers
                 </button>
             </div>
         `;
@@ -185,8 +185,8 @@ class PlaylistView extends BaseView {
     renderNoSelection() {
         return `
             <div class="no-selection">
-                <div class="empty-icon">ðŸ“‹</div>
-                <p>SÃ©lectionnez une playlist</p>
+                <div class="empty-icon">📋</div>
+                <p>Sélectionnez une playlist</p>
             </div>
         `;
     }
@@ -387,7 +387,7 @@ class PlaylistView extends BaseView {
     }
     
     async addFiles() {
-        // Montrer modal de sÃ©lection de fichiers
+        // Montrer modal de sélection de fichiers
         if (this.eventBus) {
             this.eventBus.emit('playlist:add_files_modal_requested', {
                 playlist_id: this.viewState.selectedPlaylist.id
@@ -423,7 +423,7 @@ class PlaylistView extends BaseView {
     async playPlaylist() {
         if (!this.viewState.selectedPlaylist) return;
         
-        // Ã‰mettre event pour lire la playlist
+        // Émettre event pour lire la playlist
         if (this.eventBus) {
             this.eventBus.emit('playlist:play_requested', {
                 playlist_id: this.viewState.selectedPlaylist.id
@@ -432,7 +432,7 @@ class PlaylistView extends BaseView {
     }
     
     async playItem(itemId) {
-        // Ã‰mettre event pour lire un item spÃ©cifique
+        // Émettre event pour lire un item spécifique
         if (this.eventBus) {
             this.eventBus.emit('playlist:play_item_requested', {
                 item_id: itemId

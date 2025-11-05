@@ -1,184 +1,201 @@
 // ============================================================================
 // Fichier: frontend/js/core/BaseView.js
-// Version: v3.3.0 - FIXED LOG METHOD
-// Date: 2025-11-04
+// Chemin réel: frontend/js/core/BaseView.js
+// Version: v4.0.0 - RECONSTRUCTION COMPLÈTE
+// Date: 2025-11-05
 // ============================================================================
-// CORRECTIONS v3.2.1:
-// CORRECTIONS v3.3.0:
-// ✦ Ajout méthode async init() pour compatibilité avec FileView/KeyboardView
-// ✦ Hook onInit() pour initialisation asynchrone
-// ============================================================================
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ajout mÃƒÆ’Ã‚Â©thode log() manquante (flexible signature)
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Compatible avec FileView et autres vues
+// RECONSTRUCTION v4.0.0:
+// ✅ CRITIQUE: Recréation complète de BaseView (fichier corrompu)
+// ✅ Signature standard: constructor(containerId, eventBus)
+// ✅ Résolution container robuste
+// ✅ Fallback EventBus minimal
+// ✅ Méthodes essentielles: render(), show(), hide(), update(), emit()
+// ✅ Gestion événements avec cleanup
+// ✅ Validation et logging intégrés
 // ============================================================================
 
-/**
- * @class BaseView
- * @description Classe de base abstraite pour toutes les vues
- */
 class BaseView {
     /**
      * Constructeur de la vue de base
-     * @param {string|HTMLElement} containerId - ID du conteneur ou ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment DOM
-     * @param {EventBus} eventBus - Bus d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements global
+     * @param {string|HTMLElement} containerId - ID du conteneur ou élément DOM
+     * @param {EventBus} eventBus - Instance EventBus pour communication
      */
     constructor(containerId, eventBus) {
-        // RÃƒÆ’Ã‚Â©soudre le conteneur
-        this.container = this.resolveContainer(containerId);
+        // ✅ EventBus avec fallback robuste
+        this.eventBus = eventBus || window.eventBus;
         
-        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: EventBus avec fallback robuste
-        this.eventBus = eventBus || window.eventBus || null;
-        
-        // Validation EventBus
+        // ✅ CRITIQUE: Si EventBus toujours absent, créer fallback minimal
         if (!this.eventBus) {
-            console.error(`[${this.constructor.name}] AVERTISSEMENT: EventBus non disponible`);
+            console.warn(
+                `[${this.constructor.name}] EventBus not found - creating minimal fallback. ` +
+                `Check that EventBus is initialized in main.js before Application.`
+            );
+            
+            // Créer un EventBus minimal fonctionnel
+            this.eventBus = {
+                on: () => () => {},      // Retourne une fonction de désinscription vide
+                once: () => () => {},    // Retourne une fonction de désinscription vide
+                emit: () => {},          // Ne fait rien
+                off: () => {},           // Ne fait rien
+                _isFallback: true        // Marqueur pour identification
+            };
         }
         
-        // Formatter (utilise global si disponible)
-        this.formatter = window.Formatter || null;
+        // ✅ Résolution du container
+        this.container = this.resolveContainer(containerId);
+        this.containerId = typeof containerId === 'string' ? containerId : containerId?.id || 'unknown';
         
-        // Template et donnÃƒÆ’Ã‚Â©es
-        this.template = ''; // Template HTML de base (ÃƒÆ’Ã‚Â  surcharger)
-        this.data = {}; // DonnÃƒÆ’Ã‚Â©es actuelles de la vue
-        this.previousData = {}; // DonnÃƒÆ’Ã‚Â©es prÃƒÆ’Ã‚Â©cÃƒÆ’Ã‚Â©dentes pour comparaison
+        // Services
+        this.logger = window.logger || this.createFallbackLogger();
+        this.backend = window.backendService || window.app?.services?.backend || null;
         
-        // ÃƒÆ’Ã¢â‚¬Â°tat de la vue
+        // État de la vue
         this.state = {
-            isVisible: false,
-            isRendered: false,
-            isDestroyed: false,
-            lastRender: null
+            initialized: false,
+            visible: false,
+            rendered: false,
+            loading: false,
+            error: null,
+            lastUpdate: null
         };
         
         // Configuration
         this.config = {
-            autoRender: true,
-            preserveState: false,
-            sanitizeHTML: true,
-            debounceRender: 0, // ms
-            trackChanges: true,
-            name: this.constructor.name
+            autoRender: false,
+            cacheDOM: true,
+            enableLogging: true,
+            updateOnChange: true,
+            debounceMs: 100
         };
         
-        // Gestionnaires d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
-        this.eventHandlers = new Map();
+        // Cache d'éléments DOM
+        this.elements = {};
+        this.cachedElements = new Map();
+        
+        // Gestion des événements
+        this.eventSubscriptions = [];
         this.domEventListeners = [];
         
-        // Cache et performance
-        this.renderCache = new Map();
-        this.renderQueue = null;
+        // Timers
+        this._updateTimer = null;
+        this._renderTimer = null;
         
-        // ÃƒÆ’Ã¢â‚¬Â°lÃƒÆ’Ã‚Â©ments DOM cachÃƒÆ’Ã‚Â©s pour performance
-        this.elements = {};
-        
-        // Hooks de cycle de vie
-        this.lifecycleHooks = {
-            beforeRender: [],
-            afterRender: [],
-            beforeShow: [],
-            afterShow: [],
-            beforeHide: [],
-            afterHide: [],
-            beforeDestroy: [],
-            afterDestroy: []
+        // Métriques
+        this.metrics = {
+            renderCount: 0,
+            updateCount: 0,
+            errorCount: 0,
+            lastRenderTime: 0
         };
         
-        // Logger par dÃƒÆ’Ã‚Â©faut
-        this.logger = window.logger || console;
+        // Validation
+        if (!this.container) {
+            this.log('warn', `Container not found for ${this.constructor.name}: ${containerId}`);
+        }
+        
+        this.log('debug', `${this.constructor.name} view created`);
     }
     
     // ========================================================================
-    // INITIALISATION / LIFECYCLE
+    // RÉSOLUTION CONTAINER
     // ========================================================================
     
     /**
-     * Initialisation de la vue
+     * Résout le container à partir d'un ID ou élément DOM
+     * @param {string|HTMLElement} input - ID ou élément
+     * @returns {HTMLElement|null} Élément DOM résolu
      */
-    initialize() {
-        if (!this.container) {
-            console.error(`[${this.config.name}] Container not found`);
+    resolveContainer(input) {
+        if (!input) {
+            return null;
+        }
+        
+        // Si déjà un élément DOM, le retourner
+        if (input instanceof HTMLElement) {
+            return input;
+        }
+        
+        // Si string, chercher par ID ou sélecteur
+        if (typeof input === 'string') {
+            // Essayer avec #
+            let element = document.querySelector(input.startsWith('#') ? input : `#${input}`);
+            
+            // Si pas trouvé, essayer comme sélecteur CSS
+            if (!element) {
+                element = document.querySelector(input);
+            }
+            
+            return element;
+        }
+        
+        return null;
+    }
+    
+    // ========================================================================
+    // CYCLE DE VIE
+    // ========================================================================
+    
+    /**
+     * Initialise la vue
+     */
+    init() {
+        if (this.state.initialized) {
+            this.log('warn', `${this.constructor.name} already initialized`);
             return;
         }
         
-        // Hook personnalisÃƒÆ’Ã‚Â©
-        if (typeof this.onInitialize === 'function') {
-            this.onInitialize();
-        }
+        this.state.initialized = true;
+        this.state.lastUpdate = Date.now();
         
-        // Rendu initial si auto
+        this.log('info', `${this.constructor.name} initialized`);
+        
         if (this.config.autoRender) {
             this.render();
         }
     }
     
     /**
-     * Méthode init() async pour compatibilité
-     * Alias de initialize() mais async pour les vues qui en ont besoin
-     */
-    async init() {
-        // Appeler initialize() si elle existe
-        if (typeof this.initialize === 'function' && this.initialize !== this.init) {
-            this.initialize();
-        }
-        
-        // Hook pour initialisation async
-        if (typeof this.onInit === 'function') {
-            await this.onInit();
-        }
-    }
-    
-    /**
-     * RÃƒÆ’Ã‚Â©sout le conteneur DOM
-     * @param {string|HTMLElement} containerId - ID ou ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment
-     * @returns {HTMLElement|null}
-     */
-    resolveContainer(containerId) {
-        if (typeof containerId === 'string') {
-            // ID ou sÃƒÆ’Ã‚Â©lecteur
-            let element = document.getElementById(containerId);
-            if (!element) {
-                element = document.querySelector(containerId);
-            }
-            return element;
-        } else if (containerId instanceof HTMLElement) {
-            return containerId;
-        }
-        return null;
-    }
-    
-    /**
-     * DÃƒÆ’Ã‚Â©truit la vue
+     * Détruit la vue et nettoie les ressources
      */
     destroy() {
-        if (this.state.isDestroyed) {
-            return;
+        this.log('debug', `Destroying ${this.constructor.name}`);
+        
+        // Nettoyer les timers
+        if (this._updateTimer) {
+            clearTimeout(this._updateTimer);
+            this._updateTimer = null;
         }
         
-        this.runHooks('beforeDestroy');
-        
-        // Nettoyer les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM
-        this.removeAllEventListeners();
-        
-        // Nettoyer les event handlers
-        this.eventHandlers.clear();
-        
-        // Vider le conteneur
-        if (this.container) {
-            this.container.innerHTML = '';
+        if (this._renderTimer) {
+            clearTimeout(this._renderTimer);
+            this._renderTimer = null;
         }
         
-        // Nettoyer le cache
-        this.renderCache.clear();
+        // Désinscrire tous les événements EventBus
+        this.eventSubscriptions.forEach(unsub => {
+            if (typeof unsub === 'function') {
+                unsub();
+            }
+        });
+        this.eventSubscriptions = [];
         
-        // Hook personnalisÃƒÆ’Ã‚Â©
-        if (typeof this.onDestroy === 'function') {
-            this.onDestroy();
-        }
+        // Retirer tous les event listeners DOM
+        this.domEventListeners.forEach(({ element, event, handler }) => {
+            if (element && typeof element.removeEventListener === 'function') {
+                element.removeEventListener(event, handler);
+            }
+        });
+        this.domEventListeners = [];
         
-        this.state.isDestroyed = true;
-        this.state.isVisible = false;
+        // Vider le cache
+        this.cachedElements.clear();
+        this.elements = {};
         
-        this.runHooks('afterDestroy');
+        // Réinitialiser l'état
+        this.state.initialized = false;
+        this.state.rendered = false;
+        
+        this.log('info', `${this.constructor.name} destroyed`);
     }
     
     // ========================================================================
@@ -186,205 +203,111 @@ class BaseView {
     // ========================================================================
     
     /**
-     * Rend la vue
-     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es ÃƒÆ’Ã‚Â  rendre
-     * @param {Object} options - Options de rendu
+     * Rend la vue (à surcharger dans les classes filles)
+     * @param {Object} data - Données optionnelles pour le rendu
      */
-    render(data = null, options = {}) {
-        if (this.state.isDestroyed) {
-            console.warn(`[${this.config.name}] Cannot render destroyed view`);
-            return;
-        }
-        
+    render(data = null) {
         if (!this.container) {
-            console.error(`[${this.config.name}] No container for rendering`);
+            this.log('error', `Cannot render ${this.constructor.name}: container not found`);
             return;
         }
         
-        // Mettre ÃƒÆ’Ã‚Â  jour les donnÃƒÆ’Ã‚Â©es
-        if (data) {
-            this.previousData = { ...this.data };
-            this.data = { ...this.data, ...data };
-        }
-        
-        // VÃƒÆ’Ã‚Â©rifier si re-rendu nÃƒÆ’Ã‚Â©cessaire
-        if (!options.force && this.config.trackChanges && !this.shouldRerender(data)) {
-            return;
-        }
-        
-        // Debounce si configurÃƒÆ’Ã‚Â©
-        if (this.config.debounceRender > 0 && !options.immediate) {
-            this.debounceRender(data, options);
-            return;
-        }
+        const startTime = performance.now();
         
         try {
-            this.runHooks('beforeRender');
+            this.state.rendered = true;
+            this.state.lastUpdate = Date.now();
+            this.metrics.renderCount++;
             
-            // Construire le template
-            const html = this.buildTemplate();
+            // Les classes filles doivent implémenter leur logique de rendu
+            // this.container.innerHTML = this.template(data);
             
-            // Sanitize si configurÃƒÆ’Ã‚Â©
-            const sanitized = this.config.sanitizeHTML 
-                ? this.sanitizeHTML(html) 
-                : html;
-            
-            // Injecter dans le DOM
-            this.container.innerHTML = sanitized;
-            
-            // Cacher ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM
-            this.cacheElements();
-            
-            // Attacher ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements
-            this.attachEvents();
-            
-            this.state.isRendered = true;
-            this.state.lastRender = Date.now();
-            
-            this.runHooks('afterRender');
-            
-            // Hook personnalisÃƒÆ’Ã‚Â©
-            if (typeof this.onRender === 'function') {
-                this.onRender();
-            }
-            
-            // ÃƒÆ’Ã¢â‚¬Â°mettre ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
-            this.emit('view:rendered', {
-                view: this.config.name,
-                data: this.data
+            // Émettre événement de rendu
+            this.emit('render', { 
+                view: this.constructor.name,
+                data 
             });
             
+            const renderTime = performance.now() - startTime;
+            this.metrics.lastRenderTime = renderTime;
+            
+            this.log('debug', `${this.constructor.name} rendered in ${renderTime.toFixed(2)}ms`);
+            
         } catch (error) {
-            this.handleRenderError(error, data);
+            this.handleError('Render failed', error);
         }
     }
     
     /**
-     * Construit le template HTML
-     * @returns {string} HTML
+     * Met à jour la vue avec de nouvelles données
+     * @param {Object} data - Nouvelles données
      */
-    buildTemplate() {
-        // ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
-        return this.template || '<div>No template defined</div>';
-    }
-    
-    /**
-     * VÃƒÆ’Ã‚Â©rifie si un re-rendu est nÃƒÆ’Ã‚Â©cessaire
-     * @param {Object} newData - Nouvelles donnÃƒÆ’Ã‚Â©es
-     * @returns {boolean}
-     */
-    shouldRerender(newData) {
-        if (!newData || !this.state.isRendered) return true;
-        return !this.deepEqual(this.previousData, this.data);
-    }
-    
-    /**
-     * Debounce du rendu
-     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es
-     * @param {Object} options - Options
-     */
-    debounceRender(data, options) {
-        if (this.renderQueue) {
-            clearTimeout(this.renderQueue);
+    update(data = null) {
+        if (!this.state.initialized) {
+            this.log('warn', `Cannot update ${this.constructor.name}: not initialized`);
+            return;
         }
         
-        this.renderQueue = setTimeout(() => {
-            this.render(data, { ...options, immediate: true });
-            this.renderQueue = null;
-        }, this.config.debounceRender);
-    }
-    
-    /**
-     * Met ÃƒÆ’Ã‚Â  jour des donnÃƒÆ’Ã‚Â©es spÃƒÆ’Ã‚Â©cifiques sans re-rendu complet
-     * @param {Object} updates - Mises ÃƒÆ’Ã‚Â  jour
-     */
-    update(updates) {
-        this.previousData = { ...this.data };
-        this.data = { ...this.data, ...updates };
+        this.metrics.updateCount++;
         
-        // Hook pour mise ÃƒÆ’Ã‚Â  jour personnalisÃƒÆ’Ã‚Â©e
-        if (typeof this.onUpdate === 'function') {
-            this.onUpdate(updates);
+        if (this.config.updateOnChange) {
+            this.render(data);
         }
         
-        this.emit('view:updated', {
-            view: this.config.name,
-            updates
+        this.emit('update', {
+            view: this.constructor.name,
+            data
         });
     }
     
+    /**
+     * Rafraîchit la vue
+     */
+    refresh() {
+        this.render();
+    }
+    
     // ========================================================================
-    // AFFICHAGE / MASQUAGE
+    // VISIBILITÉ
     // ========================================================================
     
     /**
      * Affiche la vue
      */
     show() {
-        if (this.state.isDestroyed) {
-            console.warn(`[${this.config.name}] Cannot show destroyed view`);
+        if (!this.container) {
+            this.log('error', `Cannot show ${this.constructor.name}: container not found`);
             return;
         }
         
-        if (this.state.isVisible) {
-            return;
-        }
+        this.container.style.display = '';
+        this.state.visible = true;
         
-        this.runHooks('beforeShow');
-        
-        if (this.container) {
-            this.container.style.display = '';
-            this.container.classList.remove('hidden');
-        }
-        
-        this.state.isVisible = true;
-        
-        // Hook personnalisÃƒÆ’Ã‚Â©
-        if (typeof this.onShow === 'function') {
-            this.onShow();
-        }
-        
-        this.runHooks('afterShow');
-        
-        this.emit('view:shown', {
-            view: this.config.name
-        });
+        this.emit('show', { view: this.constructor.name });
+        this.log('debug', `${this.constructor.name} shown`);
     }
     
     /**
-     * Masque la vue
+     * Cache la vue
      */
     hide() {
-        if (!this.state.isVisible) {
+        if (!this.container) {
+            this.log('error', `Cannot hide ${this.constructor.name}: container not found`);
             return;
         }
         
-        this.runHooks('beforeHide');
+        this.container.style.display = 'none';
+        this.state.visible = false;
         
-        if (this.container) {
-            this.container.style.display = 'none';
-            this.container.classList.add('hidden');
-        }
-        
-        this.state.isVisible = false;
-        
-        // Hook personnalisÃƒÆ’Ã‚Â©
-        if (typeof this.onHide === 'function') {
-            this.onHide();
-        }
-        
-        this.runHooks('afterHide');
-        
-        this.emit('view:hidden', {
-            view: this.config.name
-        });
+        this.emit('hide', { view: this.constructor.name });
+        this.log('debug', `${this.constructor.name} hidden`);
     }
     
     /**
-     * Toggle affichage/masquage
+     * Toggle la visibilité
      */
     toggle() {
-        if (this.state.isVisible) {
+        if (this.state.visible) {
             this.hide();
         } else {
             this.show();
@@ -392,180 +315,193 @@ class BaseView {
     }
     
     // ========================================================================
-    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS DOM
+    // GESTION DES ÉVÉNEMENTS
     // ========================================================================
     
     /**
-     * Attache les ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements DOM
-     * ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
+     * Écoute un événement EventBus
+     * @param {string} event - Nom de l'événement
+     * @param {Function} handler - Fonction de gestion
      */
-    attachEvents() {
-        // ÃƒÆ’Ã¢â€šÂ¬ implÃƒÆ’Ã‚Â©menter dans les classes filles
+    on(event, handler) {
+        if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+            this.log('warn', `Cannot subscribe to ${event}: EventBus not available`);
+            return () => {};
+        }
+        
+        const unsub = this.eventBus.on(event, handler);
+        this.eventSubscriptions.push(unsub);
+        
+        return unsub;
     }
     
     /**
-     * Ajoute un event listener DOM
-     * @param {HTMLElement|string} element - ÃƒÆ’Ã¢â‚¬Â°lÃƒÆ’Ã‚Â©ment ou sÃƒÆ’Ã‚Â©lecteur
-     * @param {string} event - Type d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
-     * @param {Function} handler - Gestionnaire
-     * @param {Object} options - Options
+     * Écoute un événement une seule fois
+     * @param {string} event - Nom de l'événement
+     * @param {Function} handler - Fonction de gestion
      */
-    addEventListener(element, event, handler, options = {}) {
-        const el = typeof element === 'string'
-            ? this.container.querySelector(element)
-            : element;
+    once(event, handler) {
+        if (!this.eventBus || typeof this.eventBus.once !== 'function') {
+            this.log('warn', `Cannot subscribe to ${event}: EventBus not available`);
+            return () => {};
+        }
         
-        if (!el) {
-            console.warn(`[${this.config.name}] Element not found for event ${event}`);
+        const unsub = this.eventBus.once(event, handler);
+        this.eventSubscriptions.push(unsub);
+        
+        return unsub;
+    }
+    
+    /**
+     * Émet un événement EventBus
+     * @param {string} event - Nom de l'événement
+     * @param {*} data - Données de l'événement
+     */
+    emit(event, data = null) {
+        if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
             return;
         }
         
-        el.addEventListener(event, handler, options);
-        
-        // Garder rÃƒÆ’Ã‚Â©fÃƒÆ’Ã‚Â©rence pour nettoyage
-        this.domEventListeners.push({
-            element: el,
-            event,
-            handler,
-            options
-        });
+        this.eventBus.emit(event, data);
     }
     
     /**
-     * Ajoute un event listener avec dÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©gation
-     * @param {string} selector - SÃƒÆ’Ã‚Â©lecteur CSS
-     * @param {string} event - Type d'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
-     * @param {Function} handler - Gestionnaire
+     * Se désabonne d'un événement
+     * @param {string} event - Nom de l'événement
+     * @param {Function} handler - Fonction de gestion
      */
-    addDelegatedListener(selector, event, handler) {
-        const delegatedHandler = (e) => {
-            const target = e.target.closest(selector);
-            if (target && this.container.contains(target)) {
-                handler.call(target, e);
-            }
-        };
-        
-        this.container.addEventListener(event, delegatedHandler);
-        
-        this.domEventListeners.push({
-            element: this.container,
-            event,
-            handler: delegatedHandler
-        });
-    }
-    
-    /**
-     * Supprime tous les event listeners
-     */
-    removeAllEventListeners() {
-        this.domEventListeners.forEach(({ element, event, handler, options }) => {
-            element.removeEventListener(event, handler, options);
-        });
-        this.domEventListeners = [];
-    }
-    
-    // ========================================================================
-    // ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS EVENTBUS
-    // ========================================================================
-    
-    /**
-     * ÃƒÆ’Ã¢â‚¬Â°met un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement via EventBus
-     * @param {string} eventName - Nom de l'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
-     * @param {*} data - DonnÃƒÆ’Ã‚Â©es
-     */
-    emit(eventName, data) {
-        if (this.eventBus && typeof this.eventBus.emit === 'function') {
-            this.eventBus.emit(eventName, data);
+    off(event, handler) {
+        if (!this.eventBus || typeof this.eventBus.off !== 'function') {
+            return;
         }
+        
+        this.eventBus.off(event, handler);
     }
     
     /**
-     * ÃƒÆ’Ã¢â‚¬Â°coute un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement via EventBus
-     * @param {string} eventName - Nom de l'ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
+     * Ajoute un event listener DOM avec tracking
+     * @param {HTMLElement} element - Élément DOM
+     * @param {string} event - Type d'événement
      * @param {Function} handler - Gestionnaire
+     * @param {Object} options - Options addEventListener
      */
-    on(eventName, handler) {
-        if (this.eventBus && typeof this.eventBus.on === 'function') {
-            this.eventBus.on(eventName, handler);
-            this.eventHandlers.set(eventName, handler);
+    addDOMListener(element, event, handler, options = {}) {
+        if (!element || typeof element.addEventListener !== 'function') {
+            this.log('warn', `Cannot add DOM listener: invalid element`);
+            return;
         }
+        
+        element.addEventListener(event, handler, options);
+        this.domEventListeners.push({ element, event, handler, options });
     }
     
     // ========================================================================
-    // CACHE D'ÃƒÆ’Ã¢â‚¬Â°LÃƒÆ’Ã¢â‚¬Â°MENTS
+    // CACHE DOM
     // ========================================================================
     
     /**
-     * Cache des ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ments DOM pour accÃƒÆ’Ã‚Â¨s rapide
-     * ÃƒÆ’Ã¢â€šÂ¬ surcharger dans les classes filles
-     */
-    cacheElements() {
-        // ÃƒÆ’Ã¢â€šÂ¬ implÃƒÆ’Ã‚Â©menter dans les classes filles
-        // Exemple:
-        // this.elements.button = this.container.querySelector('.btn');
-    }
-    
-    /**
-     * Obtient un ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment cachÃƒÆ’Ã‚Â©
-     * @param {string} name - Nom de l'ÃƒÆ’Ã‚Â©lÃƒÆ’Ã‚Â©ment
+     * Cache un élément DOM par sélecteur
+     * @param {string} selector - Sélecteur CSS
+     * @param {HTMLElement} context - Contexte de recherche (défaut: container)
      * @returns {HTMLElement|null}
      */
-    getElement(name) {
-        return this.elements[name] || null;
-    }
-    
-    // ========================================================================
-    // HOOKS DE CYCLE DE VIE
-    // ========================================================================
-    
-    /**
-     * Enregistre un hook
-     * @param {string} hookName - Nom du hook
-     * @param {Function} fn - Fonction
-     */
-    addHook(hookName, fn) {
-        if (this.lifecycleHooks[hookName]) {
-            this.lifecycleHooks[hookName].push(fn);
-        }
-    }
-    
-    /**
-     * ExÃƒÆ’Ã‚Â©cute les hooks d'un ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nement
-     * @param {string} hookName - Nom du hook
-     */
-    runHooks(hookName) {
-        if (this.lifecycleHooks[hookName]) {
-            this.lifecycleHooks[hookName].forEach(fn => {
-                try {
-                    fn.call(this);
-                } catch (error) {
-                    console.error(`[${this.config.name}] Hook ${hookName} error:`, error);
-                }
-            });
-        }
-    }
-    
-    // ========================================================================
-    // LOGGING
-    // ========================================================================
-    
-    /**
-     * MÃƒÆ’Ã‚Â©thode de logging flexible
-     * Supporte plusieurs signatures:
-     * - log(level, message)
-     * - log(level, source, message)
-     * - log(level, source, message, data)
-     */
-    log(level, ...args) {
-        if (!this.logger) return;
+    cacheElement(selector, context = null) {
+        const searchContext = context || this.container;
         
-        // Si logger a une mÃƒÆ’Ã‚Â©thode pour ce niveau, l'utiliser directement
-        if (typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
-        } else {
-            // Sinon fallback sur console
-            console.log(`[${level.toUpperCase()}]`, ...args);
+        if (!searchContext) {
+            return null;
         }
+        
+        if (this.cachedElements.has(selector)) {
+            return this.cachedElements.get(selector);
+        }
+        
+        const element = searchContext.querySelector(selector);
+        
+        if (element) {
+            this.cachedElements.set(selector, element);
+        }
+        
+        return element;
+    }
+    
+    /**
+     * Récupère un élément du cache ou le cherche
+     * @param {string} selector - Sélecteur CSS
+     * @returns {HTMLElement|null}
+     */
+    $(selector) {
+        return this.cacheElement(selector);
+    }
+    
+    /**
+     * Récupère tous les éléments correspondants
+     * @param {string} selector - Sélecteur CSS
+     * @param {HTMLElement} context - Contexte de recherche
+     * @returns {NodeList}
+     */
+    $$(selector, context = null) {
+        const searchContext = context || this.container;
+        return searchContext ? searchContext.querySelectorAll(selector) : [];
+    }
+    
+    /**
+     * Vide le cache d'éléments DOM
+     */
+    clearCache() {
+        this.cachedElements.clear();
+        this.log('debug', `${this.constructor.name} cache cleared`);
+    }
+    
+    // ========================================================================
+    // ÉTAT ET DONNÉES
+    // ========================================================================
+    
+    /**
+     * Définit l'état de chargement
+     * @param {boolean} loading - État de chargement
+     */
+    setLoading(loading) {
+        this.state.loading = loading;
+        this.emit('loading', { loading, view: this.constructor.name });
+    }
+    
+    /**
+     * Définit une erreur
+     * @param {Error|string} error - Erreur
+     */
+    setError(error) {
+        this.state.error = error;
+        this.metrics.errorCount++;
+        this.emit('error', { error, view: this.constructor.name });
+    }
+    
+    /**
+     * Efface l'erreur
+     */
+    clearError() {
+        this.state.error = null;
+    }
+    
+    // ========================================================================
+    // GESTION DES ERREURS
+    // ========================================================================
+    
+    /**
+     * Gère une erreur
+     * @param {string} context - Contexte de l'erreur
+     * @param {Error} error - Erreur
+     */
+    handleError(context, error) {
+        this.log('error', `${this.constructor.name} - ${context}:`, error);
+        this.setError(error);
+        
+        // Notifier via EventBus
+        this.emit('view:error', {
+            view: this.constructor.name,
+            context,
+            error: error.message || String(error)
+        });
     }
     
     // ========================================================================
@@ -573,176 +509,161 @@ class BaseView {
     // ========================================================================
     
     /**
-     * Formate une date
-     * @param {Date|number} date - Date
-     * @param {string} format - Format
-     * @returns {string}
+     * Échappe du HTML pour prévenir XSS
+     * @param {string} unsafe - Chaîne non sûre
+     * @returns {string} Chaîne échappée
      */
-    formatDate(date, format = 'default') {
-        if (this.formatter && typeof this.formatter.formatDate === 'function') {
-            return this.formatter.formatDate(date, format);
+    escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') {
+            return String(unsafe);
         }
         
-        // Fallback basique
-        const d = new Date(date);
-        return d.toLocaleDateString();
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
     
     /**
-     * Formate une durÃƒÆ’Ã‚Â©e
-     * @param {number} ms - DurÃƒÆ’Ã‚Â©e en millisecondes
-     * @returns {string}
+     * Crée un élément DOM
+     * @param {string} tag - Tag HTML
+     * @param {Object} attributes - Attributs
+     * @param {string|HTMLElement} content - Contenu
+     * @returns {HTMLElement}
      */
-    formatDuration(ms) {
-        if (this.formatter && typeof this.formatter.formatDuration === 'function') {
-            return this.formatter.formatDuration(ms);
-        }
+    createElement(tag, attributes = {}, content = null) {
+        const element = document.createElement(tag);
         
-        // Fallback basique
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    }
-    
-    /**
-     * Formate une taille de fichier
-     * @param {number} bytes - Taille en octets
-     * @returns {string}
-     */
-    formatFileSize(bytes) {
-        if (this.formatter && typeof this.formatter.formatFileSize === 'function') {
-            return this.formatter.formatFileSize(bytes);
-        }
-        
-        // Fallback basique
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let size = bytes;
-        let unitIndex = 0;
-        
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
-    }
-    
-    /**
-     * ÃƒÆ’Ã¢â‚¬Â°chappe le HTML
-     * @param {string} text - Texte
-     * @returns {string}
-     */
-    escapeHTML(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    /**
-     * Sanitize HTML (basique)
-     * @param {string} html - HTML
-     * @returns {string}
-     */
-    sanitizeHTML(html) {
-        // Sanitization basique - ÃƒÆ’Ã‚Â  amÃƒÆ’Ã‚Â©liorer selon les besoins
-        return html;
-    }
-    
-    /**
-     * Comparaison profonde d'objets
-     * @param {Object} obj1 - Objet 1
-     * @param {Object} obj2 - Objet 2
-     * @returns {boolean}
-     */
-    deepEqual(obj1, obj2) {
-        if (obj1 === obj2) return true;
-        
-        if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || 
-            obj1 === null || obj2 === null) {
-            return false;
-        }
-        
-        const keys1 = Object.keys(obj1);
-        const keys2 = Object.keys(obj2);
-        
-        if (keys1.length !== keys2.length) return false;
-        
-        for (const key of keys1) {
-            if (!keys2.includes(key)) return false;
-            if (!this.deepEqual(obj1[key], obj2[key])) return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Obtient une valeur imbriquÃƒÆ’Ã‚Â©e
-     * @param {Object} obj - Objet
-     * @param {string} path - Chemin (ex: 'user.name')
-     * @returns {*}
-     */
-    getNestedValue(obj, path) {
-        return path.split('.').reduce((current, key) => current?.[key], obj);
-    }
-    
-    /**
-     * GÃƒÆ’Ã‚Â¨re les erreurs de rendu
-     * @param {Error} error - Erreur
-     * @param {Object} data - DonnÃƒÆ’Ã‚Â©es
-     */
-    handleRenderError(error, data) {
-        console.error(`[${this.config.name}] Render error:`, error);
-        
-        this.emit('view:render:error', {
-            view: this.config.name,
-            error: error.message,
-            data
+        // Définir les attributs
+        Object.entries(attributes).forEach(([key, value]) => {
+            if (key === 'className') {
+                element.className = value;
+            } else if (key === 'style' && typeof value === 'object') {
+                Object.assign(element.style, value);
+            } else if (key.startsWith('data-')) {
+                element.setAttribute(key, value);
+            } else {
+                element[key] = value;
+            }
         });
         
-        // Template d'erreur
-        if (this.container) {
-            this.container.innerHTML = this.getErrorTemplate(error);
+        // Ajouter le contenu
+        if (content !== null) {
+            if (typeof content === 'string') {
+                element.textContent = content;
+            } else if (content instanceof HTMLElement) {
+                element.appendChild(content);
+            }
+        }
+        
+        return element;
+    }
+    
+    /**
+     * Débounce une fonction
+     * @param {Function} func - Fonction à débouncer
+     * @param {number} wait - Délai en ms
+     * @returns {Function}
+     */
+    debounce(func, wait = this.config.debounceMs) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // ========================================================================
+    // LOGGING
+    // ========================================================================
+    
+    /**
+     * Crée un logger fallback
+     * @returns {Object}
+     */
+    createFallbackLogger() {
+        if (window.logger && typeof window.logger.log === 'function') {
+            return window.logger;
+        }
+        
+        return {
+            log: (level, ...args) => {
+                if (this.config.enableLogging) {
+                    console.log(`[${level.toUpperCase()}]`, ...args);
+                }
+            },
+            debug: (...args) => this.config.enableLogging && console.debug(...args),
+            info: (...args) => this.config.enableLogging && console.info(...args),
+            warn: (...args) => console.warn(...args),
+            error: (...args) => console.error(...args)
+        };
+    }
+    
+    /**
+     * Log un message
+     * @param {string} level - Niveau de log
+     * @param {...any} args - Arguments
+     */
+    log(level, ...args) {
+        if (!this.config.enableLogging && level === 'debug') {
+            return;
+        }
+        
+        if (this.logger && typeof this.logger.log === 'function') {
+            this.logger.log(level, `[${this.constructor.name}]`, ...args);
+        } else if (this.logger && typeof this.logger[level] === 'function') {
+            this.logger[level](`[${this.constructor.name}]`, ...args);
         }
     }
     
+    // ========================================================================
+    // MÉTRIQUES
+    // ========================================================================
+    
     /**
-     * Obtient le template d'erreur
-     * @param {Error} error - Erreur
-     * @returns {string}
+     * Obtient les métriques de la vue
+     * @returns {Object}
      */
-    getErrorTemplate(error) {
-        return `
-            <div class="view-error" style="padding: 20px; text-align: center; color: #dc3545;">
-                <h3>Erreur de rendu</h3>
-                <p>${this.escapeHTML(error.message)}</p>
-                <button onclick="location.reload()" class="btn btn-primary">Recharger</button>
-            </div>
-        `;
+    getMetrics() {
+        return {
+            ...this.metrics,
+            initialized: this.state.initialized,
+            visible: this.state.visible,
+            rendered: this.state.rendered,
+            hasContainer: !!this.container,
+            eventSubscriptions: this.eventSubscriptions.length,
+            domListeners: this.domEventListeners.length,
+            cachedElements: this.cachedElements.size
+        };
     }
     
     /**
-     * Obtient l'ÃƒÆ’Ã‚Â©tat de la vue
-     * @returns {Object}
+     * Réinitialise les métriques
      */
-    getState() {
-        return {
-            ...this.state,
-            hasData: Object.keys(this.data).length > 0,
-            hasContainer: !!this.container,
-            eventListeners: this.domEventListeners.length
+    resetMetrics() {
+        this.metrics = {
+            renderCount: 0,
+            updateCount: 0,
+            errorCount: 0,
+            lastRenderTime: 0
         };
     }
 }
 
 // ============================================================================
-// EXPORT
+// EXPORT GLOBAL
 // ============================================================================
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BaseView;
-}
 
 if (typeof window !== 'undefined') {
     window.BaseView = BaseView;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BaseView;
 }

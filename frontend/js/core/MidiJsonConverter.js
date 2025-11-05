@@ -1,17 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/core/MidiJsonConverter.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.1.0 - 2025-10-14
 // ============================================================================
 // Description:
-//   Convertisseur bidirectionnel MIDI binaire â†” JSON
-//   ImplÃ©mente le format JsonMidi pour Ã©dition dans l'interface
+//   Convertisseur bidirectionnel MIDI binaire ↔ JSON
+//   Implémente le format JsonMidi pour édition dans l'interface
 //
-// FonctionnalitÃ©s:
+// Fonctionnalités:
 //   - Parsing fichiers MIDI standard (Format 0, 1, 2)
-//   - Conversion vers format JSON Ã©ditable
-//   - GÃ©nÃ©ration MIDI binaire depuis JSON
-//   - Validation et vÃ©rification intÃ©gritÃ©
+//   - Conversion vers format JSON éditable
+//   - Génération MIDI binaire depuis JSON
+//   - Validation et vérification intégrité
 // ============================================================================
 
 class MidiJsonConverter {
@@ -22,12 +22,12 @@ class MidiJsonConverter {
     }
 
     // ========================================================================
-    // MIDI â†’ JSON
+    // MIDI → JSON
     // ========================================================================
 
     /**
      * Convertit un fichier MIDI binaire en JSON
-     * @param {ArrayBuffer} midiData - DonnÃ©es MIDI binaires
+     * @param {ArrayBuffer} midiData - Données MIDI binaires
      * @returns {Object} JsonMidi
      */
     async midiToJson(midiData) {
@@ -53,10 +53,10 @@ class MidiJsonConverter {
             offset = track.nextOffset;
         }
         
-        // Trier tous les Ã©vÃ©nements par temps absolu
+        // Trier tous les événements par temps absolu
         allEvents.sort((a, b) => a.time - b.time);
         
-        // Calculer mÃ©tadonnÃ©es
+        // Calculer métadonnées
         const metadata = this.extractMetadata(allEvents, header);
         
         const jsonMidi = {
@@ -70,14 +70,14 @@ class MidiJsonConverter {
             // Tracks
             tracks: tracks,
             
-            // Timeline unifiÃ©e (tous les Ã©vÃ©nements)
+            // Timeline unifiée (tous les événements)
             timeline: allEvents,
             
-            // MÃ©tadonnÃ©es
+            // Métadonnées
             metadata: metadata
         };
         
-        this.logger.info('MidiJsonConverter', `âœ“ Converted ${allEvents.length} events`);
+        this.logger.info('MidiJsonConverter', `✓ Converted ${allEvents.length} events`);
         
         return jsonMidi;
     }
@@ -87,7 +87,7 @@ class MidiJsonConverter {
      * @private
      */
     parseMidiHeader(dataView, offset) {
-        // VÃ©rifier "MThd"
+        // Vérifier "MThd"
         const magic = String.fromCharCode(
             dataView.getUint8(offset),
             dataView.getUint8(offset + 1),
@@ -117,7 +117,7 @@ class MidiJsonConverter {
      * @private
      */
     parseMidiTrack(dataView, offset, trackIndex) {
-        // VÃ©rifier "MTrk"
+        // Vérifier "MTrk"
         const magic = String.fromCharCode(
             dataView.getUint8(offset),
             dataView.getUint8(offset + 1),
@@ -141,7 +141,7 @@ class MidiJsonConverter {
         let trackName = `Track ${trackIndex + 1}`;
         let channel = 0;
         
-        // Parser les Ã©vÃ©nements
+        // Parser les événements
         while (offset < trackEnd) {
             // Lire delta time
             const deltaTime = this.readVariableLength(dataView, offset);
@@ -231,7 +231,7 @@ class MidiJsonConverter {
     }
 
     /**
-     * Parse un Ã©vÃ©nement de canal
+     * Parse un événement de canal
      * @private
      */
     parseChannelEvent(eventType, channel, dataView, offset, time) {
@@ -239,7 +239,7 @@ class MidiJsonConverter {
         let byte2 = 0;
         let nextOffset = offset;
         
-        // La plupart des Ã©vÃ©nements ont 2 data bytes
+        // La plupart des événements ont 2 data bytes
         if (eventType !== 0xC0 && eventType !== 0xD0) {
             byte2 = dataView.getUint8(offset++);
             nextOffset = offset;
@@ -269,7 +269,7 @@ class MidiJsonConverter {
                     event.type = 'noteOn';
                     event.note = byte1;
                     event.velocity = byte2;
-                    event.duration = 0; // Ã€ calculer plus tard
+                    event.duration = 0; // À calculer plus tard
                 }
                 break;
                 
@@ -406,7 +406,7 @@ class MidiJsonConverter {
     }
 
     /**
-     * Extrait les mÃ©tadonnÃ©es
+     * Extrait les métadonnées
      * @private
      */
     extractMetadata(events, header) {
@@ -451,7 +451,7 @@ class MidiJsonConverter {
             }
         }
         
-        // Calculer durÃ©e
+        // Calculer durée
         if (events.length > 0) {
             metadata.totalTicks = events[events.length - 1].time;
             
@@ -466,13 +466,13 @@ class MidiJsonConverter {
     }
 
     // ========================================================================
-    // JSON â†’ MIDI
+    // JSON → MIDI
     // ========================================================================
 
     /**
      * Convertit JSON en fichier MIDI binaire
      * @param {Object} jsonMidi - JsonMidi
-     * @returns {ArrayBuffer} DonnÃ©es MIDI binaires
+     * @returns {ArrayBuffer} Données MIDI binaires
      */
     async jsonToMidi(jsonMidi) {
         this.logger.info('MidiJsonConverter', 'Converting JSON to MIDI...');
@@ -505,13 +505,13 @@ class MidiJsonConverter {
             offset += chunk.length;
         }
         
-        this.logger.info('MidiJsonConverter', `âœ“ Generated ${midiData.length} bytes`);
+        this.logger.info('MidiJsonConverter', `✓ Generated ${midiData.length} bytes`);
         
         return midiData.buffer;
     }
 
     /**
-     * CrÃ©e le header MIDI
+     * Crée le header MIDI
      * @private
      */
     createMidiHeader(jsonMidi) {
@@ -540,13 +540,13 @@ class MidiJsonConverter {
     }
 
     /**
-     * Organise les Ã©vÃ©nements en tracks
+     * Organise les événements en tracks
      * @private
      */
     organizeEventsIntoTracks(jsonMidi) {
         const tracks = [];
         
-        // Si format 0, tous les Ã©vÃ©nements dans un track
+        // Si format 0, tous les événements dans un track
         if (jsonMidi.midiFormat === 0) {
             tracks.push(jsonMidi.timeline);
             return tracks;
@@ -575,7 +575,7 @@ class MidiJsonConverter {
     }
 
     /**
-     * CrÃ©e un track MIDI
+     * Crée un track MIDI
      * @private
      */
     createMidiTrack(events, division) {
@@ -597,7 +597,7 @@ class MidiJsonConverter {
         trackData.push(...this.writeVariableLength(0)); // Delta time = 0
         trackData.push(0xFF, 0x2F, 0x00); // Meta event: End of Track
         
-        // CrÃ©er le chunk
+        // Créer le chunk
         const track = new Uint8Array(8 + trackData.length);
         const view = new DataView(track.buffer);
         
@@ -617,7 +617,7 @@ class MidiJsonConverter {
     }
 
     /**
-     * Encode un Ã©vÃ©nement
+     * Encode un événement
      * @private
      */
     encodeEvent(event) {
@@ -744,7 +744,7 @@ class MidiJsonConverter {
             errors.push('Missing or invalid metadata.tempo');
         }
 
-        // VÃ©rifier Ã©vÃ©nements
+        // Vérifier événements
         const ids = new Set();
         
         if (jsonMidi.timeline) {
@@ -773,7 +773,7 @@ class MidiJsonConverter {
     // ========================================================================
 
     /**
-     * GÃ©nÃ¨re un ID unique pour un Ã©vÃ©nement
+     * Génère un ID unique pour un événement
      * @private
      */
     generateEventId() {

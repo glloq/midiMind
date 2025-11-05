@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/services/BackendService.js
+// Chemin réel: frontend/js/services/BackendService.js
 // Version: v4.2.2 - API COMPATIBLE (CORRECTED)
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Tous les paramÃƒÆ’Ã‚Â¨tres en snake_case
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ midi.import: filename + content + base64
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ RÃƒÆ’Ã‚Â©ponse: payload.data extraite correctement
-// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ routing_id, device_id, midi_file_id, playlist_id
+// ✓ Tous les paramètres en snake_case
+// ✓ midi.import: filename + content + base64
+// ✓ Réponse: payload.data extraite correctement
+// ✓ routing_id, device_id, midi_file_id, playlist_id
 // ============================================================================
 
 class BackendService {
@@ -124,7 +124,7 @@ class BackendService {
         this.offlineMode = false;
         this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Connected successfully');
+        this.logger.info('BackendService', '✓ Connected successfully');
         this.eventBus.emit('backend:connected');
         
         this.startHeartbeat();
@@ -181,7 +181,7 @@ class BackendService {
         this.reconnectAttempts++;
         
         this.logger.info('BackendService', 
-            `ÃƒÂ¢Ã¢â‚¬Â Ã‚Â» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
+            `↻ Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
         
         this.eventBus.emit('backend:reconnecting', {
             attempt: this.reconnectAttempts,
@@ -197,7 +197,7 @@ class BackendService {
     
     enterOfflineMode() {
         this.offlineMode = true;
-        this.logger.warn('BackendService', 'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Entering offline mode');
+        this.logger.warn('BackendService', '⚠️ Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
             timestamp: Date.now()
@@ -213,7 +213,7 @@ class BackendService {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â‚¬â€ Heartbeat started');
+        this.logger.debug('BackendService', '💗 Heartbeat started');
     }
     
     async checkHeartbeat() {
@@ -223,10 +223,10 @@ class BackendService {
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `ÃƒÂ¢Ã…â€œÃ¢â‚¬â€ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
+                `⚠ Heartbeat timeout! No activity since ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â€šÂ¬ Connection dead, forcing reconnect');
+                this.logger.error('BackendService', '💔 Connection dead, forcing reconnect');
                 this.forceReconnect('Heartbeat timeout - connection dead');
                 return;
             }
@@ -239,7 +239,7 @@ class BackendService {
         
         try {
             this.heartbeatPending = true;
-            this.logger.debug('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â‚¬â€ Sending heartbeat (system.ping)');
+            this.logger.debug('BackendService', '💗 Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
             await this.sendCommand('system.ping');
@@ -248,17 +248,17 @@ class BackendService {
             this.heartbeatPending = false;
             this.heartbeatFailures = 0;
             
-            this.logger.debug('BackendService', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Heartbeat OK (latency: ${latency}ms)`);
+            this.logger.debug('BackendService', `✓ Heartbeat OK (latency: ${latency}ms)`);
             
         } catch (error) {
             this.heartbeatPending = false;
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
+                `⚠️ Heartbeat failed: ${error.message} (failure #${this.heartbeatFailures})`);
             
             if (this.heartbeatFailures >= 3) {
-                this.logger.error('BackendService', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â€šÂ¬ Multiple heartbeat failures, forcing reconnect');
+                this.logger.error('BackendService', '💔 Multiple heartbeat failures, forcing reconnect');
                 this.forceReconnect('Multiple heartbeat failures');
             }
         }
@@ -291,7 +291,7 @@ class BackendService {
     }
     
     /**
-     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ v4.2.2: Match sur payload.request_id
+     * ✓ v4.2.2: Match sur payload.request_id
      */
     handleMessage(event) {
         try {
@@ -302,43 +302,39 @@ class BackendService {
             
             this.lastActivityTime = Date.now();
             
-            // âœ… FORMAT SIMPLE: RÃ©ponse avec id, success, data
-            if (data.hasOwnProperty('success')) {
-                const requestId = data.id;
+            // Parser envelope/payload
+            if (data.envelope && data.payload) {
+                const envelopeType = data.envelope.type;
+                const payload = data.payload;
                 
-                if (requestId && this.pendingRequests.has(requestId)) {
-                    const pending = this.pendingRequests.get(requestId);
-                    this.pendingRequests.delete(requestId);
+                if (envelopeType === 'response') {
+                    const requestId = payload.request_id;
                     
-                    clearTimeout(pending.timeoutTimer);
-                    
-                    if (data.success) {
-                        pending.resolve(data.data || data);
-                    } else {
-                        const error = new Error(data.error || data.error_message || 'Command failed');
-                        error.code = data.error_code;
-                        pending.reject(error);
+                    if (requestId && this.pendingRequests.has(requestId)) {
+                        const pending = this.pendingRequests.get(requestId);
+                        this.pendingRequests.delete(requestId);
+                        
+                        clearTimeout(pending.timeoutTimer);
+                        
+                        if (payload.success) {
+                            pending.resolve(payload.data || payload);
+                        } else {
+                            const error = new Error(payload.error || payload.error_message || 'Command failed');
+                            error.code = payload.error_code;
+                            pending.reject(error);
+                        }
+                        return;
                     }
-                    return;
-                } else {
-                    this.logger.warn('BackendService', 
-                        `Response without matching request: ${requestId}`);
-                    return;
-                }
-            }
-            
-            // Si data.event => Ã‰vÃ©nement backend
-            if (data.event) {
-                const eventName = data.event;
-                if (eventName) {
-                    this.eventBus.emit(`backend:event:${eventName}`, data);
-                    
-                    const device_id = data.device_id;
-                    if (device_id !== undefined) {
-                        this.eventBus.emit(`${eventName}:${device_id}`, data);
+                } else if (envelopeType === 'event') {
+                    const eventName = payload.name;
+                    if (eventName) {
+                        this.eventBus.emit(`backend:event:${eventName}`, payload.data);
+                        this.logger.debug('BackendService', `Event received: ${eventName}`, payload.data);
+                        return;
                     }
-                    
-                    this.logger.debug('BackendService', `Event received: ${eventName}`, data);
+                } else if (envelopeType === 'error') {
+                    this.logger.error('BackendService', 'Backend error:', payload);
+                    this.eventBus.emit('backend:error', payload);
                     return;
                 }
             }
@@ -350,6 +346,19 @@ class BackendService {
             this.logger.error('BackendService', 'Error handling message:', error);
         }
     }
+    
+    send(data) {
+        if (!this.isConnected()) {
+            if (this.messageQueue.length < this.maxQueueSize) {
+                this.messageQueue.push(data);
+                this.logger.debug('BackendService', 'Message queued (not connected)');
+            } else {
+                this.logger.warn('BackendService', 'Message queue full, message dropped');
+            }
+            return false;
+        }
+        
+        try {
             const message = typeof data === 'string' ? 
                 data : JSON.stringify(data);
             this.ws.send(message);
@@ -361,7 +370,7 @@ class BackendService {
     }
     
     /**
-     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ v4.2.2: Format conforme API v4.2.2
+     * ✓ v4.2.2: Format conforme API v4.2.2
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -389,11 +398,21 @@ class BackendService {
                 },
                 timeoutTimer: timeoutTimer
             });
-            // âœ… FORMAT API SIMPLE (selon doc)
+            
+            // FORMAT ENVELOPE/PAYLOAD selon doc
             const message = {
-                id: requestId,
-                command: command,
-                params: params
+                envelope: {
+                    id: this.generateUUID(),
+                    type: 'request',
+                    timestamp: this.generateTimestamp(),
+                    version: '1.0'
+                },
+                payload: {
+                    id: requestId,
+                    command: command,
+                    params: params,
+                    timeout: timeoutMs
+                }
             };
             
             console.log("[DEBUG] Sending:", JSON.stringify(message, null, 2));
@@ -414,7 +433,7 @@ class BackendService {
                             .reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
                     
-                    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ midi.import avec content + base64
+                    // ✓ midi.import avec content + base64
                     const response = await this.sendCommand('midi.import', {
                         filename: file.name,
                         content: base64Data,
@@ -433,7 +452,7 @@ class BackendService {
     }
     
     // ============================================================================
-    // SHORTCUTS API v4.2.2 - ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ TOUS EN snake_case
+    // SHORTCUTS API v4.2.2 - ✓ TOUS EN snake_case
     // ============================================================================
     
     // === DEVICES ===
@@ -606,7 +625,7 @@ class BackendService {
         return this.sendCommand('midi.save', { filename, midi_json }); 
     }
     
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION MAJEURE: midi.import avec content + base64
+    // ✓ CORRECTION MAJEURE: midi.import avec content + base64
     async importMidi(filename, content, base64 = true) { 
         return this.sendCommand('midi.import', { filename, content, base64 }); 
     }
@@ -623,7 +642,7 @@ class BackendService {
         return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
     }
     
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ MIDI ROUTING avec snake_case
+    // ✓ MIDI ROUTING avec snake_case
     async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
         return this.sendCommand('midi.routing.add', { 
             midi_file_id, 

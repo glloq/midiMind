@@ -1,18 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaybackController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/PlaybackController.js
+// Chemin réel: frontend/js/controllers/PlaybackController.js
 // Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.3:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✓ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✓ Fix: super() appelle BaseController avec backend
+// ✓ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// Ã¢Å“â€¦ filename (pas file_path) pour playback.load
-// Ã¢Å“â€¦ Utiliser shortcuts BackendService
+// • filename (pas file_path) pour playback.load
+// • Utiliser shortcuts BackendService
 // ============================================================================
 
 class PlaybackController extends BaseController {
@@ -23,7 +23,7 @@ class PlaybackController extends BaseController {
         this.playbackModel = models.playback;
         this.fileModel = models.file;
         this.view = views.playback;
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✓ this.backend initialisé automatiquement par BaseController
         
         this.state = {
             ...this.state,
@@ -71,29 +71,29 @@ class PlaybackController extends BaseController {
             }
         });
         
-        this.log('info', 'PlaybackController', 'Ã¢Å“â€œ Events bound v4.2.2');
+        this.log('info', 'PlaybackController', '✓ Events bound v4.2.2');
     }
     
     async onBackendConnected() {
         this.state.backendReady = true;
-        this.log('info', 'PlaybackController', 'Ã¢Å“â€œ Backend connected');
+        this.log('info', 'PlaybackController', '✓ Backend connected');
     }
     
     onBackendDisconnected() {
         this.state.backendReady = false;
         this.stopPositionUpdates();
         this.state.isPlaying = false;
-        this.log('warn', 'PlaybackController', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
+        this.log('warn', 'PlaybackController', '⚠️ Backend disconnected');
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: filename (pas file_path)
+     * • CORRECTION: filename (pas file_path)
      */
     async loadFile(filename) {
         try {
             this.log('info', 'PlaybackController', `Loading: ${filename}`);
             
-            // Ã¢Å“â€¦ Utiliser helper BackendService
+            // • Utiliser helper BackendService
             await this.backend.loadPlaybackFile(filename);
             
             this.state.loadedFile = filename;
@@ -108,7 +108,7 @@ class PlaybackController extends BaseController {
                 this.playbackModel.set('position', 0);
             }
             
-            this.log('info', 'PlaybackController', `Ã¢Å“â€œ Loaded: ${filename}`);
+            this.log('info', 'PlaybackController', `✓ Loaded: ${filename}`);
             this.eventBus.emit('playback:file-loaded', { filename, duration: this.state.duration });
             
             if (this.notifications) {
@@ -140,7 +140,7 @@ class PlaybackController extends BaseController {
             
             this.startPositionUpdates();
             
-            this.log('info', 'PlaybackController', 'Ã¢Å“â€œ Playing');
+            this.log('info', 'PlaybackController', '✓ Playing');
             this.eventBus.emit('playback:started');
             
             return true;
@@ -166,7 +166,7 @@ class PlaybackController extends BaseController {
             
             this.stopPositionUpdates();
             
-            this.log('info', 'PlaybackController', 'Ã¢Å“â€œ Paused');
+            this.log('info', 'PlaybackController', '✓ Paused');
             this.eventBus.emit('playback:paused');
             
             return true;
@@ -191,7 +191,7 @@ class PlaybackController extends BaseController {
             
             this.stopPositionUpdates();
             
-            this.log('info', 'PlaybackController', 'Ã¢Å“â€œ Stopped');
+            this.log('info', 'PlaybackController', '✓ Stopped');
             this.eventBus.emit('playback:stopped');
             
             return true;
