@@ -2,34 +2,45 @@
 // Fichier: frontend/js/main.js
 // Version: v3.3.0 - EVENTBUS GLOBAL INITIALIZATION FIX
 // Date: 2025-11-05
-// Projet: MidiMind v3.1 - Système d'Orchestration MIDI
+// Projet: MidiMind v3.1 - SystÃ¨me d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.3.0:
-// ✅ CRITIQUE: Initialisation EventBus GLOBAL avant Application
-// ✅ Vérification EventBus après initialisation
-// ✅ Fix du problème "EventBus is null"
+// âœ… CRITIQUE: Initialisation EventBus GLOBAL avant Application
+// âœ… VÃ©rification EventBus aprÃ¨s initialisation
+// âœ… Fix du problÃ¨me "EventBus is null"
 //
 // MODIFICATIONS v3.2.0:
-// ✅ Ajout d'un timeout pour forcer l'affichage si l'init bloque
-// ✅ Affichage de l'interface même si l'initialisation est incomplète
-// ✅ Meilleure gestion des erreurs d'initialisation
+// âœ… Ajout d'un timeout pour forcer l'affichage si l'init bloque
+// âœ… Affichage de l'interface mÃªme si l'initialisation est incomplÃ¨te
+// âœ… Meilleure gestion des erreurs d'initialisation
 // ============================================================================
 
 
-// Attendre que le DOM soit chargé
+// Attendre que le DOM soit chargÃ©
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Starting MidiMind v3.1.0 (Performance Mode)...');
+    
+    // FORCE: Display #app immediately
+    setTimeout(() => {
+        const appEl = document.getElementById('app');
+        if (appEl) {
+            appEl.style.display = 'block';
+            console.log('✓ #app force displayed');
+        } else {
+            console.error('✗ #app NOT FOUND');
+        }
+    }, 0);
+    console.log('ðŸš€ Starting MidiMind v3.1.0 (Performance Mode)...');
     
     try {
         // =====================================================================
-        // ÉTAPE 0: VÉRIFIER PERFORMANCE CONFIG
+        // Ã‰TAPE 0: VÃ‰RIFIER PERFORMANCE CONFIG
         // =====================================================================
         
         if (typeof PerformanceConfig === 'undefined') {
             throw new Error('PerformanceConfig not loaded! Check index.html script order.');
         }
         
-        console.log('✔ PerformanceConfig loaded:', {
+        console.log('âœ” PerformanceConfig loaded:', {
             targetFPS: PerformanceConfig.rendering.targetFPS,
             maxHistory: PerformanceConfig.memory.maxHistorySize,
             maxCache: PerformanceConfig.memory.maxCacheSize,
@@ -37,54 +48,54 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         
         // =====================================================================
-        // ÉTAPE 1: ACTIVER MODE PERFORMANCE
+        // Ã‰TAPE 1: ACTIVER MODE PERFORMANCE
         // =====================================================================
         
-        // ✔ Ajouter classe performance-mode au body
+        // âœ” Ajouter classe performance-mode au body
         if (!PerformanceConfig.ui.enableTransitions) {
             document.body.classList.add('performance-mode');
-            console.log('✔ Performance mode activated (transitions disabled)');
+            console.log('âœ” Performance mode activated (transitions disabled)');
         }
         
-        // ✔ Désactiver smooth scroll
+        // âœ” DÃ©sactiver smooth scroll
         if (!PerformanceConfig.rendering.enableSmoothScrolling) {
             document.documentElement.style.scrollBehavior = 'auto';
             const mainContainer = document.querySelector('.app-main');
             if (mainContainer) {
                 mainContainer.style.scrollBehavior = 'auto';
             }
-            console.log('✔ Smooth scrolling disabled');
+            console.log('âœ” Smooth scrolling disabled');
         }
         
         // =====================================================================
-        // ÉTAPE 2: VÉRIFIER ET INITIALISER EVENTBUS GLOBAL
+        // Ã‰TAPE 2: VÃ‰RIFIER ET INITIALISER EVENTBUS GLOBAL
         // =====================================================================
         
         if (typeof EventBus === 'undefined') {
             throw new Error('EventBus class not loaded. Check index.html script order.');
         }
         
-        // ✅ CRITIQUE: Créer EventBus GLOBAL avant tout le reste
+        // âœ… CRITIQUE: CrÃ©er EventBus GLOBAL avant tout le reste
         if (!window.eventBus) {
             window.eventBus = new EventBus();
-            console.log('✔ EventBus initialized globally');
+            console.log('âœ” EventBus initialized globally');
         } else {
-            console.log('✔ EventBus already exists (reusing existing instance)');
+            console.log('âœ” EventBus already exists (reusing existing instance)');
         }
         
-        // Vérification de sécurité
+        // VÃ©rification de sÃ©curitÃ©
         if (!window.eventBus || typeof window.eventBus.emit !== 'function') {
             throw new Error('EventBus initialization failed - invalid instance');
         }
         
-        console.log('✔ EventBus verified:', {
+        console.log('âœ” EventBus verified:', {
             hasOn: typeof window.eventBus.on === 'function',
             hasEmit: typeof window.eventBus.emit === 'function',
             hasOff: typeof window.eventBus.off === 'function'
         });
         
         // =====================================================================
-        // ÉTAPE 3: VÉRIFIER APPLICATION CLASS
+        // Ã‰TAPE 3: VÃ‰RIFIER APPLICATION CLASS
         // =====================================================================
         
         if (typeof Application === 'undefined') {
@@ -92,23 +103,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 4: CRÉER INSTANCE APPLICATION
+        // Ã‰TAPE 4: CRÃ‰ER INSTANCE APPLICATION
         // =====================================================================
         
         const app = new Application();
         
-        // Rendre app globale pour accès depuis la console et les autres scripts
+        // Rendre app globale pour accÃ¨s depuis la console et les autres scripts
         window.app = app;
-        console.log('✔ Application instance created');
+        console.log('âœ” Application instance created');
         
-        // Vérification supplémentaire EventBus
+        // VÃ©rification supplÃ©mentaire EventBus
         if (!window.eventBus) {
-            console.error('❌ CRITICAL: EventBus was lost during Application initialization!');
+            console.error('âŒ CRITICAL: EventBus was lost during Application initialization!');
             throw new Error('EventBus disappeared after Application creation');
         }
         
         // =====================================================================
-        // ÉTAPE 5: VÉRIFIER MÉTHODE INIT
+        // Ã‰TAPE 5: VÃ‰RIFIER MÃ‰THODE INIT
         // =====================================================================
         
         if (typeof app.init !== 'function') {
@@ -116,51 +127,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // =====================================================================
-        // ÉTAPE 6: AFFICHER LOADING INDICATOR
+        // Ã‰TAPE 6: AFFICHER LOADING INDICATOR
         // =====================================================================
         
         showLoadingIndicator();
         
         // =====================================================================
-        // ÉTAPE 7: INITIALISER L'APPLICATION AVEC TIMEOUT
+        // Ã‰TAPE 7: INITIALISER L'APPLICATION AVEC TIMEOUT
         // =====================================================================
         
-        console.log('⚙️ Initializing application...');
+        console.log('âš™ï¸ Initializing application...');
         
-        // NOUVEAU: Timeout de sécurité pour forcer l'affichage après 5 secondes
+        // NOUVEAU: Timeout de sÃ©curitÃ© pour forcer l'affichage aprÃ¨s 5 secondes
         let initTimeout = setTimeout(() => {
-            console.warn('⚠️ Initialization timeout - forcing interface display');
+            console.warn('âš ï¸ Initialization timeout - forcing interface display');
             forceShowInterface();
         }, 5000);
         
         try {
             await app.init();
             
-            // Annuler le timeout si l'init réussit
+            // Annuler le timeout si l'init rÃ©ussit
             clearTimeout(initTimeout);
             
-            // Vérifier que l'initialisation a réussi
+            // VÃ©rifier que l'initialisation a rÃ©ussi
             if (!app.state.initialized || !app.state.ready) {
-                console.warn('⚠️ Application initialization incomplete - showing interface anyway');
+                console.warn('âš ï¸ Application initialization incomplete - showing interface anyway');
                 forceShowInterface();
             } else {
                 // =====================================================================
-                // ÉTAPE 8: AFFICHER L'INTERFACE & MASQUER LOADING
+                // Ã‰TAPE 8: AFFICHER L'INTERFACE & MASQUER LOADING
                 // =====================================================================
                 
                 hideLoadingIndicator();
                 
-                // CRITIQUE: Afficher l'élément #app qui est caché par défaut
+                // CRITIQUE: Afficher l'Ã©lÃ©ment #app qui est cachÃ© par dÃ©faut
                 const appElement = document.getElementById('app');
                 if (appElement) {
                     appElement.style.display = 'block';
-                    console.log('✔ Application interface displayed');
+                    console.log('âœ” Application interface displayed');
                 } else {
-                    console.warn('⚠️ #app element not found in DOM');
+                    console.warn('âš ï¸ #app element not found in DOM');
                 }
                 
-                console.log('✅ MidiMind v3.1.0 initialized successfully (Performance Mode)');
-                console.log('📊 Performance Stats:', {
+                console.log('âœ… MidiMind v3.1.0 initialized successfully (Performance Mode)');
+                console.log('ðŸ“Š Performance Stats:', {
                     antiAliasing: PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF',
                     targetFPS: PerformanceConfig.rendering.targetFPS,
                     maxNotes: PerformanceConfig.rendering.maxVisibleNotes,
@@ -168,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     historyLevels: PerformanceConfig.memory.maxHistorySize
                 });
                 
-                // Émettre événement pour signaler que l'app est prête
+                // Ã‰mettre Ã©vÃ©nement pour signaler que l'app est prÃªte
                 if (window.eventBus) {
                     window.eventBus.emit('app:ready', { 
                         app,
@@ -182,27 +193,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Annuler le timeout
             clearTimeout(initTimeout);
             
-            console.error('❌ Application initialization failed:', initError);
+            console.error('âŒ Application initialization failed:', initError);
             console.error('Stack trace:', initError.stack);
             
             // TOUJOURS afficher l'interface pour permettre le debug
             forceShowInterface();
             
-            // Afficher une erreur détaillée à l'utilisateur
-            showErrorMessage(`Échec d'initialisation: ${initError.message}`);
+            // Afficher une erreur dÃ©taillÃ©e Ã  l'utilisateur
+            showErrorMessage(`Ã‰chec d'initialisation: ${initError.message}`);
         }
         
         // =====================================================================
-        // ÉTAPE 9: AFFICHER INFO PERFORMANCE EN CONSOLE
+        // Ã‰TAPE 9: AFFICHER INFO PERFORMANCE EN CONSOLE
         // =====================================================================
         
         displayPerformanceInfo();
         
     } catch (error) {
-        console.error('❌ Fatal error during startup:', error);
+        console.error('âŒ Fatal error during startup:', error);
         hideLoadingIndicator();
         
-        // Forcer l'affichage même en cas d'erreur fatale
+        // Forcer l'affichage mÃªme en cas d'erreur fatale
         forceShowInterface();
         
         showErrorMessage(`Erreur fatale: ${error.message}`);
@@ -228,10 +239,10 @@ function hideLoadingIndicator() {
 }
 
 /**
- * Force l'affichage de l'interface même en cas d'erreur
+ * Force l'affichage de l'interface mÃªme en cas d'erreur
  */
 function forceShowInterface() {
-    console.log('🔧 Forcing interface display...');
+    console.log('ðŸ”§ Forcing interface display...');
     
     // Masquer loading
     hideLoadingIndicator();
@@ -240,17 +251,17 @@ function forceShowInterface() {
     const appElement = document.getElementById('app');
     if (appElement) {
         appElement.style.display = 'block';
-        console.log('✔ Interface forcefully displayed');
+        console.log('âœ” Interface forcefully displayed');
     } else {
-        console.error('❌ Cannot find #app element');
+        console.error('âŒ Cannot find #app element');
     }
 }
 
 /**
- * Affiche un message d'erreur à l'utilisateur
+ * Affiche un message d'erreur Ã  l'utilisateur
  */
 function showErrorMessage(message) {
-    // Créer un élément d'erreur si pas déjà présent
+    // CrÃ©er un Ã©lÃ©ment d'erreur si pas dÃ©jÃ  prÃ©sent
     let errorEl = document.getElementById('startup-error');
     
     if (!errorEl) {
@@ -275,7 +286,7 @@ function showErrorMessage(message) {
     }
     
     errorEl.innerHTML = `
-        <h3 style="margin-top: 0;">⚠️ Erreur de Démarrage</h3>
+        <h3 style="margin-top: 0;">âš ï¸ Erreur de DÃ©marrage</h3>
         <p>${message}</p>
         <button onclick="location.reload()" style="
             background: white;
@@ -309,48 +320,48 @@ function displayPerformanceInfo() {
     }
     
     const info = `
-╔══════════════════════════════════════════════════════╗
-║                                                      ║
-║       🎹 MIDI MIND v3.1.0 - PERFORMANCE MODE 🚀      ║
-║                                                      ║
-╠══════════════════════════════════════════════════════╣
-║                                                      ║
-║  RENDERING                                           ║
-║  • Target FPS: ${PerformanceConfig.rendering.targetFPS.toString().padEnd(38)} ║
-║  • Anti-aliasing: ${(PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF').padEnd(33)} ║
-║  • Max notes visible: ${PerformanceConfig.rendering.maxVisibleNotes.toString().padEnd(28)} ║
-║  • Animations: ${(PerformanceConfig.rendering.enableAnimations ? 'ON' : 'OFF').padEnd(37)} ║
-║                                                      ║
-║  MEMORY                                              ║
-║  • Max cache: ${PerformanceConfig.memory.maxCacheSize.toString().padEnd(36)} MB ║
-║  • History levels: ${PerformanceConfig.memory.maxHistorySize.toString().padEnd(31)} ║
-║  • Aggressive GC: ${(PerformanceConfig.memory.aggressiveGC ? 'ON' : 'OFF').padEnd(34)} ║
-║                                                      ║
-║  KEYBOARD                                            ║
-║  • Mode: ${PerformanceConfig.keyboard.mode.padEnd(43)} ║
-║  • Recording: ${(PerformanceConfig.keyboard.enableRecording ? 'ON' : 'OFF').padEnd(38)} ║
-║  • Playback: ${(PerformanceConfig.keyboard.enablePlayback ? 'ON' : 'OFF').padEnd(39)} ║
-║                                                      ║
-║  ROUTING                                             ║
-║  • Complex routing: ${(PerformanceConfig.routing.allowComplexRouting ? 'ON' : 'OFF').padEnd(30)} ║
-║  • Auto-assign: ${(PerformanceConfig.routing.enableAutoRouting ? 'ON' : 'OFF').padEnd(36)} ║
-║  • Max routes: ${PerformanceConfig.routing.maxRoutes.toString().padEnd(37)} ║
-║                                                      ║
-╠══════════════════════════════════════════════════════╣
-║                                                      ║
-║  💡 Tips:                                            ║
-║  • Utilisez window.app pour accéder à l'application ║
-║  • Utilisez window.eventBus pour l'EventBus global  ║
-║  • Utilisez window.PerformanceConfig pour config    ║
-║  • Pressez F12 pour ouvrir DevTools                 ║
-║                                                      ║
-╚══════════════════════════════════════════════════════╝
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘                                                      â•‘
+â•‘       ðŸŽ¹ MIDI MIND v3.1.0 - PERFORMANCE MODE ðŸš€      â•‘
+â•‘                                                      â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  RENDERING                                           â•‘
+â•‘  â€¢ Target FPS: ${PerformanceConfig.rendering.targetFPS.toString().padEnd(38)} â•‘
+â•‘  â€¢ Anti-aliasing: ${(PerformanceConfig.rendering.enableAntiAliasing ? 'ON' : 'OFF').padEnd(33)} â•‘
+â•‘  â€¢ Max notes visible: ${PerformanceConfig.rendering.maxVisibleNotes.toString().padEnd(28)} â•‘
+â•‘  â€¢ Animations: ${(PerformanceConfig.rendering.enableAnimations ? 'ON' : 'OFF').padEnd(37)} â•‘
+â•‘                                                      â•‘
+â•‘  MEMORY                                              â•‘
+â•‘  â€¢ Max cache: ${PerformanceConfig.memory.maxCacheSize.toString().padEnd(36)} MB â•‘
+â•‘  â€¢ History levels: ${PerformanceConfig.memory.maxHistorySize.toString().padEnd(31)} â•‘
+â•‘  â€¢ Aggressive GC: ${(PerformanceConfig.memory.aggressiveGC ? 'ON' : 'OFF').padEnd(34)} â•‘
+â•‘                                                      â•‘
+â•‘  KEYBOARD                                            â•‘
+â•‘  â€¢ Mode: ${PerformanceConfig.keyboard.mode.padEnd(43)} â•‘
+â•‘  â€¢ Recording: ${(PerformanceConfig.keyboard.enableRecording ? 'ON' : 'OFF').padEnd(38)} â•‘
+â•‘  â€¢ Playback: ${(PerformanceConfig.keyboard.enablePlayback ? 'ON' : 'OFF').padEnd(39)} â•‘
+â•‘                                                      â•‘
+â•‘  ROUTING                                             â•‘
+â•‘  â€¢ Complex routing: ${(PerformanceConfig.routing.allowComplexRouting ? 'ON' : 'OFF').padEnd(30)} â•‘
+â•‘  â€¢ Auto-assign: ${(PerformanceConfig.routing.enableAutoRouting ? 'ON' : 'OFF').padEnd(36)} â•‘
+â•‘  â€¢ Max routes: ${PerformanceConfig.routing.maxRoutes.toString().padEnd(37)} â•‘
+â•‘                                                      â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘                                                      â•‘
+â•‘  ðŸ’¡ Tips:                                            â•‘
+â•‘  â€¢ Utilisez window.app pour accÃ©der Ã  l'application â•‘
+â•‘  â€¢ Utilisez window.eventBus pour l'EventBus global  â•‘
+â•‘  â€¢ Utilisez window.PerformanceConfig pour config    â•‘
+â•‘  â€¢ Pressez F12 pour ouvrir DevTools                 â•‘
+â•‘                                                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     `;
     
     console.log(info);
     
-    // Ajouter également des métadonnées pour debug
-    console.group('🔍 Performance Configuration Details');
+    // Ajouter Ã©galement des mÃ©tadonnÃ©es pour debug
+    console.group('ðŸ” Performance Configuration Details');
     console.log('Rendering:', PerformanceConfig.rendering);
     console.log('Memory:', PerformanceConfig.memory);
     console.log('Editor:', PerformanceConfig.editor);
@@ -365,18 +376,18 @@ function displayPerformanceInfo() {
 // GESTION ERREURS GLOBALES
 // =============================================================================
 
-// Capturer les erreurs non gérées
+// Capturer les erreurs non gÃ©rÃ©es
 window.addEventListener('error', (event) => {
     const errorMessage = event.error && event.error.message 
         ? event.error.message 
         : (event.message || 'Unknown error');
     
-    // Ignorer erreur ResizeObserver (bénigne)
+    // Ignorer erreur ResizeObserver (bÃ©nigne)
     if (errorMessage.includes('ResizeObserver')) {
         return;
     }
     
-    console.error('🔴 Unhandled error:', event.error || errorMessage);
+    console.error('ðŸ”´ Unhandled error:', event.error || errorMessage);
     
     if (window.app && window.app.debugConsole) {
         window.app.debugConsole.log('error', 
@@ -386,9 +397,9 @@ window.addEventListener('error', (event) => {
     }
 });
 
-// Capturer les promesses rejetées
+// Capturer les promesses rejetÃ©es
 window.addEventListener('unhandledrejection', (event) => {
-    console.error('🔴 Unhandled promise rejection:', event.reason);
+    console.error('ðŸ”´ Unhandled promise rejection:', event.reason);
     
     if (window.app && window.app.debugConsole) {
         window.app.debugConsole.log('error', 
@@ -404,7 +415,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 window.debugUtils = {
     /**
-     * Affiche l'état actuel de l'application
+     * Affiche l'Ã©tat actuel de l'application
      */
     showAppState() {
         if (!window.app) {
@@ -412,7 +423,7 @@ window.debugUtils = {
             return;
         }
         
-        console.group('📱 Application State');
+        console.group('ðŸ“± Application State');
         console.log('Current Page:', window.location.hash || '#home');
         console.log('Initialized:', window.app.state?.initialized || false);
         console.log('Ready:', window.app.state?.ready || false);
@@ -440,7 +451,7 @@ window.debugUtils = {
             } : 'Not available'
         };
         
-        console.group('📊 Performance Statistics');
+        console.group('ðŸ“Š Performance Statistics');
         console.table(stats);
         console.groupEnd();
     },
@@ -459,9 +470,9 @@ window.debugUtils = {
      */
     forceGC() {
         if (window.gc) {
-            console.log('🗑️ Running garbage collection...');
+            console.log('ðŸ—‘ï¸ Running garbage collection...');
             window.gc();
-            console.log('✔ GC complete');
+            console.log('âœ” GC complete');
         } else {
             console.warn('GC not available. Start Chrome with --expose-gc flag.');
         }
@@ -475,10 +486,10 @@ window.debugUtils = {
     },
     
     /**
-     * Vérifie l'état d'EventBus
+     * VÃ©rifie l'Ã©tat d'EventBus
      */
     checkEventBus() {
-        console.group('🔌 EventBus Status');
+        console.group('ðŸ”Œ EventBus Status');
         console.log('Exists:', !!window.eventBus);
         console.log('Type:', typeof window.eventBus);
         if (window.eventBus) {
@@ -492,10 +503,10 @@ window.debugUtils = {
 };
 
 // Afficher les utilitaires disponibles
-console.log('🔧 Debug utilities available: window.debugUtils');
-console.log('   • showAppState()');
-console.log('   • showPerformanceStats()');
-console.log('   • togglePerformanceMode()');
-console.log('   • forceGC()');
-console.log('   • forceShowInterface()');
-console.log('   • checkEventBus()');
+console.log('ðŸ”§ Debug utilities available: window.debugUtils');
+console.log('   â€¢ showAppState()');
+console.log('   â€¢ showPerformanceStats()');
+console.log('   â€¢ togglePerformanceMode()');
+console.log('   â€¢ forceGC()');
+console.log('   â€¢ forceShowInterface()');
+console.log('   â€¢ checkEventBus()');

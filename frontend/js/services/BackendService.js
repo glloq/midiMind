@@ -329,9 +329,16 @@ class BackendService {
     }
     
     handleBackendResponse(message) {
-        const requestId = message.payload.id;
+        // Backend sends: { type, id, payload } - requestId is at top level
+        const requestId = message.id || message.payload?.id;
         
-        if (!this.pendingRequests.has(requestId)) {
+        this.logger.debug('BackendService', '📩 Response received:', {
+            requestId: requestId,
+            hasPending: this.pendingRequests.has(requestId),
+            payload: message.payload
+        });
+        
+        if (!requestId || !this.pendingRequests.has(requestId)) {
             this.logger.warn('BackendService', 'No pending request for ID: ' + requestId);
             return;
         }
