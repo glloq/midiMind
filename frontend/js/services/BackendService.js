@@ -301,6 +301,9 @@ class BackendService {
         try {
             const message = JSON.parse(event.data);
             
+            // DEBUG: Log complet du message
+            console.log('[DEBUG] RAW MESSAGE:', JSON.stringify(message, null, 2));
+            
             this.logger.debug('BackendService', '📩 Message received:', {
                 hasId: !!message.id,
                 hasEnvelope: !!message.envelope,
@@ -329,12 +332,13 @@ class BackendService {
     }
     
     handleBackendResponse(message) {
-        // Backend sends: { type, id, payload } - requestId is at top level
-        const requestId = message.id || message.payload?.id;
+        // Backend response: payload.request_id correspond à l'id de la requête
+        const requestId = message.payload.request_id;
         
-        this.logger.debug('BackendService', '📩 Response received:', {
+        console.log('[DEBUG] RESPONSE:', {
             requestId: requestId,
             hasPending: this.pendingRequests.has(requestId),
+            pendingCount: this.pendingRequests.size,
             payload: message.payload
         });
         
@@ -462,14 +466,17 @@ class BackendService {
                     id: requestId,
                     type: 'request',
                     timestamp: this.generateTimestamp(),
-                    version: '4.2.2'
+                    version: '1.0'
                 },
                 payload: {
+                    id: requestId,  // ← CRITIQUE: id aussi dans payload
                     command: command,
-                    params: params
+                    params: params,
+                    timeout: timeoutMs
                 }
             };
             
+            console.log('[DEBUG] SENDING:', JSON.stringify(message, null, 2));
             this.logger.debug('BackendService', `📤 Sending command: ${command}`, params);
             
             if (!this.send(message)) {
