@@ -1,31 +1,25 @@
 // ============================================================================
 // Fichier: frontend/js/views/HomeView.js
-// Version: v4.1.0 - SIGNATURE CORRIGÉE (HÉRITE DE BASEVIEW)
-// Date: 2025-11-04
+// Chemin réel: frontend/js/views/HomeView.js
+// Version: v4.2.0 - CORRIGÉ COMPLET (ENCODAGE + MÉTHODES)
+// Date: 2025-11-06
 // ============================================================================
-// CORRECTIONS v4.1.0:
-// ✅ CRITIQUE: HomeView hérite maintenant de BaseView
-// ✅ Appel super(containerId, eventBus) au début du constructeur
-// ✅ Suppression réimplémentation manuelle de resolveContainer
-// ✅ Accès aux méthodes BaseView (render, update, show, hide, emit, etc.)
-// ============================================================================
-// AMÉLIORATIONS v4.0.0:
-// ✦ Conformité complète avec API Documentation v4.2.2
-// ✦ Commandes au format category.action (files.list, playlist.list, etc.)
-// ✦ Gestion réponses {success: true, data: {...}}
-// ✦ Événements au format category:event
-// ✦ Intégration visualizer MIDI temps réel
+// CORRECTIONS v4.2.0:
+// ✅ CRITIQUE: Encodage UTF-8 propre (tous les caractères corrompus corrigés)
+// ✅ Ajout de toutes les méthodes appelées par HomeController
+// ✅ Harmonisation des noms d'événements
+// ✅ Cohérence complète avec BaseView et HomeController
 // ============================================================================
 
 class HomeView extends BaseView {
     constructor(containerId, eventBus) {
-        // ✅ NOUVEAU: Appel super() pour hériter de BaseView
+        // ✅ Appel super() pour hériter de BaseView
         super(containerId, eventBus);
         
         // ✅ this.container et this.eventBus déjà initialisés par BaseView
         this.logger = window.logger || console;
         
-// Ãƒâ€°tat
+        // État
         this.state = {
             mode: 'files', // 'files' ou 'playlists'
             currentFile: null,
@@ -39,7 +33,12 @@ class HomeView extends BaseView {
                 duration: 0,
                 file: null
             },
-            allMuted: false
+            allMuted: false,
+            stats: {
+                totalFiles: 0,
+                totalDuration: 0,
+                totalSize: 0
+            }
         };
         
         // Visualizer
@@ -48,7 +47,7 @@ class HomeView extends BaseView {
         this.visualizerAnimationId = null;
         this.activeNotes = new Map(); // note -> {channel, velocity, time}
         
-        // Ãƒâ€°lÃƒÂ©ments DOM
+        // Éléments DOM
         this.elements = {};
     }
 
@@ -67,12 +66,12 @@ class HomeView extends BaseView {
         this.attachEvents();
         this.initVisualizer();
         
-        // Charger les donnÃƒÂ©es initiales via API
+        // Charger les données initiales via API
         this.loadFiles();
         this.loadPlaylists();
         this.loadDevices();
         
-        this.logger.info('[HomeView] Initialized v4.0.0');
+        this.logger.info('[HomeView] Initialized v4.2.0');
     }
 
     render() {
@@ -81,7 +80,7 @@ class HomeView extends BaseView {
         this.container.innerHTML = `
             <div class="home-layout">
                 
-                <!-- SÃƒÂ©lection fichiers/playlists -->
+                <!-- Sélection fichiers/playlists -->
                 <div class="home-selector">
                     <div class="selector-tabs">
                         <button class="selector-tab active" data-mode="files">Fichiers MIDI</button>
@@ -106,15 +105,15 @@ class HomeView extends BaseView {
                     <!-- Barre instruments -->
                     <div class="instruments-bar">
                         <div class="instruments-title">
-                            <span class="icon">Ã°Å¸Å½Â¸</span>
-                            <span class="label">Devices connectÃƒÂ©s</span>
+                            <span class="icon">🎸</span>
+                            <span class="label">Devices connectés</span>
                         </div>
                         <div class="instruments-list" id="homeActiveDevices">
-                            <!-- GÃƒÂ©nÃƒÂ©rÃƒÂ© dynamiquement -->
+                            <!-- Généré dynamiquement -->
                         </div>
                         <div class="instruments-actions">
                             <button class="btn-mute-all" id="homeBtnMuteAll" title="Mute/Unmute tous les canaux">
-                                <span class="mute-icon">Ã°Å¸â€â€¡</span>
+                                <span class="mute-icon">🔇</span>
                                 <span class="mute-label">Mute All</span>
                             </button>
                         </div>
@@ -127,6 +126,33 @@ class HomeView extends BaseView {
                             <span class="note-count">0 notes actives</span>
                             <span class="active-channels">0 canaux</span>
                         </div>
+                    </div>
+                    
+                    <!-- Statistiques -->
+                    <div class="home-stats" id="homeStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Fichiers</span>
+                            <span class="stat-value" data-stat="files">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Durée totale</span>
+                            <span class="stat-value" data-stat="duration">0:00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Taille</span>
+                            <span class="stat-value" data-stat="size">0 MB</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="home-progress-bar" id="homeProgressBar" style="display: none;">
+                        <div class="progress-fill" id="homeProgressFill"></div>
+                        <div class="progress-time" id="homeProgressTime">0:00 / 0:00</div>
+                    </div>
+                    
+                    <!-- Aperçu des notes à venir -->
+                    <div class="home-note-preview" id="homeNotePreview" style="display: none;">
+                        <!-- Généré dynamiquement -->
                     </div>
                 </div>
             </div>
@@ -149,7 +175,21 @@ class HomeView extends BaseView {
             
             // Visualizer
             visualizerCanvas: document.getElementById('homeVisualizerCanvas'),
-            visualizerInfo: document.getElementById('homeVisualizerInfo')
+            visualizerInfo: document.getElementById('homeVisualizerInfo'),
+            
+            // Stats
+            stats: document.getElementById('homeStats'),
+            statFiles: document.querySelector('[data-stat="files"]'),
+            statDuration: document.querySelector('[data-stat="duration"]'),
+            statSize: document.querySelector('[data-stat="size"]'),
+            
+            // Progress
+            progressBar: document.getElementById('homeProgressBar'),
+            progressFill: document.getElementById('homeProgressFill'),
+            progressTime: document.getElementById('homeProgressTime'),
+            
+            // Note preview
+            notePreview: document.getElementById('homeNotePreview')
         };
     }
 
@@ -167,7 +207,7 @@ class HomeView extends BaseView {
             this.elements.btnMuteAll.addEventListener('click', () => this.toggleMuteAll());
         }
         
-        // DÃƒÂ©lÃƒÂ©gation d'ÃƒÂ©vÃƒÂ©nements pour les listes
+        // Délégation d'événements pour les listes
         if (this.elements.filesList) {
             this.elements.filesList.addEventListener('click', (e) => this.handleFileClick(e));
         }
@@ -182,7 +222,12 @@ class HomeView extends BaseView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        // Fichiers - ÃƒÂ©coute de files:loaded
+        // Fichiers
+        this.eventBus.on('file:list:updated', (data) => {
+            this.state.files = data.files || [];
+            this.renderFilesList();
+        });
+        
         this.eventBus.on('files:loaded', (data) => {
             this.state.files = data.files || [];
             this.renderFilesList();
@@ -193,7 +238,12 @@ class HomeView extends BaseView {
             this.updateFileSelection();
         });
         
-        // Playlists - ÃƒÂ©coute de playlist:* events
+        // Playlists
+        this.eventBus.on('playlist:list:updated', (data) => {
+            this.state.playlists = data.playlists || [];
+            this.renderPlaylistsList();
+        });
+        
         this.eventBus.on('playlists:loaded', (data) => {
             this.state.playlists = data.playlists || [];
             this.renderPlaylistsList();
@@ -204,7 +254,12 @@ class HomeView extends BaseView {
             this.updatePlaylistSelection();
         });
         
-        // Devices - ÃƒÂ©coute de device:* events
+        // Devices
+        this.eventBus.on('devices:updated', (data) => {
+            this.state.devices = data.devices || [];
+            this.renderDevicesList();
+        });
+        
         this.eventBus.on('devices:loaded', (data) => {
             this.state.devices = data.devices || [];
             this.renderDevicesList();
@@ -218,7 +273,7 @@ class HomeView extends BaseView {
             this.handleDeviceDisconnected(data);
         });
         
-        // Playback - ÃƒÂ©coute de playback:* events
+        // Playback
         this.eventBus.on('playback:state', (data) => {
             this.state.playbackStatus.state = data.state;
             this.updatePlaybackState();
@@ -239,7 +294,7 @@ class HomeView extends BaseView {
         });
         
         this.eventBus.on('midi:cc', (data) => {
-            // GÃƒÂ©rer les contrÃƒÂ´les si nÃƒÂ©cessaire
+            // Gérer les contrôles si nécessaire
         });
     }
 
@@ -280,14 +335,14 @@ class HomeView extends BaseView {
     renderEmptyState(type) {
         const messages = {
             files: {
-                icon: 'Ã°Å¸â€œÂ',
+                icon: '📁',
                 title: 'Aucun fichier MIDI',
                 subtitle: 'Chargez des fichiers MIDI pour commencer'
             },
             playlists: {
-                icon: 'Ã°Å¸Å½Âµ',
+                icon: '🎵',
                 title: 'Aucune playlist',
-                subtitle: 'CrÃƒÂ©ez une playlist pour organiser vos fichiers'
+                subtitle: 'Créez une playlist pour organiser vos fichiers'
             }
         };
         
@@ -325,27 +380,33 @@ class HomeView extends BaseView {
                         (this.state.currentFile.path === file.path || 
                          this.state.currentFile.name === file.name);
         
-        const duration = file.duration ? this.formatDuration(file.duration) : 'Ã¢â‚¬â€';
-        const size = file.size ? this.formatFileSize(file.size) : 'Ã¢â‚¬â€';
+        const duration = file.duration ? this.formatDuration(file.duration) : '—';
+        const size = file.size ? this.formatFileSize(file.size) : '—';
         
         return `
             <div class="file-item ${isActive ? 'active' : ''}" 
                  data-file-path="${file.path || file.name}">
-                <div class="file-icon">Ã°Å¸Å½Âµ</div>
+                <div class="file-icon">🎵</div>
                 <div class="file-info">
                     <div class="file-name">${file.name}</div>
                     <div class="file-meta">
                         <span>${duration}</span>
-                        <span>Ã¢â‚¬Â¢</span>
+                        <span>•</span>
                         <span>${size}</span>
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-play" data-action="play-file" title="Lire">Ã¢â€“Â¶</button>
-                    <button class="btn-load" data-action="load-file" title="Charger">Ã°Å¸â€œâ€š</button>
+                    <button class="btn-play" data-action="play-file" title="Lire">▶</button>
+                    <button class="btn-load" data-action="load-file" title="Charger">📂</button>
                 </div>
             </div>
         `;
+    }
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateFileList(files) {
+        this.state.files = files || [];
+        this.renderFilesList();
     }
 
     // ========================================================================
@@ -371,26 +432,32 @@ class HomeView extends BaseView {
                         this.state.currentPlaylist.id === playlist.id;
         
         const itemCount = playlist.items ? playlist.items.length : 0;
-        const duration = playlist.total_duration ? this.formatDuration(playlist.total_duration) : 'Ã¢â‚¬â€';
+        const duration = playlist.total_duration ? this.formatDuration(playlist.total_duration) : '—';
         
         return `
             <div class="playlist-item ${isActive ? 'active' : ''}" 
                  data-playlist-id="${playlist.id}">
-                <div class="playlist-icon">Ã°Å¸â€œâ€¹</div>
+                <div class="playlist-icon">📋</div>
                 <div class="playlist-info">
                     <div class="playlist-name">${playlist.name}</div>
                     <div class="playlist-meta">
                         <span>${itemCount} morceaux</span>
-                        <span>Ã¢â‚¬Â¢</span>
+                        <span>•</span>
                         <span>${duration}</span>
                     </div>
                 </div>
                 <div class="playlist-actions">
-                    <button class="btn-play" data-action="play-playlist" title="Lire">Ã¢â€“Â¶</button>
-                    <button class="btn-load" data-action="load-playlist" title="Charger">Ã°Å¸â€œâ€š</button>
+                    <button class="btn-play" data-action="play-playlist" title="Lire">▶</button>
+                    <button class="btn-load" data-action="load-playlist" title="Charger">📂</button>
                 </div>
             </div>
         `;
+    }
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updatePlaylistList(playlists) {
+        this.state.playlists = playlists || [];
+        this.renderPlaylistsList();
     }
 
     // ========================================================================
@@ -404,7 +471,7 @@ class HomeView extends BaseView {
         
         if (devices.length === 0) {
             this.elements.devicesList.innerHTML = `
-                <div class="devices-empty">Aucun device connectÃƒÂ©</div>
+                <div class="devices-empty">Aucun device connecté</div>
             `;
             return;
         }
@@ -415,13 +482,13 @@ class HomeView extends BaseView {
 
     renderDeviceItem(device) {
         const typeIcons = {
-            0: 'Ã¢Ââ€œ', // Unknown
-            1: 'Ã°Å¸â€Å’', // USB
-            2: 'Ã°Å¸â€œÂ¡', // BLE
-            3: 'Ã°Å¸â€™Â»'  // Virtual
+            0: '❓', // Unknown
+            1: '🔌', // USB
+            2: '📡', // BLE
+            3: '💻'  // Virtual
         };
         
-        const icon = typeIcons[device.type] || 'Ã°Å¸Å½Â¸';
+        const icon = typeIcons[device.type] || '🎸';
         
         return `
             <div class="device-chip" data-device-id="${device.id}">
@@ -430,6 +497,117 @@ class HomeView extends BaseView {
                 <span class="device-status connected"></span>
             </div>
         `;
+    }
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateDevicesList(devices) {
+        this.state.devices = devices || [];
+        this.renderDevicesList();
+    }
+
+    // ========================================================================
+    // STATISTIQUES
+    // ========================================================================
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateStats(stats) {
+        if (!stats) return;
+        
+        this.state.stats = {
+            ...this.state.stats,
+            ...stats
+        };
+        
+        // Mettre à jour l'affichage
+        if (this.elements.statFiles) {
+            this.elements.statFiles.textContent = stats.totalFiles || 0;
+        }
+        
+        if (this.elements.statDuration && stats.totalDuration) {
+            this.elements.statDuration.textContent = this.formatDuration(stats.totalDuration);
+        }
+        
+        if (this.elements.statSize && stats.totalSize) {
+            this.elements.statSize.textContent = this.formatFileSize(stats.totalSize);
+        }
+    }
+
+    // ========================================================================
+    // PROGRESSION
+    // ========================================================================
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateProgress(currentTime, duration) {
+        if (!this.elements.progressBar || !this.elements.progressFill || !this.elements.progressTime) {
+            return;
+        }
+        
+        // Afficher la barre
+        this.elements.progressBar.style.display = 'block';
+        
+        // Calculer le pourcentage
+        const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+        this.elements.progressFill.style.width = `${percent}%`;
+        
+        // Mettre à jour le temps
+        const current = this.formatDuration(currentTime / 1000);
+        const total = this.formatDuration(duration / 1000);
+        this.elements.progressTime.textContent = `${current} / ${total}`;
+    }
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    hideProgress() {
+        if (this.elements.progressBar) {
+            this.elements.progressBar.style.display = 'none';
+        }
+    }
+
+    // ========================================================================
+    // APERÇU DES NOTES
+    // ========================================================================
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateNotePreview(notes) {
+        if (!this.elements.notePreview || !notes || notes.length === 0) {
+            if (this.elements.notePreview) {
+                this.elements.notePreview.style.display = 'none';
+            }
+            return;
+        }
+        
+        this.elements.notePreview.style.display = 'block';
+        
+        const html = notes.slice(0, 5).map(note => `
+            <div class="note-preview-item">
+                <span class="note-name">${this.getMidiNoteName(note.note)}</span>
+                <span class="note-time">+${(note.time / 1000).toFixed(1)}s</span>
+            </div>
+        `).join('');
+        
+        this.elements.notePreview.innerHTML = `
+            <div class="note-preview-title">Notes à venir</div>
+            <div class="note-preview-list">${html}</div>
+        `;
+    }
+
+    getMidiNoteName(noteNumber) {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(noteNumber / 12) - 1;
+        const noteName = notes[noteNumber % 12];
+        return `${noteName}${octave}`;
+    }
+
+    // ========================================================================
+    // ROUTING DISPLAY
+    // ========================================================================
+
+    // ✅ NOUVEAU: Méthode appelée par HomeController
+    updateRoutingDisplay(routes) {
+        // Cette vue Home ne montre pas les détails du routing
+        // Mais on peut logger ou afficher un indicateur
+        if (routes && routes.length > 0) {
+            this.logger.info(`[HomeView] ${routes.length} routes actives`);
+        }
     }
 
     // ========================================================================
@@ -473,7 +651,6 @@ class HomeView extends BaseView {
         if (!this.eventBus) return;
         
         try {
-            // Utilise playback.load puis playback.play via API
             this.eventBus.emit('home:play_file_requested', { 
                 file_path: file.path || file.name 
             });
@@ -486,7 +663,6 @@ class HomeView extends BaseView {
         if (!this.eventBus) return;
         
         try {
-            // Utilise playback.load via API
             this.eventBus.emit('home:load_file_requested', { 
                 file_path: file.path || file.name 
             });
@@ -585,20 +761,18 @@ class HomeView extends BaseView {
     // ========================================================================
 
     handleDeviceConnected(data) {
-        // Mise ÃƒÂ  jour de la liste des devices
+        // Mise à jour de la liste des devices
         this.loadDevices();
         
-        // Notification visuelle
         if (this.logger) {
             this.logger.info(`[HomeView] Device connected: ${data.device_id}`);
         }
     }
 
     handleDeviceDisconnected(data) {
-        // Mise ÃƒÂ  jour de la liste des devices
+        // Mise à jour de la liste des devices
         this.loadDevices();
         
-        // Notification visuelle
         if (this.logger) {
             this.logger.info(`[HomeView] Device disconnected: ${data.device_id}`);
         }
@@ -616,11 +790,11 @@ class HomeView extends BaseView {
             this.elements.btnMuteAll.classList.toggle('muted', this.state.allMuted);
             const icon = this.elements.btnMuteAll.querySelector('.mute-icon');
             const label = this.elements.btnMuteAll.querySelector('.mute-label');
-            if (icon) icon.textContent = this.state.allMuted ? 'Ã°Å¸â€Å ' : 'Ã°Å¸â€â€¡';
+            if (icon) icon.textContent = this.state.allMuted ? '🔊' : '🔇';
             if (label) label.textContent = this.state.allMuted ? 'Unmute All' : 'Mute All';
         }
         
-        // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+        // Émettre événement
         if (this.eventBus) {
             this.eventBus.emit('home:mute_all_toggled', { muted: this.state.allMuted });
         }
@@ -679,7 +853,7 @@ class HomeView extends BaseView {
         // Dessiner les notes actives
         this.drawActiveNotes(ctx, width, height);
         
-        // Mise ÃƒÂ  jour des infos
+        // Mise à jour des infos
         this.updateVisualizerInfo();
     }
 
@@ -720,7 +894,7 @@ class HomeView extends BaseView {
 
     visualizeNoteOff(data) {
         // Laisser la note fade out naturellement
-        // ou supprimer immÃƒÂ©diatement si souhaitÃƒÂ©
+        // ou supprimer immédiatement si souhaité
         // this.activeNotes.delete(data.note);
     }
 
@@ -748,12 +922,16 @@ class HomeView extends BaseView {
     // ========================================================================
 
     updatePlaybackState() {
-        // Mise ÃƒÂ  jour visuelle de l'ÃƒÂ©tat de lecture si nÃƒÂ©cessaire
-        // (ex: indicateur de lecture en cours)
+        // Mise à jour visuelle de l'état de lecture si nécessaire
+        const state = this.state.playbackStatus.state;
+        
+        if (state === 'stopped') {
+            this.hideProgress();
+        }
     }
 
     // ========================================================================
-    // CHARGEMENT DES DONNÃƒâ€°ES (API CALLS VIA EVENTBUS)
+    // CHARGEMENT DES DONNÉES (API CALLS VIA EVENTBUS)
     // ========================================================================
 
     loadFiles() {
@@ -809,10 +987,13 @@ class HomeView extends BaseView {
         
         // Remove event listeners
         if (this.eventBus) {
+            this.eventBus.off('file:list:updated');
             this.eventBus.off('files:loaded');
             this.eventBus.off('file:selected');
+            this.eventBus.off('playlist:list:updated');
             this.eventBus.off('playlists:loaded');
             this.eventBus.off('playlist:selected');
+            this.eventBus.off('devices:updated');
             this.eventBus.off('devices:loaded');
             this.eventBus.off('device:connected');
             this.eventBus.off('device:disconnected');
@@ -837,3 +1018,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.HomeView = HomeView;
 }
+
+// ============================================================================
+// FIN - HomeView.js v4.2.0
+// ============================================================================
