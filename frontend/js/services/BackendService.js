@@ -302,12 +302,21 @@ class BackendService {
             const message = JSON.parse(event.data);
             
             this.logger.debug('BackendService', '📩 Message received:', {
-                hasId: !!message.envelope?.id,
-                hasEvent: !!message.event,
-                type: message.envelope?.type || message.event || 'unknown'
+                hasId: !!message.id,
+                hasEnvelope: !!message.envelope,
+                type: message.type || message.envelope?.type || message.event || 'unknown'
             });
             
-            if (message.envelope && message.envelope.type === 'response') {
+            // Backend format: { type, id, payload, timestamp, version }
+            if (message.type && message.payload) {
+                if (message.type === 'response') {
+                    this.handleBackendResponse(message);
+                } else if (message.type === 'event') {
+                    this.handleBackendEvent(message);
+                }
+            }
+            // Frontend format: { envelope: { type }, payload }
+            else if (message.envelope && message.envelope.type === 'response') {
                 this.handleResponse(message);
             } else if (message.event) {
                 this.handleEvent(message);
@@ -316,6 +325,41 @@ class BackendService {
             }
         } catch (error) {
             this.logger.error('BackendService', 'Error parsing message:', error, event.data);
+        }
+    }
+    
+    handleBackendResponse(message) {
+        const requestId = message.payload.id;
+        
+        if (!this.pendingRequests.has(requestId)) {
+            this.logger.warn('BackendService', 'No pending request for ID: ' + requestId);
+            return;
+        }
+        
+        const pending = this.pendingRequests.get(requestId);
+        clearTimeout(pending.timeoutTimer);
+        this.pendingRequests.delete(requestId);
+        
+        if (message.payload.success !== false && !message.payload.error) {
+            const data = message.payload.data || message.payload;
+            this.logger.debug('BackendService', '✔ Command success [' + requestId + ']', data);
+            pending.resolve(data);
+        } else {
+            const error = message.payload.error || message.payload.error_message || 'Command failed';
+            this.logger.error('BackendService', '✘ Command failed [' + requestId + ']:', error);
+            pending.reject(new Error(error));
+        }
+    }
+    
+    handleBackendEvent(message) {
+        const eventName = message.payload.name || message.payload.event;
+        const eventData = message.payload.data || message.payload;
+        
+        if (eventName) {
+            this.logger.debug('BackendService', '📡 Backend Event: ' + eventName, eventData);
+            this.eventBus.emit('backend:event:' + eventName, eventData);
+        } else {
+            this.logger.debug('BackendService', '📡 Backend heartbeat (no event name)');
         }
     }
     
