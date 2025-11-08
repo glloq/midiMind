@@ -1,18 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js
-// Version: v4.2.2 - API COMPATIBLE (FULLY CORRECTED)
-// Date: 2025-11-06
+// Version: v4.2.3 - API FORMAT PLAT CORRIGÉ (NO DOWNGRADING)
+// Date: 2025-11-08
 // ============================================================================
-// CORRECTIONS v4.2.2 (COMPLÈTES):
-// ✅ Tous les paramètres en snake_case
-// ✅ midi.import: filename + content + base64
-// ✅ Réponse: payload.data extraite correctement
-// ✅ routing_id, device_id, midi_file_id, playlist_id
-// ✅ routing.* : source_id + destination_id (pas route_id)
-// ✅ latency.* : instrument_id + offset_ms (pas device_id/latency_ms)
-// ✅ preset.save : { preset } (objet complet, pas name+data)
-// ✅ preset.export : filepath (pas filename)
+// CORRECTIONS v4.2.3:
+// ✅ FORMAT MESSAGE PLAT: { id, type, timestamp, version, payload }
+// ✅ Suppression de la structure envelope/payload imbriquée dans sendCommand
+// ✅ Conforme à API_WEBSOCKET_PROTOCOL.md v4.2.2
+// ✅ GARDE la compatibilité avec handleResponse/handleEvent (legacy frontend)
+// ✅ AJOUTE handleBackendError pour messages d'erreur type='error'
 // ============================================================================
 
 class BackendService {
@@ -52,7 +49,7 @@ class BackendService {
         
         this.pendingRequests = new Map();
         
-        this.logger.info('BackendService', 'Service initialized (v4.2.2 - FULLY CORRECTED)');
+        this.logger.info('BackendService', 'Service initialized (v4.2.3 - FLAT FORMAT, NO DOWNGRADING)');
     }
     
     generateUUID() {
@@ -128,7 +125,7 @@ class BackendService {
         this.offlineMode = false;
         this.reconnectAttempts = 0;
         
-        this.logger.info('BackendService', '✔ Connected successfully');
+        this.logger.info('BackendService', '✓ Connected successfully');
         this.eventBus.emit('backend:connected');
         
         this.startHeartbeat();
@@ -316,9 +313,11 @@ class BackendService {
                     this.handleBackendResponse(message);
                 } else if (message.type === 'event') {
                     this.handleBackendEvent(message);
+                } else if (message.type === 'error') {
+                    this.handleBackendError(message);
                 }
             }
-            // Frontend format: { envelope: { type }, payload }
+            // Frontend format: { envelope: { type }, payload } - COMPATIBILITÉ LEGACY
             else if (message.envelope && message.envelope.type === 'response') {
                 this.handleResponse(message);
             } else if (message.event) {
@@ -353,7 +352,7 @@ class BackendService {
         
         if (message.payload.success !== false && !message.payload.error) {
             const data = message.payload.data || message.payload;
-            this.logger.debug('BackendService', '✔ Command success [' + requestId + ']', data);
+            this.logger.debug('BackendService', '✓ Command success [' + requestId + ']', data);
             pending.resolve(data);
         } else {
             const error = message.payload.error || message.payload.error_message || 'Command failed';
@@ -374,6 +373,26 @@ class BackendService {
         }
     }
     
+    handleBackendError(message) {
+        const requestId = message.payload.request_id;
+        const errorMessage = message.payload.error_message || message.payload.error || 'Unknown error';
+        
+        this.logger.error('BackendService', '❌ Backend error:', errorMessage);
+        
+        if (requestId && this.pendingRequests.has(requestId)) {
+            const pending = this.pendingRequests.get(requestId);
+            clearTimeout(pending.timeoutTimer);
+            this.pendingRequests.delete(requestId);
+            pending.reject(new Error(errorMessage));
+        }
+        
+        this.eventBus.emit('backend:error', {
+            message: errorMessage,
+            requestId: requestId
+        });
+    }
+    
+    // COMPATIBILITÉ LEGACY - Format Frontend { envelope: {...}, payload: {...} }
     handleResponse(message) {
         const requestId = message.envelope.id;
         
@@ -388,7 +407,7 @@ class BackendService {
         
         if (message.payload && message.payload.success) {
             const data = message.payload.data || message.payload;
-            this.logger.debug('BackendService', `✔ Command success [${requestId}]`, data);
+            this.logger.debug('BackendService', `✓ Command success [${requestId}]`, data);
             pending.resolve(data);
         } else {
             const error = message.payload?.error || 'Command failed';
@@ -397,6 +416,7 @@ class BackendService {
         }
     }
     
+    // COMPATIBILITÉ LEGACY - Events Frontend
     handleEvent(message) {
         const eventName = message.event;
         const eventData = message.data || message;
@@ -431,7 +451,8 @@ class BackendService {
     }
     
     /**
-     * ✔ v4.2.2: Format conforme API v4.2.2
+     * ✅ v4.2.3: Format PLAT conforme API v4.2.2
+     * { id, type, timestamp, version, payload }
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -460,16 +481,14 @@ class BackendService {
                 timeoutTimer: timeoutTimer
             });
             
-            // FORMAT ENVELOPE/PAYLOAD selon doc
+            // ✅ FORMAT PLAT selon API v4.2.2
             const message = {
-                envelope: {
-                    id: requestId,
-                    type: 'request',
-                    timestamp: this.generateTimestamp(),
-                    version: '1.0'
-                },
+                id: requestId,
+                type: 'request',
+                timestamp: this.generateTimestamp(),
+                version: '1.0',
                 payload: {
-                    id: requestId,  // ← CRITIQUE: id aussi dans payload
+                    id: requestId,
                     command: command,
                     params: params,
                     timeout: timeoutMs
@@ -518,144 +537,8 @@ class BackendService {
     }
     
     // ============================================================================
-    // SHORTCUTS API v4.2.2 - ✅ TOUS CORRIGÉS ET CONFORMES
+    // API COMMANDS (v4.2.2 - snake_case)
     // ============================================================================
-    
-    // === DEVICES ===
-    async listDevices() { 
-        return this.sendCommand('devices.list'); 
-    }
-    
-    async scanDevices(full_scan = false) { 
-        return this.sendCommand('devices.scan', { full_scan }); 
-    }
-    
-    async getDevice(device_id) { 
-        return this.sendCommand('devices.getInfo', { device_id }); 
-    }
-    
-    async connectDevice(device_id) { 
-        return this.sendCommand('devices.connect', { device_id }); 
-    }
-    
-    async disconnectDevice(device_id) { 
-        return this.sendCommand('devices.disconnect', { device_id }); 
-    }
-    
-    async disconnectAllDevices() { 
-        return this.sendCommand('devices.disconnectAll'); 
-    }
-    
-    async getConnectedDevices() { 
-        return this.sendCommand('devices.getConnected'); 
-    }
-    
-    async startHotPlug() { 
-        return this.sendCommand('devices.startHotPlug'); 
-    }
-    
-    async stopHotPlug() { 
-        return this.sendCommand('devices.stopHotPlug'); 
-    }
-    
-    async getHotPlugStatus() { 
-        return this.sendCommand('devices.getHotPlugStatus'); 
-    }
-    
-    // === ROUTING - ✅ CORRIGÉ: source_id + destination_id (pas route_id)
-    async listRoutes() { 
-        return this.sendCommand('routing.listRoutes'); 
-    }
-    
-    async addRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.addRoute', { source_id, destination_id }); 
-    }
-    
-    async removeRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.removeRoute', { source_id, destination_id }); 
-    }
-    
-    async enableRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.enableRoute', { source_id, destination_id }); 
-    }
-    
-    async disableRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.disableRoute', { source_id, destination_id }); 
-    }
-    
-    async clearRoutes() { 
-        return this.sendCommand('routing.clearRoutes'); 
-    }
-    
-    // === LATENCY - ✅ CORRIGÉ: instrument_id + offset_ms
-    async enableLatency() { 
-        return this.sendCommand('latency.enable'); 
-    }
-    
-    async disableLatency() { 
-        return this.sendCommand('latency.disable'); 
-    }
-    
-    async setLatencyCompensation(instrument_id, offset_ms) { 
-        return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); 
-    }
-    
-    async getLatencyCompensation(instrument_id) { 
-        return this.sendCommand('latency.getCompensation', { instrument_id }); 
-    }
-    
-    async setGlobalOffset(offset_ms) { 
-        return this.sendCommand('latency.setGlobalOffset', { offset_ms }); 
-    }
-    
-    async getGlobalOffset() { 
-        return this.sendCommand('latency.getGlobalOffset'); 
-    }
-    
-    async listInstruments() { 
-        return this.sendCommand('latency.listInstruments'); 
-    }
-    
-    // === PLAYBACK ===
-    async listPlaybackFiles() { 
-        return this.sendCommand('playback.listFiles'); 
-    }
-    
-    async loadPlaybackFile(filename) { 
-        return this.sendCommand('playback.load', { filename }); 
-    }
-    
-    async play(file_id = null) { 
-        return this.sendCommand('playback.play', file_id ? { file_id } : {}); 
-    }
-    
-    async pause() { 
-        return this.sendCommand('playback.pause'); 
-    }
-    
-    async stop() { 
-        return this.sendCommand('playback.stop'); 
-    }
-    
-    async seek(position) { 
-        return this.sendCommand('playback.seek', { position }); 
-    }
-    
-    async setTempo(tempo) { 
-        return this.sendCommand('playback.setTempo', { tempo }); 
-    }
-    
-    async setLoop(enabled) { 
-        return this.sendCommand('playback.setLoop', { enabled }); 
-    }
-    
-    async getStatus() { 
-        return this.sendCommand('playback.getStatus'); 
-    }
-    
-    async getPlaybackInfo() { 
-        return this.sendCommand('playback.getInfo'); 
-    }
     
     // === FILES ===
     async listFiles(path = '/midi') { 
@@ -674,69 +557,180 @@ class BackendService {
         return this.sendCommand('files.delete', { filename }); 
     }
     
-    async fileExists(filename) { 
-        return this.sendCommand('files.exists', { filename }); 
+    async renameFile(old_filename, new_filename) { 
+        return this.sendCommand('files.rename', { old_filename, new_filename }); 
+    }
+    
+    async copyFile(source, destination) { 
+        return this.sendCommand('files.copy', { source, destination }); 
+    }
+    
+    async createDirectory(path) { 
+        return this.sendCommand('files.createDir', { path }); 
     }
     
     async getFileInfo(filename) { 
-        return this.sendCommand('files.getInfo', { filename }); 
+        return this.sendCommand('files.info', { filename }); 
     }
     
     // === MIDI ===
-    async loadMidi(id) { 
-        return this.sendCommand('midi.load', { id }); 
-    }
-    
-    async saveMidi(filename, midi_json) { 
-        return this.sendCommand('midi.save', { filename, midi_json }); 
-    }
-    
-    // ✔ CORRECTION MAJEURE: midi.import avec content + base64
     async importMidi(filename, content, base64 = true) { 
         return this.sendCommand('midi.import', { filename, content, base64 }); 
     }
     
-    async convertMidi(json_data) { 
-        return this.sendCommand('midi.convert', { json_data }); 
+    async exportMidi(midi_file_id, output_path = null) { 
+        return this.sendCommand('midi.export', { midi_file_id, output_path }); 
     }
     
-    async sendNoteOn(device_id, note, velocity, channel = 0) { 
-        return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); 
+    async parseMidi(filename) { 
+        return this.sendCommand('midi.parse', { filename }); 
     }
     
-    async sendNoteOff(device_id, note, channel = 0) { 
-        return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
+    async getMidiInfo(midi_file_id) { 
+        return this.sendCommand('midi.info', { midi_file_id }); 
     }
     
-    // ✔ MIDI ROUTING avec snake_case
-    async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
-        return this.sendCommand('midi.routing.add', { 
-            midi_file_id, 
-            track_id, 
-            device_id, 
-            instrument_name, 
-            channel, 
-            enabled 
-        });
+    async loadMidiFile(filename) { 
+        return this.sendCommand('midi.load', { filename }); 
     }
     
-    async listMidiRouting(midi_file_id) {
-        return this.sendCommand('midi.routing.list', { midi_file_id });
+    async unloadMidiFile(midi_file_id) { 
+        return this.sendCommand('midi.unload', { midi_file_id }); 
     }
     
-    async updateMidiRouting(routing_id, updates) {
-        return this.sendCommand('midi.routing.update', { routing_id, ...updates });
+    async getLoadedFiles() { 
+        return this.sendCommand('midi.loaded'); 
     }
     
-    async removeMidiRouting(routing_id) {
-        return this.sendCommand('midi.routing.remove', { routing_id });
+    // === PLAYBACK ===
+    async playFile(filename, loop = false) { 
+        return this.sendCommand('playback.play', { filename, loop }); 
     }
     
-    async clearMidiRouting(midi_file_id) {
-        return this.sendCommand('midi.routing.clear', { midi_file_id });
+    async pausePlayback() { 
+        return this.sendCommand('playback.pause'); 
     }
     
-    // === PRESETS - ✅ CORRIGÉ: preset (objet complet) + filepath
+    async resumePlayback() { 
+        return this.sendCommand('playback.resume'); 
+    }
+    
+    async stopPlayback() { 
+        return this.sendCommand('playback.stop'); 
+    }
+    
+    async seekPlayback(position) { 
+        return this.sendCommand('playback.seek', { position }); 
+    }
+    
+    async setPlaybackLoop(enabled) { 
+        return this.sendCommand('playback.setLoop', { enabled }); 
+    }
+    
+    async setPlaybackTempo(tempo) { 
+        return this.sendCommand('playback.setTempo', { tempo }); 
+    }
+    
+    async getPlaybackState() { 
+        return this.sendCommand('playback.getState'); 
+    }
+    
+    async getPlaybackPosition() { 
+        return this.sendCommand('playback.getPosition'); 
+    }
+    
+    // === DEVICES ===
+    async listDevices() { 
+        return this.sendCommand('devices.list'); 
+    }
+    
+    async scanDevices(full_scan = false) { 
+        return this.sendCommand('devices.scan', { full_scan }); 
+    }
+    
+    async getConnectedDevices() { 
+        return this.sendCommand('devices.getConnected'); 
+    }
+    
+    async connectDevice(device_id) { 
+        return this.sendCommand('devices.connect', { device_id }); 
+    }
+    
+    async disconnectDevice(device_id) { 
+        return this.sendCommand('devices.disconnect', { device_id }); 
+    }
+    
+    async getDeviceInfo(device_id) { 
+        return this.sendCommand('devices.info', { device_id }); 
+    }
+    
+    async setDeviceEnabled(device_id, enabled) { 
+        return this.sendCommand('devices.setEnabled', { device_id, enabled }); 
+    }
+    
+    async getHotPlugStatus() { 
+        return this.sendCommand('devices.getHotPlugStatus'); 
+    }
+    
+    async setHotPlug(enabled) { 
+        return this.sendCommand('devices.setHotPlug', { enabled }); 
+    }
+    
+    // === ROUTING ===
+    async listRoutes() { 
+        return this.sendCommand('routing.listRoutes'); 
+    }
+    
+    async addRoute(source_id, destination_id, filter = null) { 
+        return this.sendCommand('routing.addRoute', { source_id, destination_id, filter }); 
+    }
+    
+    async removeRoute(routing_id) { 
+        return this.sendCommand('routing.removeRoute', { routing_id }); 
+    }
+    
+    async updateRoute(routing_id, filter) { 
+        return this.sendCommand('routing.updateRoute', { routing_id, filter }); 
+    }
+    
+    async clearRoutes() { 
+        return this.sendCommand('routing.clearRoutes'); 
+    }
+    
+    async enableRoute(routing_id) { 
+        return this.sendCommand('routing.enableRoute', { routing_id }); 
+    }
+    
+    async disableRoute(routing_id) { 
+        return this.sendCommand('routing.disableRoute', { routing_id }); 
+    }
+    
+    async getRouteInfo(routing_id) { 
+        return this.sendCommand('routing.getInfo', { routing_id }); 
+    }
+    
+    // === LATENCY ===
+    async getLatency(instrument_id) { 
+        return this.sendCommand('latency.get', { instrument_id }); 
+    }
+    
+    async setLatency(instrument_id, offset_ms) { 
+        return this.sendCommand('latency.set', { instrument_id, offset_ms }); 
+    }
+    
+    async calibrateLatency(instrument_id) { 
+        return this.sendCommand('latency.calibrate', { instrument_id }); 
+    }
+    
+    async getAllLatencies() { 
+        return this.sendCommand('latency.getAll'); 
+    }
+    
+    async resetLatency(instrument_id) { 
+        return this.sendCommand('latency.reset', { instrument_id }); 
+    }
+    
+    // === PRESETS ===
     async listPresets() { 
         return this.sendCommand('preset.list'); 
     }
