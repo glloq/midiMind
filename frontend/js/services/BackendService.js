@@ -1,14 +1,16 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Chemin réel: frontend/js/services/BackendService.js
-// Version: v4.2.4 - FORMAT BACKEND RÉEL
+// Chemin réel: frontend/js/services/BackendService.js  
+// Version: v4.2.5 - FORMAT HYBRIDE FINAL
 // Date: 2025-11-08
 // ============================================================================
-// CORRECTIONS v4.2.4:
-// ✅ FORMAT SIMPLE: { id, command, params } (pas de envelope/payload/type/timestamp)
-// ✅ Conforme à API_Documentation_v4_2_2_CORRECTED.md
-// ✅ Réponses: { success, data, error, timestamp }
-// ✅ Events: { event, data, ... }
+// CORRECTIONS v4.2.5 (FORMAT HYBRIDE):
+// ✅ ENVOI: Format simple { id, command, params } (doc API)
+// ✅ RÉCEPTION: Format { type, payload } (protocole WebSocket réel)
+// ✅ ID numériques + messageCallbacks (au lieu d'UUID + pendingRequests)
+// ✅ Gestion événements: message.type === 'event' + message.payload.name
+// ✅ Gestion réponses: message.type === 'response' + message.payload.request_id
+// ✅ AUCUN DOWNGRADE - Toutes les 90 méthodes API conservées
 // ============================================================================
 
 class BackendService {
@@ -49,7 +51,7 @@ class BackendService {
         this.messageCallbacks = new Map();
         this.messageId = 0;
         
-        this.logger.info('BackendService', 'Service initialized (v4.2.4 - REAL BACKEND FORMAT)');
+        this.logger.info('BackendService', 'Service initialized (v4.2.5 - HYBRID FORMAT)');
     }
     
     generateMessageId() {
@@ -295,18 +297,29 @@ class BackendService {
             
             this.logger.debug('BackendService', '📩 Message received:', {
                 hasId: !!message.id,
-                hasEvent: !!message.event,
-                hasSuccess: message.success !== undefined
+                type: message.type || 'unknown',
+                hasPayload: !!message.payload
             });
             
-            // EVENT: { event: "device:connected", data: {...} }
-            if (message.event) {
-                this.handleEvent(message);
+            // Backend format: { type, id, payload, timestamp, version }
+            if (message.type && message.payload) {
+                if (message.type === 'response') {
+                    this.handleBackendResponse(message);
+                } else if (message.type === 'event') {
+                    this.handleBackendEvent(message);
+                } else if (message.type === 'error') {
+                    this.handleBackendError(message);
+                }
             }
-            // RESPONSE: { id: 123, success: true/false, data: {...}, error: "..." }
-            else if (message.id !== undefined) {
-                this.handleResponse(message);
-            } else {
+            // Simple format: { id, success, data, error } (backup)
+            else if (message.id !== undefined && message.success !== undefined) {
+                this.handleSimpleResponse(message);
+            }
+            // Event format: { event: "name", data: {...} } (backup)
+            else if (message.event) {
+                this.handleSimpleEvent(message);
+            }
+            else {
                 this.logger.warn('BackendService', 'Unknown message format:', message);
             }
         } catch (error) {
@@ -314,39 +327,83 @@ class BackendService {
         }
     }
     
-    handleResponse(message) {
-        const messageId = message.id;
+    handleBackendResponse(message) {
+        // Backend response: payload.request_id correspond à l'id envoyé
+        const requestId = message.payload.request_id;
         
-        console.log('[DEBUG] RESPONSE:', {
-            messageId: messageId,
-            hasCallback: this.messageCallbacks.has(messageId),
+        console.log('[DEBUG] BACKEND RESPONSE:', {
+            requestId: requestId,
+            hasCallback: this.messageCallbacks.has(requestId),
             callbackCount: this.messageCallbacks.size,
-            success: message.success
+            success: message.payload.success
         });
         
-        if (!this.messageCallbacks.has(messageId)) {
-            this.logger.warn('BackendService', 'No callback for message ID: ' + messageId);
+        if (!requestId || !this.messageCallbacks.has(requestId)) {
+            this.logger.warn('BackendService', 'No callback for request ID: ' + requestId);
             return;
         }
         
-        const callback = this.messageCallbacks.get(messageId);
-        this.messageCallbacks.delete(messageId);
+        const callback = this.messageCallbacks.get(requestId);
+        this.messageCallbacks.delete(requestId);
         
-        // Résoudre le callback avec la réponse
-        callback(message);
+        // Transformer en format simple pour le callback
+        const simpleResponse = {
+            id: requestId,
+            success: message.payload.success !== false && !message.payload.error,
+            data: message.payload.data,
+            error: message.payload.error || message.payload.error_message
+        };
+        
+        callback(simpleResponse);
     }
     
-    handleEvent(message) {
+    handleBackendEvent(message) {
+        const eventName = message.payload.name || message.payload.event;
+        const eventData = message.payload.data || message.payload;
+        
+        if (eventName) {
+            this.logger.debug('BackendService', '📡 Backend Event: ' + eventName, eventData);
+            // Émettre avec le nom original de l'événement
+            this.eventBus.emit(eventName, eventData);
+            // Aussi émettre avec préfixe pour compatibilité
+            this.eventBus.emit('backend:event:' + eventName, eventData);
+        } else {
+            this.logger.debug('BackendService', '📡 Backend message (no event name)');
+        }
+    }
+    
+    handleBackendError(message) {
+        const requestId = message.payload.request_id;
+        const errorMessage = message.payload.error_message || message.payload.error || 'Unknown error';
+        
+        this.logger.error('BackendService', '❌ Backend error:', errorMessage);
+        
+        if (requestId && this.messageCallbacks.has(requestId)) {
+            const callback = this.messageCallbacks.get(requestId);
+            this.messageCallbacks.delete(requestId);
+            callback({ id: requestId, success: false, error: errorMessage });
+        }
+        
+        this.eventBus.emit('backend:error', {
+            message: errorMessage,
+            requestId: requestId
+        });
+    }
+    
+    // BACKUP: Support format simple { id, success, data, error }
+    handleSimpleResponse(message) {
+        if (this.messageCallbacks.has(message.id)) {
+            const callback = this.messageCallbacks.get(message.id);
+            this.messageCallbacks.delete(message.id);
+            callback(message);
+        }
+    }
+    
+    // BACKUP: Support format simple { event, data }
+    handleSimpleEvent(message) {
         const eventName = message.event;
         const eventData = message.data || message;
-        
-        this.logger.debug('BackendService', `📡 Event: ${eventName}`, eventData);
-        
-        // Émettre sur EventBus avec le nom de l'event
         this.eventBus.emit(eventName, eventData);
-        
-        // Aussi émettre avec préfixe backend:event: pour compatibilité
-        this.eventBus.emit('backend:event:' + eventName, eventData);
     }
     
     send(data) {
@@ -374,8 +431,8 @@ class BackendService {
     }
     
     /**
-     * ✅ v4.2.4: Format SIMPLE conforme backend réel
-     * { id, command, params }
+     * ✅ v4.2.5: ENVOI format simple { id, command, params }
+     * RÉCEPTION format { type, payload } avec payload.request_id
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -408,7 +465,7 @@ class BackendService {
                 }
             });
             
-            // ✅ FORMAT SIMPLE selon documentation
+            // ✅ FORMAT SIMPLE pour envoi
             const message = {
                 id: id,
                 command: command,
@@ -457,367 +514,122 @@ class BackendService {
     }
     
     // ============================================================================
-    // API COMMANDS (v4.2.2 - conforme documentation)
+    // API COMMANDS (v4.2.2 - conforme documentation) - TOUTES CONSERVÉES
     // ============================================================================
     
     // === FILES ===
-    async listFiles(path = '/midi') { 
-        return this.sendCommand('files.list', { path }); 
-    }
-    
-    async readFile(filename) { 
-        return this.sendCommand('files.read', { filename }); 
-    }
-    
-    async writeFile(filename, content) { 
-        return this.sendCommand('files.write', { filename, content }); 
-    }
-    
-    async deleteFile(filename) { 
-        return this.sendCommand('files.delete', { filename }); 
-    }
-    
-    async fileExists(filename) { 
-        return this.sendCommand('files.exists', { filename }); 
-    }
-    
-    async getFileInfo(filename) { 
-        return this.sendCommand('files.getInfo', { filename }); 
-    }
+    async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
+    async readFile(filename) { return this.sendCommand('files.read', { filename }); }
+    async writeFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
+    async deleteFile(filename) { return this.sendCommand('files.delete', { filename }); }
+    async fileExists(filename) { return this.sendCommand('files.exists', { filename }); }
+    async getFileInfo(filename) { return this.sendCommand('files.getInfo', { filename }); }
     
     // === MIDI ===
-    async importMidi(filename, content, base64 = true) { 
-        return this.sendCommand('midi.import', { filename, content, base64 }); 
-    }
-    
-    async convertMidi(json_data) { 
-        return this.sendCommand('midi.convert', { json_data }); 
-    }
-    
-    async loadMidi(id) { 
-        return this.sendCommand('midi.load', { id }); 
-    }
-    
-    async saveMidi(filename, midi_json) { 
-        return this.sendCommand('midi.save', { filename, midi_json }); 
-    }
-    
-    async sendNoteOn(device_id, note, velocity, channel = 0) { 
-        return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); 
-    }
-    
-    async sendNoteOff(device_id, note, channel = 0) { 
-        return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
-    }
+    async importMidi(filename, content, base64 = true) { return this.sendCommand('midi.import', { filename, content, base64 }); }
+    async convertMidi(json_data) { return this.sendCommand('midi.convert', { json_data }); }
+    async loadMidi(id) { return this.sendCommand('midi.load', { id }); }
+    async saveMidi(filename, midi_json) { return this.sendCommand('midi.save', { filename, midi_json }); }
+    async sendNoteOn(device_id, note, velocity, channel = 0) { return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); }
+    async sendNoteOff(device_id, note, channel = 0) { return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); }
     
     // MIDI Routing
     async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
-        return this.sendCommand('midi.routing.add', { 
-            midi_file_id, track_id, device_id, instrument_name, channel, enabled 
-        });
+        return this.sendCommand('midi.routing.add', { midi_file_id, track_id, device_id, instrument_name, channel, enabled });
     }
-    
-    async listMidiRouting(midi_file_id) {
-        return this.sendCommand('midi.routing.list', { midi_file_id });
-    }
-    
-    async updateMidiRouting(routing_id, updates) {
-        return this.sendCommand('midi.routing.update', { routing_id, updates });
-    }
-    
-    async removeMidiRouting(routing_id) {
-        return this.sendCommand('midi.routing.remove', { routing_id });
-    }
-    
-    async clearMidiRouting(midi_file_id) {
-        return this.sendCommand('midi.routing.clear', { midi_file_id });
-    }
+    async listMidiRouting(midi_file_id) { return this.sendCommand('midi.routing.list', { midi_file_id }); }
+    async updateMidiRouting(routing_id, updates) { return this.sendCommand('midi.routing.update', { routing_id, updates }); }
+    async removeMidiRouting(routing_id) { return this.sendCommand('midi.routing.remove', { routing_id }); }
+    async clearMidiRouting(midi_file_id) { return this.sendCommand('midi.routing.clear', { midi_file_id }); }
     
     // === PLAYBACK ===
-    async loadPlaybackFile(filename) { 
-        return this.sendCommand('playback.load', { filename }); 
-    }
-    
-    async play(file_id = null) { 
-        return this.sendCommand('playback.play', file_id ? { file_id } : {}); 
-    }
-    
-    async pause() { 
-        return this.sendCommand('playback.pause'); 
-    }
-    
-    async stop() { 
-        return this.sendCommand('playback.stop'); 
-    }
-    
-    async seek(position) { 
-        return this.sendCommand('playback.seek', { position }); 
-    }
-    
-    async setTempo(tempo) { 
-        return this.sendCommand('playback.setTempo', { tempo }); 
-    }
-    
-    async setLoop(enabled) { 
-        return this.sendCommand('playback.setLoop', { enabled }); 
-    }
-    
-    async getStatus() { 
-        return this.sendCommand('playback.getStatus'); 
-    }
-    
-    async getPlaybackInfo() { 
-        return this.sendCommand('playback.getInfo'); 
-    }
-    
-    async listPlaybackFiles() { 
-        return this.sendCommand('playback.listFiles'); 
-    }
+    async loadPlaybackFile(filename) { return this.sendCommand('playback.load', { filename }); }
+    async play(file_id = null) { return this.sendCommand('playback.play', file_id ? { file_id } : {}); }
+    async pause() { return this.sendCommand('playback.pause'); }
+    async stop() { return this.sendCommand('playback.stop'); }
+    async seek(position) { return this.sendCommand('playback.seek', { position }); }
+    async setTempo(tempo) { return this.sendCommand('playback.setTempo', { tempo }); }
+    async setLoop(enabled) { return this.sendCommand('playback.setLoop', { enabled }); }
+    async getStatus() { return this.sendCommand('playback.getStatus'); }
+    async getPlaybackInfo() { return this.sendCommand('playback.getInfo'); }
+    async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
     
     // === DEVICES ===
-    async listDevices() { 
-        return this.sendCommand('devices.list'); 
-    }
-    
-    async scanDevices(full_scan = false) { 
-        return this.sendCommand('devices.scan', { full_scan }); 
-    }
-    
-    async getConnectedDevices() { 
-        return this.sendCommand('devices.getConnected'); 
-    }
-    
-    async connectDevice(device_id) { 
-        return this.sendCommand('devices.connect', { device_id }); 
-    }
-    
-    async disconnectDevice(device_id) { 
-        return this.sendCommand('devices.disconnect', { device_id }); 
-    }
-    
-    async disconnectAllDevices() { 
-        return this.sendCommand('devices.disconnectAll'); 
-    }
-    
-    async getDevice(device_id) { 
-        return this.sendCommand('devices.getInfo', { device_id }); 
-    }
-    
-    async getHotPlugStatus() { 
-        return this.sendCommand('devices.getHotPlugStatus'); 
-    }
-    
-    async startHotPlug() { 
-        return this.sendCommand('devices.startHotPlug'); 
-    }
-    
-    async stopHotPlug() { 
-        return this.sendCommand('devices.stopHotPlug'); 
-    }
+    async listDevices() { return this.sendCommand('devices.list'); }
+    async scanDevices(full_scan = false) { return this.sendCommand('devices.scan', { full_scan }); }
+    async getConnectedDevices() { return this.sendCommand('devices.getConnected'); }
+    async connectDevice(device_id) { return this.sendCommand('devices.connect', { device_id }); }
+    async disconnectDevice(device_id) { return this.sendCommand('devices.disconnect', { device_id }); }
+    async disconnectAllDevices() { return this.sendCommand('devices.disconnectAll'); }
+    async getDevice(device_id) { return this.sendCommand('devices.getInfo', { device_id }); }
+    async getHotPlugStatus() { return this.sendCommand('devices.getHotPlugStatus'); }
+    async startHotPlug() { return this.sendCommand('devices.startHotPlug'); }
+    async stopHotPlug() { return this.sendCommand('devices.stopHotPlug'); }
     
     // === ROUTING ===
-    async listRoutes() { 
-        return this.sendCommand('routing.listRoutes'); 
-    }
-    
-    async addRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.addRoute', { source_id, destination_id }); 
-    }
-    
-    async removeRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.removeRoute', { source_id, destination_id }); 
-    }
-    
-    async clearRoutes() { 
-        return this.sendCommand('routing.clearRoutes'); 
-    }
-    
-    async enableRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.enableRoute', { source_id, destination_id }); 
-    }
-    
-    async disableRoute(source_id, destination_id) { 
-        return this.sendCommand('routing.disableRoute', { source_id, destination_id }); 
-    }
+    async listRoutes() { return this.sendCommand('routing.listRoutes'); }
+    async addRoute(source_id, destination_id) { return this.sendCommand('routing.addRoute', { source_id, destination_id }); }
+    async removeRoute(source_id, destination_id) { return this.sendCommand('routing.removeRoute', { source_id, destination_id }); }
+    async clearRoutes() { return this.sendCommand('routing.clearRoutes'); }
+    async enableRoute(source_id, destination_id) { return this.sendCommand('routing.enableRoute', { source_id, destination_id }); }
+    async disableRoute(source_id, destination_id) { return this.sendCommand('routing.disableRoute', { source_id, destination_id }); }
     
     // === LATENCY ===
-    async getLatencyCompensation(instrument_id) { 
-        return this.sendCommand('latency.getCompensation', { instrument_id }); 
-    }
-    
-    async setLatencyCompensation(instrument_id, offset_ms) { 
-        return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); 
-    }
-    
-    async enableLatency() { 
-        return this.sendCommand('latency.enable'); 
-    }
-    
-    async disableLatency() { 
-        return this.sendCommand('latency.disable'); 
-    }
-    
-    async getGlobalOffset() { 
-        return this.sendCommand('latency.getGlobalOffset'); 
-    }
-    
-    async setGlobalOffset(offset_ms) { 
-        return this.sendCommand('latency.setGlobalOffset', { offset_ms }); 
-    }
-    
-    async listInstruments() { 
-        return this.sendCommand('latency.listInstruments'); 
-    }
+    async getLatencyCompensation(instrument_id) { return this.sendCommand('latency.getCompensation', { instrument_id }); }
+    async setLatencyCompensation(instrument_id, offset_ms) { return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); }
+    async enableLatency() { return this.sendCommand('latency.enable'); }
+    async disableLatency() { return this.sendCommand('latency.disable'); }
+    async getGlobalOffset() { return this.sendCommand('latency.getGlobalOffset'); }
+    async setGlobalOffset(offset_ms) { return this.sendCommand('latency.setGlobalOffset', { offset_ms }); }
+    async listInstruments() { return this.sendCommand('latency.listInstruments'); }
     
     // === PRESETS ===
-    async listPresets() { 
-        return this.sendCommand('preset.list'); 
-    }
-    
-    async loadPreset(id) { 
-        return this.sendCommand('preset.load', { id }); 
-    }
-    
-    async savePreset(preset) { 
-        return this.sendCommand('preset.save', { preset }); 
-    }
-    
-    async deletePreset(id) { 
-        return this.sendCommand('preset.delete', { id }); 
-    }
-    
-    async exportPreset(id, filepath) { 
-        return this.sendCommand('preset.export', { id, filepath }); 
-    }
+    async listPresets() { return this.sendCommand('preset.list'); }
+    async loadPreset(id) { return this.sendCommand('preset.load', { id }); }
+    async savePreset(preset) { return this.sendCommand('preset.save', { preset }); }
+    async deletePreset(id) { return this.sendCommand('preset.delete', { id }); }
+    async exportPreset(id, filepath) { return this.sendCommand('preset.export', { id, filepath }); }
     
     // === PLAYLISTS ===
-    async listPlaylists() { 
-        return this.sendCommand('playlist.list'); 
-    }
-    
-    async createPlaylist(name, description = '') { 
-        return this.sendCommand('playlist.create', { name, description }); 
-    }
-    
-    async getPlaylist(playlist_id) { 
-        return this.sendCommand('playlist.get', { playlist_id }); 
-    }
-    
-    async updatePlaylist(playlist_id, data) { 
-        return this.sendCommand('playlist.update', { playlist_id, data }); 
-    }
-    
-    async deletePlaylist(playlist_id) { 
-        return this.sendCommand('playlist.delete', { playlist_id }); 
-    }
-    
-    async addPlaylistItem(playlist_id, filename, order = null) { 
-        return this.sendCommand('playlist.addItem', { playlist_id, filename, order }); 
-    }
-    
-    async removePlaylistItem(playlist_id, item_id) { 
-        return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); 
-    }
-    
-    async reorderPlaylist(playlist_id, item_id, new_order) { 
-        return this.sendCommand('playlist.reorder', { playlist_id, item_id, new_order }); 
-    }
-    
-    async setPlaylistLoop(playlist_id, enabled) { 
-        return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); 
-    }
+    async listPlaylists() { return this.sendCommand('playlist.list'); }
+    async createPlaylist(name, description = '') { return this.sendCommand('playlist.create', { name, description }); }
+    async getPlaylist(playlist_id) { return this.sendCommand('playlist.get', { playlist_id }); }
+    async updatePlaylist(playlist_id, data) { return this.sendCommand('playlist.update', { playlist_id, data }); }
+    async deletePlaylist(playlist_id) { return this.sendCommand('playlist.delete', { playlist_id }); }
+    async addPlaylistItem(playlist_id, filename, order = null) { return this.sendCommand('playlist.addItem', { playlist_id, filename, order }); }
+    async removePlaylistItem(playlist_id, item_id) { return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); }
+    async reorderPlaylist(playlist_id, item_id, new_order) { return this.sendCommand('playlist.reorder', { playlist_id, item_id, new_order }); }
+    async setPlaylistLoop(playlist_id, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); }
     
     // === SYSTEM ===
-    async getVersion() { 
-        return this.sendCommand('system.version'); 
-    }
-    
-    async getInfo() { 
-        return this.sendCommand('system.info'); 
-    }
-    
-    async getUptime() { 
-        return this.sendCommand('system.uptime'); 
-    }
-    
-    async getMemory() { 
-        return this.sendCommand('system.memory'); 
-    }
-    
-    async getDisk() { 
-        return this.sendCommand('system.disk'); 
-    }
-    
-    async getCommands() { 
-        return this.sendCommand('system.commands'); 
-    }
+    async getVersion() { return this.sendCommand('system.version'); }
+    async getInfo() { return this.sendCommand('system.info'); }
+    async getUptime() { return this.sendCommand('system.uptime'); }
+    async getMemory() { return this.sendCommand('system.memory'); }
+    async getDisk() { return this.sendCommand('system.disk'); }
+    async getCommands() { return this.sendCommand('system.commands'); }
     
     // === NETWORK ===
-    async getNetworkStatus() { 
-        return this.sendCommand('network.status'); 
-    }
-    
-    async getNetworkInterfaces() { 
-        return this.sendCommand('network.interfaces'); 
-    }
-    
-    async getNetworkStats() { 
-        return this.sendCommand('network.stats'); 
-    }
+    async getNetworkStatus() { return this.sendCommand('network.status'); }
+    async getNetworkInterfaces() { return this.sendCommand('network.interfaces'); }
+    async getNetworkStats() { return this.sendCommand('network.stats'); }
     
     // === BLUETOOTH ===
-    async getBluetoothStatus() { 
-        return this.sendCommand('bluetooth.status'); 
-    }
-    
-    async scanBluetooth() { 
-        return this.sendCommand('bluetooth.scan'); 
-    }
-    
-    async pairBluetooth(address) { 
-        return this.sendCommand('bluetooth.pair', { address }); 
-    }
-    
-    async unpairBluetooth(address) { 
-        return this.sendCommand('bluetooth.unpair', { address }); 
-    }
-    
-    async getPairedBluetooth() { 
-        return this.sendCommand('bluetooth.paired'); 
-    }
-    
-    async forgetBluetooth(address) { 
-        return this.sendCommand('bluetooth.forget', { address }); 
-    }
-    
-    async getBluetoothSignal(address) { 
-        return this.sendCommand('bluetooth.signal', { address }); 
-    }
-    
-    async setBluetoothConfig(settings) { 
-        return this.sendCommand('bluetooth.config', { settings }); 
-    }
+    async getBluetoothStatus() { return this.sendCommand('bluetooth.status'); }
+    async scanBluetooth() { return this.sendCommand('bluetooth.scan'); }
+    async pairBluetooth(address) { return this.sendCommand('bluetooth.pair', { address }); }
+    async unpairBluetooth(address) { return this.sendCommand('bluetooth.unpair', { address }); }
+    async getPairedBluetooth() { return this.sendCommand('bluetooth.paired'); }
+    async forgetBluetooth(address) { return this.sendCommand('bluetooth.forget', { address }); }
+    async getBluetoothSignal(address) { return this.sendCommand('bluetooth.signal', { address }); }
+    async setBluetoothConfig(settings) { return this.sendCommand('bluetooth.config', { settings }); }
     
     // === LOGGER ===
-    async getLogs(level = 'info', limit = 100) { 
-        return this.sendCommand('logger.getLogs', { level, limit }); 
-    }
-    
-    async getLogLevel() { 
-        return this.sendCommand('logger.getLevel'); 
-    }
-    
-    async setLogLevel(level) { 
-        return this.sendCommand('logger.setLevel', { level }); 
-    }
-    
-    async clearLogs() { 
-        return this.sendCommand('logger.clear'); 
-    }
-    
-    async exportLogs(filename) { 
-        return this.sendCommand('logger.export', { filename }); 
-    }
+    async getLogs(level = 'info', limit = 100) { return this.sendCommand('logger.getLogs', { level, limit }); }
+    async getLogLevel() { return this.sendCommand('logger.getLevel'); }
+    async setLogLevel(level) { return this.sendCommand('logger.setLevel', { level }); }
+    async clearLogs() { return this.sendCommand('logger.clear'); }
+    async exportLogs(filename) { return this.sendCommand('logger.export', { filename }); }
     
     // ============================================================================
     // UTILS
