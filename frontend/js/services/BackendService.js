@@ -1,15 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js
-// Version: v4.2.3 - API FORMAT PLAT CORRIGÉ (NO DOWNGRADING)
+// Version: v4.2.4 - FORMAT BACKEND RÉEL
 // Date: 2025-11-08
 // ============================================================================
-// CORRECTIONS v4.2.3:
-// ✅ FORMAT MESSAGE PLAT: { id, type, timestamp, version, payload }
-// ✅ Suppression de la structure envelope/payload imbriquée dans sendCommand
-// ✅ Conforme à API_WEBSOCKET_PROTOCOL.md v4.2.2
-// ✅ GARDE la compatibilité avec handleResponse/handleEvent (legacy frontend)
-// ✅ AJOUTE handleBackendError pour messages d'erreur type='error'
+// CORRECTIONS v4.2.4:
+// ✅ FORMAT SIMPLE: { id, command, params } (pas de envelope/payload/type/timestamp)
+// ✅ Conforme à API_Documentation_v4_2_2_CORRECTED.md
+// ✅ Réponses: { success, data, error, timestamp }
+// ✅ Events: { event, data, ... }
 // ============================================================================
 
 class BackendService {
@@ -47,21 +46,14 @@ class BackendService {
         this.messageQueue = [];
         this.maxQueueSize = 100;
         
-        this.pendingRequests = new Map();
+        this.messageCallbacks = new Map();
+        this.messageId = 0;
         
-        this.logger.info('BackendService', 'Service initialized (v4.2.3 - FLAT FORMAT, NO DOWNGRADING)');
+        this.logger.info('BackendService', 'Service initialized (v4.2.4 - REAL BACKEND FORMAT)');
     }
     
-    generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-    
-    generateTimestamp() {
-        return new Date().toISOString();
+    generateMessageId() {
+        return ++this.messageId;
     }
     
     async connect(url = null) {
@@ -303,25 +295,17 @@ class BackendService {
             
             this.logger.debug('BackendService', '📩 Message received:', {
                 hasId: !!message.id,
-                hasEnvelope: !!message.envelope,
-                type: message.type || message.envelope?.type || message.event || 'unknown'
+                hasEvent: !!message.event,
+                hasSuccess: message.success !== undefined
             });
             
-            // Backend format: { type, id, payload, timestamp, version }
-            if (message.type && message.payload) {
-                if (message.type === 'response') {
-                    this.handleBackendResponse(message);
-                } else if (message.type === 'event') {
-                    this.handleBackendEvent(message);
-                } else if (message.type === 'error') {
-                    this.handleBackendError(message);
-                }
-            }
-            // Frontend format: { envelope: { type }, payload } - COMPATIBILITÉ LEGACY
-            else if (message.envelope && message.envelope.type === 'response') {
-                this.handleResponse(message);
-            } else if (message.event) {
+            // EVENT: { event: "device:connected", data: {...} }
+            if (message.event) {
                 this.handleEvent(message);
+            }
+            // RESPONSE: { id: 123, success: true/false, data: {...}, error: "..." }
+            else if (message.id !== undefined) {
+                this.handleResponse(message);
             } else {
                 this.logger.warn('BackendService', 'Unknown message format:', message);
             }
@@ -330,100 +314,39 @@ class BackendService {
         }
     }
     
-    handleBackendResponse(message) {
-        // Backend response: payload.request_id correspond à l'id de la requête
-        const requestId = message.payload.request_id;
+    handleResponse(message) {
+        const messageId = message.id;
         
         console.log('[DEBUG] RESPONSE:', {
-            requestId: requestId,
-            hasPending: this.pendingRequests.has(requestId),
-            pendingCount: this.pendingRequests.size,
-            payload: message.payload
+            messageId: messageId,
+            hasCallback: this.messageCallbacks.has(messageId),
+            callbackCount: this.messageCallbacks.size,
+            success: message.success
         });
         
-        if (!requestId || !this.pendingRequests.has(requestId)) {
-            this.logger.warn('BackendService', 'No pending request for ID: ' + requestId);
+        if (!this.messageCallbacks.has(messageId)) {
+            this.logger.warn('BackendService', 'No callback for message ID: ' + messageId);
             return;
         }
         
-        const pending = this.pendingRequests.get(requestId);
-        clearTimeout(pending.timeoutTimer);
-        this.pendingRequests.delete(requestId);
+        const callback = this.messageCallbacks.get(messageId);
+        this.messageCallbacks.delete(messageId);
         
-        if (message.payload.success !== false && !message.payload.error) {
-            const data = message.payload.data || message.payload;
-            this.logger.debug('BackendService', '✓ Command success [' + requestId + ']', data);
-            pending.resolve(data);
-        } else {
-            const error = message.payload.error || message.payload.error_message || 'Command failed';
-            this.logger.error('BackendService', '✘ Command failed [' + requestId + ']:', error);
-            pending.reject(new Error(error));
-        }
+        // Résoudre le callback avec la réponse
+        callback(message);
     }
     
-    handleBackendEvent(message) {
-        const eventName = message.payload.name || message.payload.event;
-        const eventData = message.payload.data || message.payload;
-        
-        if (eventName) {
-            this.logger.debug('BackendService', '📡 Backend Event: ' + eventName, eventData);
-            this.eventBus.emit('backend:event:' + eventName, eventData);
-        } else {
-            this.logger.debug('BackendService', '📡 Backend heartbeat (no event name)');
-        }
-    }
-    
-    handleBackendError(message) {
-        const requestId = message.payload.request_id;
-        const errorMessage = message.payload.error_message || message.payload.error || 'Unknown error';
-        
-        this.logger.error('BackendService', '❌ Backend error:', errorMessage);
-        
-        if (requestId && this.pendingRequests.has(requestId)) {
-            const pending = this.pendingRequests.get(requestId);
-            clearTimeout(pending.timeoutTimer);
-            this.pendingRequests.delete(requestId);
-            pending.reject(new Error(errorMessage));
-        }
-        
-        this.eventBus.emit('backend:error', {
-            message: errorMessage,
-            requestId: requestId
-        });
-    }
-    
-    // COMPATIBILITÉ LEGACY - Format Frontend { envelope: {...}, payload: {...} }
-    handleResponse(message) {
-        const requestId = message.envelope.id;
-        
-        if (!this.pendingRequests.has(requestId)) {
-            this.logger.warn('BackendService', `No pending request for ID: ${requestId}`);
-            return;
-        }
-        
-        const pending = this.pendingRequests.get(requestId);
-        clearTimeout(pending.timeoutTimer);
-        this.pendingRequests.delete(requestId);
-        
-        if (message.payload && message.payload.success) {
-            const data = message.payload.data || message.payload;
-            this.logger.debug('BackendService', `✓ Command success [${requestId}]`, data);
-            pending.resolve(data);
-        } else {
-            const error = message.payload?.error || 'Command failed';
-            this.logger.error('BackendService', `✘ Command failed [${requestId}]:`, error);
-            pending.reject(new Error(error));
-        }
-    }
-    
-    // COMPATIBILITÉ LEGACY - Events Frontend
     handleEvent(message) {
         const eventName = message.event;
         const eventData = message.data || message;
         
         this.logger.debug('BackendService', `📡 Event: ${eventName}`, eventData);
         
+        // Émettre sur EventBus avec le nom de l'event
         this.eventBus.emit(eventName, eventData);
+        
+        // Aussi émettre avec préfixe backend:event: pour compatibilité
+        this.eventBus.emit('backend:event:' + eventName, eventData);
     }
     
     send(data) {
@@ -451,8 +374,8 @@ class BackendService {
     }
     
     /**
-     * ✅ v4.2.3: Format PLAT conforme API v4.2.2
-     * { id, type, timestamp, version, payload }
+     * ✅ v4.2.4: Format SIMPLE conforme backend réel
+     * { id, command, params }
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -462,37 +385,34 @@ class BackendService {
             }
             
             const timeoutMs = timeout || this.config.defaultCommandTimeout || 10000;
-            const requestId = this.generateUUID();
+            const id = this.generateMessageId();
             
             const timeoutTimer = setTimeout(() => {
-                if (this.pendingRequests.has(requestId)) {
-                    this.pendingRequests.delete(requestId);
+                if (this.messageCallbacks.has(id)) {
+                    this.messageCallbacks.delete(id);
                     reject(new Error(`Command timeout after ${timeoutMs}ms: ${command}`));
                 }
             }, timeoutMs);
             
-            this.pendingRequests.set(requestId, {
-                resolve: (data) => {
-                    resolve(data);
-                },
-                reject: (error) => {
-                    reject(error);
-                },
-                timeoutTimer: timeoutTimer
+            // Callback pour gérer la réponse
+            this.messageCallbacks.set(id, (response) => {
+                clearTimeout(timeoutTimer);
+                
+                if (response.success === true) {
+                    this.logger.debug('BackendService', `✓ Command success [${id}]: ${command}`);
+                    resolve(response.data || response);
+                } else {
+                    const error = response.error || 'Command failed';
+                    this.logger.error('BackendService', `✘ Command failed [${id}]: ${command} - ${error}`);
+                    reject(new Error(error));
+                }
             });
             
-            // ✅ FORMAT PLAT selon API v4.2.2
+            // ✅ FORMAT SIMPLE selon documentation
             const message = {
-                id: requestId,
-                type: 'request',
-                timestamp: this.generateTimestamp(),
-                version: '1.0',
-                payload: {
-                    id: requestId,
-                    command: command,
-                    params: params,
-                    timeout: timeoutMs
-                }
+                id: id,
+                command: command,
+                params: params
             };
             
             console.log('[DEBUG] SENDING:', JSON.stringify(message, null, 2));
@@ -500,7 +420,7 @@ class BackendService {
             
             if (!this.send(message)) {
                 clearTimeout(timeoutTimer);
-                this.pendingRequests.delete(requestId);
+                this.messageCallbacks.delete(id);
                 reject(new Error(`Failed to send command: ${command}`));
             }
         });
@@ -537,7 +457,7 @@ class BackendService {
     }
     
     // ============================================================================
-    // API COMMANDS (v4.2.2 - snake_case)
+    // API COMMANDS (v4.2.2 - conforme documentation)
     // ============================================================================
     
     // === FILES ===
@@ -557,20 +477,12 @@ class BackendService {
         return this.sendCommand('files.delete', { filename }); 
     }
     
-    async renameFile(old_filename, new_filename) { 
-        return this.sendCommand('files.rename', { old_filename, new_filename }); 
-    }
-    
-    async copyFile(source, destination) { 
-        return this.sendCommand('files.copy', { source, destination }); 
-    }
-    
-    async createDirectory(path) { 
-        return this.sendCommand('files.createDir', { path }); 
+    async fileExists(filename) { 
+        return this.sendCommand('files.exists', { filename }); 
     }
     
     async getFileInfo(filename) { 
-        return this.sendCommand('files.info', { filename }); 
+        return this.sendCommand('files.getInfo', { filename }); 
     }
     
     // === MIDI ===
@@ -578,65 +490,88 @@ class BackendService {
         return this.sendCommand('midi.import', { filename, content, base64 }); 
     }
     
-    async exportMidi(midi_file_id, output_path = null) { 
-        return this.sendCommand('midi.export', { midi_file_id, output_path }); 
+    async convertMidi(json_data) { 
+        return this.sendCommand('midi.convert', { json_data }); 
     }
     
-    async parseMidi(filename) { 
-        return this.sendCommand('midi.parse', { filename }); 
+    async loadMidi(id) { 
+        return this.sendCommand('midi.load', { id }); 
     }
     
-    async getMidiInfo(midi_file_id) { 
-        return this.sendCommand('midi.info', { midi_file_id }); 
+    async saveMidi(filename, midi_json) { 
+        return this.sendCommand('midi.save', { filename, midi_json }); 
     }
     
-    async loadMidiFile(filename) { 
-        return this.sendCommand('midi.load', { filename }); 
+    async sendNoteOn(device_id, note, velocity, channel = 0) { 
+        return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); 
     }
     
-    async unloadMidiFile(midi_file_id) { 
-        return this.sendCommand('midi.unload', { midi_file_id }); 
+    async sendNoteOff(device_id, note, channel = 0) { 
+        return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); 
     }
     
-    async getLoadedFiles() { 
-        return this.sendCommand('midi.loaded'); 
+    // MIDI Routing
+    async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = null, channel = 0, enabled = true) {
+        return this.sendCommand('midi.routing.add', { 
+            midi_file_id, track_id, device_id, instrument_name, channel, enabled 
+        });
+    }
+    
+    async listMidiRouting(midi_file_id) {
+        return this.sendCommand('midi.routing.list', { midi_file_id });
+    }
+    
+    async updateMidiRouting(routing_id, updates) {
+        return this.sendCommand('midi.routing.update', { routing_id, updates });
+    }
+    
+    async removeMidiRouting(routing_id) {
+        return this.sendCommand('midi.routing.remove', { routing_id });
+    }
+    
+    async clearMidiRouting(midi_file_id) {
+        return this.sendCommand('midi.routing.clear', { midi_file_id });
     }
     
     // === PLAYBACK ===
-    async playFile(filename, loop = false) { 
-        return this.sendCommand('playback.play', { filename, loop }); 
+    async loadPlaybackFile(filename) { 
+        return this.sendCommand('playback.load', { filename }); 
     }
     
-    async pausePlayback() { 
+    async play(file_id = null) { 
+        return this.sendCommand('playback.play', file_id ? { file_id } : {}); 
+    }
+    
+    async pause() { 
         return this.sendCommand('playback.pause'); 
     }
     
-    async resumePlayback() { 
-        return this.sendCommand('playback.resume'); 
-    }
-    
-    async stopPlayback() { 
+    async stop() { 
         return this.sendCommand('playback.stop'); 
     }
     
-    async seekPlayback(position) { 
+    async seek(position) { 
         return this.sendCommand('playback.seek', { position }); 
     }
     
-    async setPlaybackLoop(enabled) { 
-        return this.sendCommand('playback.setLoop', { enabled }); 
-    }
-    
-    async setPlaybackTempo(tempo) { 
+    async setTempo(tempo) { 
         return this.sendCommand('playback.setTempo', { tempo }); 
     }
     
-    async getPlaybackState() { 
-        return this.sendCommand('playback.getState'); 
+    async setLoop(enabled) { 
+        return this.sendCommand('playback.setLoop', { enabled }); 
     }
     
-    async getPlaybackPosition() { 
-        return this.sendCommand('playback.getPosition'); 
+    async getStatus() { 
+        return this.sendCommand('playback.getStatus'); 
+    }
+    
+    async getPlaybackInfo() { 
+        return this.sendCommand('playback.getInfo'); 
+    }
+    
+    async listPlaybackFiles() { 
+        return this.sendCommand('playback.listFiles'); 
     }
     
     // === DEVICES ===
@@ -660,20 +595,24 @@ class BackendService {
         return this.sendCommand('devices.disconnect', { device_id }); 
     }
     
-    async getDeviceInfo(device_id) { 
-        return this.sendCommand('devices.info', { device_id }); 
+    async disconnectAllDevices() { 
+        return this.sendCommand('devices.disconnectAll'); 
     }
     
-    async setDeviceEnabled(device_id, enabled) { 
-        return this.sendCommand('devices.setEnabled', { device_id, enabled }); 
+    async getDevice(device_id) { 
+        return this.sendCommand('devices.getInfo', { device_id }); 
     }
     
     async getHotPlugStatus() { 
         return this.sendCommand('devices.getHotPlugStatus'); 
     }
     
-    async setHotPlug(enabled) { 
-        return this.sendCommand('devices.setHotPlug', { enabled }); 
+    async startHotPlug() { 
+        return this.sendCommand('devices.startHotPlug'); 
+    }
+    
+    async stopHotPlug() { 
+        return this.sendCommand('devices.stopHotPlug'); 
     }
     
     // === ROUTING ===
@@ -681,53 +620,53 @@ class BackendService {
         return this.sendCommand('routing.listRoutes'); 
     }
     
-    async addRoute(source_id, destination_id, filter = null) { 
-        return this.sendCommand('routing.addRoute', { source_id, destination_id, filter }); 
+    async addRoute(source_id, destination_id) { 
+        return this.sendCommand('routing.addRoute', { source_id, destination_id }); 
     }
     
-    async removeRoute(routing_id) { 
-        return this.sendCommand('routing.removeRoute', { routing_id }); 
-    }
-    
-    async updateRoute(routing_id, filter) { 
-        return this.sendCommand('routing.updateRoute', { routing_id, filter }); 
+    async removeRoute(source_id, destination_id) { 
+        return this.sendCommand('routing.removeRoute', { source_id, destination_id }); 
     }
     
     async clearRoutes() { 
         return this.sendCommand('routing.clearRoutes'); 
     }
     
-    async enableRoute(routing_id) { 
-        return this.sendCommand('routing.enableRoute', { routing_id }); 
+    async enableRoute(source_id, destination_id) { 
+        return this.sendCommand('routing.enableRoute', { source_id, destination_id }); 
     }
     
-    async disableRoute(routing_id) { 
-        return this.sendCommand('routing.disableRoute', { routing_id }); 
-    }
-    
-    async getRouteInfo(routing_id) { 
-        return this.sendCommand('routing.getInfo', { routing_id }); 
+    async disableRoute(source_id, destination_id) { 
+        return this.sendCommand('routing.disableRoute', { source_id, destination_id }); 
     }
     
     // === LATENCY ===
-    async getLatency(instrument_id) { 
-        return this.sendCommand('latency.get', { instrument_id }); 
+    async getLatencyCompensation(instrument_id) { 
+        return this.sendCommand('latency.getCompensation', { instrument_id }); 
     }
     
-    async setLatency(instrument_id, offset_ms) { 
-        return this.sendCommand('latency.set', { instrument_id, offset_ms }); 
+    async setLatencyCompensation(instrument_id, offset_ms) { 
+        return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); 
     }
     
-    async calibrateLatency(instrument_id) { 
-        return this.sendCommand('latency.calibrate', { instrument_id }); 
+    async enableLatency() { 
+        return this.sendCommand('latency.enable'); 
     }
     
-    async getAllLatencies() { 
-        return this.sendCommand('latency.getAll'); 
+    async disableLatency() { 
+        return this.sendCommand('latency.disable'); 
     }
     
-    async resetLatency(instrument_id) { 
-        return this.sendCommand('latency.reset', { instrument_id }); 
+    async getGlobalOffset() { 
+        return this.sendCommand('latency.getGlobalOffset'); 
+    }
+    
+    async setGlobalOffset(offset_ms) { 
+        return this.sendCommand('latency.setGlobalOffset', { offset_ms }); 
+    }
+    
+    async listInstruments() { 
+        return this.sendCommand('latency.listInstruments'); 
     }
     
     // === PRESETS ===
@@ -902,11 +841,10 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        for (const [requestId, pending] of this.pendingRequests.entries()) {
-            clearTimeout(pending.timeoutTimer);
-            pending.reject(new Error('Disconnected'));
+        for (const [id, callback] of this.messageCallbacks.entries()) {
+            callback({ success: false, error: 'Disconnected' });
         }
-        this.pendingRequests.clear();
+        this.messageCallbacks.clear();
         
         if (this.ws) {
             this.ws.close(1000, 'Client disconnect');
@@ -962,7 +900,7 @@ class BackendService {
             reconnectionStopped: this.reconnectionStopped,
             state: this.getConnectionState(),
             queuedMessages: this.messageQueue.length,
-            pendingRequests: this.pendingRequests.size,
+            pendingCallbacks: this.messageCallbacks.size,
             url: this.config.url,
             lastActivityTime: this.lastActivityTime,
             timeSinceActivity: Date.now() - this.lastActivityTime,
