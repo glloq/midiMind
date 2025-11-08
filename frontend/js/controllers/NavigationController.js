@@ -1,205 +1,190 @@
 // ============================================================================
-// Fichier: frontend/js/core/Router.js
-// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.1.1 - FIX INITIALIZATION
-// Date: 2025-11-02
+// Fichier: frontend/js/controllers/NavigationController.js
+// Chemin réel: frontend/js/controllers/NavigationController.js
+// Version: v4.1.0 - CORRECTION CRITIQUE CONTROLLERS
+// Date: 2025-11-08
 // ============================================================================
-// CORRECTIONS v3.1.1:
-// ✓ CRITIQUE: Initialisation différée (ne charge pas de route avant enregistrement)
-// ✓ CRITIQUE: Émission d'événements 'route-changed'
-// ✓ Fix: Meilleure gestion des routes non trouvées
-// ✓ Méthode startRouting() pour démarrer après enregistrement des routes
+// CORRECTIONS v4.1.0:
+// ✅ CRITIQUE: Suppression référence inexistante this.controllers
+// ✅ CRITIQUE: Suppression pageControllerMap (non nécessaire)
+// ✅ Communication controllers via EventBus (architecture correcte)
+// ✅ Les controllers s'activent/désactivent via événements navigation:before/after
+//
+// CRÉATION v4.0.0:
+// ✅ CRITIQUE: Recréation complète du NavigationController manquant
+// ✅ Gestion affichage/masquage des pages
+// ✅ Synchronisation avec Router et hash URL
+// ✅ Mise à jour états active sur navigation
+// ✅ Appel automatique init/render des vues
+// ✅ Support transitions
 // ============================================================================
 
-class Router {
-    constructor(config = {}) {
+class NavigationController extends BaseController {
+    constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
+        super(eventBus, models, views, notifications, debugConsole, backend);
+        
         // Configuration
         this.config = {
-            mode: config.mode || 'hash',           // 'hash' ou 'history'
-            root: config.root || '/',              // URL de base
-            useTransitions: config.useTransitions !== false,
-            transitionDuration: config.transitionDuration || 300,
-            ...config
+            pageSelector: '.page',
+            navItemSelector: '.nav-item',
+            activeClass: 'active',
+            transitionDuration: 300,
+            useTransitions: true,
+            defaultPage: 'home',
+            ...this.config
         };
-        
-        // Routes enregistrées
-        this.routes = new Map();
-        
-        // Route actuelle
-        this.currentRoute = null;
-        this.previousRoute = null;
-        
-        // Middlewares
-        this.middlewares = [];
-        
-        // Guards (before/after hooks)
-        this.beforeHooks = [];
-        this.afterHooks = [];
-        
-        // Cache des vues
-        this.viewCache = new Map();
         
         // État
         this.state = {
-            isNavigating: false,
-            history: [],
-            params: {},
-            query: {},
-            started: false  // Nouveau: indique si le routing a démarré
+            currentPage: null,
+            previousPage: null,
+            isTransitioning: false,
+            initialized: false,
+            history: []
         };
         
-        // Event listeners
-        this.listeners = new Map();
+        // Cache des éléments DOM
+        this.elements = {
+            pages: null,
+            navItems: null,
+            appMain: null
+        };
         
-        // Initialisation (sans charger de route)
-        this.init();
+        // Mapping page -> vue
+        this.pageViewMap = new Map();
+        
+        this.log('debug', 'NavigationController', '✓ NavigationController v4.1.0 created');
     }
     
     // ========================================================================
     // INITIALISATION
     // ========================================================================
     
-    init() {
-        // Écouter les changements d'URL
-        if (this.config.mode === 'history') {
-            // Mode History API
-            window.addEventListener('popstate', (e) => this.handlePopState(e));
-            
-            // Intercepter les clics sur les liens
-            document.addEventListener('click', (e) => this.handleLinkClick(e));
-        } else {
-            // Mode Hash
-            window.addEventListener('hashchange', () => this.handleHashChange());
-        }
+    onInitialize() {
+        this.log('info', 'NavigationController', 'Initializing navigation system...');
         
-        // NE PAS charger la route initiale automatiquement
-        // Elle sera chargée après l'enregistrement des routes via startRouting()
-    }
-    
-    /**
-     * Démarre le routing (après enregistrement des routes)
-     * À appeler explicitement après avoir enregistré toutes les routes
-     */
-    startRouting() {
-        if (this.state.started) {
-            console.warn('Router: Routing already started');
-            return;
-        }
+        // Cacher tous les éléments DOM
+        this.cacheElements();
         
-        this.state.started = true;
-        this.loadInitialRoute();
+        // Enregistrer les vues
+        this.registerPageMappings();
+        
+        // Attacher événements navigation
+        this.attachNavigationEvents();
+        
+        // Initialiser toutes les vues
+        this.initializeViews();
+        
+        // Écouter événements
+        this.setupEventListeners();
+        
+        this.state.initialized = true;
+        
+        this.log('info', 'NavigationController', '✓ Navigation system initialized');
     }
     
     /**
-     * Charger la route initiale
+     * Cacher les éléments DOM
      */
-    loadInitialRoute() {
-        const path = this.getCurrentPath();
-        this.navigateTo(path, { skipPushState: true });
+    cacheElements() {
+        this.elements.pages = document.querySelectorAll(this.config.pageSelector);
+        this.elements.navItems = document.querySelectorAll(this.config.navItemSelector);
+        this.elements.appMain = document.querySelector('.app-main');
+        
+        this.log('debug', 'NavigationController', `Cached ${this.elements.pages.length} pages, ${this.elements.navItems.length} nav items`);
     }
     
-    // ========================================================================
-    // ENREGISTREMENT DES ROUTES
-    // ========================================================================
-    
     /**
-     * Enregistrer une route
-     * @param {string} path - Chemin de la route (peut contenir des paramètres)
-     * @param {Object} config - Configuration de la route
+     * Enregistrer les mappings page -> vue
+     * ✅ CORRECTION: Suppression référence this.controllers (n'existe pas)
      */
-    route(path, config) {
-        const route = {
-            path: path,
-            pattern: this.pathToRegex(path),
-            component: config.component || null,
-            controller: config.controller || null,
-            view: config.view || null,
-            title: config.title || '',
-            meta: config.meta || {},
-            beforeEnter: config.beforeEnter || null,
-            beforeLeave: config.beforeLeave || null,
-            cache: config.cache !== false,
-            ...config
+    registerPageMappings() {
+        // Mapping pages -> vues (selon les IDs dans index.html)
+        const pageMappings = {
+            'home': this.views.home,
+            'files': this.views.file,
+            'instruments': this.views.instrument,
+            'keyboard': this.views.keyboard,
+            'system': this.views.system,
+            'editor': this.views.editor,
+            'routing': this.views.routing,
+            'playlist': this.views.playlist,
+            'visualizer': this.views.visualizer
         };
         
-        this.routes.set(path, route);
-        
-        return this;
-    }
-    
-    /**
-     * Enregistrer plusieurs routes
-     * @param {Array} routes - Tableau de routes
-     */
-    addRoutes(routes) {
-        routes.forEach(route => {
-            this.route(route.path, route);
-        });
-        
-        return this;
-    }
-    
-    /**
-     * Route 404 (not found)
-     * @param {Object} config - Configuration de la route 404
-     */
-    notFound(config) {
-        this.route('*', {
-            ...config,
-            is404: true
-        });
-        
-        return this;
-    }
-    
-    /**
-     * Configuration rapide des routes API
-     * Configure les routes pour les nouvelles fonctionnalités
-     * @param {Object} controllers - Objet contenant les contrôleurs
-     * @param {Object} views - Objet contenant les vues
-     */
-    configureApiRoutes(controllers = {}, views = {}) {
-        const apiRoutes = [
-            {
-                path: '/bluetooth',
-                controller: controllers.bluetooth,
-                view: views.bluetooth,
-                title: 'Bluetooth - MidiMind',
-                meta: { requiresFeature: 'bluetooth' }
-            },
-            {
-                path: '/latency',
-                controller: controllers.latency,
-                view: views.latency,
-                title: 'Latence - MidiMind',
-                meta: { requiresFeature: 'latency' }
-            },
-            {
-                path: '/presets',
-                controller: controllers.preset,
-                view: views.preset,
-                title: 'Presets - MidiMind',
-                meta: { requiresFeature: 'presets' }
-            },
-            {
-                path: '/network',
-                controller: controllers.network,
-                view: views.network,
-                title: 'Réseau - MidiMind',
-                meta: { requiresFeature: 'network' }
-            },
-            {
-                path: '/logger',
-                controller: controllers.logger,
-                view: views.logger,
-                title: 'Logs - MidiMind',
-                meta: { requiresFeature: 'logger' }
+        for (const [page, view] of Object.entries(pageMappings)) {
+            if (view) {
+                this.pageViewMap.set(page, view);
             }
-        ];
+        }
         
-        this.addRoutes(apiRoutes);
+        this.log('debug', 'NavigationController', `Registered ${this.pageViewMap.size} page-view mappings`);
+    }
+    
+    /**
+     * Attacher les événements de navigation
+     */
+    attachNavigationEvents() {
+        // Cliquer sur les items de navigation
+        this.elements.navItems.forEach(navItem => {
+            navItem.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = navItem.dataset.page || navItem.getAttribute('href')?.replace('#', '');
+                if (page) {
+                    this.showPage(page);
+                }
+            });
+        });
         
-        return this;
+        // Écouter les changements de hash
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash.slice(1); // Retirer le #
+            const page = hash || this.config.defaultPage;
+            this.showPage(page, { fromHashChange: true });
+        });
+        
+        this.log('debug', 'NavigationController', 'Navigation events attached');
+    }
+    
+    /**
+     * Initialiser toutes les vues
+     */
+    initializeViews() {
+        let initializedCount = 0;
+        
+        for (const [page, view] of this.pageViewMap) {
+            if (view && typeof view.init === 'function' && !view.state?.initialized) {
+                try {
+                    view.init();
+                    initializedCount++;
+                    this.log('debug', 'NavigationController', `✓ Initialized view: ${page}`);
+                } catch (error) {
+                    this.log('error', 'NavigationController', `Failed to init view ${page}:`, error);
+                }
+            }
+        }
+        
+        this.log('info', 'NavigationController', `✓ Initialized ${initializedCount} views`);
+    }
+    
+    /**
+     * Écouter les événements globaux
+     */
+    setupEventListeners() {
+        // Écouter les demandes de navigation via EventBus
+        if (this.eventBus) {
+            this.on('navigation:goto', (data) => {
+                this.showPage(data.page, data.options);
+            });
+            
+            this.on('navigation:back', () => {
+                this.goBack();
+            });
+            
+            this.on('navigation:forward', () => {
+                this.goForward();
+            });
+        }
     }
     
     // ========================================================================
@@ -207,293 +192,184 @@ class Router {
     // ========================================================================
     
     /**
-     * Naviguer vers une route
-     * @param {string} path - Chemin de destination
+     * Afficher une page
+     * @param {string} pageName - Nom de la page (home, files, instruments, etc.)
      * @param {Object} options - Options de navigation
      */
-    async navigateTo(path, options = {}) {
-        // Vérifier si déjà en navigation
-        if (this.state.isNavigating && !options.force) {
+    async showPage(pageName, options = {}) {
+        // Validation
+        if (!pageName) {
+            this.log('warn', 'NavigationController', 'showPage called without pageName');
             return false;
         }
         
-        this.state.isNavigating = true;
+        // Si déjà en transition, ignorer (sauf si force)
+        if (this.state.isTransitioning && !options.force) {
+            this.log('debug', 'NavigationController', `Already transitioning, ignoring showPage(${pageName})`);
+            return false;
+        }
+        
+        // Si c'est déjà la page actuelle, ignorer (sauf si reload)
+        if (this.state.currentPage === pageName && !options.reload) {
+            this.log('debug', 'NavigationController', `Already on page ${pageName}`);
+            return false;
+        }
+        
+        this.state.isTransitioning = true;
         
         try {
-            // Normaliser le chemin
-            const normalizedPath = this.normalizePath(path);
+            this.log('info', 'NavigationController', `Navigating to page: ${pageName}`);
             
-            // Trouver la route correspondante
-            const matchedRoute = this.matchRoute(normalizedPath);
+            const previousPage = this.state.currentPage;
             
-            if (!matchedRoute) {
-                // Route 404
-                const notFoundRoute = this.find404Route();
-                if (notFoundRoute) {
-                    await this.loadRoute(notFoundRoute, normalizedPath, options);
-                } else {
-                    console.warn(`Router: Route not found: ${normalizedPath}`);
-                    // Si pas de route 404 définie, ne pas échouer silencieusement
-                    // Émettre un événement pour que NavigationController puisse gérer
-                    this.emit('route-not-found', { path: normalizedPath });
-                }
-                return false;
-            }
-            
-            // Extraire les paramètres
-            const params = this.extractParams(matchedRoute, normalizedPath);
-            const query = this.extractQuery(normalizedPath);
-            
-            // Mettre à jour l'état
-            this.state.params = params;
-            this.state.query = query;
-            
-            // Charger la route
-            await this.loadRoute(matchedRoute.route, normalizedPath, options);
-            
-            // Mettre à jour l'URL si nécessaire
-            if (!options.skipPushState) {
-                this.updateURL(normalizedPath, options.replace);
-            }
-            
-            // Émettre événement de changement de route
-            this.emit('route-changed', {
-                route: matchedRoute.route,
-                path: normalizedPath,
-                params: params,
-                query: query
+            // ✅ Émettre événement before navigation
+            // Les controllers écoutent cet événement et se désactivent si nécessaire
+            this.emit('navigation:before', {
+                from: previousPage,
+                to: pageName
             });
             
-            return true;
-        } catch (error) {
-            console.error('Router: Navigation error:', error);
-            this.emit('route-error', { path, error });
-            return false;
-        } finally {
-            this.state.isNavigating = false;
-        }
-    }
-    
-    /**
-     * Charger une route
-     */
-    async loadRoute(route, path, options = {}) {
-        // Sauvegarder la route précédente
-        this.previousRoute = this.currentRoute;
-        
-        // Hook beforeLeave de la route précédente
-        if (this.previousRoute && this.previousRoute.beforeLeave) {
-            const canLeave = await this.previousRoute.beforeLeave(this.previousRoute, route);
-            if (canLeave === false) {
-                return false;
-            }
-        }
-        
-        // Hook beforeEnter
-        if (route.beforeEnter) {
-            const canEnter = await route.beforeEnter(route, this.previousRoute);
-            if (canEnter === false) {
-                return false;
-            }
-        }
-        
-        // Exécuter les middlewares
-        for (const middleware of this.middlewares) {
-            const result = await middleware(route, this.previousRoute);
-            if (result === false) {
-                return false;
-            }
-        }
-        
-        // Exécuter les before hooks
-        for (const hook of this.beforeHooks) {
-            const result = await hook(route, this.previousRoute);
-            if (result === false) {
-                return false;
-            }
-        }
-        
-        // Transitions
-        if (this.config.useTransitions && !options.skipTransitions) {
-            await this.transitionOut();
-        }
-        
-        // Activer le contrôleur et la vue
-        if (route.controller) {
-            // Désactiver le contrôleur précédent
-            if (this.previousRoute && this.previousRoute.controller) {
-                if (typeof this.previousRoute.controller.onLeave === 'function') {
-                    await this.previousRoute.controller.onLeave();
-                }
+            // Transition sortie de la page actuelle
+            if (previousPage && this.config.useTransitions) {
+                await this.transitionOut(previousPage);
             }
             
-            // Activer le nouveau contrôleur
-            if (typeof route.controller.onEnter === 'function') {
-                await route.controller.onEnter(this.state.params, this.state.query);
+            // Masquer toutes les pages
+            this.hideAllPages();
+            
+            // Afficher la nouvelle page
+            const pageElement = document.getElementById(pageName);
+            if (!pageElement) {
+                throw new Error(`Page element #${pageName} not found`);
             }
+            
+            pageElement.classList.add(this.config.activeClass);
+            pageElement.style.display = 'block';
+            
+            // Mettre à jour la navigation
+            this.updateNavigation(pageName);
+            
+            // Initialiser/Rendre la vue si nécessaire
+            const view = this.pageViewMap.get(pageName);
+            if (view) {
+                // Si la vue n'est pas initialisée, l'initialiser
+                if (!view.state?.initialized && typeof view.init === 'function') {
+                    this.log('debug', 'NavigationController', `Initializing view: ${pageName}`);
+                    view.init();
+                }
+                
+                // Si la vue a une méthode render, la rendre
+                if (typeof view.render === 'function') {
+                    this.log('debug', 'NavigationController', `Rendering view: ${pageName}`);
+                    view.render();
+                }
+                
+                // Si la vue a une méthode show, l'appeler
+                if (typeof view.show === 'function') {
+                    view.show();
+                }
+            } else {
+                this.log('warn', 'NavigationController', `No view found for page: ${pageName}`);
+            }
+            
+            // Transition entrée
+            if (this.config.useTransitions) {
+                await this.transitionIn(pageName);
+            }
+            
+            // Mettre à jour l'état
+            this.state.previousPage = previousPage;
+            this.state.currentPage = pageName;
+            this.state.history.push({
+                page: pageName,
+                timestamp: Date.now()
+            });
+            
+            // Mettre à jour le hash URL si pas déjà fait par hashchange
+            if (!options.fromHashChange) {
+                window.location.hash = pageName;
+            }
+            
+            // ✅ Émettre événement after navigation
+            // Les controllers écoutent cet événement et s'activent si nécessaire
+            this.emit('navigation:after', {
+                from: previousPage,
+                to: pageName
+            });
+            
+            // Notification si activée
+            if (this.notifications && options.notify) {
+                this.notifications.show(`Page: ${pageName}`, 'info', 2000);
+            }
+            
+            this.log('info', 'NavigationController', `✓ Navigated to page: ${pageName}`);
+            
+            return true;
+            
+        } catch (error) {
+            this.handleError(`Failed to show page ${pageName}`, error);
+            return false;
+            
+        } finally {
+            this.state.isTransitioning = false;
         }
-        
-        // Rendre la vue
-        if (route.view) {
-            this.renderView(route.view, route.cache);
-        }
-        
-        // Mettre à jour le titre
-        if (route.title) {
-            document.title = route.title;
-        }
-        
-        // Transitions
-        if (this.config.useTransitions && !options.skipTransitions) {
-            await this.transitionIn();
-        }
-        
-        // Mettre à jour la route actuelle
-        this.currentRoute = route;
-        
-        // Ajouter à l'historique
-        this.state.history.push({
-            path: path,
-            route: route,
-            timestamp: Date.now()
+    }
+    
+    /**
+     * Masquer toutes les pages
+     */
+    hideAllPages() {
+        this.elements.pages.forEach(page => {
+            page.classList.remove(this.config.activeClass);
+            
+            // Pour les pages modales, les masquer complètement
+            if (page.classList.contains('page-modal') || page.classList.contains('page-fullscreen')) {
+                page.style.display = 'none';
+            }
         });
-        
-        // Exécuter les after hooks
-        for (const hook of this.afterHooks) {
-            await hook(route, this.previousRoute);
-        }
-        
-        return true;
     }
     
     /**
-     * Rendre une vue
+     * Mettre à jour la navigation active
      */
-    renderView(view, useCache = true) {
-        const container = this.getContainer();
-        
-        if (!container) {
-            console.error('Router: No container found for rendering');
-            return;
-        }
-        
-        // Vérifier le cache
-        if (useCache && this.viewCache.has(view)) {
-            container.innerHTML = this.viewCache.get(view);
-            return;
-        }
-        
-        // Rendre la vue
-        let content = '';
-        
-        if (typeof view === 'function') {
-            content = view(this.state.params, this.state.query);
-        } else if (typeof view === 'string') {
-            content = view;
-        } else if (view && typeof view.render === 'function') {
-            content = view.render(this.state.params, this.state.query);
-        }
-        
-        // Mettre en cache
-        if (useCache) {
-            this.viewCache.set(view, content);
-        }
-        
-        // Afficher
-        container.innerHTML = content;
+    updateNavigation(pageName) {
+        this.elements.navItems.forEach(navItem => {
+            const itemPage = navItem.dataset.page || navItem.getAttribute('href')?.replace('#', '');
+            
+            if (itemPage === pageName) {
+                navItem.classList.add(this.config.activeClass);
+            } else {
+                navItem.classList.remove(this.config.activeClass);
+            }
+        });
     }
     
     /**
-     * Recharger la route actuelle
+     * Revenir à la page précédente
      */
-    reload() {
-        if (this.currentRoute) {
-            const path = this.getCurrentPath();
-            this.navigateTo(path, { skipPushState: true, force: true });
+    goBack() {
+        if (this.state.history.length > 1) {
+            // Retirer la page actuelle
+            this.state.history.pop();
+            
+            // Obtenir la page précédente
+            const previousEntry = this.state.history[this.state.history.length - 1];
+            
+            if (previousEntry) {
+                this.showPage(previousEntry.page, { fromHistory: true });
+            }
+        } else {
+            // Si pas d'historique, aller à home
+            this.showPage(this.config.defaultPage);
         }
     }
     
     /**
-     * Retour arrière
+     * Aller en avant (si applicable)
      */
-    back() {
-        window.history.back();
-    }
-    
-    /**
-     * Avancer
-     */
-    forward() {
-        window.history.forward();
-    }
-    
-    // ========================================================================
-    // HANDLERS
-    // ========================================================================
-    
-    /**
-     * Gérer popstate
-     */
-    handlePopState(event) {
-        const path = this.getCurrentPath();
-        this.navigateTo(path, { skipPushState: true });
-    }
-    
-    /**
-     * Gérer hashchange
-     */
-    handleHashChange() {
-        const path = this.getCurrentPath();
-        this.navigateTo(path, { skipPushState: true });
-    }
-    
-    /**
-     * Gérer clic sur lien
-     */
-    handleLinkClick(event) {
-        // Vérifier si c'est un lien
-        const link = event.target.closest('a');
-        if (!link) return;
-        
-        // Vérifier si c'est un lien interne
-        const href = link.getAttribute('href');
-        if (!href || href.startsWith('http') || href.startsWith('//') || href.startsWith('mailto:')) {
-            return;
-        }
-        
-        // Empêcher le comportement par défaut
-        event.preventDefault();
-        
-        // Naviguer
-        this.navigateTo(href);
-    }
-    
-    // ========================================================================
-    // MIDDLEWARES & HOOKS
-    // ========================================================================
-    
-    /**
-     * Ajouter un middleware
-     */
-    use(middleware) {
-        this.middlewares.push(middleware);
-        return this;
-    }
-    
-    /**
-     * Ajouter un hook before
-     */
-    beforeEach(hook) {
-        this.beforeHooks.push(hook);
-        return this;
-    }
-    
-    /**
-     * Ajouter un hook after
-     */
-    afterEach(hook) {
-        this.afterHooks.push(hook);
-        return this;
+    goForward() {
+        // TODO: Implémenter si besoin d'un système de navigation avant/arrière complet
+        this.log('debug', 'NavigationController', 'goForward not implemented');
     }
     
     // ========================================================================
@@ -501,34 +377,33 @@ class Router {
     // ========================================================================
     
     /**
-     * Transition de sortie
+     * Transition de sortie d'une page
      */
-    async transitionOut() {
-        const container = this.getContainer();
+    async transitionOut(pageName) {
+        const pageElement = document.getElementById(pageName);
         
-        if (container) {
-            container.style.opacity = '1';
-            container.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
-            container.style.opacity = '0';
+        if (pageElement) {
+            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
+            pageElement.style.opacity = '0';
             
             await this.wait(this.config.transitionDuration);
         }
     }
     
     /**
-     * Transition d'entrée
+     * Transition d'entrée d'une page
      */
-    async transitionIn() {
-        const container = this.getContainer();
+    async transitionIn(pageName) {
+        const pageElement = document.getElementById(pageName);
         
-        if (container) {
-            container.style.opacity = '0';
-            container.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
+        if (pageElement) {
+            pageElement.style.opacity = '0';
+            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
             
             // Force reflow
-            container.offsetHeight;
+            pageElement.offsetHeight;
             
-            container.style.opacity = '1';
+            pageElement.style.opacity = '1';
             
             await this.wait(this.config.transitionDuration);
         }
@@ -541,209 +416,22 @@ class Router {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
     
-    /**
-     * Obtenir le conteneur de rendu
-     */
-    getContainer() {
-        return this.config.container || 
-               document.getElementById('router-view') ||
-               document.querySelector('.main-content') ||
-               document.body;
-    }
-    
-    // ========================================================================
-    // UTILITAIRES
-    // ========================================================================
-    
-    /**
-     * Obtenir le chemin actuel
-     */
-    getCurrentPath() {
-        if (this.config.mode === 'history') {
-            let path = window.location.pathname;
-            
-            // Retirer le root si nécessaire
-            if (this.config.root !== '/') {
-                path = path.replace(this.config.root, '');
-            }
-            
-            return path || '/';
-        } else {
-            return window.location.hash.slice(1) || '/';
-        }
-    }
-    
-    /**
-     * Mettre à jour l'URL
-     */
-    updateURL(path, replace = false) {
-        if (this.config.mode === 'history') {
-            const url = this.config.root + path;
-            
-            if (replace) {
-                window.history.replaceState(null, '', url);
-            } else {
-                window.history.pushState(null, '', url);
-            }
-        } else {
-            if (replace) {
-                window.location.replace('#' + path);
-            } else {
-                window.location.hash = path;
-            }
-        }
-    }
-    
-    /**
-     * Normaliser un chemin
-     */
-    normalizePath(path) {
-        // Retirer les slashes multiples
-        path = path.replace(/\/+/g, '/');
-        
-        // Retirer le slash final sauf pour root
-        if (path !== '/' && path.endsWith('/')) {
-            path = path.slice(0, -1);
-        }
-        
-        // Assurer que ça commence par /
-        if (!path.startsWith('/')) {
-            path = '/' + path;
-        }
-        
-        return path;
-    }
-    
-    /**
-     * Convertir un path pattern en regex
-     */
-    pathToRegex(path) {
-        // Remplacer les paramètres :param par des groupes de capture
-        const pattern = path
-            .replace(/\//g, '\\/')
-            .replace(/:(\w+)/g, '(?<$1>[^/]+)')
-            .replace(/\*/g, '.*');
-        
-        return new RegExp('^' + pattern + '$');
-    }
-    
-    /**
-     * Trouver la route correspondante
-     */
-    matchRoute(path) {
-        for (const [routePath, route] of this.routes) {
-            if (routePath === '*') continue; // Skip 404 route
-            
-            const match = path.match(route.pattern);
-            if (match) {
-                return {
-                    route: route,
-                    params: match.groups || {}
-                };
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Trouver la route 404
-     */
-    find404Route() {
-        return this.routes.get('*') || null;
-    }
-    
-    /**
-     * Extraire les paramètres
-     */
-    extractParams(matchedRoute, path) {
-        const match = path.match(matchedRoute.route.pattern);
-        return match ? (match.groups || {}) : {};
-    }
-    
-    /**
-     * Extraire les query params
-     */
-    extractQuery(path) {
-        const queryStart = path.indexOf('?');
-        if (queryStart === -1) return {};
-        
-        const queryString = path.slice(queryStart + 1);
-        const params = new URLSearchParams(queryString);
-        const query = {};
-        
-        for (const [key, value] of params) {
-            query[key] = value;
-        }
-        
-        return query;
-    }
-    
-    // ========================================================================
-    // EVENT EMITTER
-    // ========================================================================
-    
-    /**
-     * Écouter un événement
-     */
-    on(event, callback) {
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, []);
-        }
-        this.listeners.get(event).push(callback);
-        
-        return this;
-    }
-    
-    /**
-     * Retirer un écouteur
-     */
-    off(event, callback) {
-        if (!this.listeners.has(event)) return this;
-        
-        const callbacks = this.listeners.get(event);
-        const index = callbacks.indexOf(callback);
-        
-        if (index !== -1) {
-            callbacks.splice(index, 1);
-        }
-        
-        return this;
-    }
-    
-    /**
-     * Émettre un événement
-     */
-    emit(event, data) {
-        if (!this.listeners.has(event)) return;
-        
-        const callbacks = this.listeners.get(event);
-        callbacks.forEach(callback => callback(data));
-    }
-    
     // ========================================================================
     // GETTERS
     // ========================================================================
     
     /**
-     * Obtenir la route actuelle
+     * Obtenir la page actuelle
      */
-    getCurrentRoute() {
-        return this.currentRoute;
+    getCurrentPage() {
+        return this.state.currentPage;
     }
     
     /**
-     * Obtenir les paramètres
+     * Obtenir la page précédente
      */
-    getParams() {
-        return this.state.params;
-    }
-    
-    /**
-     * Obtenir les query params
-     */
-    getQuery() {
-        return this.state.query;
+    getPreviousPage() {
+        return this.state.previousPage;
     }
     
     /**
@@ -752,10 +440,68 @@ class Router {
     getHistory() {
         return [...this.state.history];
     }
+    
+    /**
+     * Vérifier si une page est active
+     */
+    isPageActive(pageName) {
+        return this.state.currentPage === pageName;
+    }
+    
+    // ========================================================================
+    // MÉTHODES PUBLIQUES
+    // ========================================================================
+    
+    /**
+     * Recharger la page actuelle
+     */
+    reloadCurrentPage() {
+        if (this.state.currentPage) {
+            this.showPage(this.state.currentPage, { reload: true });
+        }
+    }
+    
+    /**
+     * Aller à la page par défaut
+     */
+    goHome() {
+        this.showPage(this.config.defaultPage);
+    }
+    
+    /**
+     * Obtenir la vue d'une page
+     */
+    getPageView(pageName) {
+        return this.pageViewMap.get(pageName);
+    }
+    
+    // ========================================================================
+    // DESTRUCTION
+    // ========================================================================
+    
+    onDestroy() {
+        this.log('info', 'NavigationController', 'Destroying navigation system...');
+        
+        // Retirer les événements
+        this.elements.navItems.forEach(navItem => {
+            navItem.replaceWith(navItem.cloneNode(true));
+        });
+        
+        // Nettoyer les caches
+        this.pageViewMap.clear();
+        
+        this.log('info', 'NavigationController', '✓ Navigation system destroyed');
+    }
 }
 
-window.Router = Router;
+// ============================================================================
+// EXPORT
+// ============================================================================
 
-// ============================================================================
-// FIN DU FICHIER Router.js v3.1.1
-// ============================================================================
+if (typeof window !== 'undefined') {
+    window.NavigationController = NavigationController;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = NavigationController;
+}

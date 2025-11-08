@@ -1,9 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/PlaylistView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
-// Date: 2025-11-02
+// Version: v4.0.1 - CONFORMITÉ API + MÉTHODES RENDER
+// Date: 2025-11-08
 // ============================================================================
-// AMÉLIORATIONS v4.0.0:
+// AMÉLIORATIONS v4.0.1:
+// ✅ Ajout méthode render() pour insertion DOM
+// ✅ Ajout méthode show() pour affichage et rechargement playlists
+// ✅ Ajout méthode hide() pour masquage
 // ✅ API v4.2.2: playlist.* (create, delete, update, list, get, addItem, removeItem, reorder, setLoop)
 // ✅ Drag & drop pour réorganiser
 // ✅ Gestion loop
@@ -24,7 +27,7 @@ class PlaylistView extends BaseView {
             draggedItem: null
         };
         
-        this.log('info', 'PlaylistView', '✅ PlaylistView v4.0.0 initialized');
+        this.log('info', 'PlaylistView', '✅ PlaylistView v4.0.1 initialized');
     }
     
     // ========================================================================
@@ -66,7 +69,75 @@ class PlaylistView extends BaseView {
     }
     
     // ========================================================================
-    // RENDERING
+    // RENDERING - MÉTHODES PRINCIPALES
+    // ========================================================================
+    
+    /**
+     * Rendre la vue playlist
+     * @param {Object} data - Données optionnelles pour le rendu
+     */
+    render(data = null) {
+        if (!this.container) {
+            this.log('error', 'PlaylistView', 'Cannot render: container not found');
+            return;
+        }
+        
+        const startTime = performance.now();
+        
+        try {
+            // Générer et insérer le HTML
+            this.container.innerHTML = this.buildTemplate(data || this.viewState);
+            
+            // Attacher les événements
+            this.attachEvents();
+            
+            // Mettre à jour l'état
+            this.state.rendered = true;
+            this.state.lastUpdate = Date.now();
+            
+            // Émettre événement
+            if (this.eventBus) {
+                this.eventBus.emit('playlist-view:rendered', {
+                    playlistsCount: this.viewState.playlists.length
+                });
+            }
+            
+            const renderTime = performance.now() - startTime;
+            this.log('debug', 'PlaylistView', `✓ Rendered in ${renderTime.toFixed(2)}ms`);
+            
+        } catch (error) {
+            this.log('error', 'PlaylistView', 'Render failed:', error);
+            this.handleError('Render failed', error);
+        }
+    }
+
+    /**
+     * Afficher la vue playlist
+     */
+    show() {
+        if (this.container) {
+            this.container.style.display = 'block';
+            this.state.visible = true;
+            
+            // Recharger les playlists si nécessaire
+            if (this.viewState.playlists.length === 0) {
+                this.loadPlaylists();
+            }
+        }
+    }
+
+    /**
+     * Masquer la vue playlist
+     */
+    hide() {
+        if (this.container) {
+            this.container.style.display = 'none';
+            this.state.visible = false;
+        }
+    }
+    
+    // ========================================================================
+    // RENDERING - SOUS-COMPOSANTS
     // ========================================================================
     
     renderPlaylistsList(state) {
@@ -255,7 +326,7 @@ class PlaylistView extends BaseView {
         this.container.addEventListener('dragover', (e) => {
             e.preventDefault();
             const itemEntry = e.target.closest('.item-entry');
-            if (itemEntry && this.viewState.draggedItem) {
+            if (itemEntry) {
                 itemEntry.classList.add('drag-over');
             }
         });

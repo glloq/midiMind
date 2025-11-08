@@ -1,7 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/EditorView.js
-// Version: v4.0.0 - CONFORMITÉ API
-// Date: 2025-11-02
+// Version: v4.0.1 - CONFORMITÉ API + MÉTHODES RENDER
+// Date: 2025-11-08
+// ============================================================================
+// AMÉLIORATIONS v4.0.1:
+// ✅ Ajout méthode render() pour insertion DOM
+// ✅ Ajout méthode show() pour affichage et redessinage canvas
+// ✅ Ajout méthode hide() pour masquage
+// ✅ Conformité API v4.2.2
 // ============================================================================
 
 class EditorView extends BaseView {
@@ -26,6 +32,8 @@ class EditorView extends BaseView {
         
         this.canvas = null;
         this.ctx = null;
+        
+        this.log('info', 'EditorView', '✅ EditorView v4.0.1 initialized');
     }
     
     buildTemplate(data = {}) {
@@ -75,6 +83,95 @@ class EditorView extends BaseView {
             </div>
         `;
     }
+    
+    // ========================================================================
+    // RENDERING - MÉTHODES PRINCIPALES
+    // ========================================================================
+    
+    /**
+     * Rendre la vue éditeur
+     * @param {Object} data - Données optionnelles pour le rendu
+     */
+    render(data = null) {
+        if (!this.container) {
+            this.log('error', 'EditorView', 'Cannot render: container not found');
+            return;
+        }
+        
+        const startTime = performance.now();
+        
+        try {
+            // Générer et insérer le HTML
+            this.container.innerHTML = this.buildTemplate(data || this.viewState);
+            
+            // Initialiser le canvas si nécessaire
+            this.initializeCanvas();
+            
+            // Attacher les événements
+            this.attachEvents();
+            
+            // Mettre à jour l'état
+            this.state.rendered = true;
+            this.state.lastUpdate = Date.now();
+            
+            // Émettre événement
+            if (this.eventBus) {
+                this.eventBus.emit('editor-view:rendered', {
+                    hasFile: !!this.viewState.currentFile
+                });
+            }
+            
+            const renderTime = performance.now() - startTime;
+            this.log('debug', 'EditorView', `✓ Rendered in ${renderTime.toFixed(2)}ms`);
+            
+        } catch (error) {
+            this.log('error', 'EditorView', 'Render failed:', error);
+            this.handleError('Render failed', error);
+        }
+    }
+
+    /**
+     * Afficher la vue éditeur
+     */
+    show() {
+        if (this.container) {
+            this.container.style.display = 'block';
+            this.state.visible = true;
+            
+            // Redessiner le canvas si nécessaire
+            if (this.canvas && this.viewState.currentFile) {
+                this.redrawCanvas();
+            }
+        }
+    }
+
+    /**
+     * Masquer la vue éditeur
+     */
+    hide() {
+        if (this.container) {
+            this.container.style.display = 'none';
+            this.state.visible = false;
+        }
+    }
+    
+    /**
+     * Initialiser le canvas après insertion DOM
+     */
+    initializeCanvas() {
+        this.setupCanvas();
+    }
+    
+    /**
+     * Redessiner le canvas
+     */
+    redrawCanvas() {
+        this.drawGrid();
+    }
+    
+    // ========================================================================
+    // EVENTS
+    // ========================================================================
     
     attachEvents() {
         super.attachEvents();

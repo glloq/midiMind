@@ -1,9 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v4.0.0 - CONFORMITÉ API DOCUMENTATION
-// Date: 2025-11-02
+// Version: v4.0.1 - CONFORMITÉ API + MÉTHODES RENDER
+// Date: 2025-11-08
 // ============================================================================
-// AMÉLIORATIONS v4.0.0:
+// AMÉLIORATIONS v4.0.1:
+// ✅ Ajout méthode render() pour insertion DOM
+// ✅ Ajout méthode show() pour affichage
+// ✅ Ajout méthode hide() pour masquage
 // ✅ Conformité API v4.2.2 (files.list, files.read, files.write, files.delete)
 // ✅ Gestion réponses {success: true, data: {...}}
 // ✅ Upload et gestion fichiers MIDI
@@ -27,7 +30,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', 'FileView', '✅ FileView v4.0.0 initialized (API-compliant)');
+        this.log('info', 'FileView', '✅ FileView v4.0.1 initialized (API-compliant + render)');
     }
     
     // ========================================================================
@@ -96,7 +99,82 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // RENDERING
+    // RENDERING - MÉTHODES PRINCIPALES
+    // ========================================================================
+    
+    /**
+     * Rendre la vue
+     * @param {Object} data - Données optionnelles pour le rendu
+     */
+    render(data = null) {
+        if (!this.container) {
+            this.log('error', 'FileView', 'Cannot render: container not found');
+            return;
+        }
+        
+        const startTime = performance.now();
+        
+        try {
+            // Générer et insérer le HTML
+            this.container.innerHTML = this.buildTemplate(data || this.viewState);
+            
+            // Attacher les événements
+            this.attachEvents();
+            
+            // Mettre à jour l'état
+            this.state.rendered = true;
+            this.state.lastUpdate = Date.now();
+            
+            // Émettre événement
+            if (this.eventBus) {
+                this.eventBus.emit('file-view:rendered', {
+                    filesCount: this.viewState.files.length
+                });
+            }
+            
+            const renderTime = performance.now() - startTime;
+            this.log('debug', 'FileView', `✓ Rendered in ${renderTime.toFixed(2)}ms`);
+            
+        } catch (error) {
+            this.log('error', 'FileView', 'Render failed:', error);
+            this.handleError('Render failed', error);
+        }
+    }
+
+    /**
+     * Afficher la vue
+     */
+    show() {
+        if (this.container) {
+            this.container.style.display = 'block';
+            this.state.visible = true;
+            
+            // Recharger les données si nécessaire
+            if (this.viewState.files.length === 0) {
+                this.refreshFiles();
+            }
+        }
+    }
+
+    /**
+     * Masquer la vue
+     */
+    hide() {
+        if (this.container) {
+            this.container.style.display = 'none';
+            this.state.visible = false;
+        }
+    }
+
+    /**
+     * Recharger les fichiers
+     */
+    refreshFiles() {
+        this.handleRefresh();
+    }
+    
+    // ========================================================================
+    // RENDERING - SOUS-COMPOSANTS
     // ========================================================================
     
     renderLoading() {
@@ -224,8 +302,8 @@ class FileView extends BaseView {
                     <span class="detail-value">${midiInfo.tracks || '—'}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Tempo:</span>
-                    <span class="detail-value">${midiInfo.tempo || '—'} BPM</span>
+                    <span class="detail-label">PPQ:</span>
+                    <span class="detail-value">${midiInfo.ppq || '—'}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Durée:</span>
@@ -237,16 +315,15 @@ class FileView extends BaseView {
     
     renderNoSelection() {
         return `
-            <div class="details-empty">
-                <div class="empty-icon">📄</div>
-                <p>Sélectionnez un fichier</p>
-                <p class="text-muted">Les détails s'afficheront ici</p>
+            <div class="details-placeholder">
+                <div class="placeholder-icon">📋</div>
+                <p>Sélectionnez un fichier pour voir ses détails</p>
             </div>
         `;
     }
     
     // ========================================================================
-    // EVENT HANDLERS
+    // EVENTS
     // ========================================================================
     
     attachEvents() {
@@ -254,7 +331,7 @@ class FileView extends BaseView {
         
         if (!this.container) return;
         
-        // Délégation d'événements
+        // Actions des boutons
         this.container.addEventListener('click', (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
             if (!action) return;
@@ -275,14 +352,11 @@ class FileView extends BaseView {
                 case 'play-file':
                     if (filePath) this.handlePlayFile(filePath);
                     break;
-                case 'load-file':
-                    this.handleLoadFile();
-                    break;
                 case 'delete-file':
                     if (filePath) this.handleDeleteFile(filePath);
-                    else if (this.viewState.selectedFile) {
-                        this.handleDeleteFile(this.viewState.selectedFile.path || this.viewState.selectedFile.name);
-                    }
+                    break;
+                case 'load-file':
+                    this.handleLoadFile();
                     break;
                 case 'close-details':
                     this.handleCloseDetails();
@@ -293,58 +367,46 @@ class FileView extends BaseView {
             }
         });
         
-        // Change events
+        // Changement de filtre
+        this.container.addEventListener('input', (e) => {
+            if (e.target.dataset.action === 'filter-files') {
+                this.viewState.filter = e.target.value;
+                this.render();
+            }
+        });
+        
+        // Changement de tri
         this.container.addEventListener('change', (e) => {
-            const action = e.target.dataset.action;
-            
-            if (action === 'change-sort') {
+            if (e.target.dataset.action === 'change-sort') {
                 this.viewState.sortBy = e.target.value;
                 this.render();
             }
         });
         
-        // Input events
-        this.container.addEventListener('input', (e) => {
-            const action = e.target.dataset.action;
-            
-            if (action === 'filter-files') {
-                this.viewState.filter = e.target.value;
-                this.render();
-            } else if (action === 'change-path') {
-                this.viewState.currentPath = e.target.value;
-            }
-        });
-        
-        // EventBus listeners
         this.setupEventBusListeners();
     }
     
     setupEventBusListeners() {
         if (!this.eventBus) return;
         
-        // files:listed - réponse de files.list
+        // files.list response
         this.eventBus.on('files:listed', (data) => {
+            this.log('debug', 'FileView', `Received ${data.files?.length || 0} files`);
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
             this.render();
         });
         
-        // files:loaded - réponse de files.read
-        this.eventBus.on('file:loaded', (data) => {
-            // Fichier chargé avec succès
-            this.log('info', 'FileView', `File loaded: ${data.path}`);
-        });
-        
-        // files:deleted - réponse de files.delete
-        this.eventBus.on('file:deleted', (data) => {
-            this.log('info', 'FileView', `File deleted: ${data.path}`);
-            this.handleRefresh();
-        });
-        
-        // files:uploaded - réponse de files.write
+        // files.write response (upload)
         this.eventBus.on('file:uploaded', (data) => {
-            this.log('info', 'FileView', `File uploaded: ${data.path}`);
-            this.handleRefresh();
+            this.log('info', 'FileView', `File uploaded: ${data.file_path}`);
+            this.handleRefresh(); // Recharger la liste
+        });
+        
+        // files.delete response
+        this.eventBus.on('file:deleted', (data) => {
+            this.log('info', 'FileView', `File deleted: ${data.file_path}`);
+            this.handleRefresh(); // Recharger la liste
         });
         
         // Erreurs
