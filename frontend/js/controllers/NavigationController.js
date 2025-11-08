@@ -1,41 +1,42 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin réel: frontend/js/controllers/NavigationController.js
-// Version: v4.1.0 - CORRECTION CRITIQUE CONTROLLERS
+// Version: v4.2.0 - CORRECTION INITIALIZATION ORDER
 // Date: 2025-11-08
 // ============================================================================
+// CORRECTIONS v4.2.0:
+// ✅ CRITIQUE: Désactivation autoInitialize pour éviter erreur initialization
+// ✅ CRITIQUE: this.elements initialisé AVANT que onInitialize soit appelé
+// ✅ Solution: config.autoInitialize = false dans le constructeur
+//
 // CORRECTIONS v4.1.0:
 // ✅ CRITIQUE: Suppression référence inexistante this.controllers
 // ✅ CRITIQUE: Suppression pageControllerMap (non nécessaire)
 // ✅ Communication controllers via EventBus (architecture correcte)
-// ✅ Les controllers s'activent/désactivent via événements navigation:before/after
-//
-// CRÉATION v4.0.0:
-// ✅ CRITIQUE: Recréation complète du NavigationController manquant
-// ✅ Gestion affichage/masquage des pages
-// ✅ Synchronisation avec Router et hash URL
-// ✅ Mise à jour états active sur navigation
-// ✅ Appel automatique init/render des vues
-// ✅ Support transitions
 // ============================================================================
 
 class NavigationController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
+        // ✅ CRITIQUE: Désactiver l'auto-initialisation héritée
+        // Car nous devons initialiser this.elements AVANT onInitialize()
+        this.config.autoInitialize = false;
+        
         // Configuration
         this.config = {
+            ...this.config,
             pageSelector: '.page',
             navItemSelector: '.nav-item',
             activeClass: 'active',
             transitionDuration: 300,
             useTransitions: true,
-            defaultPage: 'home',
-            ...this.config
+            defaultPage: 'home'
         };
         
         // État
         this.state = {
+            ...this.state,
             currentPage: null,
             previousPage: null,
             isTransitioning: false,
@@ -53,7 +54,10 @@ class NavigationController extends BaseController {
         // Mapping page -> vue
         this.pageViewMap = new Map();
         
-        this.log('debug', 'NavigationController', '✓ NavigationController v4.1.0 created');
+        this.log('debug', 'NavigationController', '✓ NavigationController v4.2.0 created');
+        
+        // ✅ CRITIQUE: Maintenant initialiser manuellement
+        this.initialize();
     }
     
     // ========================================================================
@@ -99,47 +103,51 @@ class NavigationController extends BaseController {
      * ✅ CORRECTION: Suppression référence this.controllers (n'existe pas)
      */
     registerPageMappings() {
-        // Mapping pages -> vues (selon les IDs dans index.html)
-        const pageMappings = {
-            'home': this.views.home,
-            'files': this.views.file,
-            'instruments': this.views.instrument,
-            'keyboard': this.views.keyboard,
-            'system': this.views.system,
-            'editor': this.views.editor,
-            'routing': this.views.routing,
-            'playlist': this.views.playlist,
-            'visualizer': this.views.visualizer
-        };
+        // Mapper les pages aux vues disponibles
+        const pageViewPairs = [
+            ['home', 'home'],
+            ['files', 'files'],
+            ['instruments', 'instruments'],
+            ['keyboard', 'keyboard'],
+            ['routing', 'routing'],
+            ['editor', 'editor'],
+            ['system', 'system'],
+            ['visualizer', 'visualizer']
+        ];
         
-        for (const [page, view] of Object.entries(pageMappings)) {
+        pageViewPairs.forEach(([pageName, viewName]) => {
+            const view = this.views[viewName];
             if (view) {
-                this.pageViewMap.set(page, view);
+                this.pageViewMap.set(pageName, view);
+                this.log('debug', 'NavigationController', `✓ Mapped page '${pageName}' to view '${viewName}'`);
+            } else {
+                this.log('warn', 'NavigationController', `View '${viewName}' not found for page '${pageName}'`);
             }
-        }
-        
-        this.log('debug', 'NavigationController', `Registered ${this.pageViewMap.size} page-view mappings`);
+        });
     }
     
     /**
      * Attacher les événements de navigation
      */
     attachNavigationEvents() {
-        // Cliquer sur les items de navigation
+        // Événements sur les éléments de navigation
         this.elements.navItems.forEach(navItem => {
             navItem.addEventListener('click', (e) => {
                 e.preventDefault();
+                
                 const page = navItem.dataset.page || navItem.getAttribute('href')?.replace('#', '');
+                
                 if (page) {
                     this.showPage(page);
                 }
             });
         });
         
-        // Écouter les changements de hash
+        // Événements sur le hash change
         window.addEventListener('hashchange', () => {
-            const hash = window.location.hash.slice(1); // Retirer le #
+            const hash = window.location.hash.replace('#', '');
             const page = hash || this.config.defaultPage;
+            
             this.showPage(page, { fromHashChange: true });
         });
         
@@ -359,17 +367,17 @@ class NavigationController extends BaseController {
                 this.showPage(previousEntry.page, { fromHistory: true });
             }
         } else {
-            // Si pas d'historique, aller à home
+            // Si pas d'historique, aller à la page par défaut
             this.showPage(this.config.defaultPage);
         }
     }
     
     /**
-     * Aller en avant (si applicable)
+     * Aller vers l'avant dans l'historique (si implémenté)
      */
     goForward() {
-        // TODO: Implémenter si besoin d'un système de navigation avant/arrière complet
-        this.log('debug', 'NavigationController', 'goForward not implemented');
+        // TODO: Implémenter si nécessaire
+        this.log('warn', 'NavigationController', 'goForward not implemented yet');
     }
     
     // ========================================================================
@@ -377,43 +385,37 @@ class NavigationController extends BaseController {
     // ========================================================================
     
     /**
-     * Transition de sortie d'une page
+     * Transition sortie d'une page
      */
     async transitionOut(pageName) {
         const pageElement = document.getElementById(pageName);
+        if (!pageElement) return;
         
-        if (pageElement) {
-            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
-            pageElement.style.opacity = '0';
+        return new Promise(resolve => {
+            pageElement.classList.add('transitioning-out');
             
-            await this.wait(this.config.transitionDuration);
-        }
+            setTimeout(() => {
+                pageElement.classList.remove('transitioning-out');
+                resolve();
+            }, this.config.transitionDuration);
+        });
     }
     
     /**
-     * Transition d'entrée d'une page
+     * Transition entrée d'une page
      */
     async transitionIn(pageName) {
         const pageElement = document.getElementById(pageName);
+        if (!pageElement) return;
         
-        if (pageElement) {
-            pageElement.style.opacity = '0';
-            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
+        return new Promise(resolve => {
+            pageElement.classList.add('transitioning-in');
             
-            // Force reflow
-            pageElement.offsetHeight;
-            
-            pageElement.style.opacity = '1';
-            
-            await this.wait(this.config.transitionDuration);
-        }
-    }
-    
-    /**
-     * Attendre un délai
-     */
-    wait(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+            setTimeout(() => {
+                pageElement.classList.remove('transitioning-in');
+                resolve();
+            }, this.config.transitionDuration);
+        });
     }
     
     // ========================================================================
