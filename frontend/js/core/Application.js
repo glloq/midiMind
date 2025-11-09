@@ -1,9 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
 // Chemin rÃ©el: frontend/js/core/Application.js
-// Version: v4.1.0 - FIXED MODEL SIGNATURES
-// Date: 2025-11-03
+// Version: v4.2.0 - FIX INSTRUMENT VIEW ID
+// Date: 2025-11-09
 // ============================================================================
+// ============================================================================
+// CORRECTIONS v4.2.0:
+// ✅ CRITIQUE: Correction ID InstrumentView (instrument-view au lieu de instruments-view)
+// ✅ Conformité avec index.html pour éviter erreurs de vue manquante
+//
 // CORRECTIONS v4.1.0:
 // âœ“ CRITIQUE: Passer 5 paramÃ¨tres aux modÃ¨les (eventBus, backend, logger, initialData, options)
 // âœ“ Fix: StateModel, FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
@@ -404,7 +409,7 @@ class Application {
         
         // InstrumentView
         if (window.InstrumentView) {
-            this.views.instrument = new InstrumentView('instruments-view', this.eventBus);
+            this.views.instrument = new InstrumentView('instrument-view', this.eventBus);
             window.instrumentView = this.views.instrument;
         }
         

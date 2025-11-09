@@ -1,8 +1,12 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.h
-// Version: 4.2.0
+// Version: 4.2.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.1:
+//   - Added WebSocket keepalive support (ping/pong)
+//   - Added pong timeout handling
 //
 // Changes v4.2.0:
 //   - Added EventBus integration
@@ -82,6 +86,8 @@ private:
     void onClose(connection_hdl hdl);
     void onMessage(connection_hdl hdl, message_ptr msg);
     void onFail(connection_hdl hdl);
+    bool onPing(connection_hdl hdl, std::string payload);
+    void onPongTimeout(connection_hdl hdl, std::string payload);
     
     void serverThread();
     void processRequest(connection_hdl hdl, const MessageEnvelope& message);

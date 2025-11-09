@@ -1,42 +1,50 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin réel: frontend/js/controllers/NavigationController.js
-// Version: v4.2.0 - CORRECTION INITIALIZATION ORDER
-// Date: 2025-11-08
+// Version: v4.2.0 - FIX INITIALIZATION TIMING  
+// Date: 2025-11-09
 // ============================================================================
 // CORRECTIONS v4.2.0:
-// ✅ CRITIQUE: Désactivation autoInitialize pour éviter erreur initialization
-// ✅ CRITIQUE: this.elements initialisé AVANT que onInitialize soit appelé
-// ✅ Solution: config.autoInitialize = false dans le constructeur
+// ✅ CRITIQUE: Désactivation autoInitialize pour éviter this.elements undefined
+// ✅ CRITIQUE: Initialisation manuelle après configuration complète
+// ✅ Fix: this.elements initialisé AVANT onInitialize()
 //
 // CORRECTIONS v4.1.0:
 // ✅ CRITIQUE: Suppression référence inexistante this.controllers
 // ✅ CRITIQUE: Suppression pageControllerMap (non nécessaire)
 // ✅ Communication controllers via EventBus (architecture correcte)
+// ✅ Les controllers s'activent/désactivent via événements navigation:before/after
+//
+// CRÉATION v4.0.0:
+// ✅ CRITIQUE: Recréation complète du NavigationController manquant
+// ✅ Gestion affichage/masquage des pages
+// ✅ Synchronisation avec Router et hash URL
+// ✅ Mise à jour états active sur navigation
+// ✅ Appel automatique init/render des vues
+// ✅ Support transitions
 // ============================================================================
 
 class NavigationController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // ✅ CRITIQUE: Désactiver l'auto-initialisation héritée
-        // Car nous devons initialiser this.elements AVANT onInitialize()
+        // ✅ CRITIQUE v4.2.0: Désactiver auto-initialisation de BaseController
+        // pour éviter appel prématuré de onInitialize() avant this.elements
         this.config.autoInitialize = false;
         
         // Configuration
         this.config = {
-            ...this.config,
             pageSelector: '.page',
             navItemSelector: '.nav-item',
             activeClass: 'active',
             transitionDuration: 300,
             useTransitions: true,
-            defaultPage: 'home'
+            defaultPage: 'home',
+            ...this.config
         };
         
         // État
         this.state = {
-            ...this.state,
             currentPage: null,
             previousPage: null,
             isTransitioning: false,
@@ -56,7 +64,7 @@ class NavigationController extends BaseController {
         
         this.log('debug', 'NavigationController', '✓ NavigationController v4.2.0 created');
         
-        // ✅ CRITIQUE: Maintenant initialiser manuellement
+        // ✅ CRITIQUE v4.2.0: Initialiser manuellement APRÈS que tout soit configuré
         this.initialize();
     }
     
@@ -103,51 +111,49 @@ class NavigationController extends BaseController {
      * ✅ CORRECTION: Suppression référence this.controllers (n'existe pas)
      */
     registerPageMappings() {
-        // Mapper les pages aux vues disponibles
-        const pageViewPairs = [
-            ['home', 'home'],
-            ['files', 'files'],
-            ['instruments', 'instruments'],
-            ['keyboard', 'keyboard'],
-            ['routing', 'routing'],
-            ['editor', 'editor'],
-            ['system', 'system'],
-            ['visualizer', 'visualizer']
-        ];
+        // Mapping pages -> vues (selon les IDs dans index.html)
+        const pageMappings = {
+            'home': this.views.home,
+            'files': this.views.file,
+            'instruments': this.views.instrument,
+            'keyboard': this.views.keyboard,
+            'system': this.views.system,
+            'editor': this.views.editor,
+            'routing': this.views.routing,
+            'playlist': this.views.playlist,
+            'visualizer': this.views.visualizer
+        };
         
-        pageViewPairs.forEach(([pageName, viewName]) => {
-            const view = this.views[viewName];
+        for (const [page, view] of Object.entries(pageMappings)) {
             if (view) {
-                this.pageViewMap.set(pageName, view);
-                this.log('debug', 'NavigationController', `✓ Mapped page '${pageName}' to view '${viewName}'`);
+                this.pageViewMap.set(page, view);
             } else {
-                this.log('warn', 'NavigationController', `View '${viewName}' not found for page '${pageName}'`);
+                this.log('warn', 'NavigationController', `View '${page}' not found for page '${page}'`);
             }
-        });
+        }
+        
+        this.log('debug', 'NavigationController', `Registered ${this.pageViewMap.size} page-view mappings`);
     }
     
     /**
      * Attacher les événements de navigation
      */
     attachNavigationEvents() {
-        // Événements sur les éléments de navigation
+        // Cliquer sur les items de navigation
         this.elements.navItems.forEach(navItem => {
             navItem.addEventListener('click', (e) => {
                 e.preventDefault();
-                
                 const page = navItem.dataset.page || navItem.getAttribute('href')?.replace('#', '');
-                
                 if (page) {
                     this.showPage(page);
                 }
             });
         });
         
-        // Événements sur le hash change
+        // Écouter les changements de hash
         window.addEventListener('hashchange', () => {
-            const hash = window.location.hash.replace('#', '');
+            const hash = window.location.hash.slice(1); // Retirer le #
             const page = hash || this.config.defaultPage;
-            
             this.showPage(page, { fromHashChange: true });
         });
         
@@ -247,12 +253,14 @@ class NavigationController extends BaseController {
             
             // Afficher la nouvelle page
             const pageElement = document.getElementById(pageName);
-            if (!pageElement) {
-                throw new Error(`Page element #${pageName} not found`);
+            if (pageElement) {
+                pageElement.classList.add(this.config.activeClass);
+                
+                // Pour les pages modales, les afficher
+                if (pageElement.classList.contains('page-modal') || pageElement.classList.contains('page-fullscreen')) {
+                    pageElement.style.display = 'flex';
+                }
             }
-            
-            pageElement.classList.add(this.config.activeClass);
-            pageElement.style.display = 'block';
             
             // Mettre à jour la navigation
             this.updateNavigation(pageName);
@@ -367,17 +375,17 @@ class NavigationController extends BaseController {
                 this.showPage(previousEntry.page, { fromHistory: true });
             }
         } else {
-            // Si pas d'historique, aller à la page par défaut
+            // Si pas d'historique, aller à home
             this.showPage(this.config.defaultPage);
         }
     }
     
     /**
-     * Aller vers l'avant dans l'historique (si implémenté)
+     * Aller en avant (si applicable)
      */
     goForward() {
-        // TODO: Implémenter si nécessaire
-        this.log('warn', 'NavigationController', 'goForward not implemented yet');
+        // TODO: Implémenter si besoin d'un système de navigation avant/arrière complet
+        this.log('debug', 'NavigationController', 'goForward not implemented');
     }
     
     // ========================================================================
@@ -385,37 +393,43 @@ class NavigationController extends BaseController {
     // ========================================================================
     
     /**
-     * Transition sortie d'une page
+     * Transition de sortie d'une page
      */
     async transitionOut(pageName) {
         const pageElement = document.getElementById(pageName);
-        if (!pageElement) return;
         
-        return new Promise(resolve => {
-            pageElement.classList.add('transitioning-out');
+        if (pageElement) {
+            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
+            pageElement.style.opacity = '0';
             
-            setTimeout(() => {
-                pageElement.classList.remove('transitioning-out');
-                resolve();
-            }, this.config.transitionDuration);
-        });
+            await this.wait(this.config.transitionDuration);
+        }
     }
     
     /**
-     * Transition entrée d'une page
+     * Transition d'entrée d'une page
      */
     async transitionIn(pageName) {
         const pageElement = document.getElementById(pageName);
-        if (!pageElement) return;
         
-        return new Promise(resolve => {
-            pageElement.classList.add('transitioning-in');
+        if (pageElement) {
+            pageElement.style.opacity = '0';
+            pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
             
-            setTimeout(() => {
-                pageElement.classList.remove('transitioning-in');
-                resolve();
-            }, this.config.transitionDuration);
-        });
+            // Force reflow
+            pageElement.offsetHeight;
+            
+            pageElement.style.opacity = '1';
+            
+            await this.wait(this.config.transitionDuration);
+        }
+    }
+    
+    /**
+     * Attendre un délai
+     */
+    wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     
     // ========================================================================

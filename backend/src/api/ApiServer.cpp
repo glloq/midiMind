@@ -1,8 +1,13 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.2.0
+// Version: 4.2.1
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.1:
+//   - Added WebSocket keepalive (ping/pong handlers)
+//   - Added pong timeout configuration (60s)
+//   - Automatic closure of dead connections
 //
 // Changes v4.2.0:
 //   - Added EventBus integration
@@ -35,6 +40,31 @@ ApiServer::ApiServer(std::shared_ptr<EventBus> eventBus)
     
     server_.init_asio();
     server_.set_reuse_addr(true);
+    
+    // ========================================================================
+    // KEEPALIVE CONFIGURATION - Correction Erreur #1
+    // ========================================================================
+    
+    // Pong timeout: 60 secondes sans pong = connexion morte
+    server_.set_pong_timeout(60000);
+    
+    // Handler pour timeout pong
+    server_.set_pong_timeout_handler(
+        std::bind(&ApiServer::onPongTimeout, this, 
+                 std::placeholders::_1, std::placeholders::_2)
+    );
+    
+    // Handler pour ping reçu (répond automatiquement avec pong)
+    server_.set_ping_handler(
+        std::bind(&ApiServer::onPing, this,
+                 std::placeholders::_1, std::placeholders::_2)
+    );
+    
+    Logger::info("ApiServer", "✓ WebSocket keepalive configured (pong timeout: 60s)");
+    
+    // ========================================================================
+    // CONNECTION HANDLERS
+    // ========================================================================
     
     server_.set_open_handler(
         std::bind(&ApiServer::onOpen, this, std::placeholders::_1)
@@ -443,6 +473,41 @@ void ApiServer::onFail(connection_hdl hdl) {
     {
         std::lock_guard<std::mutex> statsLock(statsMutex_);
         stats_.errorCount++;
+    }
+}
+
+// ============================================================================
+// KEEPALIVE HANDLERS - Correction Erreur #1
+// ============================================================================
+
+bool ApiServer::onPing(connection_hdl hdl, std::string payload) {
+    // Log si payload non vide (rare)
+    if (!payload.empty()) {
+        Logger::debug("ApiServer", "Ping received with payload: " + payload);
+    }
+    
+    // Retourner true = WebSocket++ envoie automatiquement un pong
+    // C'est le comportement par défaut du protocole WebSocket
+    return true;
+}
+
+void ApiServer::onPongTimeout(connection_hdl hdl, std::string payload) {
+    Logger::warning("ApiServer", "Pong timeout - closing dead connection");
+    
+    try {
+        // Fermer proprement avec code 1000 (normal closure)
+        server_.close(hdl, websocketpp::close::status::normal, 
+                     "Pong timeout - connection dead");
+        
+        // Nettoyer de la liste
+        {
+            std::lock_guard<std::mutex> lock(connectionsMutex_);
+            connections_.erase(hdl);
+        }
+        
+    } catch (const std::exception& e) {
+        Logger::error("ApiServer", 
+                     "Error closing dead connection: " + std::string(e.what()));
     }
 }
 
