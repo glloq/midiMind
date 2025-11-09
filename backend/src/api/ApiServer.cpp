@@ -1,8 +1,11 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.2.1
+// Version: 4.2.2
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.2:
+//   - FIXED: Command dispatching now passes complete JSON with command+params
 //
 // Changes v4.2.1:
 //   - Added WebSocket keepalive (ping/pong handlers)
@@ -540,7 +543,14 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
     
     try {
         const auto& request = message.getRequest();
-        json result = commandCallback_(request.params);
+        
+        // Build complete command JSON with both command and params
+        json commandJson = {
+            {"command", request.command},
+            {"params", request.params}
+        };
+        
+        json result = commandCallback_(commandJson);
         
         auto response = MessageEnvelope::createSuccessResponse(
             request.id,

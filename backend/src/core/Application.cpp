@@ -1,7 +1,15 @@
 // ============================================================================
 // File: backend/src/core/Application.cpp
-// Version: 4.2.4 - FIX singleton and CommandHandler
+// Version: 4.2.5
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Changes v4.2.5:
+//   - ADDED: Command handler callback configuration in initializeApi()
+//
+// Changes v4.2.4:
+//   - FIX singleton and CommandHandler
+//
 // ============================================================================
 
 #include "Application.h"
@@ -380,6 +388,12 @@ bool Application::initializeApi() {
         Logger::info("Application", "  Creating ApiServer...");
         apiServer_ = std::make_shared<ApiServer>(eventBus_);
         Logger::info("Application", "  [OK] ApiServer initialized");
+        
+        Logger::info("Application", "  Configuring command handler...");
+        apiServer_->setCommandCallback([this](const json& command) {
+            return commandHandler_->processCommand(command);
+        });
+        Logger::info("Application", "  [OK] Command handler configured");
         
         Logger::info("Application", "");
         return true;
