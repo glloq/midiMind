@@ -1,19 +1,21 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js  
-// Version: v4.3.0 - CONNECTION STABILITY FIXES
-// Date: 2025-11-09
+// Version: v4.3.1 - API STANDARDIZATION
+// Date: 2025-11-10
 // ============================================================================
+// CORRECTIONS v4.3.1 (STANDARDISATION API):
+// ✅ AJOUT: Méthodes files.* standards (listFiles, readFile, writeFile, etc.)
+// ✅ ALIAS: Méthodes MIDI conservées pour compatibilité (listMidiFiles, etc.)
+// ✅ COHÉRENCE: Noms de méthodes alignés avec API documentée
+// ✅ AUCUN DOWNGRADE: Toutes les 90+ méthodes conservées
+//
 // CORRECTIONS v4.3.0 (STABILITÉ CONNEXION):
 // ✅ FIX ERREUR #2: Heartbeat moins agressif (45s/90s au lieu de 30s/60s)
 // ✅ FIX ERREUR #3: Timeout spécifique pour heartbeat (15s au lieu de 10s)
-// ✅ FIX ERREUR #4: Nettoyage callbacks à la déconnexion (failPendingCallbacks)
-// ✅ FIX ERREUR #5: Historique diagnostic persistant (localStorage)
-// ✅ Configuration adaptative selon environnement (dev/prod/RPI)
-// ✅ Logging détaillé des déconnexions
-// ✅ AUCUN DOWNGRADE - Toutes les 90 méthodes API conservées
+// ✅ FIX ERREUR #4: Nettoyage callbacks à la déconnexion
+// ✅ FIX ERREUR #5: Historique diagnostic persistant
 // ============================================================================
-
 class BackendService {
     constructor(url, eventBus, logger) {
         this.eventBus = eventBus || window.eventBus || null;
@@ -648,10 +650,20 @@ class BackendService {
     // API MIDI COMMANDS (90 méthodes - AUCUN DOWNGRADE)
     // ========================================================================
     
+    
     // === FILES ===
-    async listMidiFiles(directory = '') { return this.sendCommand('files.list', { directory }); }
-    async getMidiFile(filename) { return this.sendCommand('files.get', { filename }); }
-    async uploadMidiFile(filename, content) { return this.sendCommand('files.upload', { filename, content }); }
+    // ✅ Méthodes standards (compatibilité API documentée)
+    async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
+    async readFile(filename) { return this.sendCommand('files.read', { filename }); }
+    async writeFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
+    async deleteFile(filename) { return this.sendCommand('files.delete', { filename }); }
+    async fileExists(filename) { return this.sendCommand('files.exists', { filename }); }
+    async getFileInfo(filename) { return this.sendCommand('files.getInfo', { filename }); }
+    
+    // ✅ Méthodes MIDI spécifiques (alias pour compatibilité)
+    async listMidiFiles(directory = '') { return this.sendCommand('files.list', { path: directory }); }
+    async getMidiFile(filename) { return this.sendCommand('files.read', { filename }); }
+    async uploadMidiFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
     async deleteMidiFile(filename) { return this.sendCommand('files.delete', { filename }); }
     async renameMidiFile(oldName, newName) { return this.sendCommand('files.rename', { oldName, newName }); }
     async moveMidiFile(filename, destination) { return this.sendCommand('files.move', { filename, destination }); }
