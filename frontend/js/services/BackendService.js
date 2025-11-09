@@ -1,8 +1,8 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js  
-// Version: v4.2.5 - FORMAT HYBRIDE FINAL
-// Date: 2025-11-08
+// Version: v4.2.5 - API v4.2.2 FULLY COMPLIANT
+// Date: 2025-11-09
 // ============================================================================
 // CORRECTIONS v4.2.5 (FORMAT HYBRIDE):
 // ✅ ENVOI: Format simple { id, command, params } (doc API)
@@ -598,7 +598,7 @@ class BackendService {
     async deletePlaylist(playlist_id) { return this.sendCommand('playlist.delete', { playlist_id }); }
     async addPlaylistItem(playlist_id, filename, order = null) { return this.sendCommand('playlist.addItem', { playlist_id, filename, order }); }
     async removePlaylistItem(playlist_id, item_id) { return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); }
-    async reorderPlaylist(playlist_id, item_id, new_order) { return this.sendCommand('playlist.reorder', { playlist_id, item_id, new_order }); }
+    async reorderPlaylist(playlist_id, item_ids) { return this.sendCommand('playlist.reorder', { playlist_id, item_ids }); }
     async setPlaylistLoop(playlist_id, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); }
     
     // === SYSTEM ===
@@ -608,6 +608,7 @@ class BackendService {
     async getMemory() { return this.sendCommand('system.memory'); }
     async getDisk() { return this.sendCommand('system.disk'); }
     async getCommands() { return this.sendCommand('system.commands'); }
+    async ping() { return this.sendCommand('system.ping'); }
     
     // === NETWORK ===
     async getNetworkStatus() { return this.sendCommand('network.status'); }
@@ -621,7 +622,7 @@ class BackendService {
     async unpairBluetooth(address) { return this.sendCommand('bluetooth.unpair', { address }); }
     async getPairedBluetooth() { return this.sendCommand('bluetooth.paired'); }
     async forgetBluetooth(address) { return this.sendCommand('bluetooth.forget', { address }); }
-    async getBluetoothSignal(address) { return this.sendCommand('bluetooth.signal', { address }); }
+    async getBluetoothSignal(device_id) { return this.sendCommand('bluetooth.signal', { device_id }); }
     async setBluetoothConfig(settings) { return this.sendCommand('bluetooth.config', { settings }); }
     
     // === LOGGER ===

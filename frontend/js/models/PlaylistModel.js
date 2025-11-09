@@ -72,7 +72,7 @@ class PlaylistModel extends BaseModel {
                 await this.refreshPlaylists();
                 
                 this.emit('playlist:created', {
-                    playlistId: data.playlist_id,
+                    playlist_id: data.playlist_id,
                     name
                 });
                 
@@ -89,24 +89,24 @@ class PlaylistModel extends BaseModel {
     /**
      * Supprime une playlist
      * ✅ API v4.2.2: playlist.delete
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      */
-    async deletePlaylist(playlistId) {
+    async deletePlaylist(playlist_id) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.deletePlaylist', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Deleting playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Deleting playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.delete', {
-                playlist_id: playlistId
+                playlist_id: playlist_id
             });
             const data = response.data || response;
             
             // Si c'était la playlist actuelle, la déselectionner
-            if (this.data.currentPlaylistId === playlistId) {
+            if (this.data.currentPlaylistId === playlist_id) {
                 this.data.currentPlaylist = null;
                 this.data.currentPlaylistId = null;
             }
@@ -114,7 +114,7 @@ class PlaylistModel extends BaseModel {
             // Recharger la liste
             await this.refreshPlaylists();
             
-            this.emit('playlist:deleted', { playlistId });
+            this.emit('playlist:deleted', { playlist_id });
             
             return true;
         } catch (error) {
@@ -126,20 +126,20 @@ class PlaylistModel extends BaseModel {
     /**
      * Met à jour une playlist
      * ✅ API v4.2.2: playlist.update
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      * @param {Object} config - Configuration à mettre à jour
      */
-    async updatePlaylist(playlistId, config) {
+    async updatePlaylist(playlist_id, config) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.updatePlaylist', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Updating playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Updating playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.update', {
-                playlist_id: playlistId,
+                playlist_id: playlist_id,
                 config
             });
             const data = response.data || response;
@@ -147,7 +147,7 @@ class PlaylistModel extends BaseModel {
             // Recharger la liste
             await this.refreshPlaylists();
             
-            this.emit('playlist:updated', { playlistId, config });
+            this.emit('playlist:updated', { playlist_id, config });
             
             return true;
         } catch (error) {
@@ -187,29 +187,29 @@ class PlaylistModel extends BaseModel {
     /**
      * Récupère une playlist spécifique
      * ✅ API v4.2.2: playlist.get
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      */
-    async getPlaylist(playlistId) {
+    async getPlaylist(playlist_id) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.getPlaylist', 'Backend not connected');
             return null;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Getting playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Getting playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.get', {
-                playlist_id: playlistId
+                playlist_id: playlist_id
             });
             const data = response.data || response;
             
             if (data) {
                 // Mettre à jour la playlist actuelle
                 this.set('currentPlaylist', data);
-                this.set('currentPlaylistId', playlistId);
+                this.set('currentPlaylistId', playlist_id);
                 
                 this.emit('playlist:loaded', { 
-                    playlistId, 
+                    playlist_id, 
                     playlist: data 
                 });
                 
@@ -226,30 +226,30 @@ class PlaylistModel extends BaseModel {
     /**
      * Ajoute un item à une playlist
      * ✅ API v4.2.2: playlist.addItem
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      * @param {Object} item - Item à ajouter
      */
-    async addItem(playlistId, item) {
+    async addItem(playlist_id, item) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.addItem', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Adding item to playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Adding item to playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.addItem', {
-                playlist_id: playlistId,
+                playlist_id: playlist_id,
                 item
             });
             const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
-            if (this.data.currentPlaylistId === playlistId) {
-                await this.getPlaylist(playlistId);
+            if (this.data.currentPlaylistId === playlist_id) {
+                await this.getPlaylist(playlist_id);
             }
             
-            this.emit('playlist:item-added', { playlistId, item });
+            this.emit('playlist:item-added', { playlist_id, item });
             
             return true;
         } catch (error) {
@@ -261,30 +261,30 @@ class PlaylistModel extends BaseModel {
     /**
      * Retire un item d'une playlist
      * ✅ API v4.2.2: playlist.removeItem
-     * @param {string} playlistId - ID de la playlist
-     * @param {string} itemId - ID de l'item
+     * @param {string} playlist_id - ID de la playlist
+     * @param {string} item_id - ID de l'item
      */
-    async removeItem(playlistId, itemId) {
+    async removeItem(playlist_id, item_id) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.removeItem', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Removing item from playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Removing item from playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.removeItem', {
-                playlist_id: playlistId,
-                item_id: itemId
+                playlist_id: playlist_id,
+                item_id: item_id
             });
             const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
-            if (this.data.currentPlaylistId === playlistId) {
-                await this.getPlaylist(playlistId);
+            if (this.data.currentPlaylistId === playlist_id) {
+                await this.getPlaylist(playlist_id);
             }
             
-            this.emit('playlist:item-removed', { playlistId, itemId });
+            this.emit('playlist:item-removed', { playlist_id, item_id });
             
             return true;
         } catch (error) {
@@ -296,30 +296,30 @@ class PlaylistModel extends BaseModel {
     /**
      * Réordonne les items d'une playlist
      * ✅ API v4.2.2: playlist.reorder
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      * @param {Array} order - Nouvel ordre des items
      */
-    async reorderItems(playlistId, order) {
+    async reorderItems(playlist_id, order) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.reorderItems', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Reordering playlist: ${playlistId}`);
+            this.log('info', 'PlaylistModel', `Reordering playlist: ${playlist_id}`);
             
             const response = await this.backend.sendCommand('playlist.reorder', {
-                playlist_id: playlistId,
+                playlist_id: playlist_id,
                 order
             });
             const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
-            if (this.data.currentPlaylistId === playlistId) {
-                await this.getPlaylist(playlistId);
+            if (this.data.currentPlaylistId === playlist_id) {
+                await this.getPlaylist(playlist_id);
             }
             
-            this.emit('playlist:reordered', { playlistId, order });
+            this.emit('playlist:reordered', { playlist_id, order });
             
             return true;
         } catch (error) {
@@ -331,30 +331,30 @@ class PlaylistModel extends BaseModel {
     /**
      * Active/désactive la boucle sur une playlist
      * ✅ API v4.2.2: playlist.setLoop
-     * @param {string} playlistId - ID de la playlist
+     * @param {string} playlist_id - ID de la playlist
      * @param {boolean} enabled - État de la boucle
      */
-    async setLoop(playlistId, enabled) {
+    async setLoop(playlist_id, enabled) {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'PlaylistModel.setLoop', 'Backend not connected');
             return false;
         }
         
         try {
-            this.log('info', 'PlaylistModel', `Setting loop for playlist: ${playlistId} = ${enabled}`);
+            this.log('info', 'PlaylistModel', `Setting loop for playlist: ${playlist_id} = ${enabled}`);
             
             const response = await this.backend.sendCommand('playlist.setLoop', {
-                playlist_id: playlistId,
+                playlist_id: playlist_id,
                 enabled
             });
             const data = response.data || response;
             
             // Recharger la playlist actuelle si c'est celle-ci
-            if (this.data.currentPlaylistId === playlistId) {
-                await this.getPlaylist(playlistId);
+            if (this.data.currentPlaylistId === playlist_id) {
+                await this.getPlaylist(playlist_id);
             }
             
-            this.emit('playlist:loop-changed', { playlistId, enabled });
+            this.emit('playlist:loop-changed', { playlist_id, enabled });
             
             return true;
         } catch (error) {
@@ -407,8 +407,8 @@ class PlaylistModel extends BaseModel {
     /**
      * Vérifie si une playlist existe
      */
-    hasPlaylist(playlistId) {
-        return this.findPlaylistById(playlistId) !== undefined;
+    hasPlaylist(playlist_id) {
+        return this.findPlaylistById(playlist_id) !== undefined;
     }
     
     /**

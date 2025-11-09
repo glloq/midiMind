@@ -297,7 +297,7 @@ class DebugController extends BaseController {
         
         try {
             const start = performance.now();
-            await this.backend.sendCommand('get_status');
+            await this.backend.sendCommand('playback.getStatus');
             const latency = performance.now() - start;
             return latency;
         } catch (error) {

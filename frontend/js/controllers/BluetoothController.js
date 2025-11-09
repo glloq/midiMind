@@ -63,7 +63,7 @@ class BluetoothController extends BaseController {
         this.subscribe('bluetooth:forget', (data) => this.forgetDevice(data.address));
         this.subscribe('bluetooth:config', (data) => this.configBluetooth(data));
         this.subscribe('bluetooth:refresh-paired', () => this.listPairedDevices());
-        this.subscribe('bluetooth:refresh-signal', (data) => this.getSignalStrength(data.deviceId));
+        this.subscribe('bluetooth:refresh-signal', (data) => this.getSignalStrength(data.device_id));
         
         // Événements backend
         this.subscribe('backend:connected', () => {
@@ -318,28 +318,26 @@ class BluetoothController extends BaseController {
     /**
      * Obtenir l'intensité du signal d'un périphérique
      */
-    async getSignalStrength(deviceId) {
+    async getSignalStrength(device_id) {
         return this.executeAction('getSignalStrength', async (data) => {
             try {
                 const response = await this.backendService.sendCommand('bluetooth.signal', {
-                    device_id: data.deviceId
+                    device_id: data.device_id
                 });
                 
                 if (response.success) {
                     const rssi = response.data.rssi || 0;
                     
                     // Mettre à jour le périphérique dans la liste
-                    const device = this.state.bluetooth.devices.find(d => d.id === data.deviceId);
+                    const device = this.state.bluetooth.devices.find(d => d.id === data.device_id);
                     if (device) {
                         device.rssi = rssi;
                     }
                     
-                    this.updateView({
-                        signalStrength: { deviceId: data.deviceId, rssi }
+                    this.updateView({signalStrength: { device_id: data.device_id, rssi }
                     });
                     
-                    this.emitEvent('bluetooth:signal:updated', {
-                        deviceId: data.deviceId,
+                    this.emitEvent('bluetooth:signal:updated', {device_id: data.device_id,
                         rssi
                     });
                 }
@@ -349,7 +347,7 @@ class BluetoothController extends BaseController {
                 this.logDebug('error', `Erreur lors de la récupération du signal: ${error.message}`);
                 throw error;
             }
-        }, { deviceId });
+        }, {device_id });
     }
     
     /**

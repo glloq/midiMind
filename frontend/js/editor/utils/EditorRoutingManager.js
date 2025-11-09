@@ -123,16 +123,16 @@ RoutingManager = class RoutingManager {
     // ASSIGNATION
     // ========================================================================
 
-    assign(channelNumber, instrumentId) {
+    assign(channelNumber, instrument_id) {
         const channel = this.midiChannels.find(c => c.number === channelNumber);
         if (!channel) {
             console.warn('[RoutingManager] Invalid channel:', channelNumber);
             return false;
         }
         
-        const instrument = this.instruments.find(i => i.id === instrumentId);
+        const instrument = this.instruments.find(i => i.id === instrument_id);
         if (!instrument) {
-            console.warn('[RoutingManager] Invalid instrument:', instrumentId);
+            console.warn('[RoutingManager] Invalid instrument:', instrument_id);
             return false;
         }
         
@@ -141,8 +141,7 @@ RoutingManager = class RoutingManager {
             console.warn('[RoutingManager] Low compatibility:', compatibility);
         }
         
-        this.routing.assignments.set(channelNumber, {
-            instrumentId: instrumentId,
+        this.routing.assignments.set(channelNumber, {instrument_id: instrument_id,
             instrument: instrument,
             channel: channel,
             compatibility: compatibility,
@@ -156,7 +155,7 @@ RoutingManager = class RoutingManager {
         
         this.eventBus.emit('routing:assigned', {
             channel: channelNumber,
-            instrument: instrumentId,
+            instrument: instrument_id,
             compatibility: compatibility.score
         });
         
@@ -365,9 +364,8 @@ RoutingManager = class RoutingManager {
             id: `preset_${Date.now()}`,
             name: name,
             assignments: Array.from(this.routing.assignments.entries()).map(
-                ([channel, assignment]) => ({
-                    channel: channel,
-                    instrumentId: assignment.instrumentId,
+                ([channel, assignment]) => ({channel: channel,
+                    instrument_id: assignment.instrument_id,
                     instrumentName: assignment.instrument.name
                 })
             ),
@@ -397,12 +395,12 @@ RoutingManager = class RoutingManager {
         
         this.clearAll();
         
-        preset.assignments.forEach(({ channel, instrumentId }) => {
-            const instrument = this.instruments.find(i => i.id === instrumentId);
+        preset.assignments.forEach(({ channel, instrument_id }) => {
+            const instrument = this.instruments.find(i => i.id === instrument_id);
             if (instrument) {
-                this.assign(channel, instrumentId);
+                this.assign(channel, instrument_id);
             } else {
-                console.warn('[RoutingManager] Instrument not found:', instrumentId);
+                console.warn('[RoutingManager] Instrument not found:', instrument_id);
             }
         });
         
@@ -454,14 +452,13 @@ RoutingManager = class RoutingManager {
         });
         
         const usedInstruments = new Map();
-        this.routing.assignments.forEach((assignment, channel) => {
-            const instId = assignment.instrumentId;
+        this.routing.assignments.forEach((assignment, channel) => {const instId = assignment.instrument_id;
             if (usedInstruments.has(instId)) {
                 this.conflicts.push({
                     type: 'duplicate',
                     channel: channel,
                     otherChannel: usedInstruments.get(instId),
-                    instrumentId: instId,
+                    instrument_id: instId,
                     message: `Instrument ${assignment.instrument.name} assigned multiple times`
                 });
             } else {
@@ -469,12 +466,11 @@ RoutingManager = class RoutingManager {
             }
         });
         
-        this.routing.assignments.forEach((assignment, channel) => {
-            if (assignment.compatibility.score < 0.3) {
+        this.routing.assignments.forEach((assignment, channel) => {if (assignment.compatibility.score < 0.3) {
                 this.conflicts.push({
                     type: 'low-compatibility',
                     channel: channel,
-                    instrumentId: assignment.instrumentId,
+                    instrument_id: assignment.instrument_id,
                     score: assignment.compatibility.score,
                     message: `Low compatibility (${Math.round(assignment.compatibility.score * 100)}%)`
                 });
@@ -512,14 +508,13 @@ RoutingManager = class RoutingManager {
     // EXPORT / IMPORT
     // ========================================================================
 
-    export() {
-        return {
+    export() {return {
             mode: this.routing.mode,
             currentPreset: this.routing.currentPreset,
             assignments: Array.from(this.routing.assignments.entries()).map(
                 ([channel, assignment]) => ({
                     channel: channel,
-                    instrumentId: assignment.instrumentId,
+                    instrument_id: assignment.instrument_id,
                     instrumentName: assignment.instrument.name,
                     compatibility: assignment.compatibility.score
                 })
@@ -534,10 +529,10 @@ RoutingManager = class RoutingManager {
         
         this.clearAll();
         
-        config.assignments.forEach(({ channel, instrumentId }) => {
-            const instrument = this.instruments.find(i => i.id === instrumentId);
+        config.assignments.forEach(({ channel, instrument_id }) => {
+            const instrument = this.instruments.find(i => i.id === instrument_id);
             if (instrument) {
-                this.assign(channel, instrumentId);
+                this.assign(channel, instrument_id);
             }
         });
         

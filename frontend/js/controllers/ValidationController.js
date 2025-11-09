@@ -209,8 +209,7 @@ class ValidationController extends BaseController {
         };
         
         // Validateurs de routage
-        this.validators.routing = {
-            sourceId: {
+        this.validators.routing = {source_id: {
                 validator: (id) => typeof id === 'number' && id >= 0,
                 message: 'L\'ID source doit être un nombre positif'
             },

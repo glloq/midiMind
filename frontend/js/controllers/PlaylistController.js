@@ -1,8 +1,8 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/PlaylistController.js
 // Chemin rÃ©el: frontend/js/controllers/PlaylistController.js
-// Version: v4.2.3 - FIXED BACKEND SIGNATURE - API CORRECTED
-// Date: 2025-11-02
+// Version: v4.2.3 - API v4.2.2 FULLY COMPLIANT
+// Date: 2025-11-09
 // ============================================================================
 // CORRECTIONS v4.2.3:
 // âœ“ CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
@@ -27,7 +27,6 @@ class PlaylistController extends BaseController {
         this.logger = window.logger || console;
         
         this.state = {
-            ...this.state,
             currentPlaylist: null,
             currentFile: null,
             currentIndex: 0,
@@ -257,12 +256,49 @@ class PlaylistController extends BaseController {
     /**
      * â€¢ CORRECTION: new_order (snake_case)
      */
+    
+    /**
+     * ✅ CORRECTION API v4.2.2: playlist.reorder utilise item_ids (array)
+     * Réorganise une playlist en déplaçant un item vers une nouvelle position
+     * @param {string} playlist_id - ID de la playlist
+     * @param {number} item_id - ID de l'item à déplacer
+     * @param {number} new_order - Nouvelle position (index)
+     */
     async reorderPlaylist(playlist_id, item_id, new_order) {
         try {
             this.logDebug('playlist', `Reordering playlist ${playlist_id}: item ${item_id} to position ${new_order}`);
             
-            await this.backend.reorderPlaylist(playlist_id, item_id, new_order);
+            // Récupérer la playlist actuelle pour construire l'array item_ids
+            const playlist = await this.backend.getPlaylist(playlist_id);
             
+            if (!playlist || !playlist.items) {
+                throw new Error('Playlist not found or has no items');
+            }
+            
+            // Construire l'array item_ids actuel
+            const currentOrder = playlist.items.map(item => item.id);
+            
+            // Trouver l'index actuel de l'item à déplacer
+            const currentIndex = currentOrder.findIndex(id => id === item_id);
+            
+            if (currentIndex === -1) {
+                throw new Error(`Item ${item_id} not found in playlist`);
+            }
+            
+            // Valider new_order
+            if (new_order < 0 || new_order >= currentOrder.length) {
+                throw new Error(`Invalid new_order ${new_order} (playlist has ${currentOrder.length} items)`);
+            }
+            
+            // Créer le nouvel ordre en déplaçant l'item
+            const newOrder = [...currentOrder];
+            newOrder.splice(currentIndex, 1); // Retirer l'item de sa position actuelle
+            newOrder.splice(new_order, 0, item_id); // L'insérer à la nouvelle position
+            
+            // Appeler l'API avec le nouvel ordre complet
+            await this.backend.reorderPlaylist(playlist_id, newOrder);
+            
+            // Recharger la playlist
             await this.loadPlaylist(playlist_id);
             
             this.eventBus.emit('playlist:reordered', { playlist_id, item_id, new_order });

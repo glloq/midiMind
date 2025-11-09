@@ -512,7 +512,7 @@ class PianoRollController extends BaseController {
                 noteRange: this.calculateNoteRange(trackData?.notes || []),
                 syncOffset: 0,
                 latencyCompensation: 0,
-                instrumentId: null,
+                instrument_id: null,
                 color: this.getChannelColor(channel),
                 opacity: 1.0,
                 renderPriority: trackData?.notes.length > 500 ? 'high' : 'normal'

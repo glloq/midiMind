@@ -292,7 +292,7 @@ class RoutingView extends BaseView {
 
     renderRouteItem(route) {
         const isEnabled = route.enabled !== false;
-        const routeId = route.route_id || `${route.source_id}_${route.destination_id}`;
+        const routeId = `${route.source_id}_${route.destination_id}`;
         
         return `
             <div class="route-item ${!isEnabled ? 'disabled' : ''}" 

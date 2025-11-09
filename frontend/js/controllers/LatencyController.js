@@ -64,11 +64,11 @@ class LatencyController extends BaseController {
         this.subscribe('latency:disable', () => this.disableCompensation());
         this.subscribe('latency:set-global-offset', (data) => this.setGlobalOffset(data.offset));
         this.subscribe('latency:set-compensation', (data) => {
-            this.setInstrumentCompensation(data.instrumentId, data.offset);
+            this.setInstrumentCompensation(data.instrument_id, data.offset);
         });
         this.subscribe('latency:refresh', () => this.loadLatencySettings());
         this.subscribe('latency:select-instrument', (data) => {
-            this.selectInstrument(data.instrumentId);
+            this.selectInstrument(data.instrument_id);
         });
         
         // Événements backend
@@ -179,27 +179,26 @@ class LatencyController extends BaseController {
     /**
      * Définit l'offset global
      */
-    async setGlobalOffset(offsetMs) {
+    async setGlobalOffset(offset_ms) {
         return this.executeAction('setGlobalOffset', async (data) => {
             try {
                 const response = await this.backendService.sendCommand('latency.setGlobalOffset', {
-                    offset_ms: data.offsetMs
+                    offset_ms: data.offset_ms
                 });
                 
-                if (response.success) {
-                    this.state.latency.globalOffset = data.offsetMs;
+                if (response.success) {this.state.latency.globalOffset = data.offset_ms;
                     
                     this.showNotification(
-                        `Offset global défini à ${data.offsetMs.toFixed(1)} ms`,
+                        `Offset global défini à ${data.offset_ms.toFixed(1)} ms`,
                         'success'
                     );
                     
                     this.updateView({
-                        globalOffset: data.offsetMs
+                        globalOffset: data.offset_ms
                     });
                     
                     this.emitEvent('latency:global-offset:updated', {
-                        offset: data.offsetMs
+                        offset: data.offset_ms
                     });
                 }
                 
@@ -208,32 +207,31 @@ class LatencyController extends BaseController {
                 this.handleError('Erreur lors de la définition de l\'offset global', error);
                 throw error;
             }
-        }, { offsetMs });
+        }, {offset_ms });
     }
     
     /**
      * Définit la compensation pour un instrument
      */
-    async setInstrumentCompensation(instrumentId, offsetMs) {
+    async setInstrumentCompensation(instrument_id, offset_ms) {
         return this.executeAction('setInstrumentCompensation', async (data) => {
             try {
                 const response = await this.backendService.sendCommand('latency.setCompensation', {
-                    instrument_id: data.instrumentId,
-                    offset_ms: data.offsetMs
+                    instrument_id: data.instrument_id,
+                    offset_ms: data.offset_ms
                 });
                 
-                if (response.success) {
-                    // Mettre à jour l'instrument dans la liste
+                if (response.success) {// Mettre à jour l'instrument dans la liste
                     const instrument = this.state.latency.instruments.find(
-                        i => i.instrument_id === data.instrumentId
+                        i => i.instrument_id === data.instrument_id
                     );
                     
                     if (instrument) {
-                        instrument.compensation_offset_us = data.offsetMs * 1000; // Convert ms to us
+                        instrument.compensation_offset_us = data.offset_ms * 1000; // Convert ms to us
                     }
                     
                     this.showNotification(
-                        `Compensation pour ${data.instrumentId} définie à ${data.offsetMs.toFixed(1)} ms`,
+                        `Compensation pour ${data.instrument_id} définie à ${data.offset_ms.toFixed(1)} ms`,
                         'success'
                     );
                     
@@ -241,39 +239,37 @@ class LatencyController extends BaseController {
                         instruments: this.state.latency.instruments
                     });
                     
-                    this.emitEvent('latency:instrument:updated', {
-                        instrumentId: data.instrumentId,
-                        offset: data.offsetMs
+                    this.emitEvent('latency:instrument:updated', {instrument_id: data.instrument_id,
+                        offset: data.offset_ms
                     });
                 }
                 
                 return response;
             } catch (error) {
                 this.handleError(
-                    `Erreur lors de la définition de la compensation pour ${instrumentId}`,
+                    `Erreur lors de la définition de la compensation pour ${instrument_id}`,
                     error
                 );
                 throw error;
             }
-        }, { instrumentId, offsetMs });
+        }, {instrument_id, offset_ms });
     }
     
     /**
      * Obtient la compensation d'un instrument
      */
-    async getInstrumentCompensation(instrumentId) {
+    async getInstrumentCompensation(instrument_id) {
         return this.executeAction('getInstrumentCompensation', async (data) => {
             try {
                 const response = await this.backendService.sendCommand('latency.getCompensation', {
-                    instrument_id: data.instrumentId
+                    instrument_id: data.instrument_id
                 });
                 
-                if (response.success) {
-                    const offsetMs = (response.data.compensation_offset_us || 0) / 1000;
+                if (response.success) {const offset_ms = (response.data.compensation_offset_us || 0) / 1000;
                     
                     this.emitEvent('latency:compensation:loaded', {
-                        instrumentId: data.instrumentId,
-                        offset: offsetMs
+                        instrument_id: data.instrument_id,
+                        offset: offset_ms
                     });
                     
                     return offsetMs;
@@ -284,17 +280,16 @@ class LatencyController extends BaseController {
                 this.logDebug('error', `Erreur lors de la récupération de la compensation: ${error.message}`);
                 return 0;
             }
-        }, { instrumentId });
+        }, {instrument_id });
     }
     
     /**
      * Sélectionne un instrument
      */
-    selectInstrument(instrumentId) {
-        this.state.latency.selectedInstrument = instrumentId;
+    selectInstrument(instrument_id) {this.state.latency.selectedInstrument = instrument_id;
         
         const instrument = this.state.latency.instruments.find(
-            i => i.instrument_id === instrumentId
+            i => i.instrument_id === instrument_id
         );
         
         if (instrument) {
