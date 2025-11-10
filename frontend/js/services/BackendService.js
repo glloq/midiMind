@@ -1,21 +1,17 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js  
-// Version: v4.3.1 - API STANDARDIZATION
+// Version: v4.4.0 - API v4.2.2 ENVELOPE FORMAT
 // Date: 2025-11-10
 // ============================================================================
-// CORRECTIONS v4.3.1 (STANDARDISATION API):
-// ✅ AJOUT: Méthodes files.* standards (listFiles, readFile, writeFile, etc.)
-// ✅ ALIAS: Méthodes MIDI conservées pour compatibilité (listMidiFiles, etc.)
-// ✅ COHÉRENCE: Noms de méthodes alignés avec API documentée
+// CORRECTIONS v4.4.0 (FORMAT API v4.2.2):
+// ✅ FORMAT ENVELOPE OBLIGATOIRE: {id, type, timestamp, version, payload}
+// ✅ UUID v4 au lieu d'incrémental numérique
+// ✅ Timestamp ISO 8601 avec millisecondes UTC
+// ✅ Payload.timeout ajouté dans les requêtes
 // ✅ AUCUN DOWNGRADE: Toutes les 90+ méthodes conservées
-//
-// CORRECTIONS v4.3.0 (STABILITÉ CONNEXION):
-// ✅ FIX ERREUR #2: Heartbeat moins agressif (45s/90s au lieu de 30s/60s)
-// ✅ FIX ERREUR #3: Timeout spécifique pour heartbeat (15s au lieu de 10s)
-// ✅ FIX ERREUR #4: Nettoyage callbacks à la déconnexion
-// ✅ FIX ERREUR #5: Historique diagnostic persistant
 // ============================================================================
+
 class BackendService {
     constructor(url, eventBus, logger) {
         this.eventBus = eventBus || window.eventBus || null;
@@ -31,7 +27,7 @@ class BackendService {
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const isRaspberryPi = window.location.hostname === '192.168.1.37';
         
-        // ✅ CONFIGURATION ADAPTATIVE (FIX ERREUR #2 + #3)
+        // ✅ CONFIGURATION ADAPTATIVE
         this.config = {
             url: url || 'ws://localhost:8080',
             
@@ -42,14 +38,14 @@ class BackendService {
             timeoutInterval: isDevelopment ? 3000 : 5000,
             maxReconnectAttempts: isDevelopment ? 10 : 5,
             
-            // ✅ FIX ERREUR #2: Heartbeat moins agressif
-            heartbeatInterval: isRaspberryPi ? 60000 : 45000,     // 45s au lieu de 30s (60s sur RPI)
-            heartbeatTimeout: isRaspberryPi ? 120000 : 90000,     // 90s au lieu de 60s (120s sur RPI)
+            // Heartbeat moins agressif
+            heartbeatInterval: isRaspberryPi ? 60000 : 45000,
+            heartbeatTimeout: isRaspberryPi ? 120000 : 90000,
             maxHeartbeatFailures: 3,
             
-            // ✅ FIX ERREUR #3: Timeout spécifique pour heartbeat
+            // Timeout spécifique pour heartbeat
             defaultCommandTimeout: 10000,
-            heartbeatCommandTimeout: isRaspberryPi ? 20000 : 15000  // 15s pour heartbeat (20s sur RPI)
+            heartbeatCommandTimeout: isRaspberryPi ? 20000 : 15000
         };
         
         this.reconnectAttempts = 0;
@@ -67,23 +63,42 @@ class BackendService {
         this.maxQueueSize = 100;
         
         this.messageCallbacks = new Map();
-        this.messageId = 0;
         
-        // ✅ FIX ERREUR #5: Historique diagnostic
+        // Historique diagnostic
         this.connectionHistory = this.loadConnectionHistory();
         
-        this.logger.info('BackendService', `Service initialized (v4.3.0 - STABILITY FIXES)`);
+        this.logger.info('BackendService', `Service initialized (v4.4.0 - API v4.2.2 ENVELOPE)`);
         this.logger.info('BackendService', `Environment: ${isDevelopment ? 'DEV' : isRaspberryPi ? 'RPI' : 'PROD'}`);
         this.logger.info('BackendService', `Config: heartbeat=${this.config.heartbeatInterval}ms, timeout=${this.config.heartbeatTimeout}ms`);
     }
     
     // ========================================================================
-    // CONNEXION WEBSOCKET
+    // UUID v4 GENERATOR (RFC 4122)
     // ========================================================================
     
-    generateMessageId() {
-        return ++this.messageId;
+    /**
+     * ✅ v4.4.0: Génère un UUID v4 conforme RFC 4122
+     * @returns {string} UUID v4
+     */
+    generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
+    
+    /**
+     * ✅ v4.4.0: Génère un timestamp ISO 8601 avec millisecondes UTC
+     * @returns {string} Timestamp ISO 8601
+     */
+    generateTimestamp() {
+        return new Date().toISOString();
+    }
+    
+    // ========================================================================
+    // CONNEXION WEBSOCKET
+    // ========================================================================
     
     async connect(url = null) {
         if (this.connected) {
@@ -149,12 +164,11 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.connectionStartTime = Date.now();
         
-        this.logger.info('BackendService', '✓ Connected successfully');
+        this.logger.info('BackendService', '✅ Connected successfully');
         this.eventBus.emit('backend:connected');
         
-        // ✅ FIX ERREUR #5: Logger la connexion
         this.saveConnectionEvent('connected', {
-            timestamp: new Date().toISOString(),
+            timestamp: this.generateTimestamp(),
             url: this.config.url
         });
         
@@ -162,14 +176,13 @@ class BackendService {
         this.flushMessageQueue();
     }
     
-    // ✅ FIX ERREUR #4 + #5: Nettoyage callbacks + historique détaillé
     handleClose(event) {
         const wasConnected = this.connected;
         const uptime = this.connectionStartTime ? Date.now() - this.connectionStartTime : 0;
         
-        // ✅ FIX ERREUR #5: DIAGNOSTIC COMPLET
+        // DIAGNOSTIC COMPLET
         const diagnostic = {
-            timestamp: new Date().toISOString(),
+            timestamp: this.generateTimestamp(),
             code: event.code,
             reason: event.reason || 'No reason provided',
             wasClean: event.wasClean,
@@ -204,16 +217,16 @@ class BackendService {
         this.stopHeartbeat();
         
         // Log détaillé
-        this.logger.error('BackendService', '❌ CONNEXION FERMÉE - DIAGNOSTIC COMPLET:', JSON.stringify(diagnostic, null, 2));
+        this.logger.error('BackendService', '❌ CONNEXION FERMÉE - DIAGNOSTIC:', JSON.stringify(diagnostic, null, 2));
         
         // Interpréter le code de fermeture
         const closeReason = this.getCloseReason(event.code);
         this.logger.warn('BackendService', `Code ${event.code}: ${closeReason}`);
         
-        // ✅ FIX ERREUR #5: Sauvegarder dans l'historique
+        // Sauvegarder dans l'historique
         this.saveConnectionEvent('closed', diagnostic);
         
-        // ✅ FIX ERREUR #4: NETTOYER TOUS LES CALLBACKS
+        // NETTOYER TOUS LES CALLBACKS
         this.failPendingCallbacks('Connection closed');
         
         // Émettre événement
@@ -242,9 +255,8 @@ class BackendService {
         this.logger.error('BackendService', 'Connection error:', error);
         this.eventBus.emit('backend:connection-error', error);
         
-        // ✅ FIX ERREUR #5: Logger l'erreur
         this.saveConnectionEvent('error', {
-            timestamp: new Date().toISOString(),
+            timestamp: this.generateTimestamp(),
             error: error.toString()
         });
     }
@@ -293,15 +305,14 @@ class BackendService {
             timestamp: Date.now()
         });
         
-        // ✅ FIX ERREUR #5: Logger le mode offline
         this.saveConnectionEvent('offline', {
-            timestamp: new Date().toISOString(),
+            timestamp: this.generateTimestamp(),
             reconnectAttempts: this.reconnectAttempts
         });
     }
     
     // ========================================================================
-    // HEARTBEAT (FIX ERREUR #2 + #3)
+    // HEARTBEAT
     // ========================================================================
     
     startHeartbeat() {
@@ -309,7 +320,6 @@ class BackendService {
             clearInterval(this.heartbeatTimer);
         }
         
-        // ✅ FIX ERREUR #2: Intervalle augmenté (45s au lieu de 30s)
         this.heartbeatTimer = setInterval(() => {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
@@ -325,11 +335,9 @@ class BackendService {
         }
     }
     
-    // ✅ FIX ERREUR #2 + #3: Heartbeat robuste avec timeout approprié
     async checkHeartbeat() {
         const timeSinceActivity = Date.now() - this.lastActivityTime;
         
-        // ✅ FIX ERREUR #2: Timeout augmenté (90s au lieu de 60s)
         if (timeSinceActivity > this.config.heartbeatTimeout) {
             this.heartbeatFailures++;
             
@@ -358,7 +366,6 @@ class BackendService {
             
             const startTime = Date.now();
             
-            // ✅ FIX ERREUR #3: Timeout spécifique pour heartbeat (15s au lieu de 10s)
             const result = await this.sendCommand('system.ping', {}, this.config.heartbeatCommandTimeout);
             
             const latency = Date.now() - startTime;
@@ -398,9 +405,8 @@ class BackendService {
     forceReconnect(reason = 'Force reconnect') {
         this.logger.warn('BackendService', `Force reconnect: ${reason}`);
         
-        // ✅ FIX ERREUR #5: Logger la reconnexion forcée
         this.saveConnectionEvent('force_reconnect', {
-            timestamp: new Date().toISOString(),
+            timestamp: this.generateTimestamp(),
             reason: reason,
             heartbeatFailures: this.heartbeatFailures
         });
@@ -419,7 +425,7 @@ class BackendService {
     }
     
     // ========================================================================
-    // GESTION DES MESSAGES
+    // GESTION DES MESSAGES (FORMAT ENVELOPE v4.2.2)
     // ========================================================================
     
     handleMessage(event) {
@@ -431,40 +437,42 @@ class BackendService {
             // DEBUG: Log complet du message
             this.logger.debug('BackendService', '[DEBUG] RAW MESSAGE:', JSON.stringify(message, null, 2));
             
+            // ✅ v4.4.0: VÉRIFIER FORMAT ENVELOPE OBLIGATOIRE
+            if (!message.id || !message.type || !message.timestamp || !message.version || !message.payload) {
+                this.logger.error('BackendService', '❌ INVALID MESSAGE FORMAT (missing envelope fields):', message);
+                return;
+            }
+            
             this.logger.debug('BackendService', '📩 Message received:', {
-                hasId: !!message.id,
-                type: message.type || 'unknown',
-                hasPayload: !!message.payload
+                id: message.id,
+                type: message.type,
+                timestamp: message.timestamp
             });
             
-            // Backend format: { type, id, payload, timestamp, version }
-            if (message.type && message.payload) {
-                if (message.type === 'response') {
+            // Router selon le type
+            switch (message.type) {
+                case 'response':
                     this.handleBackendResponse(message);
-                } else if (message.type === 'event') {
+                    break;
+                
+                case 'event':
                     this.handleBackendEvent(message);
-                } else if (message.type === 'error') {
+                    break;
+                
+                case 'error':
                     this.handleBackendError(message);
-                }
+                    break;
+                
+                default:
+                    this.logger.warn('BackendService', `Unknown message type: ${message.type}`);
             }
-            // Simple format: { id, success, data, error } (backup)
-            else if (message.id !== undefined && message.success !== undefined) {
-                this.handleSimpleResponse(message);
-            }
-            // Event format: { event: "name", data: {...} } (backup)
-            else if (message.event) {
-                this.handleSimpleEvent(message);
-            }
-            else {
-                this.logger.warn('BackendService', 'Unknown message format:', message);
-            }
+            
         } catch (error) {
             this.logger.error('BackendService', 'Error parsing message:', error, event.data);
         }
     }
     
     handleBackendResponse(message) {
-        // Backend response: payload.request_id correspond à l'id envoyé
         const requestId = message.payload.request_id;
         
         this.logger.debug('BackendService', '[DEBUG] BACKEND RESPONSE:', {
@@ -485,9 +493,10 @@ class BackendService {
         // Transformer en format simple pour le callback
         const simpleResponse = {
             id: requestId,
-            success: message.payload.success !== false && !message.payload.error,
+            success: message.payload.success === true,
             data: message.payload.data,
-            error: message.payload.error || message.payload.error_message
+            error: message.payload.error_message || message.payload.error,
+            latency: message.payload.latency
         };
         
         callback(simpleResponse);
@@ -510,39 +519,32 @@ class BackendService {
     
     handleBackendError(message) {
         const requestId = message.payload.request_id;
-        const errorMessage = message.payload.error_message || message.payload.error || 'Unknown error';
+        const errorMessage = message.payload.message || message.payload.error || 'Unknown error';
+        const errorCode = message.payload.code;
         
-        this.logger.error('BackendService', '✗ Backend error:', errorMessage);
+        this.logger.error('BackendService', '✗ Backend error:', errorCode, errorMessage);
         
         if (requestId && this.messageCallbacks.has(requestId)) {
             const callback = this.messageCallbacks.get(requestId);
             this.messageCallbacks.delete(requestId);
-            callback({ id: requestId, success: false, error: errorMessage });
+            callback({ 
+                id: requestId, 
+                success: false, 
+                error: errorMessage,
+                error_code: errorCode
+            });
         }
         
         this.eventBus.emit('backend:error', {
             message: errorMessage,
-            requestId: requestId
+            code: errorCode,
+            requestId: requestId,
+            retryable: message.payload.retryable
         });
     }
     
-    // BACKUP: Support format simple { id, success, data, error }
-    handleSimpleResponse(message) {
-        if (this.messageCallbacks.has(message.id)) {
-            const callback = this.messageCallbacks.get(message.id);
-            this.messageCallbacks.delete(message.id);
-            callback(message);
-        }
-    }
-    
-    // BACKUP: Support format événement simple
-    handleSimpleEvent(message) {
-        this.logger.debug('BackendService', '📡 Simple event: ' + message.event, message.data);
-        this.eventBus.emit(message.event, message.data);
-    }
-    
     // ========================================================================
-    // ENVOI DE MESSAGES
+    // ENVOI DE MESSAGES (FORMAT ENVELOPE v4.2.2)
     // ========================================================================
     
     send(data) {
@@ -567,8 +569,9 @@ class BackendService {
     }
     
     /**
-     * ✅ v4.3.0: ENVOI format simple { id, command, params }
-     * RÉCEPTION format { type, payload } avec payload.request_id
+     * ✅ v4.4.0: ENVOI FORMAT ENVELOPE COMPLET (API v4.2.2)
+     * Structure: {id, type, timestamp, version, payload: {id, command, params, timeout}}
+     * RÉCEPTION: {id, type, timestamp, version, payload: {request_id, success, data/error}}
      */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
@@ -578,7 +581,7 @@ class BackendService {
             }
             
             const timeoutMs = timeout || this.config.defaultCommandTimeout;
-            const id = this.generateMessageId();
+            const id = this.generateUUID();  // ✅ UUID v4
             
             const timeoutTimer = setTimeout(() => {
                 if (this.messageCallbacks.has(id)) {
@@ -600,14 +603,21 @@ class BackendService {
                 }
             });
             
-            // Envoyer message (format simple pour le backend)
+            // ✅ v4.4.0: ENVELOPE FORMAT COMPLET
             const message = {
                 id: id,
-                command: command,
-                params: params || {}
+                type: "request",
+                timestamp: this.generateTimestamp(),  // ✅ ISO 8601 avec millisecondes
+                version: "1.0",
+                payload: {
+                    id: id,
+                    command: command,
+                    params: params || {},
+                    timeout: timeoutMs
+                }
             };
             
-            this.logger.debug('BackendService', `[DEBUG] SENDING [${id}]:`, command, params);
+            this.logger.debug('BackendService', `[DEBUG] SENDING ENVELOPE [${id}]:`, command, params);
             
             try {
                 this.ws.send(JSON.stringify(message));
@@ -621,7 +631,7 @@ class BackendService {
         });
     }
     
-    // ✅ FIX ERREUR #4: Nettoyer tous les callbacks en attente
+    // Nettoyer tous les callbacks en attente
     failPendingCallbacks(reason = 'Connection lost') {
         if (this.messageCallbacks.size === 0) return;
         
@@ -647,20 +657,124 @@ class BackendService {
     }
     
     // ========================================================================
-    // API MIDI COMMANDS (90 méthodes - AUCUN DOWNGRADE)
+    // API MIDI COMMANDS (90+ méthodes - AUCUN DOWNGRADE)
     // ========================================================================
     
+    // === DEVICES ===
+    async listDevices() { return this.sendCommand('devices.list'); }
+    async scanDevices(full_scan = false) { return this.sendCommand('devices.scan', { full_scan }); }
+    async connectDevice(device_id) { return this.sendCommand('devices.connect', { device_id }); }
+    async disconnectDevice(device_id) { return this.sendCommand('devices.disconnect', { device_id }); }
+    async disconnectAllDevices() { return this.sendCommand('devices.disconnectAll'); }
+    async getDeviceInfo(device_id) { return this.sendCommand('devices.getInfo', { device_id }); }
+    async getConnectedDevices() { return this.sendCommand('devices.getConnected'); }
+    async startHotPlug(interval_ms = 2000) { return this.sendCommand('devices.startHotPlug', { interval_ms }); }
+    async stopHotPlug() { return this.sendCommand('devices.stopHotPlug'); }
+    async getHotPlugStatus() { return this.sendCommand('devices.getHotPlugStatus'); }
+    
+    // === BLUETOOTH ===
+    async bluetoothConfig(enabled, scan_timeout = 5) { return this.sendCommand('bluetooth.config', { enabled, scan_timeout }); }
+    async bluetoothStatus() { return this.sendCommand('bluetooth.status'); }
+    async bluetoothScan(duration = 5, filter = '') { return this.sendCommand('bluetooth.scan', { duration, filter }); }
+    async bluetoothPair(address, pin = '') { return this.sendCommand('bluetooth.pair', { address, pin }); }
+    async bluetoothUnpair(address) { return this.sendCommand('bluetooth.unpair', { address }); }
+    async bluetoothPaired() { return this.sendCommand('bluetooth.paired'); }
+    async bluetoothForget(address) { return this.sendCommand('bluetooth.forget', { address }); }
+    async bluetoothSignal(device_id) { return this.sendCommand('bluetooth.signal', { device_id }); }
+    
+    // === ROUTING ===
+    async addRoute(source_id, destination_id) { return this.sendCommand('routing.addRoute', { source_id, destination_id }); }
+    async removeRoute(source_id, destination_id) { return this.sendCommand('routing.removeRoute', { source_id, destination_id }); }
+    async clearRoutes() { return this.sendCommand('routing.clearRoutes'); }
+    async listRoutes() { return this.sendCommand('routing.listRoutes'); }
+    async enableRoute(source_id, destination_id) { return this.sendCommand('routing.enableRoute', { source_id, destination_id }); }
+    async disableRoute(source_id, destination_id) { return this.sendCommand('routing.disableRoute', { source_id, destination_id }); }
+    
+    // === PLAYBACK ===
+    async loadPlayback(filename) { return this.sendCommand('playback.load', { filename }); }
+    async play(filename = null) { return this.sendCommand('playback.play', filename ? { filename } : {}); }
+    async pause() { return this.sendCommand('playback.pause'); }
+    async stop() { return this.sendCommand('playback.stop'); }
+    async getPlaybackStatus() { return this.sendCommand('playback.getStatus'); }
+    async seek(position) { return this.sendCommand('playback.seek', { position }); }
+    async setTempo(tempo) { return this.sendCommand('playback.setTempo', { tempo }); }
+    async setLoop(enabled) { return this.sendCommand('playback.setLoop', { enabled }); }
+    async getPlaybackInfo() { return this.sendCommand('playback.getInfo'); }
+    async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
+    async resume() { return this.sendCommand('playback.resume'); }
     
     // === FILES ===
-    // ✅ Méthodes standards (compatibilité API documentée)
     async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
     async readFile(filename) { return this.sendCommand('files.read', { filename }); }
-    async writeFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
+    async writeFile(filename, content, base64 = true) { return this.sendCommand('files.write', { filename, content, base64 }); }
     async deleteFile(filename) { return this.sendCommand('files.delete', { filename }); }
     async fileExists(filename) { return this.sendCommand('files.exists', { filename }); }
     async getFileInfo(filename) { return this.sendCommand('files.getInfo', { filename }); }
     
-    // ✅ Méthodes MIDI spécifiques (alias pour compatibilité)
+    // === LATENCY ===
+    async setLatencyCompensation(instrument_id, offset_ms) { return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); }
+    async getLatencyCompensation(instrument_id) { return this.sendCommand('latency.getCompensation', { instrument_id }); }
+    async enableLatency() { return this.sendCommand('latency.enable'); }
+    async disableLatency() { return this.sendCommand('latency.disable'); }
+    async setGlobalLatencyOffset(offset_ms) { return this.sendCommand('latency.setGlobalOffset', { offset_ms }); }
+    async getGlobalLatencyOffset() { return this.sendCommand('latency.getGlobalOffset'); }
+    async listLatencyInstruments() { return this.sendCommand('latency.listInstruments'); }
+    
+    // === PRESETS ===
+    async listPresets() { return this.sendCommand('preset.list'); }
+    async loadPreset(id) { return this.sendCommand('preset.load', { id }); }
+    async savePreset(preset) { return this.sendCommand('preset.save', { preset }); }
+    async deletePreset(id) { return this.sendCommand('preset.delete', { id }); }
+    async exportPreset(id, filepath) { return this.sendCommand('preset.export', { id, filepath }); }
+    
+    // === MIDI ===
+    async convertMidi(filename) { return this.sendCommand('midi.convert', { filename }); }
+    async loadMidi(id) { return this.sendCommand('midi.load', { id }); }
+    async saveMidi(filename, midi_json) { return this.sendCommand('midi.save', { filename, midi_json }); }
+    async importMidi(filename, content, base64 = true) { return this.sendCommand('midi.import', { filename, content, base64 }); }
+    async addMidiRouting(midi_file_id, track_id, device_id, instrument_name = '', channel = 0, enabled = true) { 
+        return this.sendCommand('midi.routing.add', { midi_file_id, track_id, device_id, instrument_name, channel, enabled }); 
+    }
+    async listMidiRoutings(midi_file_id) { return this.sendCommand('midi.routing.list', { midi_file_id }); }
+    async updateMidiRouting(routing_id, enabled) { return this.sendCommand('midi.routing.update', { routing_id, enabled }); }
+    async removeMidiRouting(routing_id) { return this.sendCommand('midi.routing.remove', { routing_id }); }
+    async clearMidiRoutings(midi_file_id) { return this.sendCommand('midi.routing.clear', { midi_file_id }); }
+    async sendNoteOn(device_id, note, velocity, channel = 0) { return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); }
+    async sendNoteOff(device_id, note, channel = 0) { return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); }
+    
+    // === PLAYLISTS ===
+    async createPlaylist(name, description = '') { return this.sendCommand('playlist.create', { name, description }); }
+    async deletePlaylist(playlist_id) { return this.sendCommand('playlist.delete', { playlist_id }); }
+    async updatePlaylist(playlist_id, name, description = '') { return this.sendCommand('playlist.update', { playlist_id, name, description }); }
+    async listPlaylists() { return this.sendCommand('playlist.list'); }
+    async getPlaylist(playlist_id) { return this.sendCommand('playlist.get', { playlist_id }); }
+    async addPlaylistItem(playlist_id, midi_file_id) { return this.sendCommand('playlist.addItem', { playlist_id, midi_file_id }); }
+    async removePlaylistItem(playlist_id, item_id) { return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); }
+    async reorderPlaylist(playlist_id, item_ids) { return this.sendCommand('playlist.reorder', { playlist_id, item_ids }); }
+    async setPlaylistLoop(playlist_id, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); }
+    
+    // === SYSTEM ===
+    async systemPing() { return this.sendCommand('system.ping'); }
+    async getVersion() { return this.sendCommand('system.version'); }
+    async getSystemInfo() { return this.sendCommand('system.info'); }
+    async getUptime() { return this.sendCommand('system.uptime'); }
+    async getMemory() { return this.sendCommand('system.memory'); }
+    async getDisk() { return this.sendCommand('system.disk'); }
+    async getCommands() { return this.sendCommand('system.commands'); }
+    
+    // === NETWORK ===
+    async getNetworkStatus() { return this.sendCommand('network.status'); }
+    async getNetworkInterfaces() { return this.sendCommand('network.interfaces'); }
+    async getNetworkStats() { return this.sendCommand('network.stats'); }
+    
+    // === LOGGER ===
+    async setLogLevel(level) { return this.sendCommand('logger.setLevel', { level }); }
+    async getLogLevel() { return this.sendCommand('logger.getLevel'); }
+    async getLogs(count = 100) { return this.sendCommand('logger.getLogs', { count }); }
+    async clearLogs() { return this.sendCommand('logger.clear'); }
+    async exportLogs(filename) { return this.sendCommand('logger.export', { filename }); }
+    
+    // === MÉTHODES MIDI SPÉCIFIQUES (ALIAS pour compatibilité) ===
     async listMidiFiles(directory = '') { return this.sendCommand('files.list', { path: directory }); }
     async getMidiFile(filename) { return this.sendCommand('files.read', { filename }); }
     async uploadMidiFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
@@ -674,10 +788,8 @@ class BackendService {
     async searchFiles(query) { return this.sendCommand('files.search', { query }); }
     async getRecentFiles(limit = 10) { return this.sendCommand('files.getRecent', { limit }); }
     
-    // === MIDI MESSAGES ===
+    // === MIDI MESSAGES SUPPLÉMENTAIRES ===
     async sendMidiMessage(device_id, message) { return this.sendCommand('midi.send', { device_id, message }); }
-    async sendNoteOn(device_id, channel, note, velocity) { return this.sendCommand('midi.sendNoteOn', { device_id, channel, note, velocity }); }
-    async sendNoteOff(device_id, channel, note) { return this.sendCommand('midi.sendNoteOff', { device_id, channel, note }); }
     async sendCC(device_id, channel, controller, value) { return this.sendCommand('midi.sendCC', { device_id, channel, controller, value }); }
     async sendProgramChange(device_id, channel, program) { return this.sendCommand('midi.sendProgramChange', { device_id, channel, program }); }
     async sendPitchBend(device_id, channel, value) { return this.sendCommand('midi.sendPitchBend', { device_id, channel, value }); }
@@ -692,99 +804,8 @@ class BackendService {
     async updateMidiRoute(route_id, config) { return this.sendCommand('midi.routing.update', { route_id, config }); }
     async clearMidiRoutes() { return this.sendCommand('midi.routing.clear'); }
     
-    // === PLAYBACK ===
-    async play(filename = null) { return this.sendCommand('playback.play', filename ? { filename } : {}); }
-    async pause() { return this.sendCommand('playback.pause'); }
-    async stop() { return this.sendCommand('playback.stop'); }
-    async resume() { return this.sendCommand('playback.resume'); }
-    async seek(position) { return this.sendCommand('playback.seek', { position }); }
-    async setTempo(tempo) { return this.sendCommand('playback.setTempo', { tempo }); }
-    async getTempo() { return this.sendCommand('playback.getTempo'); }
-    async setLoop(enabled) { return this.sendCommand('playback.setLoop', { enabled }); }
-    async getStatus() { return this.sendCommand('playback.getStatus'); }
-    async getPlaybackInfo() { return this.sendCommand('playback.getInfo'); }
-    async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
-    
-    // === DEVICES ===
-    async listDevices() { return this.sendCommand('devices.list'); }
-    async scanDevices(full_scan = false) { return this.sendCommand('devices.scan', { full_scan }); }
-    async getConnectedDevices() { return this.sendCommand('devices.getConnected'); }
-    async connectDevice(device_id) { return this.sendCommand('devices.connect', { device_id }); }
-    async disconnectDevice(device_id) { return this.sendCommand('devices.disconnect', { device_id }); }
-    async disconnectAllDevices() { return this.sendCommand('devices.disconnectAll'); }
-    async getDevice(device_id) { return this.sendCommand('devices.getInfo', { device_id }); }
-    async getHotPlugStatus() { return this.sendCommand('devices.getHotPlugStatus'); }
-    async startHotPlug() { return this.sendCommand('devices.startHotPlug'); }
-    async stopHotPlug() { return this.sendCommand('devices.stopHotPlug'); }
-    
-    // === ROUTING ===
-    async listRoutes() { return this.sendCommand('routing.listRoutes'); }
-    async addRoute(source_id, destination_id) { return this.sendCommand('routing.addRoute', { source_id, destination_id }); }
-    async removeRoute(source_id, destination_id) { return this.sendCommand('routing.removeRoute', { source_id, destination_id }); }
-    async clearRoutes() { return this.sendCommand('routing.clearRoutes'); }
-    async enableRoute(source_id, destination_id) { return this.sendCommand('routing.enableRoute', { source_id, destination_id }); }
-    async disableRoute(source_id, destination_id) { return this.sendCommand('routing.disableRoute', { source_id, destination_id }); }
-    
-    // === LATENCY ===
-    async getLatencyCompensation(instrument_id) { return this.sendCommand('latency.getCompensation', { instrument_id }); }
-    async setLatencyCompensation(instrument_id, offset_ms) { return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); }
-    async enableLatency() { return this.sendCommand('latency.enable'); }
-    async disableLatency() { return this.sendCommand('latency.disable'); }
-    async getGlobalOffset() { return this.sendCommand('latency.getGlobalOffset'); }
-    async setGlobalOffset(offset_ms) { return this.sendCommand('latency.setGlobalOffset', { offset_ms }); }
-    async listInstruments() { return this.sendCommand('latency.listInstruments'); }
-    
-    // === PRESETS ===
-    async listPresets() { return this.sendCommand('preset.list'); }
-    async loadPreset(id) { return this.sendCommand('preset.load', { id }); }
-    async savePreset(preset) { return this.sendCommand('preset.save', { preset }); }
-    async deletePreset(id) { return this.sendCommand('preset.delete', { id }); }
-    async exportPreset(id, filepath) { return this.sendCommand('preset.export', { id, filepath }); }
-    
-    // === PLAYLISTS ===
-    async listPlaylists() { return this.sendCommand('playlist.list'); }
-    async createPlaylist(name, description = '') { return this.sendCommand('playlist.create', { name, description }); }
-    async getPlaylist(playlist_id) { return this.sendCommand('playlist.get', { playlist_id }); }
-    async updatePlaylist(playlist_id, data) { return this.sendCommand('playlist.update', { playlist_id, data }); }
-    async deletePlaylist(playlist_id) { return this.sendCommand('playlist.delete', { playlist_id }); }
-    async addPlaylistItem(playlist_id, filename, order = null) { return this.sendCommand('playlist.addItem', { playlist_id, filename, order }); }
-    async removePlaylistItem(playlist_id, item_id) { return this.sendCommand('playlist.removeItem', { playlist_id, item_id }); }
-    async reorderPlaylist(playlist_id, item_ids) { return this.sendCommand('playlist.reorder', { playlist_id, item_ids }); }
-    async setPlaylistLoop(playlist_id, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); }
-    
-    // === SYSTEM ===
-    async getVersion() { return this.sendCommand('system.version'); }
-    async getInfo() { return this.sendCommand('system.info'); }
-    async getUptime() { return this.sendCommand('system.uptime'); }
-    async getMemory() { return this.sendCommand('system.memory'); }
-    async getDisk() { return this.sendCommand('system.disk'); }
-    async getCommands() { return this.sendCommand('system.commands'); }
-    async ping() { return this.sendCommand('system.ping'); }
-    
-    // === NETWORK ===
-    async getNetworkStatus() { return this.sendCommand('network.status'); }
-    async getNetworkInterfaces() { return this.sendCommand('network.interfaces'); }
-    async getNetworkStats() { return this.sendCommand('network.stats'); }
-    
-    // === BLUETOOTH ===
-    async getBluetoothStatus() { return this.sendCommand('bluetooth.status'); }
-    async scanBluetooth() { return this.sendCommand('bluetooth.scan'); }
-    async pairBluetooth(address) { return this.sendCommand('bluetooth.pair', { address }); }
-    async unpairBluetooth(address) { return this.sendCommand('bluetooth.unpair', { address }); }
-    async getPairedBluetooth() { return this.sendCommand('bluetooth.paired'); }
-    async forgetBluetooth(address) { return this.sendCommand('bluetooth.forget', { address }); }
-    async getBluetoothSignal(device_id) { return this.sendCommand('bluetooth.signal', { device_id }); }
-    async setBluetoothConfig(settings) { return this.sendCommand('bluetooth.config', { settings }); }
-    
-    // === LOGGER ===
-    async getLogs(level = 'info', limit = 100) { return this.sendCommand('logger.getLogs', { level, limit }); }
-    async getLogLevel() { return this.sendCommand('logger.getLevel'); }
-    async setLogLevel(level) { return this.sendCommand('logger.setLevel', { level }); }
-    async clearLogs() { return this.sendCommand('logger.clear'); }
-    async exportLogs(filename) { return this.sendCommand('logger.export', { filename }); }
-    
     // ========================================================================
-    // ✅ FIX ERREUR #5: HISTORIQUE DE DIAGNOSTIC (localStorage)
+    // DIAGNOSTIC
     // ========================================================================
     
     loadConnectionHistory() {
@@ -801,7 +822,7 @@ class BackendService {
         try {
             const event = {
                 type: eventType,
-                timestamp: new Date().toISOString(),
+                timestamp: this.generateTimestamp(),
                 ...data
             };
             
@@ -867,7 +888,7 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        // ✅ FIX ERREUR #4: Nettoyer les callbacks
+        // Nettoyer les callbacks
         this.failPendingCallbacks('Manual disconnect');
         
         if (this.ws) {
@@ -881,9 +902,8 @@ class BackendService {
         
         this.logger.info('BackendService', 'Disconnected');
         
-        // ✅ FIX ERREUR #5: Logger la déconnexion
         this.saveConnectionEvent('manual_disconnect', {
-            timestamp: new Date().toISOString()
+            timestamp: this.generateTimestamp()
         });
     }
     
@@ -970,7 +990,7 @@ class BackendService {
             1001: 'Going away (browser closed)',
             1002: 'Protocol error',
             1003: 'Unsupported data',
-            1006: 'Abnormal closure (connection lost)', // ⚠️ PROBLÈME PRINCIPAL
+            1006: 'Abnormal closure (connection lost)',
             1007: 'Invalid frame payload data',
             1008: 'Policy violation',
             1009: 'Message too big',
