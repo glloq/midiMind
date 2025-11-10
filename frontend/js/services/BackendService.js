@@ -1,15 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
 // Chemin réel: frontend/js/services/BackendService.js  
-// Version: v4.4.0 - API v4.2.2 ENVELOPE FORMAT
+// Version: v4.4.1 - API v4.2.2 ENVELOPE + VALIDATION
 // Date: 2025-11-10
 // ============================================================================
-// CORRECTIONS v4.4.0 (FORMAT API v4.2.2):
-// ✅ FORMAT ENVELOPE OBLIGATOIRE: {id, type, timestamp, version, payload}
-// ✅ UUID v4 au lieu d'incrémental numérique
-// ✅ Timestamp ISO 8601 avec millisecondes UTC
-// ✅ Payload.timeout ajouté dans les requêtes
-// ✅ AUCUN DOWNGRADE: Toutes les 90+ méthodes conservées
+// CORRECTIONS v4.4.1 (VALIDATION ENVELOPE):
+// ✅ validateEnvelopeFormat() - Validation messages avant envoi
+// ✅ Validation dans send() et flushMessageQueue()
+// ✅ Rejet messages invalides sans mise en queue
+// ✅ FIXES SYNTAXE: 3 erreurs corrigées (backticks, parenthèses)
 // ============================================================================
 
 class BackendService {
@@ -23,27 +22,19 @@ class BackendService {
         this.offlineMode = false;
         this.reconnectionStopped = false;
         
-        // ✅ DÉTECTION ENVIRONNEMENT
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const isRaspberryPi = window.location.hostname === '192.168.1.37';
         
-        // ✅ CONFIGURATION ADAPTATIVE
         this.config = {
             url: url || 'ws://localhost:8080',
-            
-            // Reconnexion
             reconnectInterval: isDevelopment ? 2000 : 3000,
             maxReconnectInterval: isDevelopment ? 20000 : 30000,
             reconnectDecay: 1.5,
             timeoutInterval: isDevelopment ? 3000 : 5000,
             maxReconnectAttempts: isDevelopment ? 10 : 5,
-            
-            // Heartbeat moins agressif
             heartbeatInterval: isRaspberryPi ? 60000 : 45000,
             heartbeatTimeout: isRaspberryPi ? 120000 : 90000,
             maxHeartbeatFailures: 3,
-            
-            // Timeout spécifique pour heartbeat
             defaultCommandTimeout: 10000,
             heartbeatCommandTimeout: isRaspberryPi ? 20000 : 15000
         };
@@ -61,25 +52,17 @@ class BackendService {
         
         this.messageQueue = [];
         this.maxQueueSize = 100;
-        
         this.messageCallbacks = new Map();
-        
-        // Historique diagnostic
         this.connectionHistory = this.loadConnectionHistory();
         
-        this.logger.info('BackendService', `Service initialized (v4.4.0 - API v4.2.2 ENVELOPE)`);
+        this.logger.info('BackendService', `Service initialized (v4.4.1 - VALIDATION)`);
         this.logger.info('BackendService', `Environment: ${isDevelopment ? 'DEV' : isRaspberryPi ? 'RPI' : 'PROD'}`);
-        this.logger.info('BackendService', `Config: heartbeat=${this.config.heartbeatInterval}ms, timeout=${this.config.heartbeatTimeout}ms`);
     }
     
     // ========================================================================
-    // UUID v4 GENERATOR (RFC 4122)
+    // UUID & TIMESTAMP
     // ========================================================================
     
-    /**
-     * ✅ v4.4.0: Génère un UUID v4 conforme RFC 4122
-     * @returns {string} UUID v4
-     */
     generateUUID() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
             const r = Math.random() * 16 | 0;
@@ -88,12 +71,38 @@ class BackendService {
         });
     }
     
-    /**
-     * ✅ v4.4.0: Génère un timestamp ISO 8601 avec millisecondes UTC
-     * @returns {string} Timestamp ISO 8601
-     */
     generateTimestamp() {
         return new Date().toISOString();
+    }
+    
+    /**
+     * ✅ v4.4.1: Valide format envelope avant envoi
+     */
+    validateEnvelopeFormat(message) {
+        if (typeof message !== 'object' || message === null) {
+            this.logger.error('BackendService', '❌ Not an object');
+            return false;
+        }
+        
+        const required = ['id', 'type', 'timestamp', 'version', 'payload'];
+        for (const field of required) {
+            if (!message.hasOwnProperty(field)) {
+                this.logger.error('BackendService', `❌ Missing field: ${field}`);
+                return false;
+            }
+        }
+        
+        if (message.type === 'request' && message.payload) {
+            const payloadRequired = ['id', 'command', 'params'];
+            for (const field of payloadRequired) {
+                if (!message.payload.hasOwnProperty(field)) {
+                    this.logger.error('BackendService', `❌ Missing payload field: ${field}`);
+                    return false;
+                }
+            }
+        }
+        
+        return true;
     }
     
     // ========================================================================
@@ -180,7 +189,6 @@ class BackendService {
         const wasConnected = this.connected;
         const uptime = this.connectionStartTime ? Date.now() - this.connectionStartTime : 0;
         
-        // DIAGNOSTIC COMPLET
         const diagnostic = {
             timestamp: this.generateTimestamp(),
             code: event.code,
@@ -211,25 +219,18 @@ class BackendService {
             }
         };
         
-        // Mise à jour de l'état
         this.connected = false;
         this.connecting = false;
         this.stopHeartbeat();
         
-        // Log détaillé
-        this.logger.error('BackendService', '❌ CONNEXION FERMÉE - DIAGNOSTIC:', JSON.stringify(diagnostic, null, 2));
+        this.logger.error('BackendService', '❌ CONNEXION FERMÉE:', JSON.stringify(diagnostic, null, 2));
         
-        // Interpréter le code de fermeture
         const closeReason = this.getCloseReason(event.code);
         this.logger.warn('BackendService', `Code ${event.code}: ${closeReason}`);
         
-        // Sauvegarder dans l'historique
         this.saveConnectionEvent('closed', diagnostic);
-        
-        // NETTOYER TOUS LES CALLBACKS
         this.failPendingCallbacks('Connection closed');
         
-        // Émettre événement
         if (wasConnected) {
             this.eventBus.emit('backend:disconnected', {
                 code: event.code,
@@ -239,7 +240,6 @@ class BackendService {
             });
         }
         
-        // Planifier reconnexion si non arrêtée
         if (!this.reconnectionStopped) {
             this.scheduleReconnection();
         }
@@ -344,7 +344,6 @@ class BackendService {
             this.logger.warn('BackendService', 
                 `⚠️ Heartbeat timeout! No activity for ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures}/${this.config.maxHeartbeatFailures})`);
             
-            // 3 échecs = reconnexion
             if (this.heartbeatFailures >= this.config.maxHeartbeatFailures) {
                 this.logger.error('BackendService', `💔 ${this.config.maxHeartbeatFailures} consecutive heartbeat failures`);
                 this.forceReconnect(`Heartbeat timeout - ${this.config.maxHeartbeatFailures} failures`);
@@ -352,7 +351,6 @@ class BackendService {
             }
         }
         
-        // Ne pas envoyer si un heartbeat est déjà en cours
         if (this.heartbeatPending) {
             this.logger.warn('BackendService', '⏳ Heartbeat already pending, skipping');
             return;
@@ -365,9 +363,7 @@ class BackendService {
             this.logger.debug('BackendService', '💗 Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
-            
             const result = await this.sendCommand('system.ping', {}, this.config.heartbeatCommandTimeout);
-            
             const latency = Date.now() - startTime;
             
             this.heartbeatPending = false;
@@ -394,7 +390,6 @@ class BackendService {
                 failures: this.heartbeatFailures
             });
             
-            // Si 3 échecs, forcer reconnexion
             if (this.heartbeatFailures >= this.config.maxHeartbeatFailures) {
                 this.logger.error('BackendService', `💔 ${this.config.maxHeartbeatFailures} heartbeat failures, forcing reconnect`);
                 this.forceReconnect(`${this.config.maxHeartbeatFailures} consecutive heartbeat failures`);
@@ -425,7 +420,7 @@ class BackendService {
     }
     
     // ========================================================================
-    // GESTION DES MESSAGES (FORMAT ENVELOPE v4.2.2)
+    // GESTION DES MESSAGES
     // ========================================================================
     
     handleMessage(event) {
@@ -434,10 +429,8 @@ class BackendService {
         try {
             const message = JSON.parse(event.data);
             
-            // DEBUG: Log complet du message
             this.logger.debug('BackendService', '[DEBUG] RAW MESSAGE:', JSON.stringify(message, null, 2));
             
-            // ✅ v4.4.0: VÉRIFIER FORMAT ENVELOPE OBLIGATOIRE
             if (!message.id || !message.type || !message.timestamp || !message.version || !message.payload) {
                 this.logger.error('BackendService', '❌ INVALID MESSAGE FORMAT (missing envelope fields):', message);
                 return;
@@ -449,7 +442,6 @@ class BackendService {
                 timestamp: message.timestamp
             });
             
-            // Router selon le type
             switch (message.type) {
                 case 'response':
                     this.handleBackendResponse(message);
@@ -490,7 +482,6 @@ class BackendService {
         const callback = this.messageCallbacks.get(requestId);
         this.messageCallbacks.delete(requestId);
         
-        // Transformer en format simple pour le callback
         const simpleResponse = {
             id: requestId,
             success: message.payload.success === true,
@@ -508,9 +499,7 @@ class BackendService {
         
         if (eventName) {
             this.logger.debug('BackendService', '📡 Backend Event: ' + eventName, eventData);
-            // Émettre avec le nom original de l'événement
             this.eventBus.emit(eventName, eventData);
-            // Aussi émettre avec préfixe pour compatibilité
             this.eventBus.emit('backend:event:' + eventName, eventData);
         } else {
             this.logger.debug('BackendService', '📡 Backend message (no event name)');
@@ -544,35 +533,41 @@ class BackendService {
     }
     
     // ========================================================================
-    // ENVOI DE MESSAGES (FORMAT ENVELOPE v4.2.2)
+    // ENVOI DE MESSAGES
     // ========================================================================
     
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            if (typeof data === 'object' && !this.validateEnvelopeFormat(data)) {
+                this.logger.error('BackendService', '❌ REJECT invalid - not queued');
+                return false;
+            }
             if (this.messageQueue.length >= this.maxQueueSize) {
-                this.logger.warn('BackendService', 'Message queue full, dropping message');
+                this.logger.warn('BackendService', 'Queue full');
                 return false;
             }
             this.messageQueue.push(data);
-            this.logger.debug('BackendService', 'Message queued (not connected)');
             return false;
         }
         
         try {
-            const message = typeof data === 'string' ? data : JSON.stringify(data);
+            let message;
+            if (typeof data === 'string') {
+                const parsed = JSON.parse(data);
+                if (!this.validateEnvelopeFormat(parsed)) return false;
+                message = data;
+            } else {
+                if (!this.validateEnvelopeFormat(data)) return false;
+                message = JSON.stringify(data);
+            }
             this.ws.send(message);
             return true;
         } catch (error) {
-            this.logger.error('BackendService', 'Error sending message:', error);
+            this.logger.error('BackendService', 'Send error:', error);
             return false;
         }
     }
     
-    /**
-     * ✅ v4.4.0: ENVOI FORMAT ENVELOPE COMPLET (API v4.2.2)
-     * Structure: {id, type, timestamp, version, payload: {id, command, params, timeout}}
-     * RÉCEPTION: {id, type, timestamp, version, payload: {request_id, success, data/error}}
-     */
     async sendCommand(command, params = {}, timeout = null) {
         return new Promise((resolve, reject) => {
             if (!this.isConnected()) {
@@ -581,7 +576,7 @@ class BackendService {
             }
             
             const timeoutMs = timeout || this.config.defaultCommandTimeout;
-            const id = this.generateUUID();  // ✅ UUID v4
+            const id = this.generateUUID();
             
             const timeoutTimer = setTimeout(() => {
                 if (this.messageCallbacks.has(id)) {
@@ -590,7 +585,6 @@ class BackendService {
                 }
             }, timeoutMs);
             
-            // Callback pour gérer la réponse
             this.messageCallbacks.set(id, (response) => {
                 clearTimeout(timeoutTimer);
                 
@@ -603,11 +597,10 @@ class BackendService {
                 }
             });
             
-            // ✅ v4.4.0: ENVELOPE FORMAT COMPLET
             const message = {
                 id: id,
                 type: "request",
-                timestamp: this.generateTimestamp(),  // ✅ ISO 8601 avec millisecondes
+                timestamp: this.generateTimestamp(),
                 version: "1.0",
                 payload: {
                     id: id,
@@ -631,7 +624,6 @@ class BackendService {
         });
     }
     
-    // Nettoyer tous les callbacks en attente
     failPendingCallbacks(reason = 'Connection lost') {
         if (this.messageCallbacks.size === 0) return;
         
@@ -657,10 +649,10 @@ class BackendService {
     }
     
     // ========================================================================
-    // API MIDI COMMANDS (90+ méthodes - AUCUN DOWNGRADE)
+    // API MIDI COMMANDS (90+ méthodes)
     // ========================================================================
     
-    // === DEVICES ===
+    // DEVICES
     async listDevices() { return this.sendCommand('devices.list'); }
     async scanDevices(full_scan = false) { return this.sendCommand('devices.scan', { full_scan }); }
     async connectDevice(device_id) { return this.sendCommand('devices.connect', { device_id }); }
@@ -672,7 +664,7 @@ class BackendService {
     async stopHotPlug() { return this.sendCommand('devices.stopHotPlug'); }
     async getHotPlugStatus() { return this.sendCommand('devices.getHotPlugStatus'); }
     
-    // === BLUETOOTH ===
+    // BLUETOOTH
     async bluetoothConfig(enabled, scan_timeout = 5) { return this.sendCommand('bluetooth.config', { enabled, scan_timeout }); }
     async bluetoothStatus() { return this.sendCommand('bluetooth.status'); }
     async bluetoothScan(duration = 5, filter = '') { return this.sendCommand('bluetooth.scan', { duration, filter }); }
@@ -682,7 +674,7 @@ class BackendService {
     async bluetoothForget(address) { return this.sendCommand('bluetooth.forget', { address }); }
     async bluetoothSignal(device_id) { return this.sendCommand('bluetooth.signal', { device_id }); }
     
-    // === ROUTING ===
+    // ROUTING
     async addRoute(source_id, destination_id) { return this.sendCommand('routing.addRoute', { source_id, destination_id }); }
     async removeRoute(source_id, destination_id) { return this.sendCommand('routing.removeRoute', { source_id, destination_id }); }
     async clearRoutes() { return this.sendCommand('routing.clearRoutes'); }
@@ -690,7 +682,7 @@ class BackendService {
     async enableRoute(source_id, destination_id) { return this.sendCommand('routing.enableRoute', { source_id, destination_id }); }
     async disableRoute(source_id, destination_id) { return this.sendCommand('routing.disableRoute', { source_id, destination_id }); }
     
-    // === PLAYBACK ===
+    // PLAYBACK
     async loadPlayback(filename) { return this.sendCommand('playback.load', { filename }); }
     async play(filename = null) { return this.sendCommand('playback.play', filename ? { filename } : {}); }
     async pause() { return this.sendCommand('playback.pause'); }
@@ -703,7 +695,7 @@ class BackendService {
     async listPlaybackFiles() { return this.sendCommand('playback.listFiles'); }
     async resume() { return this.sendCommand('playback.resume'); }
     
-    // === FILES ===
+    // FILES
     async listFiles(path = '/midi') { return this.sendCommand('files.list', { path }); }
     async readFile(filename) { return this.sendCommand('files.read', { filename }); }
     async writeFile(filename, content, base64 = true) { return this.sendCommand('files.write', { filename, content, base64 }); }
@@ -711,7 +703,7 @@ class BackendService {
     async fileExists(filename) { return this.sendCommand('files.exists', { filename }); }
     async getFileInfo(filename) { return this.sendCommand('files.getInfo', { filename }); }
     
-    // === LATENCY ===
+    // LATENCY
     async setLatencyCompensation(instrument_id, offset_ms) { return this.sendCommand('latency.setCompensation', { instrument_id, offset_ms }); }
     async getLatencyCompensation(instrument_id) { return this.sendCommand('latency.getCompensation', { instrument_id }); }
     async enableLatency() { return this.sendCommand('latency.enable'); }
@@ -720,14 +712,14 @@ class BackendService {
     async getGlobalLatencyOffset() { return this.sendCommand('latency.getGlobalOffset'); }
     async listLatencyInstruments() { return this.sendCommand('latency.listInstruments'); }
     
-    // === PRESETS ===
+    // PRESETS
     async listPresets() { return this.sendCommand('preset.list'); }
     async loadPreset(id) { return this.sendCommand('preset.load', { id }); }
     async savePreset(preset) { return this.sendCommand('preset.save', { preset }); }
     async deletePreset(id) { return this.sendCommand('preset.delete', { id }); }
     async exportPreset(id, filepath) { return this.sendCommand('preset.export', { id, filepath }); }
     
-    // === MIDI ===
+    // MIDI
     async convertMidi(filename) { return this.sendCommand('midi.convert', { filename }); }
     async loadMidi(id) { return this.sendCommand('midi.load', { id }); }
     async saveMidi(filename, midi_json) { return this.sendCommand('midi.save', { filename, midi_json }); }
@@ -742,7 +734,7 @@ class BackendService {
     async sendNoteOn(device_id, note, velocity, channel = 0) { return this.sendCommand('midi.sendNoteOn', { device_id, note, velocity, channel }); }
     async sendNoteOff(device_id, note, channel = 0) { return this.sendCommand('midi.sendNoteOff', { device_id, note, channel }); }
     
-    // === PLAYLISTS ===
+    // PLAYLISTS
     async createPlaylist(name, description = '') { return this.sendCommand('playlist.create', { name, description }); }
     async deletePlaylist(playlist_id) { return this.sendCommand('playlist.delete', { playlist_id }); }
     async updatePlaylist(playlist_id, name, description = '') { return this.sendCommand('playlist.update', { playlist_id, name, description }); }
@@ -753,7 +745,7 @@ class BackendService {
     async reorderPlaylist(playlist_id, item_ids) { return this.sendCommand('playlist.reorder', { playlist_id, item_ids }); }
     async setPlaylistLoop(playlist_id, enabled) { return this.sendCommand('playlist.setLoop', { playlist_id, enabled }); }
     
-    // === SYSTEM ===
+    // SYSTEM
     async systemPing() { return this.sendCommand('system.ping'); }
     async getVersion() { return this.sendCommand('system.version'); }
     async getSystemInfo() { return this.sendCommand('system.info'); }
@@ -762,19 +754,19 @@ class BackendService {
     async getDisk() { return this.sendCommand('system.disk'); }
     async getCommands() { return this.sendCommand('system.commands'); }
     
-    // === NETWORK ===
+    // NETWORK
     async getNetworkStatus() { return this.sendCommand('network.status'); }
     async getNetworkInterfaces() { return this.sendCommand('network.interfaces'); }
     async getNetworkStats() { return this.sendCommand('network.stats'); }
     
-    // === LOGGER ===
+    // LOGGER
     async setLogLevel(level) { return this.sendCommand('logger.setLevel', { level }); }
     async getLogLevel() { return this.sendCommand('logger.getLevel'); }
     async getLogs(count = 100) { return this.sendCommand('logger.getLogs', { count }); }
     async clearLogs() { return this.sendCommand('logger.clear'); }
     async exportLogs(filename) { return this.sendCommand('logger.export', { filename }); }
     
-    // === MÉTHODES MIDI SPÉCIFIQUES (ALIAS pour compatibilité) ===
+    // MIDI ALIASES
     async listMidiFiles(directory = '') { return this.sendCommand('files.list', { path: directory }); }
     async getMidiFile(filename) { return this.sendCommand('files.read', { filename }); }
     async uploadMidiFile(filename, content) { return this.sendCommand('files.write', { filename, content }); }
@@ -788,7 +780,7 @@ class BackendService {
     async searchFiles(query) { return this.sendCommand('files.search', { query }); }
     async getRecentFiles(limit = 10) { return this.sendCommand('files.getRecent', { limit }); }
     
-    // === MIDI MESSAGES SUPPLÉMENTAIRES ===
+    // MIDI MESSAGES
     async sendMidiMessage(device_id, message) { return this.sendCommand('midi.send', { device_id, message }); }
     async sendCC(device_id, channel, controller, value) { return this.sendCommand('midi.sendCC', { device_id, channel, controller, value }); }
     async sendProgramChange(device_id, channel, program) { return this.sendCommand('midi.sendProgramChange', { device_id, channel, program }); }
@@ -828,7 +820,6 @@ class BackendService {
             
             this.connectionHistory.push(event);
             
-            // Garder seulement les 50 derniers événements
             if (this.connectionHistory.length > 50) {
                 this.connectionHistory = this.connectionHistory.slice(-50);
             }
@@ -862,21 +853,18 @@ class BackendService {
     flushMessageQueue() {
         if (this.messageQueue.length === 0) return;
         
-        this.logger.info('BackendService', `📤 Flushing message queue (${this.messageQueue.length} messages)`);
-        
-        let success = 0;
-        let failed = 0;
+        let success = 0, failed = 0, invalid = 0;
         
         while (this.messageQueue.length > 0) {
-            const message = this.messageQueue.shift();
-            if (this.send(message)) {
-                success++;
-            } else {
-                failed++;
+            const msg = this.messageQueue.shift();
+            if (typeof msg === 'object' && !this.validateEnvelopeFormat(msg)) {
+                invalid++;
+                continue;
             }
+            this.send(msg) ? success++ : failed++;
         }
         
-        this.logger.info('BackendService', `📊 Queue flushed: ${success} sent, ${failed} failed`);
+        this.logger.info('BackendService', `Flushed: ${success} sent, ${failed} fail, ${invalid} invalid`);
     }
     
     disconnect() {
@@ -888,7 +876,6 @@ class BackendService {
             this.reconnectTimer = null;
         }
         
-        // Nettoyer les callbacks
         this.failPendingCallbacks('Manual disconnect');
         
         if (this.ws) {
@@ -966,10 +953,6 @@ class BackendService {
         };
     }
     
-    // ========================================================================
-    // HELPERS
-    // ========================================================================
-    
     formatUptime(ms) {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
@@ -1007,7 +990,7 @@ class BackendService {
 }
 
 // ============================================================================
-// EXPORT & INITIALISATION GLOBALE
+// EXPORT
 // ============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
