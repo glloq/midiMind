@@ -1,9 +1,15 @@
 // ============================================================================
 // File: backend/src/api/CommandHandler.cpp
-// Version: 4.2.2
+// Version: 4.2.3
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 
+
+// Changes v4.2.3:
+//   - FIXED: Removed double wrapping - commands return raw data
+//   - ApiServer now handles response envelope creation
+//   - Removed createSuccessResponse, createErrorResponse, validateCommand
+//
 #include "CommandHandler.h"
 #include "../core/Logger.h"
 #include "../timing/LatencyCompensator.h"
@@ -66,64 +72,35 @@ CommandHandler::~CommandHandler() {
 // ============================================================================
 
 json CommandHandler::processCommand(const json& command) {
-    try {
-        std::string error;
-        if (!validateCommand(command, error)) {
-            return createErrorResponse(error, "INVALID_COMMAND");
-        }
-        
-        // CORRECTION CRITIQUE 1: Validation sÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©curisÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©e avant accÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¨s
-        if (!command.contains("command") || !command["command"].is_string()) {
-            return createErrorResponse("Missing or invalid 'command' field", "INVALID_COMMAND");
-        }
-        
-        std::string commandName = command["command"];
-        json params = command.value("params", json::object());
-        
-        // Find and copy command function under lock
-        CommandFunction func;
-        {
-            std::lock_guard<std::mutex> lock(commandsMutex_);
-            
-            auto it = commands_.find(commandName);
-            if (it == commands_.end()) {
-                return createErrorResponse(
-                    "Unknown command: " + commandName,
-                    "UNKNOWN_COMMAND");
-            }
-            
-            func = it->second;  // Copy function
-        }
-        // Lock released here - execute command without holding lock
-        
-        try {
-            json data = func(params);
-            return createSuccessResponse(data);
-            
-        } catch (const std::exception& e) {
-            return createErrorResponse(
-                std::string(e.what()),
-                "COMMAND_FAILED");
-        }
-        
-    } catch (const std::exception& e) {
-        return createErrorResponse(
-            "Failed to process command: " + std::string(e.what()),
-            "INTERNAL_ERROR");
+    // Validate command structure
+    if (!command.is_object()) {
+        throw std::runtime_error("Command must be a JSON object");
     }
+    
+    if (!command.contains("command") || !command["command"].is_string()) {
+        throw std::runtime_error("Missing or invalid 'command' field");
+    }
+    
+    std::string commandName = command["command"];
+    json params = command.value("params", json::object());
+    
+    // Find and copy command function under lock
+    CommandFunction func;
+    {
+        std::lock_guard<std::mutex> lock(commandsMutex_);
+        
+        auto it = commands_.find(commandName);
+        if (it == commands_.end()) {
+            throw std::runtime_error("Unknown command: " + commandName);
+        }
+        
+        func = it->second;
+    }
+    
+    // Execute command - returns raw data (ApiServer wraps in response envelope)
+    return func(params);
 }
 
-json CommandHandler::processCommand(const std::string& jsonString) {
-    try {
-        json command = json::parse(jsonString);
-        return processCommand(command);
-        
-    } catch (const json::parse_error& e) {
-        return createErrorResponse(
-            "Invalid JSON: " + std::string(e.what()),
-            "PARSE_ERROR");
-    }
-}
 
 // ============================================================================
 // COMMAND REGISTRATION
@@ -1386,43 +1363,6 @@ void CommandHandler::registerPresetCommands() {
 // HELPERS
 // ============================================================================
 
-json CommandHandler::createSuccessResponse(const json& data) const {
-    return json{
-        {"success", true},
-        {"data", data},
-        {"timestamp", std::chrono::system_clock::now().time_since_epoch().count()}
-    };
-}
-
-json CommandHandler::createErrorResponse(const std::string& error, 
-                                        const std::string& errorCode) const {
-    return json{
-        {"success", false},
-        {"error", error},
-        {"error_code", errorCode},
-        {"timestamp", std::chrono::system_clock::now().time_since_epoch().count()}
-    };
-}
-
-bool CommandHandler::validateCommand(const json& command, 
-                                     std::string& error) const {
-    if (!command.is_object()) {
-        error = "Command must be a JSON object";
-        return false;
-    }
-    
-    if (!command.contains("command")) {
-        error = "Missing 'command' field";
-        return false;
-    }
-    
-    if (!command["command"].is_string()) {
-        error = "'command' must be a string";
-        return false;
-    }
-    
-    return true;
-}
 
 
 // ============================================================================

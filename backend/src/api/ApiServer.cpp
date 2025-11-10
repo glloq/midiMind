@@ -1,8 +1,11 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.2.2
+// Version: 4.2.3
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.3:
+//   - FIXED: Use getId() instead of getRequest().id for consistency
 //
 // Changes v4.2.2:
 //   - FIXED: Command dispatching now passes complete JSON with command+params
@@ -45,7 +48,7 @@ ApiServer::ApiServer(std::shared_ptr<EventBus> eventBus)
     server_.set_reuse_addr(true);
     
     // ========================================================================
-    // KEEPALIVE CONFIGURATION - Correction Erreur #1
+    // KEEPALIVE CONFIGURATION
     // ========================================================================
     
     // Pong timeout: 60 secondes sans pong = connexion morte
@@ -252,72 +255,52 @@ void ApiServer::setupEventSubscriptions() {
         )
     );
     
-    Logger::info("ApiServer", "✓ Event subscriptions configured (" + 
-                std::to_string(eventSubscriptions_.size()) + " events)");
+    Logger::info("ApiServer", "✓ Event subscriptions configured");
 }
 
 // ============================================================================
-// SERVER MANAGEMENT
+// SERVER LIFECYCLE
 // ============================================================================
 
-void ApiServer::start(int port) {
-    if (running_) {
+bool ApiServer::start(uint16_t port) {
+    if (running_.load()) {
         Logger::warning("ApiServer", "Server already running");
-        return;
+        return false;
     }
     
-    Logger::info("ApiServer", 
-                "Starting WebSocket server on port " + std::to_string(port));
+    port_ = port;
     
     try {
-        port_ = port;
-        running_ = true;
-        
         serverThread_ = std::thread(&ApiServer::serverThread, this);
+        running_.store(true);
         
-        Logger::info("ApiServer", "✓ WebSocket server started");
+        Logger::info("ApiServer", "✓ Server started on port " + std::to_string(port));
+        return true;
         
     } catch (const std::exception& e) {
-        running_ = false;
         Logger::error("ApiServer", 
                      "Failed to start server: " + std::string(e.what()));
-        throw;
+        return false;
     }
 }
 
 void ApiServer::stop() {
-    if (!running_) {
+    if (!running_.load()) {
         return;
     }
     
-    Logger::info("ApiServer", "Stopping WebSocket server...");
+    Logger::info("ApiServer", "Stopping server...");
     
-    running_ = false;
+    running_.store(false);
     
     try {
-        {
-            std::lock_guard<std::mutex> lock(connectionsMutex_);
-            
-            for (auto& hdl : connections_) {
-                try {
-                    server_.close(hdl, websocketpp::close::status::going_away, 
-                                 "Server shutting down");
-                } catch (const std::exception& e) {
-                    Logger::warning("ApiServer", 
-                               "Error closing connection: " + std::string(e.what()));
-                }
-            }
-            
-            connections_.clear();
-        }
-        
         server_.stop();
         
         if (serverThread_.joinable()) {
             serverThread_.join();
         }
         
-        Logger::info("ApiServer", "✓ WebSocket server stopped");
+        Logger::info("ApiServer", "✓ Server stopped");
         
     } catch (const std::exception& e) {
         Logger::error("ApiServer", 
@@ -325,16 +308,30 @@ void ApiServer::stop() {
     }
 }
 
-size_t ApiServer::getClientCount() const {
+bool ApiServer::isRunning() const {
+    return running_.load();
+}
+
+void ApiServer::setCommandCallback(CommandCallback callback) {
+    commandCallback_ = callback;
+}
+
+size_t ApiServer::getConnectionCount() const {
     std::lock_guard<std::mutex> lock(connectionsMutex_);
     return connections_.size();
 }
 
 ApiServer::Stats ApiServer::getStats() const {
     std::lock_guard<std::mutex> lock(statsMutex_);
-    Stats copy = stats_;
-    copy.activeConnections = getClientCount();
-    return copy;
+    
+    Stats stats = stats_;
+    stats.activeConnections = getConnectionCount();
+    
+    auto now = std::chrono::steady_clock::now();
+    stats.uptime = std::chrono::duration_cast<std::chrono::seconds>(
+        now - stats.startTime).count();
+    
+    return stats;
 }
 
 // ============================================================================
@@ -480,7 +477,7 @@ void ApiServer::onFail(connection_hdl hdl) {
 }
 
 // ============================================================================
-// KEEPALIVE HANDLERS - Correction Erreur #1
+// KEEPALIVE HANDLERS
 // ============================================================================
 
 bool ApiServer::onPing(connection_hdl hdl, std::string payload) {
@@ -535,7 +532,7 @@ void ApiServer::serverThread() {
 
 void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& message) {
     if (!commandCallback_) {
-        sendError(hdl, message.getRequest().id, 
+        sendError(hdl, message.getId(), 
                  protocol::ErrorCode::INTERNAL_ERROR,
                  "No command handler configured");
         return;
@@ -553,7 +550,7 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
         json result = commandCallback_(commandJson);
         
         auto response = MessageEnvelope::createSuccessResponse(
-            request.id,
+            message.getId(),
             result
         );
         
@@ -563,7 +560,7 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
         Logger::error("ApiServer", 
                      "Command processing error: " + std::string(e.what()));
         
-        sendError(hdl, message.getRequest().id,
+        sendError(hdl, message.getId(),
                  protocol::ErrorCode::COMMAND_FAILED,
                  "Command execution failed",
                  {{"error", e.what()}});

@@ -1,7 +1,13 @@
 // ============================================================================
 // File: backend/src/api/CommandHandler.h
-// Version: 4.2.2
+// Version: 4.2.8
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
+// ============================================================================
+//
+// Changes v4.2.8:
+//   - REMOVED: createSuccessResponse(), createErrorResponse(), validateCommand()
+//     (already removed from .cpp in v4.2.3, now removed from header)
+//
 // ============================================================================
 
 #pragma once
@@ -15,7 +21,7 @@
 #include "../storage/PresetManager.h"
 #include "../storage/MidiDatabase.h"
 #include "../storage/PlaylistManager.h"
-#include "../core/EventBus.h"
+#include "../events/EventBus.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -51,7 +57,6 @@ public:
     CommandHandler& operator=(const CommandHandler&) = delete;
     
     json processCommand(const json& command);
-    json processCommand(const std::string& jsonString);
     
     void registerCommand(const std::string& name, CommandFunction function);
     bool unregisterCommand(const std::string& name);
@@ -76,10 +81,6 @@ private:
     void registerLatencyCommands();
     void registerPresetCommands();
     
-    json createSuccessResponse(const json& data) const;
-    json createErrorResponse(const std::string& error, 
-                          const std::string& errorCode = "COMMAND_FAILED") const;
-    bool validateCommand(const json& command, std::string& error) const;
     std::vector<uint8_t> base64Decode(const std::string& encoded) const;
     
     std::unordered_map<std::string, CommandFunction> commands_;
@@ -98,3 +99,7 @@ private:
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE CommandHandler.h v4.2.8
+// ============================================================================

@@ -1,24 +1,20 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.h
-// Version: 4.2.1
+// Version: 4.2.7
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Changes v4.2.1:
-//   - Added WebSocket keepalive support (ping/pong)
-//   - Added pong timeout handling
-//
-// Changes v4.2.0:
-//   - Added EventBus integration
-//   - Added event subscription support
-//   - Modified constructor to accept EventBus
+// Changes v4.2.7:
+//   - FIXED: start() signature matches implementation (bool return + uint16_t)
+//   - FIXED: getClientCount() → getConnectionCount() 
+//   - FIXED: Stats struct adds uptime field
 //
 // ============================================================================
 
 #pragma once
 
 #include "MessageEnvelope.h"
-#include "../core/EventBus.h"
+#include "../events/EventBus.h"
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <set>
@@ -37,6 +33,7 @@ public:
     using connection_hdl = websocketpp::connection_hdl;
     using message_ptr = server_t::message_ptr;
     using CommandCallback = std::function<json(const json&)>;
+    using Subscription = std::function<void()>;
     
     struct Stats {
         std::chrono::steady_clock::time_point startTime;
@@ -45,9 +42,9 @@ public:
         size_t messagesSent;
         size_t messagesReceived;
         size_t errorCount;
+        int64_t uptime;
     };
     
-    // Constructor with EventBus
     explicit ApiServer(std::shared_ptr<EventBus> eventBus = nullptr);
     ~ApiServer();
     
@@ -55,10 +52,10 @@ public:
     ApiServer& operator=(const ApiServer&) = delete;
     
     // Server management
-    void start(int port = 8080);
+    bool start(uint16_t port = 8080);
     void stop();
     bool isRunning() const { return running_; }
-    size_t getClientCount() const;
+    size_t getConnectionCount() const;
     Stats getStats() const;
     
     // Message sending
@@ -109,3 +106,7 @@ private:
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE ApiServer.h v4.2.7
+// ============================================================================

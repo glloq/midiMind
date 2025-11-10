@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/JsonMidiConverter.cpp
-// Version: 4.1.0
+// Version: 4.2.2
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -10,9 +10,8 @@
 // Author: MidiMind Team
 // Date: 2025-10-16
 //
-// Changes v4.1.0:
-//   - Complete implementation
-//   - Enhanced conversion logic
+// Changes v4.2.2:
+//   - Fixed bank extraction (MSB/LSB from CC 0/32)
 //
 // ============================================================================
 
@@ -297,7 +296,7 @@ JsonMidiConverter::JsonMidiConverter() {
 }
 
 // ============================================================================
-// CONVERSION: MIDI â†’ JsonMidi
+// CONVERSION: MIDI → JsonMidi
 // ============================================================================
 
 JsonMidi JsonMidiConverter::fromMidiMessages(
@@ -348,7 +347,7 @@ JsonMidi JsonMidiConverter::fromMidiMessages(
     jsonMidi.metadata.tempo = extractTempo(jsonMidi.timeline);
     
     Logger::info("JsonMidiConverter", 
-                "âœ“ Converted to " + std::to_string(jsonMidi.timeline.size()) + " events");
+                "✓ Converted to " + std::to_string(jsonMidi.timeline.size()) + " events");
     
     return jsonMidi;
 }
@@ -425,7 +424,7 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
 }
 
 // ============================================================================
-// CONVERSION: JsonMidi â†’ MIDI
+// CONVERSION: JsonMidi → MIDI
 // ============================================================================
 
 std::vector<MidiMessage> JsonMidiConverter::toMidiMessages(const JsonMidi& jsonMidi) {
@@ -447,7 +446,7 @@ std::vector<MidiMessage> JsonMidiConverter::toMidiMessages(const JsonMidi& jsonM
     }
     
     Logger::info("JsonMidiConverter", 
-                "âœ“ Converted to " + std::to_string(messages.size()) + " MIDI messages");
+                "✓ Converted to " + std::to_string(messages.size()) + " MIDI messages");
     
     return messages;
 }
@@ -564,7 +563,7 @@ void JsonMidiConverter::calculateNoteDurations(std::vector<JsonMidiEvent>& timel
         }
     }
     
-    Logger::debug("JsonMidiConverter", "âœ“ Note durations calculated");
+    Logger::debug("JsonMidiConverter", "✓ Note durations calculated");
 }
 
 uint32_t JsonMidiConverter::ticksToMs(uint32_t ticks, uint16_t ticksPerBeat, uint32_t tempo) {
@@ -778,14 +777,26 @@ JsonMidiTrack JsonMidiConverter::convertMidiTrackToJsonTrack(
     jsonTrack.transpose = 0;
     jsonTrack.color = "#667eea";  // Couleur par défaut
     
-    // Extraire l'instrument du premier Program Change
+    // Extraire Bank Select (CC 0/32) et Program Change
+    uint8_t bankMSB = 0;
+    uint8_t bankLSB = 0;
+    uint8_t program = 0;
+    
     for (const auto& event : track.events) {
-        if (event.type == MidiEventType::MIDI_CHANNEL && 
-            event.messageType == "programChange") {
-            jsonTrack.instrument.program = event.program;
-            jsonTrack.instrument.bank = 0;  // TODO: extraire MSB/LSB bank si présent
-            jsonTrack.instrument.name = "Program " + std::to_string(event.program);
-            break;
+        if (event.type == MidiEventType::MIDI_CHANNEL) {
+            if (event.messageType == "controlChange") {
+                if (event.controller == 0) {  // Bank Select MSB
+                    bankMSB = event.value;
+                } else if (event.controller == 32) {  // Bank Select LSB
+                    bankLSB = event.value;
+                }
+            } else if (event.messageType == "programChange") {
+                program = event.program;
+                jsonTrack.instrument.program = program;
+                jsonTrack.instrument.bank = (bankMSB << 7) | bankLSB;
+                jsonTrack.instrument.name = "Program " + std::to_string(program);
+                break;
+            }
         }
     }
     

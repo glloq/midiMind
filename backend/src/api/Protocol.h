@@ -1,24 +1,13 @@
 // ============================================================================
 // File: backend/src/api/Protocol.h
-// Version: 4.1.4
+// Version: 4.2.6
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
-// Description:
-//   WebSocket protocol - CORRECT ORDER (functions before structures)
-//
-// Author: MidiMind Team
-// Date: 2025-10-17
-//
-// Changes v4.1.4:
-//   - FIXED: Thread-safe generateUUID() with thread_local
-//   - FIXED: Thread-safe getISO8601Timestamp() using localtime_r/gmtime_r
-//   - FIXED: All struct constructors initialize all members
-//
-// Changes v4.1.3:
-//   - FIXED: Functions declared BEFORE structures that use them
-//   - FIXED: Namespace collision with midiMind::ErrorCode
-//   - Use protocol::ErrorCode everywhere
+// Changes v4.2.6:
+//   - ADDED: stringToErrorCode() function for error code parsing
+//   - FIXED: Response::fromJson() now parses error_code instead of hardcoding
+//   - FIXED: Error::fromJson() now parses code instead of hardcoding
 //
 // ============================================================================
 
@@ -37,7 +26,13 @@ namespace midiMind {
 namespace protocol {
 
 // ============================================================================
-// ENUMERATIONS (must be first)
+// CONSTANTS
+// ============================================================================
+
+const std::string PROTOCOL_VERSION = "1.0";
+
+// ============================================================================
+// ENUMERATIONS
 // ============================================================================
 
 enum class MessageType {
@@ -77,7 +72,7 @@ enum class EventPriority {
 };
 
 // ============================================================================
-// CONVERSION FUNCTIONS (must be before structures)
+// CONVERSION FUNCTIONS
 // ============================================================================
 
 inline std::string messageTypeToString(MessageType type) {
@@ -122,6 +117,28 @@ inline std::string errorCodeToString(ErrorCode code) {
     }
 }
 
+inline ErrorCode stringToErrorCode(const std::string& str) {
+    if (str == "INVALID_REQUEST")      return ErrorCode::INVALID_REQUEST;
+    if (str == "UNAUTHORIZED")         return ErrorCode::UNAUTHORIZED;
+    if (str == "FORBIDDEN")            return ErrorCode::FORBIDDEN;
+    if (str == "NOT_FOUND")            return ErrorCode::NOT_FOUND;
+    if (str == "TIMEOUT")              return ErrorCode::TIMEOUT;
+    if (str == "INTERNAL_ERROR")       return ErrorCode::INTERNAL_ERROR;
+    if (str == "SERVICE_UNAVAILABLE")  return ErrorCode::SERVICE_UNAVAILABLE;
+    if (str == "PARSE_ERROR")          return ErrorCode::PARSE_ERROR;
+    if (str == "INVALID_COMMAND")      return ErrorCode::INVALID_COMMAND;
+    if (str == "INVALID_PARAMS")       return ErrorCode::INVALID_PARAMS;
+    if (str == "INVALID_MESSAGE")      return ErrorCode::INVALID_MESSAGE;
+    if (str == "COMMAND_FAILED")       return ErrorCode::COMMAND_FAILED;
+    if (str == "UNKNOWN_COMMAND")      return ErrorCode::UNKNOWN_COMMAND;
+    if (str == "DEVICE_NOT_FOUND")     return ErrorCode::DEVICE_NOT_FOUND;
+    if (str == "DEVICE_BUSY")          return ErrorCode::DEVICE_BUSY;
+    if (str == "MIDI_ERROR")           return ErrorCode::MIDI_ERROR;
+    if (str == "FILE_ERROR")           return ErrorCode::FILE_ERROR;
+    if (str == "SYSTEM_ERROR")         return ErrorCode::SYSTEM_ERROR;
+    return ErrorCode::UNKNOWN;
+}
+
 inline std::string eventPriorityToString(EventPriority priority) {
     switch (priority) {
         case EventPriority::LOW:      return "low";
@@ -144,12 +161,7 @@ inline EventPriority stringToEventPriority(const std::string& str) {
 // HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * @brief Generate UUID (thread-safe)
- * @note Uses thread_local for thread safety
- */
 inline std::string generateUUID() {
-    // Thread-local random generators for thread safety
     thread_local std::random_device rd;
     thread_local std::mt19937 gen(rd());
     thread_local std::uniform_int_distribution<> dis(0, 15);
@@ -186,10 +198,6 @@ inline std::string generateUUID() {
     return ss.str();
 }
 
-/**
- * @brief Get ISO 8601 timestamp (thread-safe)
- * @note Uses gmtime_r on POSIX systems for thread safety
- */
 inline std::string getISO8601Timestamp() {
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
@@ -198,10 +206,8 @@ inline std::string getISO8601Timestamp() {
     
     std::tm tm_buf;
 #ifdef _WIN32
-    // Windows: gmtime_s
     gmtime_s(&tm_buf, &time_t_now);
 #else
-    // POSIX: gmtime_r (thread-safe)
     gmtime_r(&time_t_now, &tm_buf);
 #endif
     
@@ -213,7 +219,7 @@ inline std::string getISO8601Timestamp() {
 }
 
 // ============================================================================
-// STRUCTURES (after all conversion functions)
+// STRUCTURES
 // ============================================================================
 
 struct Envelope {
@@ -320,7 +326,7 @@ struct Response {
             resp.data = j.value("data", json::object());
         } else {
             resp.errorMessage = j.value("error_message", "");
-            resp.errorCode = ErrorCode::UNKNOWN;
+            resp.errorCode = stringToErrorCode(j.value("error_code", "UNKNOWN"));
         }
         
         return resp;
@@ -384,7 +390,7 @@ struct Error {
     
     static Error fromJson(const json& j) {
         Error err;
-        err.code = ErrorCode::UNKNOWN;
+        err.code = stringToErrorCode(j.value("code", "UNKNOWN"));
         err.message = j.value("message", "");
         err.details = j.value("details", json::object());
         err.retryable = j.value("retryable", false);
@@ -397,5 +403,5 @@ struct Error {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Protocol.h v4.1.4
+// END OF FILE Protocol.h v4.2.6
 // ============================================================================

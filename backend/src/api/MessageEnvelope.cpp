@@ -1,8 +1,11 @@
 // ============================================================================
 // File: backend/src/api/MessageEnvelope.cpp
-// Version: 4.1.3 - FORMAT PLAT UNIQUE
+// Version: 4.2.3
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.3:
+//   - FIXED: Request ID synchronization - envelope.id copied to request.id if empty
 //
 // Changes v4.1.3:
 //   - Format unique plat: {id, type, timestamp, version, payload}
@@ -203,6 +206,10 @@ std::optional<MessageEnvelope> MessageEnvelope::fromJson(const json& j) {
         switch (msg.envelope_.type) {
             case protocol::MessageType::REQUEST:
                 msg.request_ = protocol::Request::fromJson(payload);
+                // CRITICAL FIX: Synchronize request ID with envelope ID
+                if (msg.request_->id.empty()) {
+                    msg.request_->id = msg.envelope_.id;
+                }
                 break;
                 
             case protocol::MessageType::RESPONSE:
@@ -391,5 +398,5 @@ std::vector<std::string> MessageEnvelope::getValidationErrors() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE MessageEnvelope.cpp v4.1.3
+// END OF FILE MessageEnvelope.cpp v4.2.3
 // ============================================================================

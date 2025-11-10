@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/storage/MidiDatabase.cpp
-// Version: 4.2.1
+// Version: 4.2.2
 // ============================================================================
 
 #include "MidiDatabase.h"
@@ -391,9 +391,22 @@ int MidiDatabase::count() const {
 json MidiDatabase::getStatistics() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
+    // Compter le nombre total de routings
+    const std::string countSql = "SELECT COUNT(*) as count FROM midi_instrument_routings";
+    std::string countStr = database_.queryScalar(countSql);
+    int totalRoutings = 0;
+    
+    if (!countStr.empty()) {
+        try {
+            totalRoutings = std::stoi(countStr);
+        } catch (...) {
+            totalRoutings = 0;
+        }
+    }
+    
     return {
         {"total_files", count()},
-        {"total_routings", 0}  // TODO: compter les routings
+        {"total_routings", totalRoutings}
     };
 }
 
