@@ -1,24 +1,24 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
-// Chemin rÃ©el: frontend/js/core/Application.js
+// Chemin rÃƒÂ©el: frontend/js/core/Application.js
 // Version: v4.5.0 - FIX NAVIGATION INIT ORDER
 // Date: 2025-11-11
 // ============================================================================
 // CORRECTIONS v4.1.0:
-// âœ“ CRITIQUE: Passer 5 paramÃ¨tres aux modÃ¨les (eventBus, backend, logger, initialData, options)
-// âœ“ Fix: StateModel, FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
-// âœ“ Tous les modÃ¨les reÃ§oivent maintenant backend et logger correctement
+// Ã¢Å“â€œ CRITIQUE: Passer 5 paramÃƒÂ¨tres aux modÃƒÂ¨les (eventBus, backend, logger, initialData, options)
+// Ã¢Å“â€œ Fix: StateModel, FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
+// Ã¢Å“â€œ Tous les modÃƒÂ¨les reÃƒÂ§oivent maintenant backend et logger correctement
 //
 // CORRECTIONS v4.0.0:
-// âœ¦ CRITIQUE: Initialisation correcte de NavigationController AVANT Router
-// âœ¦ CRITIQUE: Connexion Router <-> NavigationController simplifiÃ©e
-// âœ¦ CRITIQUE: StartRouting() appelÃ©e APRÃˆS l'enregistrement des routes
-// âœ¦ Fix: Toutes les pages fonctionnent correctement
+// Ã¢Å“Â¦ CRITIQUE: Initialisation correcte de NavigationController AVANT Router
+// Ã¢Å“Â¦ CRITIQUE: Connexion Router <-> NavigationController simplifiÃƒÂ©e
+// Ã¢Å“Â¦ CRITIQUE: StartRouting() appelÃƒÂ©e APRÃƒË†S l'enregistrement des routes
+// Ã¢Å“Â¦ Fix: Toutes les pages fonctionnent correctement
 // ============================================================================
 
 class Application {
     constructor() {
-        // Ã‰tat de l'application
+        // Ãƒâ€°tat de l'application
         this.state = {
             initialized: false,
             ready: false,
@@ -43,7 +43,7 @@ class Application {
             file: null
         };
         
-        // ModÃ¨les
+        // ModÃƒÂ¨les
         this.models = {
             state: null,
             file: null,
@@ -68,7 +68,7 @@ class Application {
             visualizer: null
         };
         
-        // ContrÃ´leurs
+        // ContrÃƒÂ´leurs
         this.controllers = {
             navigation: null,
             file: null,
@@ -99,7 +99,7 @@ class Application {
             }
         };
         
-        // RÃ©fÃ©rence globale
+        // RÃƒÂ©fÃƒÂ©rence globale
         window.app = this;
     }
     
@@ -108,51 +108,51 @@ class Application {
     // ========================================================================
     
     /**
-     * Initialise l'application complÃ¨te
+     * Initialise l'application complÃƒÂ¨te
      */
     async init() {
-        console.log('ðŸš€ Initializing MidiMind v3.1...');
+        console.log('Ã°Å¸Å¡â‚¬ Initializing MidiMind v3.1...');
         
         try {
-            // Ã‰tape 1: Fondations
+            // Ãƒâ€°tape 1: Fondations
             await this.initFoundations();
             
-            // Ã‰tape 2: Services
+            // Ãƒâ€°tape 2: Services
             await this.initServices();
             
-            // Ã‰tape 3: ModÃ¨les
+            // Ãƒâ€°tape 3: ModÃƒÂ¨les
             await this.initModels();
             
-            // Ã‰tape 4: Vues
+            // Ãƒâ€°tape 4: Vues
             await this.initViews();
             
-            // Ã‰tape 5: ContrÃ´leurs
+            // Ãƒâ€°tape 5: ContrÃƒÂ´leurs
             await this.initControllers();
             
-            // Ã‰tape 6: Navigation & Router
+            // Ãƒâ€°tape 6: Navigation & Router
             await this.initNavigation();
             
-            // Ã‰tape 7: Connexion backend (non-bloquant)
+            // Ãƒâ€°tape 7: Connexion backend (non-bloquant)
             this.connectBackend().catch(err => {
                 this.log('warn', 'Backend connection failed, continuing in offline mode', err);
             });
             
-            // Ã‰tape 8: Finalisation
+            // Ãƒâ€°tape 8: Finalisation
             await this.finalize();
             
             this.state.initialized = true;
             this.state.ready = true;
             
-            console.log('âœ“ MidiMind v3.1 initialized successfully');
-            this.log('info', 'âœ“ Application ready');
+            console.log('Ã¢Å“â€œ MidiMind v3.1 initialized successfully');
+            this.log('info', 'Ã¢Å“â€œ Application ready');
             
-            // Ã‰mettre Ã©vÃ©nement ready
+            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement ready
             if (this.eventBus) {
                 this.eventBus.emit('app:ready');
             }
             
         } catch (error) {
-            console.error('âœ— Failed to initialize application:', error);
+            console.error('Ã¢Å“â€” Failed to initialize application:', error);
             this.log('error', 'Initialization failed', error);
             this.handleInitError(error);
         }
@@ -162,7 +162,7 @@ class Application {
      * Initialise les composants de base
      */
     async initFoundations() {
-        console.log('ðŸ”§ Initializing foundations...');
+        console.log('Ã°Å¸â€Â§ Initializing foundations...');
         
         // EventBus
         this.eventBus = window.eventBus || new EventBus();
@@ -199,11 +199,11 @@ class Application {
             }
         }
         
-        this.log('info', 'âœ“ Foundations initialized');
+        this.log('info', 'Ã¢Å“â€œ Foundations initialized');
     }
     
     /**
-     * CrÃ©e un logger robuste avec fallback
+     * CrÃƒÂ©e un logger robuste avec fallback
      */
     createLogger() {
         if (window.Logger) {
@@ -244,7 +244,7 @@ class Application {
      * Initialise les services
      */
     async initServices() {
-        console.log('ðŸ”Œ Initializing services...');
+        console.log('Ã°Å¸â€Å’ Initializing services...');
         
         // BackendService
         if (window.BackendService) {
@@ -274,18 +274,18 @@ class Application {
             window.fileService = this.services.file;
         }
         
-        this.log('info', 'âœ“ Services initialized');
+        this.log('info', 'Ã¢Å“â€œ Services initialized');
     }
     
     /**
-     * Initialise les modÃ¨les
-     * âœ“ v4.1.0: CORRECTION - Passer les 5 paramÃ¨tres requis par BaseModel
+     * Initialise les modÃƒÂ¨les
+     * Ã¢Å“â€œ v4.1.0: CORRECTION - Passer les 5 paramÃƒÂ¨tres requis par BaseModel
      */
     async initModels() {
-        console.log('ðŸ“¦ Initializing models...');
+        console.log('Ã°Å¸â€œÂ¦ Initializing models...');
         
         // StateModel
-        // âœ“ NOUVEAU: Passer 5 paramÃ¨tres (eventBus, backend, logger, initialData, options)
+        // Ã¢Å“â€œ NOUVEAU: Passer 5 paramÃƒÂ¨tres (eventBus, backend, logger, initialData, options)
         if (window.StateModel) {
             this.models.state = new StateModel(
                 this.eventBus,
@@ -381,14 +381,14 @@ class Application {
             window.routingModel = this.models.routing;
         }
         
-        this.log('info', 'âœ“ Models initialized');
+        this.log('info', 'Ã¢Å“â€œ Models initialized');
     }
     
     /**
      * Initialise les vues
      */
     async initViews() {
-        console.log('ðŸŽ¨ Initializing views...');
+        console.log('Ã°Å¸Å½Â¨ Initializing views...');
         
         // HomeView
         if (window.HomeView) {
@@ -404,7 +404,7 @@ class Application {
         
         // InstrumentView
         if (window.InstrumentView) {
-            this.views.instrument = new InstrumentView('instruments-view', this.eventBus);
+            this.views.instrument = new InstrumentView('instrument-view', this.eventBus);
             window.instrumentView = this.views.instrument;
         }
         
@@ -444,14 +444,14 @@ class Application {
             window.visualizerView = this.views.visualizer;
         }
         
-        this.log('info', 'âœ“ Views initialized');
+        this.log('info', 'Ã¢Å“â€œ Views initialized');
     }
     
     /**
-     * Initialise les contrÃ´leurs
+     * Initialise les contrÃƒÂ´leurs
      */
     async initControllers() {
-        console.log('ðŸŽ® Initializing controllers...');
+        console.log('Ã°Å¸Å½Â® Initializing controllers...');
         
         // FileController
         if (window.FileController) {
@@ -461,7 +461,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -473,7 +473,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -485,7 +485,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -497,7 +497,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -509,7 +509,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -531,7 +531,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -543,7 +543,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -555,7 +555,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -567,7 +567,7 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
@@ -579,20 +579,20 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
         }
         
-        this.log('info', 'âœ“ Controllers initialized');
+        this.log('info', 'Ã¢Å“â€œ Controllers initialized');
     }
     
     /**
      * Initialise la navigation
      */
     async initNavigation() {
-        console.log('ðŸ§­ Initializing navigation...');
+        console.log('Ã°Å¸Â§Â­ Initializing navigation...');
         
-        // NavigationController DOIT Ãªtre initialisÃ© en premier
+        // NavigationController DOIT ÃƒÂªtre initialisÃƒÂ© en premier
         if (window.NavigationController) {
             this.controllers.navigation = new NavigationController(
                 this.eventBus,
@@ -600,16 +600,16 @@ class Application {
                 this.views,
                 this.notifications,
                 this.debugConsole,
-                this.services.backend  // âœ¦ BACKEND PASSED
+                this.services.backend  // Ã¢Å“Â¦ BACKEND PASSED
             );
             
-            // ✅ FIX CRITIQUE v4.5.0: Initialiser explicitement AVANT Router
+            // âœ… FIX CRITIQUE v4.5.0: Initialiser explicitement AVANT Router
             if (typeof this.controllers.navigation.init === 'function') {
                 this.controllers.navigation.init();
-                this.log('info', '✓ NavigationController initialized');
+                this.log('info', 'âœ“ NavigationController initialized');
             } else if (typeof this.controllers.navigation.onInitialize === 'function') {
                 this.controllers.navigation.onInitialize();
-                this.log('info', '✓ NavigationController.onInitialize() called');
+                this.log('info', 'âœ“ NavigationController.onInitialize() called');
             }
         }
         
@@ -617,11 +617,11 @@ class Application {
         if (window.Router) {
             this.router = new Router({
                 mode: 'hash',
-                useTransitions: false,  // DÃ©sactivÃ© car NavigationController gÃ¨re les transitions
+                useTransitions: false,  // DÃƒÂ©sactivÃƒÂ© car NavigationController gÃƒÂ¨re les transitions
                 transitionDuration: 300
             });
             
-            // Enregistrer les routes AVANT de dÃ©marrer le routing
+            // Enregistrer les routes AVANT de dÃƒÂ©marrer le routing
             this.registerRoutes();
             
             // Connecter le Router au NavigationController
@@ -635,19 +635,19 @@ class Application {
             }
             
             
-            // FIX v4.2.0: Forcer le hash Ã  home si vide ou invalide
+            // FIX v4.2.0: Forcer le hash ÃƒÂ  home si vide ou invalide
             const currentHash = window.location.hash;
             if (!currentHash || currentHash === '#' || currentHash === '') {
                 window.location.hash = '#home';
                 this.log('info', 'Hash forced to #home');
             }
             
-            // DÃ©marrer le routing maintenant
+            // DÃƒÂ©marrer le routing maintenant
             this.router.startRouting();
-            this.log('info', 'âœ“ Routing started');
+            this.log('info', 'Ã¢Å“â€œ Routing started');
         }
         
-        this.log('info', 'âœ“ Navigation initialized');
+        this.log('info', 'Ã¢Å“â€œ Navigation initialized');
     }
     
     /**
@@ -668,7 +668,7 @@ class Application {
         });
         
         this.router.route('/editor', {
-            title: 'MidiMind - Ã‰diteur',
+            title: 'MidiMind - Ãƒâ€°diteur',
             view: 'editor'
         });
         
@@ -688,7 +688,7 @@ class Application {
         });
         
         this.router.route('/system', {
-            title: 'MidiMind - SystÃ¨me',
+            title: 'MidiMind - SystÃƒÂ¨me',
             view: 'system'
         });
         
@@ -697,13 +697,13 @@ class Application {
             view: 'visualizer'
         });
         
-        // Route par dÃ©faut
+        // Route par dÃƒÂ©faut
         this.router.route('/', {
             title: 'MidiMind',
             view: 'home'
         });
         
-        this.log('info', 'âœ“ Routes registered');
+        this.log('info', 'Ã¢Å“â€œ Routes registered');
     }
     
     /**
@@ -722,7 +722,7 @@ class Application {
             
             if (success) {
                 this.state.backendConnected = true;
-                this.log('info', 'âœ“ Backend connected');
+                this.log('info', 'Ã¢Å“â€œ Backend connected');
                 
                 if (this.eventBus) {
                     this.eventBus.emit('app:backend-connected');
@@ -749,12 +749,12 @@ class Application {
      * Finalisation de l'initialisation
      */
     async finalize() {
-        console.log('ðŸ Finalizing initialization...');
+        console.log('Ã°Å¸ÂÂ Finalizing initialization...');
         
-        // Ã‰vÃ©nements d'erreur globaux
+        // Ãƒâ€°vÃƒÂ©nements d'erreur globaux
         this.setupErrorHandlers();
         
-        // Ã‰vÃ©nements de connexion
+        // Ãƒâ€°vÃƒÂ©nements de connexion
         this.setupConnectionHandlers();
         
         // Raccourcis clavier
@@ -762,7 +762,7 @@ class Application {
             this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.logger);
         }
         
-        this.log('info', 'âœ“ Finalization complete');
+        this.log('info', 'Ã¢Å“â€œ Finalization complete');
     }
     
     /**
@@ -800,24 +800,24 @@ class Application {
     setupConnectionHandlers() {
         if (!this.eventBus) return;
         
-        // Backend connectÃ©
+        // Backend connectÃƒÂ©
         this.eventBus.on('backend:connected', (data) => {
             this.state.backendConnected = true;
             this.state.offlineMode = false;
             this.state.reconnectAttempts = 0;
             
-            this.log('info', 'âœ“ Backend connected');
+            this.log('info', 'Ã¢Å“â€œ Backend connected');
             
             if (this.notifications) {
                 this.notifications.show('Backend connected', 'success', 3000);
             }
         });
         
-        // Backend dÃ©connectÃ©
+        // Backend dÃƒÂ©connectÃƒÂ©
         this.eventBus.on('backend:disconnected', (data) => {
             this.state.backendConnected = false;
             
-            this.log('warn', 'âš ï¸ Backend disconnected');
+            this.log('warn', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
             
             if (this.notifications && !this.state.offlineMode) {
                 this.notifications.show('Backend disconnected', 'warning', 5000);
@@ -829,7 +829,7 @@ class Application {
             this.state.offlineMode = true;
             this.state.backendConnected = false;
             
-            this.log('warn', 'âš ï¸ Offline mode activated');
+            this.log('warn', 'Ã¢Å¡Â Ã¯Â¸Â Offline mode activated');
             
             if (this.notifications && this.config.offlineMode.showNotification) {
                 this.notifications.show(
@@ -849,10 +849,10 @@ class Application {
     }
     
     /**
-     * GÃ¨re les erreurs d'initialisation
+     * GÃƒÂ¨re les erreurs d'initialisation
      */
     handleInitError(error) {
-        console.error('âœ— Initialization error:', error);
+        console.error('Ã¢Å“â€” Initialization error:', error);
         
         if (this.notifications) {
             this.notifications.show(
@@ -878,7 +878,7 @@ class Application {
             max-width: 500px;
         `;
         errorDiv.innerHTML = `
-            <h3 style="margin: 0 0 10px 0;">âœ— Initialization Failed</h3>
+            <h3 style="margin: 0 0 10px 0;">Ã¢Å“â€” Initialization Failed</h3>
             <p style="margin: 0;">${error.message}</p>
             <button onclick="location.reload()" 
                     style="margin-top: 15px; padding: 8px 16px; border: none; background: white; color: #dc3545; cursor: pointer; border-radius: 4px;">
@@ -889,11 +889,11 @@ class Application {
     }
     
     // ========================================================================
-    // MÃ‰THODES PUBLIQUES
+    // MÃƒâ€°THODES PUBLIQUES
     // ========================================================================
     
     /**
-     * Obtient l'Ã©tat de l'application
+     * Obtient l'ÃƒÂ©tat de l'application
      */
     getState() {
         return { ...this.state };
@@ -926,26 +926,26 @@ class Application {
     }
     
     /**
-     * DÃ©truit l'application
+     * DÃƒÂ©truit l'application
      */
     destroy() {
         this.log('info', 'Destroying application...');
         
-        // DÃ©truire les contrÃ´leurs
+        // DÃƒÂ©truire les contrÃƒÂ´leurs
         Object.values(this.controllers).forEach(controller => {
             if (controller && typeof controller.destroy === 'function') {
                 controller.destroy();
             }
         });
         
-        // DÃ©truire les vues
+        // DÃƒÂ©truire les vues
         Object.values(this.views).forEach(view => {
             if (view && typeof view.destroy === 'function') {
                 view.destroy();
             }
         });
         
-        // DÃ©connecter le backend
+        // DÃƒÂ©connecter le backend
         if (this.services.backend && typeof this.services.backend.disconnect === 'function') {
             this.services.backend.disconnect();
         }
@@ -953,7 +953,7 @@ class Application {
         this.state.initialized = false;
         this.state.ready = false;
         
-        this.log('info', 'âœ“ Application destroyed');
+        this.log('info', 'Ã¢Å“â€œ Application destroyed');
     }
 }
 
