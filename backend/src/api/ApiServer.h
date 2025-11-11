@@ -37,7 +37,6 @@ public:
     using connection_hdl = websocketpp::connection_hdl;
     using message_ptr = server_t::message_ptr;
     using CommandCallback = std::function<json(const json&)>;
-    using Subscription = std::function<void()>;
     
     struct Stats {
         std::chrono::steady_clock::time_point startTime;

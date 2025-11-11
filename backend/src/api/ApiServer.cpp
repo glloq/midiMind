@@ -1,24 +1,14 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.cpp
-// Version: 4.2.3
+// Version: 4.2.4
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
+// Changes v4.2.4:
+//   - FIXED: Removed eventSubscriptions_ storage (EventBus manages subscriptions)
+//
 // Changes v4.2.3:
 //   - FIXED: Use getId() instead of getRequest().id for consistency
-//
-// Changes v4.2.2:
-//   - FIXED: Command dispatching now passes complete JSON with command+params
-//
-// Changes v4.2.1:
-//   - Added WebSocket keepalive (ping/pong handlers)
-//   - Added pong timeout configuration (60s)
-//   - Automatic closure of dead connections
-//
-// Changes v4.2.0:
-//   - Added EventBus integration
-//   - Implemented event subscriptions
-//   - Broadcasting events to WebSocket clients
 //
 // ============================================================================
 
@@ -113,7 +103,6 @@ ApiServer::~ApiServer() {
 
 void ApiServer::setEventBus(std::shared_ptr<EventBus> eventBus) {
     eventBus_ = eventBus;
-    eventSubscriptions_.clear();
     
     if (eventBus_) {
         setupEventSubscriptions();
@@ -128,131 +117,117 @@ void ApiServer::setupEventSubscriptions() {
     Logger::info("ApiServer", "Setting up event subscriptions...");
     
     // 1. MIDI Message Received
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::MidiMessageReceivedEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"device_id", event.deviceId},
-                    {"device_name", event.deviceName},
-                    {"message", {
-                        {"status", event.message.getStatus()},
-                        {"data1", event.message.getData1()},
-                        {"data2", event.message.getData2()}
-                    }},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("midi:message:received", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::MidiMessageReceivedEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"device_id", event.deviceId},
+                {"device_name", event.deviceName},
+                {"message", {
+                    {"status", event.message.getStatus()},
+                    {"data1", event.message.getData1()},
+                    {"data2", event.message.getData2()}
+                }},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("midi:message:received", data);
+            broadcast(envelope);
+        }
     );
     
     // 2. Device Connected
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::DeviceConnectedEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"device_id", event.deviceId},
-                    {"device_name", event.deviceName},
-                    {"device_type", event.deviceType},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("device:connected", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::DeviceConnectedEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"device_id", event.deviceId},
+                {"device_name", event.deviceName},
+                {"device_type", event.deviceType},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("device:connected", data);
+            broadcast(envelope);
+        }
     );
     
     // 3. Device Disconnected
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::DeviceDisconnectedEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"device_id", event.deviceId},
-                    {"device_name", event.deviceName},
-                    {"reason", event.reason},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("device:disconnected", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::DeviceDisconnectedEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"device_id", event.deviceId},
+                {"device_name", event.deviceName},
+                {"reason", event.reason},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("device:disconnected", data);
+            broadcast(envelope);
+        }
     );
     
     // 4. Playback State Changed
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::PlaybackStateChangedEvent>(
-            [this](const auto& event) {
-                std::string stateStr;
-                switch (event.state) {
-                    case events::PlaybackStateChangedEvent::State::PLAYING:
-                        stateStr = "playing";
-                        break;
-                    case events::PlaybackStateChangedEvent::State::PAUSED:
-                        stateStr = "paused";
-                        break;
-                    case events::PlaybackStateChangedEvent::State::STOPPED:
-                    default:
-                        stateStr = "stopped";
-                        break;
-                }
-                
-                json data = {
-                    {"state", stateStr},
-                    {"filepath", event.filepath},
-                    {"position", event.position},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("playback:state", data);
-                broadcast(envelope);
+    eventBus_->subscribe<events::PlaybackStateChangedEvent>(
+        [this](const auto& event) {
+            std::string stateStr;
+            switch (event.state) {
+                case events::PlaybackStateChangedEvent::State::PLAYING:
+                    stateStr = "playing";
+                    break;
+                case events::PlaybackStateChangedEvent::State::PAUSED:
+                    stateStr = "paused";
+                    break;
+                case events::PlaybackStateChangedEvent::State::STOPPED:
+                default:
+                    stateStr = "stopped";
+                    break;
             }
-        )
+            
+            json data = {
+                {"state", stateStr},
+                {"filepath", event.filepath},
+                {"position", event.position},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("playback:state", data);
+            broadcast(envelope);
+        }
     );
     
     // 5. Playback Progress
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::PlaybackProgressEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"position", event.position},
-                    {"duration", event.duration},
-                    {"percentage", event.percentage},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("playback:progress", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::PlaybackProgressEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"position", event.position},
+                {"duration", event.duration},
+                {"percentage", event.percentage},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("playback:progress", data);
+            broadcast(envelope);
+        }
     );
     
     // 6. Route Added
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::RouteAddedEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"source", event.source},
-                    {"destination", event.destination},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("route:added", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::RouteAddedEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"source", event.source},
+                {"destination", event.destination},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("route:added", data);
+            broadcast(envelope);
+        }
     );
     
     // 7. Route Removed
-    eventSubscriptions_.push_back(
-        eventBus_->subscribe<events::RouteRemovedEvent>(
-            [this](const auto& event) {
-                json data = {
-                    {"source", event.source},
-                    {"destination", event.destination},
-                    {"timestamp", event.timestamp}
-                };
-                auto envelope = MessageEnvelope::createEvent("route:removed", data);
-                broadcast(envelope);
-            }
-        )
+    eventBus_->subscribe<events::RouteRemovedEvent>(
+        [this](const auto& event) {
+            json data = {
+                {"source", event.source},
+                {"destination", event.destination},
+                {"timestamp", event.timestamp}
+            };
+            auto envelope = MessageEnvelope::createEvent("route:removed", data);
+            broadcast(envelope);
+        }
     );
     
     Logger::info("ApiServer", "✓ Event subscriptions configured");
@@ -568,3 +543,7 @@ void ApiServer::processRequest(connection_hdl hdl, const MessageEnvelope& messag
 }
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE ApiServer.cpp v4.2.4
+// ============================================================================
