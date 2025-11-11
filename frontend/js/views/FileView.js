@@ -113,11 +113,20 @@ class FileView extends BaseView {
         const startTime = performance.now();
         
         try {
+            // DEBUG: Afficher l'état actuel
+            console.log('[FileView] render() - viewState:', JSON.stringify(this.viewState));
+            console.log('[FileView] render() - data:', data);
+            
             // Générer et insérer le HTML
-            this.container.innerHTML = this.buildTemplate(data || this.viewState);
+            const template = this.buildTemplate(data || this.viewState);
+            console.log('[FileView] Template generated, length:', template.length);
+            
+            this.container.innerHTML = template;
+            console.log('[FileView] innerHTML set');
             
             // Attacher les événements
             this.attachEvents();
+            console.log('[FileView] Events attached');
             
             // Mettre à jour l'état
             this.state.rendered = true;
@@ -131,19 +140,25 @@ class FileView extends BaseView {
             }
             
             const renderTime = performance.now() - startTime;
-            this.log('debug', 'FileView', `✅ Rendered in ${renderTime.toFixed(2)}ms`);
+            this.log('info', 'FileView', `✅ Rendered in ${renderTime.toFixed(2)}ms`);
             
         } catch (error) {
-            this.log('error', 'FileView', 'Render failed:', error);
-            this.handleError('Render failed', error);
+            // LOG COMPLET de l'erreur
+            console.error('[FileView] RENDER ERROR:', error);
+            console.error('[FileView] Error stack:', error.stack);
+            console.error('[FileView] Error message:', error.message);
+            console.error('[FileView] viewState at error:', this.viewState);
+            
+            this.log('error', 'FileView', 'Render failed:', error.message || error);
             
             // Afficher un message d'erreur à l'utilisateur
             if (this.container) {
                 this.container.innerHTML = `
-                    <div class="error-message">
-                        <h3>Erreur d'affichage</h3>
-                        <p>Impossible d'afficher la liste des fichiers.</p>
-                        <button onclick="window.location.reload()">Recharger la page</button>
+                    <div class="error-message" style="padding: 20px; text-align: center;">
+                        <h3>❌ Erreur d'affichage</h3>
+                        <p>${error.message || 'Erreur inconnue'}</p>
+                        <pre style="text-align: left; background: #f5f5f5; padding: 10px; overflow: auto;">${error.stack || ''}</pre>
+                        <button onclick="window.location.reload()" style="margin-top: 10px; padding: 10px 20px;">Recharger la page</button>
                     </div>
                 `;
             }
