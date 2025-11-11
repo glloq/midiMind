@@ -1,16 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
 // Chemin réel: frontend/js/views/FileView.js
-// Version: v4.0.5 - CORRECTION CRITIQUE
+// Version: v4.1.0 - ENCODAGE UTF-8 CORRIGÉ
 // Date: 2025-11-11
 // ============================================================================
-// CORRECTIONS v4.0.5:
-// ✅ CRITIQUE: Retrait de super.attachEvents() (méthode inexistante dans BaseView)
-// ✅ Gestion d'erreur robuste dans render()
-// ✅ Sécurisation filterFiles() et sortFiles()
-// ✅ Vérification state.files avant utilisation
-// ✅ Fix upload bloqué (input permanent dans DOM)
-// ✅ Encodage UTF-8 propre
+// CORRECTIONS v4.1.0:
+// ✅ Encodage UTF-8 complet (tous caractères français corrigés)
+// ✅ Gestion événements robuste
+// ✅ Upload permanent dans DOM
+// ✅ Affichage liste fichiers
 // ============================================================================
 
 class FileView extends BaseView {
@@ -30,7 +28,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', 'FileView', '✅ FileView v4.0.5 initialized (fixed attachEvents)');
+        this.log('info', 'FileView', '✅ FileView v4.1.0 initialized (UTF-8 fixed)');
     }
     
     // ========================================================================
@@ -209,7 +207,7 @@ class FileView extends BaseView {
     buildEmptyState() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">📁</div>
+                <div class="empty-icon">📭</div>
                 <h3>Aucun fichier</h3>
                 <p>Uploadez des fichiers MIDI pour commencer</p>
             </div>
@@ -522,8 +520,8 @@ class FileView extends BaseView {
         if (!this.eventBus) return;
         
         // files.list response
-        this.eventBus.on('files:listed', (data) => {
-            this.log('debug', 'FileView', `Received ${data.files?.length || 0} files`);
+        this.eventBus.on('files:list-updated', (data) => {
+            this.log('info', 'FileView', `Received ${data.files?.length || 0} files`);
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
             this.render();
