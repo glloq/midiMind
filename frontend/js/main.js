@@ -93,10 +93,51 @@ document.addEventListener('DOMContentLoaded', async () => {
             hasEmit: typeof window.eventBus.emit === 'function',
             hasOff: typeof window.eventBus.off === 'function'
         });
+        console.log('✅ EventBus verified:', {
+            hasOn: typeof window.eventBus.on === 'function',
+            hasEmit: typeof window.eventBus.emit === 'function',
+            hasOff: typeof window.eventBus.off === 'function'
+        });
         
         // =====================================================================
-        // Ã‰TAPE 3: VÃ‰RIFIER APPLICATION CLASS
+        // ✅ NOUVEAU: ÉTAPE 2.1: INITIALISER LOGGER GLOBAL
         // =====================================================================
+        
+        if (typeof Logger === 'undefined') {
+            throw new Error('Logger class not loaded. Check index.html script order.');
+        }
+        
+        if (!window.logger) {
+            console.log('📝 Creating global Logger...');
+            window.logger = new Logger({
+                level: 'info',
+                enableConsole: true,
+                enableEventBus: true,
+                eventBus: window.eventBus
+            });
+            console.log('✅ Logger created and initialized');
+        } else {
+            console.log('✅ Logger already exists (reusing existing instance)');
+        }
+        
+        // =====================================================================
+        // ✅ NOUVEAU: ÉTAPE 2.2: INITIALISER NOTIFICATIONMANAGER GLOBAL
+        // =====================================================================
+        
+        if (typeof NotificationManager === 'undefined') {
+            console.warn('⚠️ NotificationManager class not loaded (optional)');
+        } else if (!window.notificationManager) {
+            console.log('🔔 Creating global NotificationManager...');
+            window.notificationManager = new NotificationManager();
+            console.log('✅ NotificationManager created and initialized');
+        } else {
+            console.log('✅ NotificationManager already exists (reusing existing instance)');
+        }
+        
+        // =====================================================================
+        // ÉTAPE 3: VÉRIFIER APPLICATION CLASS
+        // =====================================================================
+        
         
         if (typeof Application === 'undefined') {
             throw new Error('Application class not loaded. Check index.html script order.');
@@ -142,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let initTimeout = setTimeout(() => {
             console.warn('âš ï¸ Initialization timeout - forcing interface display');
             forceShowInterface();
-        }, 2000);  // ✅ RÉDUIT À 2 secondes pour affichage plus rapide
+        }, 5000);
         
         try {
             await app.init();

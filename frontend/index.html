@@ -25,7 +25,7 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="header-logo">
-                    <div class="logo-icon">🎹</div>
+                    <div class="logo-icon">ðŸŽ¹</div>
                     <div class="logo-text">
                         <span class="logo-title">MIDI Mind</span>
                         <span class="logo-version">v3.1</span>
@@ -39,9 +39,9 @@
                         <span class="total-time" id="globalDuration">00:00</span>
                     </div>
                     <div class="playback-controls">
-                        <button class="control-btn btn-play" id="globalPlay" title="Lecture">▶</button>
-                        <button class="control-btn btn-pause" id="globalPause" title="Pause" style="display: none;">⏸</button>
-                        <button class="control-btn btn-stop" id="globalStop" title="Stop">⏹</button>
+                        <button class="control-btn btn-play" id="globalPlay" title="Lecture">â–¶</button>
+                        <button class="control-btn btn-pause" id="globalPause" title="Pause" style="display: none;">â¸</button>
+                        <button class="control-btn btn-stop" id="globalStop" title="Stop">â¹</button>
                     </div>
                     <div class="playback-progress">
                         <div class="progress-bar">
@@ -50,10 +50,10 @@
                     </div>
                 </div>
                 <div class="header-debug">
-                    <button class="btn-debug" id="btnToggleDebug" title="Debug">🐞</button>
+                    <button class="btn-debug" id="btnToggleDebug" title="Debug">ðŸž</button>
                     <div class="connection-status" id="connectionStatus">
                         <span class="status-dot"></span>
-                        <span class="status-text">Déconnecté</span>
+                        <span class="status-text">DÃ©connectÃ©</span>
                     </div>
                 </div>
             </div>
@@ -62,32 +62,32 @@
         <!-- Navigation -->
         <nav class="main-nav">
             <a href="#home" class="nav-item active" data-page="home">
-                <span class="nav-icon">🏠</span>
+                <span class="nav-icon">ðŸ </span>
                 <span class="nav-label">Home</span>
             </a>
             <a href="#files" class="nav-item" data-page="files">
-                <span class="nav-icon">📁</span>
+                <span class="nav-icon">ðŸ“</span>
                 <span class="nav-label">Fichiers</span>
             </a>
             <a href="#instruments" class="nav-item" data-page="instruments">
-                <span class="nav-icon">🎸</span>
+                <span class="nav-icon">ðŸŽ¸</span>
                 <span class="nav-label">Instruments</span>
             </a>
             <a href="#keyboard" class="nav-item" data-page="keyboard">
-                <span class="nav-icon">🎹</span>
+                <span class="nav-icon">ðŸŽ¹</span>
                 <span class="nav-label">Keyboard</span>
             </a>
             <a href="#system" class="nav-item" data-page="system">
-                <span class="nav-icon">⚙️</span>
-                <span class="nav-label">Système</span>
+                <span class="nav-icon">âš™ï¸</span>
+                <span class="nav-label">SystÃ¨me</span>
             </a>
         </nav>
 
         <!-- Debug Console -->
         <div class="debug-console" id="debugConsole" style="display: none;">
             <div class="debug-header">
-                <span class="debug-title">🐞 Console de Debug</span>
-                <button class="btn-close-debug" id="btnCloseDebug">×</button>
+                <span class="debug-title">ðŸž Console de Debug</span>
+                <button class="btn-close-debug" id="btnCloseDebug">Ã—</button>
             </div>
             <div class="debug-content" id="debugContent"></div>
             <div class="debug-controls">
@@ -107,62 +107,62 @@
             <!-- PAGE HOME -->
             <div id="home" class="page active">
                 <div id="home-view">
-                    <!-- Généré par HomeView -->
+                    <!-- GÃ©nÃ©rÃ© par HomeView -->
                 </div>
             </div>
             
             <!-- PAGE FILES -->
             <div id="files" class="page">
                 <div id="file-view">
-                    <!-- Généré par FileView -->
+                    <!-- GÃ©nÃ©rÃ© par FileView -->
                 </div>
             </div>
             
             <!-- PAGE INSTRUMENTS -->
             <div id="instruments" class="page">
                 <div id="instrument-view">
-                    <!-- Généré par InstrumentView -->
+                    <!-- GÃ©nÃ©rÃ© par InstrumentView -->
                 </div>
             </div>
             
             <!-- PAGE KEYBOARD -->
             <div id="keyboard" class="page">
                 <div id="keyboard-view">
-                    <!-- Généré par KeyboardView -->
+                    <!-- GÃ©nÃ©rÃ© par KeyboardView -->
                 </div>
             </div>
             
             <!-- PAGE SYSTEM -->
             <div id="system" class="page">
                 <div id="system-view">
-                    <!-- Généré par SystemView -->
+                    <!-- GÃ©nÃ©rÃ© par SystemView -->
                 </div>
             </div>
             
             <!-- PAGE EDITOR (Modal) -->
             <div id="editor" class="page page-fullscreen" style="display: none;">
                 <div id="editor-view">
-                    <!-- Généré par EditorView -->
+                    <!-- GÃ©nÃ©rÃ© par EditorView -->
                 </div>
             </div>
             
             <!-- PAGE ROUTING (Modal) -->
             <div id="routing" class="page page-modal" style="display: none;">
                 <div id="routing-view">
-                    <!-- Généré par RoutingView -->
+                    <!-- GÃ©nÃ©rÃ© par RoutingView -->
                 </div>
             </div>
             
             <!-- PAGE PLAYLIST (Modal) -->
             <div id="playlist" class="page page-modal" style="display: none;">
                 <div id="playlist-view">
-                    <!-- Généré par PlaylistView -->
+                    <!-- GÃ©nÃ©rÃ© par PlaylistView -->
                 </div>
             </div>
             
-            <!-- VISUALIZER (peut être intégré dans d'autres pages) -->
+            <!-- VISUALIZER (peut Ãªtre intÃ©grÃ© dans d'autres pages) -->
             <div id="visualizer-view" style="display: none;">
-                <!-- Généré par VisualizerView -->
+                <!-- GÃ©nÃ©rÃ© par VisualizerView -->
             </div>
         </main>
 
@@ -178,12 +178,15 @@
         <p>Chargement de MIDI Mind...</p>
     </div>
 
-    <!-- Scripts - Ordre CRITIQUE -->
+    <!-- Scripts - Ordre CRITIQUE ✅ CORRIGÉ Phase 1 -->
     <!-- Config -->
     <script src="js/config/AppConfig.js"></script>
     <script src="js/config/PerformanceConfig.js"></script>
 
-    <!-- Utils -->
+    <!-- ✅ EventBus EN PREMIER! (CRITIQUE) -->
+    <script src="js/core/EventBus.js"></script>
+
+    <!-- Utils (après EventBus) -->
     <script src="js/utils/Logger.js"></script>
     <script src="js/utils/DebugConsole.js"></script>
     <script src="js/utils/Constants.js"></script>
@@ -195,9 +198,20 @@
     <script src="js/utils/MidiParser.js"></script>
     <script src="js/utils/KeyboardShortcuts.js"></script>
     <script src="js/utils/ApiClient.js"></script>
+    <script src="js/utils/RoutingManager.js"></script>
+    <script src="js/utils/MetronomeEngine.js"></script>
 
-    <!-- EventBus -->
-    <script src="js/core/EventBus.js"></script>
+    <!-- UI -->
+    <script src="js/ui/NotificationManager.js"></script>
+
+    <!-- Monitoring -->
+    <script src="js/monitoring/PerformanceMonitor.js"></script>
+
+    <!-- Core Utils -->
+    <script src="js/core/MidiJsonConverter.js"></script>
+
+    <!-- Audio -->
+    <script src="js/audio/Metronome.js"></script>
 
     <!-- Services -->
     <script src="js/services/StorageService.js"></script>

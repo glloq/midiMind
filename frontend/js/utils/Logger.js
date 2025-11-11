@@ -1,12 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/utils/Logger.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
-// Version: 3.0.1 - FIXED GLOBAL EXPOSURE
-// Date: 2025-10-22
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
+// Version: 3.0.2 - FIXED CRITICAL GLOBAL EXPOSURE BUG
+// Date: 2025-11-11
+// ============================================================================
+// CORRECTIONS v3.0.2:
+// ✅ CRITIQUE: window.Logger au lieu de window.logger (ligne 164)
+// ✅ Suppression doublon ligne 167
+// ✅ Encodage UTF-8 corrigé (é, è, à, etc.)
+// ✅ Émojis correctement affichés (✓, ✅, etc.)
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// âœ… Exposition globale explicite de la classe Logger
-// âœ… VÃ©rification de disponibilitÃ© window
+// ✅ Exposition globale explicite de la classe Logger
+// ✅ Vérification de disponibilité window
 // ============================================================================
 
 class Logger {
@@ -86,7 +92,7 @@ class Logger {
         
         const formatted = this._formatMessage(level, category, message, data);
         
-        // Ajouter Ã  l'historique
+        // Ajouter à l'historique
         this.history.push({
             level: levelName,
             category,
@@ -110,7 +116,7 @@ class Logger {
             console[consoleMethod](`%c${formatted}`, `color: ${color}`);
         }
         
-        // Ã‰mettre Ã©vÃ©nement
+        // Émettre événement
         if (this.config.enableEventBus && this.eventBus) {
             this.eventBus.emit('log', {
                 level: levelName,
@@ -158,13 +164,12 @@ class Logger {
 }
 
 // ============================================================================
-// EXPOSITION GLOBALE - CRITIQUE
+// EXPOSITION GLOBALE - ✅ CORRIGÉ v3.0.2
 // ============================================================================
 if (typeof window !== 'undefined') {
-    window.logger = Logger;
-    console.log('âœ“ Logger class exposed globally');
+    window.Logger = Logger;  // ✅ CORRECTION: window.Logger (la classe), pas window.logger
+    console.log('✅ Logger class exposed globally as window.Logger');
 }
-window.logger = Logger;
 // ============================================================================
-// FIN DU FICHIER Logger.js v3.0.1
+// FIN DU FICHIER Logger.js v3.0.2
 // ============================================================================
