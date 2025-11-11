@@ -1,16 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v4.0.1 - CONFORMITÃƒâ€° API + MÃƒâ€°THODES RENDER
-// Date: 2025-11-08
+// Version: v4.0.4 - CORRECTIONS COMPLÈTES
+// Date: 2025-11-11
 // ============================================================================
-// AMÃƒâ€°LIORATIONS v4.0.1:
-// Ã¢Å“â€¦ Ajout mÃƒÂ©thode render() pour insertion DOM
-// Ã¢Å“â€¦ Ajout mÃƒÂ©thode show() pour affichage
-// Ã¢Å“â€¦ Ajout mÃƒÂ©thode hide() pour masquage
-// Ã¢Å“â€¦ ConformitÃƒÂ© API v4.2.2 (files.list, files.read, files.write, files.delete)
-// Ã¢Å“â€¦ Gestion rÃƒÂ©ponses {success: true, data: {...}}
-// Ã¢Å“â€¦ Upload et gestion fichiers MIDI
-// Ã¢Å“â€¦ PrÃƒÂ©visualisation et mÃƒÂ©tadonnÃƒÂ©es
+// CORRECTIONS v4.0.4:
+// ✅ Fix upload bloqué (input permanent dans DOM)
+// ✅ Gestion d'erreur robuste dans render()
+// ✅ Sécurisation filterFiles() et sortFiles()
+// ✅ Vérification state.files avant utilisation
+// ✅ Encodage UTF-8 propre
 // ============================================================================
 
 class FileView extends BaseView {
@@ -19,7 +17,7 @@ class FileView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // Ãƒâ€°tat spÃƒÂ©cifique ÃƒÂ  la vue
+        // État spécifique à la vue
         this.viewState = {
             files: [],
             selectedFile: null,
@@ -30,7 +28,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', 'FileView', 'Ã¢Å“â€¦ FileView v4.0.1 initialized (API-compliant + render)');
+        this.log('info', 'FileView', '✅ FileView v4.0.4 initialized (fixed)');
     }
     
     // ========================================================================
@@ -43,18 +41,18 @@ class FileView extends BaseView {
         return `
             <div class="file-view-container">
                 <div class="page-header">
-                    <h1>Ã°Å¸â€œÂ Fichiers MIDI</h1>
+                    <h1>📁 Fichiers MIDI</h1>
                     <div class="header-actions">
                         <button class="btn-upload" data-action="upload-file">
-                            Ã°Å¸â€œÂ¤ Upload
+                            📤 Upload
                         </button>
                         <button class="btn-refresh" data-action="refresh-files">
-                            Ã°Å¸â€â€ž Actualiser
+                            🔄 Actualiser
                         </button>
                     </div>
                 </div>
                 
-                <!-- Barre de contrÃƒÂ´le -->
+                <!-- Barre de contrôle -->
                 <div class="files-toolbar">
                     <div class="files-path">
                         <span class="path-label">Dossier:</span>
@@ -74,12 +72,12 @@ class FileView extends BaseView {
                             <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
                         </select>
                         <button class="btn-sort-order" data-action="toggle-sort-order">
-                            ${state.sortOrder === 'asc' ? 'Ã¢â€ â€˜' : 'Ã¢â€ â€œ'}
+                            ${state.sortOrder === 'asc' ? '↑' : '↓'}
                         </button>
                     </div>
                     
                     <div class="files-count">
-                        <span>${state.files.length} fichier(s)</span>
+                        <span>${state.files ? state.files.length : 0} fichier(s)</span>
                     </div>
                 </div>
                 
@@ -90,7 +88,7 @@ class FileView extends BaseView {
                     </div>
                 </div>
                 
-                <!-- Panneau de dÃƒÂ©tails -->
+                <!-- Panneau de détails -->
                 <div class="file-details" id="fileDetails">
                     ${state.selectedFile ? this.renderFileDetails(state.selectedFile) : this.renderNoSelection()}
                 </div>
@@ -99,12 +97,12 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // RENDERING - MÃƒâ€°THODES PRINCIPALES
+    // RENDERING - MÉTHODES PRINCIPALES
     // ========================================================================
     
     /**
      * Rendre la vue
-     * @param {Object} data - DonnÃƒÂ©es optionnelles pour le rendu
+     * @param {Object} data - Données optionnelles pour le rendu
      */
     render(data = null) {
         if (!this.container) {
@@ -115,29 +113,40 @@ class FileView extends BaseView {
         const startTime = performance.now();
         
         try {
-            // GÃƒÂ©nÃƒÂ©rer et insÃƒÂ©rer le HTML
+            // Générer et insérer le HTML
             this.container.innerHTML = this.buildTemplate(data || this.viewState);
             
-            // Attacher les ÃƒÂ©vÃƒÂ©nements
+            // Attacher les événements
             this.attachEvents();
             
-            // Mettre ÃƒÂ  jour l'ÃƒÂ©tat
+            // Mettre à jour l'état
             this.state.rendered = true;
             this.state.lastUpdate = Date.now();
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             if (this.eventBus) {
                 this.eventBus.emit('file-view:rendered', {
-                    filesCount: this.viewState.files.length
+                    filesCount: this.viewState.files ? this.viewState.files.length : 0
                 });
             }
             
             const renderTime = performance.now() - startTime;
-            this.log('debug', 'FileView', `Ã¢Å“â€œ Rendered in ${renderTime.toFixed(2)}ms`);
+            this.log('debug', 'FileView', `✅ Rendered in ${renderTime.toFixed(2)}ms`);
             
         } catch (error) {
             this.log('error', 'FileView', 'Render failed:', error);
             this.handleError('Render failed', error);
+            
+            // Afficher un message d'erreur à l'utilisateur
+            if (this.container) {
+                this.container.innerHTML = `
+                    <div class="error-message">
+                        <h3>Erreur d'affichage</h3>
+                        <p>Impossible d'afficher la liste des fichiers.</p>
+                        <button onclick="window.location.reload()">Recharger la page</button>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -149,8 +158,8 @@ class FileView extends BaseView {
             this.container.style.display = 'block';
             this.state.visible = true;
             
-            // Recharger les donnÃƒÂ©es si nÃƒÂ©cessaire
-            if (this.viewState.files.length === 0) {
+            // Recharger les données si nécessaire
+            if (!this.viewState.files || this.viewState.files.length === 0) {
                 this.refreshFiles();
             }
         }
@@ -188,31 +197,44 @@ class FileView extends BaseView {
     
     renderFilesList(state) {
         try {
+            // ✅ Vérification robuste
             if (!state || !state.files) {
-                return '<div class="files-empty"><p>No files data</p></div>';
+                return `
+                    <div class="files-empty">
+                        <div class="empty-icon">📂</div>
+                        <p>Aucune donnée disponible</p>
+                        <button class="btn-refresh" data-action="refresh-files">🔄 Actualiser</button>
+                    </div>
+                `;
             }
             
             let files = this.filterFiles(state.files, state.filter);
             files = this.sortFiles(files, state.sortBy, state.sortOrder);
-        
-        if (files.length === 0) {
+            
+            if (files.length === 0) {
+                return `
+                    <div class="files-empty">
+                        <div class="empty-icon">📂</div>
+                        <p>Aucun fichier MIDI trouvé</p>
+                        <p class="text-muted">Uploadez des fichiers ou vérifiez le chemin</p>
+                    </div>
+                `;
+            }
+            
             return `
-                <div class="files-empty">
-                    <div class="empty-icon">Ã°Å¸â€œâ€š</div>
-                    <p>Aucun fichier MIDI trouvÃƒÂ©</p>
-                    <p class="text-muted">Uploadez des fichiers ou vÃƒÂ©rifiez le chemin</p>
+                <div class="files-grid">
+                    ${files.map(file => this.renderFileCard(file, state.selectedFile)).join('')}
                 </div>
             `;
-        }
-        
-        return `
-            <div class="files-grid">
-                ${files.map(file => this.renderFileCard(file, state.selectedFile)).join('')}
-            </div>
-        `;
         } catch (error) {
             this.log('error', 'FileView', 'renderFilesList error:', error);
-            return '<div class="files-empty"><p>Error loading files</p></div>';
+            return `
+                <div class="files-empty">
+                    <div class="empty-icon">⚠️</div>
+                    <p>Erreur lors du chargement des fichiers</p>
+                    <button class="btn-refresh" data-action="refresh-files">🔄 Réessayer</button>
+                </div>
+            `;
         }
     }
     
@@ -220,31 +242,31 @@ class FileView extends BaseView {
         const isSelected = selectedFile && 
                           (selectedFile.path === file.path || selectedFile.name === file.name);
         
-        const size = file.size ? this.formatFileSize(file.size) : 'Ã¢â‚¬â€';
+        const size = file.size ? this.formatFileSize(file.size) : '–';
         const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : 'Ã¢â‚¬â€';
+        const dateStr = date ? this.formatDate(date) : '–';
         
         return `
             <div class="file-card ${isSelected ? 'selected' : ''}" 
                  data-file-path="${file.path || file.name}">
-                <div class="file-icon">Ã°Å¸Å½Âµ</div>
+                <div class="file-icon">🎵</div>
                 <div class="file-info">
                     <div class="file-name" title="${file.name}">${file.name}</div>
                     <div class="file-meta">
                         <span class="file-size">${size}</span>
-                        <span>Ã¢â‚¬Â¢</span>
+                        <span>•</span>
                         <span class="file-date">${dateStr}</span>
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-icon" data-action="select-file" title="SÃƒÂ©lectionner">
-                        Ã°Å¸â€œâ€¹
+                    <button class="btn-icon" data-action="select-file" title="Sélectionner">
+                        📋
                     </button>
                     <button class="btn-icon" data-action="play-file" title="Lire">
-                        Ã¢â€“Â¶
+                        ▶
                     </button>
                     <button class="btn-icon" data-action="delete-file" title="Supprimer">
-                        Ã°Å¸â€”â€˜Ã¯Â¸Â
+                        🗑️
                     </button>
                 </div>
             </div>
@@ -252,17 +274,17 @@ class FileView extends BaseView {
     }
     
     renderFileDetails(file) {
-        const size = file.size ? this.formatFileSize(file.size) : 'Ã¢â‚¬â€';
+        const size = file.size ? this.formatFileSize(file.size) : '–';
         const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : 'Ã¢â‚¬â€';
+        const dateStr = date ? this.formatDate(date) : '–';
         
         return `
             <div class="details-header">
-                <h3>DÃƒÂ©tails du fichier</h3>
-                <button class="btn-close" data-action="close-details">Ã¢Å“â€¢</button>
+                <h3>Détails du fichier</h3>
+                <button class="btn-close" data-action="close-details">✕</button>
             </div>
             <div class="details-content">
-                <div class="detail-icon">Ã°Å¸Å½Âµ</div>
+                <div class="detail-icon">🎵</div>
                 <div class="detail-name">${file.name}</div>
                 
                 <div class="details-section">
@@ -285,13 +307,13 @@ class FileView extends BaseView {
                 
                 <div class="details-actions">
                     <button class="btn-primary" data-action="load-file">
-                        Ã°Å¸â€œâ€š Charger dans l'ÃƒÂ©diteur
+                        📂 Charger dans l'éditeur
                     </button>
                     <button class="btn-secondary" data-action="play-file">
-                        Ã¢â€“Â¶ Lire
+                        ▶ Lire
                     </button>
                     <button class="btn-danger" data-action="delete-file">
-                        Ã°Å¸â€”â€˜Ã¯Â¸Â Supprimer
+                        🗑️ Supprimer
                     </button>
                 </div>
             </div>
@@ -304,19 +326,19 @@ class FileView extends BaseView {
                 <h4>Informations MIDI</h4>
                 <div class="detail-row">
                     <span class="detail-label">Format:</span>
-                    <span class="detail-value">${midiInfo.format || 'Ã¢â‚¬â€'}</span>
+                    <span class="detail-value">${midiInfo.format || '–'}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Pistes:</span>
-                    <span class="detail-value">${midiInfo.tracks || 'Ã¢â‚¬â€'}</span>
+                    <span class="detail-value">${midiInfo.tracks || '–'}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">PPQ:</span>
-                    <span class="detail-value">${midiInfo.ppq || 'Ã¢â‚¬â€'}</span>
+                    <span class="detail-value">${midiInfo.ppq || '–'}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">DurÃƒÂ©e:</span>
-                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : 'Ã¢â‚¬â€'}</span>
+                    <span class="detail-label">Durée:</span>
+                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : '–'}</span>
                 </div>
             </div>
         `;
@@ -325,8 +347,8 @@ class FileView extends BaseView {
     renderNoSelection() {
         return `
             <div class="details-placeholder">
-                <div class="placeholder-icon">Ã°Å¸â€œâ€¹</div>
-                <p>SÃƒÂ©lectionnez un fichier pour voir ses dÃƒÂ©tails</p>
+                <div class="placeholder-icon">📋</div>
+                <p>Sélectionnez un fichier pour voir ses détails</p>
             </div>
         `;
     }
@@ -431,7 +453,7 @@ class FileView extends BaseView {
     // ========================================================================
     
     handleUpload() {
-        // Utiliser ou créer un input file permanent
+        // ✅ Utiliser ou créer un input file permanent attaché au DOM
         let input = document.getElementById('file-upload-input');
         
         if (!input) {
@@ -443,20 +465,25 @@ class FileView extends BaseView {
             input.style.display = 'none';
             document.body.appendChild(input);
             
+            this.log('debug', 'FileView', 'Created permanent file input');
+            
             // Attacher le handler une seule fois
-            input.addEventListener('change', async (e) => {
+            input.addEventListener('change', (e) => {
                 const files = Array.from(e.target.files);
                 
                 if (files.length === 0) return;
                 
+                this.log('info', 'FileView', `Selected ${files.length} file(s)`);
+                
                 for (const file of files) {
                     try {
                         // ✅ Émettre événement que FileController écoute
-                        this.eventBus.emit('file:upload', {
-                            file: file  // Objet File natif
-                        });
-                        
-                        this.log('info', 'FileView', `Upload requested: ${file.name}`);
+                        if (this.eventBus) {
+                            this.eventBus.emit('file:upload', {
+                                file: file  // Objet File natif
+                            });
+                            this.log('info', 'FileView', `Upload requested: ${file.name}`);
+                        }
                     } catch (error) {
                         this.log('error', 'FileView', `Upload error: ${error.message}`);
                     }
@@ -468,9 +495,9 @@ class FileView extends BaseView {
         }
         
         // Déclencher le sélecteur de fichiers
+        this.log('debug', 'FileView', 'Triggering file selector');
         input.click();
     }
-
     
     handleRefresh() {
         this.viewState.isLoading = true;
@@ -493,7 +520,7 @@ class FileView extends BaseView {
             this.viewState.selectedFile = file;
             this.render();
             
-            // Ãƒâ€°mettre ÃƒÂ©vÃƒÂ©nement
+            // Émettre événement
             if (this.eventBus) {
                 this.eventBus.emit('file:selected', { file });
             }
@@ -514,7 +541,7 @@ class FileView extends BaseView {
         
         const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
         
-        // Demander chargement dans l'ÃƒÂ©diteur via files.read puis conversion
+        // Demander chargement dans l'éditeur via files.read puis conversion
         if (this.eventBus) {
             this.eventBus.emit('file:load_editor_requested', {
                 file_path: filePath
@@ -533,7 +560,7 @@ class FileView extends BaseView {
             });
         }
         
-        // Clear selection si c'est le fichier sÃƒÂ©lectionnÃƒÂ©
+        // Clear selection si c'est le fichier sélectionné
         if (this.viewState.selectedFile && 
             (this.viewState.selectedFile.path === filePath || 
              this.viewState.selectedFile.name === filePath)) {
@@ -556,24 +583,34 @@ class FileView extends BaseView {
     // ========================================================================
     
     filterFiles(files, filter) {
-        if (!files || !Array.isArray(files)) return [];
+        // ✅ Vérification robuste
+        if (!files || !Array.isArray(files)) {
+            this.log('warn', 'FileView', 'filterFiles: files is not an array');
+            return [];
+        }
+        
         if (!filter) return files;
         
         const lowerFilter = filter.toLowerCase();
         return files.filter(file => 
-            file.name.toLowerCase().includes(lowerFilter)
+            file.name && file.name.toLowerCase().includes(lowerFilter)
         );
     }
     
     sortFiles(files, sortBy, sortOrder) {
-        if (!files || !Array.isArray(files)) return [];
+        // ✅ Vérification robuste
+        if (!files || !Array.isArray(files)) {
+            this.log('warn', 'FileView', 'sortFiles: files is not an array');
+            return [];
+        }
+        
         const sorted = [...files].sort((a, b) => {
             let aVal, bVal;
             
             switch (sortBy) {
                 case 'name':
-                    aVal = a.name.toLowerCase();
-                    bVal = b.name.toLowerCase();
+                    aVal = (a.name || '').toLowerCase();
+                    bVal = (b.name || '').toLowerCase();
                     break;
                 case 'date':
                     aVal = a.modified || a.created || 0;
@@ -602,8 +639,12 @@ class FileView extends BaseView {
     }
     
     formatDate(timestamp) {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        try {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        } catch (error) {
+            return '–';
+        }
     }
     
     formatDuration(seconds) {
