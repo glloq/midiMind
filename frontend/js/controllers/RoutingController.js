@@ -1,15 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/RoutingController.js
-// Chemin réel: frontend/js/controllers/RoutingController.js
+// Chemin rÃ©el: frontend/js/controllers/RoutingController.js
 // Version: v4.2.4 - API FULLY COMPLIANT
 // Date: 2025-11-06
 // ============================================================================
 // CORRECTIONS v4.2.4:
-// ✅ addRoute: destination_id (pas dest_id)
-// ✅ removeRoute: (source_id, destination_id) pas route_id
-// ✅ enableRoute: (source_id, destination_id) pas route_id
-// ✅ disableRoute: (source_id, destination_id) pas route_id
-// ✅ 100% conforme API Documentation v4.2.2
+// âœ… addRoute: destination_id (pas dest_id)
+// âœ… removeRoute: (source_id, destination_id) pas route_id
+// âœ… enableRoute: (source_id, destination_id) pas route_id
+// âœ… disableRoute: (source_id, destination_id) pas route_id
+// âœ… 100% conforme API Documentation v4.2.2
 // ============================================================================
 
 class RoutingController extends BaseController {
@@ -41,6 +41,15 @@ class RoutingController extends BaseController {
         this.eventBus.on('routing:enable_route', (data) => this.enableRoute(data.source_id, data.destination_id));
         this.eventBus.on('routing:disable_route', (data) => this.disableRoute(data.source_id, data.destination_id));
         this.eventBus.on('routing:clear_all', () => this.clearAllRoutes());
+        
+        // Charger routes uniquement quand la page Routing devient active
+        this.eventBus.on('navigation:page_changed', (data) => {
+            if (data.page === 'routing' && this.backend?.isConnected?.()) {
+                this.loadRoutes().catch(err => {
+                    this.log('error', 'RoutingController', 'loadRoutes failed:', err);
+                });
+            }
+        });
     }
     
     async initialize() {
@@ -54,19 +63,18 @@ class RoutingController extends BaseController {
         
         this.logger?.info?.('RoutingController', 'Initializing v4.2.4 (API Compliant)...');
         
-        if (this.backend?.isConnected()) {
-            await this.loadRoutes();
-        }
         
         this.localState.isInitialized = true;
     }
     
     async onBackendConnected() {
-        await this.loadRoutes();
+        // NE PAS charger automatiquement les routes au démarrage
+        // Les routes seront chargées quand la page Routing devient active
+        this.log('info', 'RoutingController', 'Waiting for routing page activation...');
     }
     
     /**
-     * ✅ Charge routes depuis backend
+     * âœ… Charge routes depuis backend
      */
     async loadRoutes() {
         if (!this.backend?.isConnected()) return;
@@ -90,7 +98,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * ✅ CORRIGÉ: Ajoute route avec source_id, destination_id
+     * âœ… CORRIGÃ‰: Ajoute route avec source_id, destination_id
      */
     async addRoute(params) {
         const { source_id, destination_id } = params;
@@ -104,12 +112,12 @@ class RoutingController extends BaseController {
         }
         
         try {
-            // ✅ API v4.2.2: destination_id (pas dest_id)
+            // âœ… API v4.2.2: destination_id (pas dest_id)
             const response = await this.backend.addRoute(source_id, destination_id);
             
             await this.loadRoutes();
             
-            this.notifications?.success('Route added', `Route ${source_id} → ${destination_id}`);
+            this.notifications?.success('Route added', `Route ${source_id} â†’ ${destination_id}`);
             
             return response;
             
@@ -121,7 +129,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * ✅ CORRIGÉ: Utilise (source_id, destination_id) pas route_id
+     * âœ… CORRIGÃ‰: Utilise (source_id, destination_id) pas route_id
      */
     async removeRoute(source_id, destination_id) {
         if (!source_id || !destination_id) {
@@ -133,12 +141,12 @@ class RoutingController extends BaseController {
         }
         
         try {
-            // ✅ API v4.2.2: (source_id, destination_id)
+            // âœ… API v4.2.2: (source_id, destination_id)
             await this.backend.removeRoute(source_id, destination_id);
             
             await this.loadRoutes();
             
-            this.notifications?.success('Route removed', `Route ${source_id} → ${destination_id} deleted`);
+            this.notifications?.success('Route removed', `Route ${source_id} â†’ ${destination_id} deleted`);
             
         } catch (error) {
             this.logger?.error?.('RoutingController', 'removeRoute failed:', error);
@@ -148,7 +156,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * ✅ CORRIGÉ: Active route avec (source_id, destination_id)
+     * âœ… CORRIGÃ‰: Active route avec (source_id, destination_id)
      */
     async enableRoute(source_id, destination_id) {
         if (!source_id || !destination_id) {
@@ -160,12 +168,12 @@ class RoutingController extends BaseController {
         }
         
         try {
-            // ✅ API v4.2.2: (source_id, destination_id)
+            // âœ… API v4.2.2: (source_id, destination_id)
             await this.backend.enableRoute(source_id, destination_id);
             
             await this.loadRoutes();
             
-            this.notifications?.success('Route enabled', `Route ${source_id} → ${destination_id} enabled`);
+            this.notifications?.success('Route enabled', `Route ${source_id} â†’ ${destination_id} enabled`);
             
         } catch (error) {
             this.logger?.error?.('RoutingController', 'enableRoute failed:', error);
@@ -175,7 +183,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * ✅ CORRIGÉ: Désactive route avec (source_id, destination_id)
+     * âœ… CORRIGÃ‰: DÃ©sactive route avec (source_id, destination_id)
      */
     async disableRoute(source_id, destination_id) {
         if (!source_id || !destination_id) {
@@ -187,12 +195,12 @@ class RoutingController extends BaseController {
         }
         
         try {
-            // ✅ API v4.2.2: (source_id, destination_id)
+            // âœ… API v4.2.2: (source_id, destination_id)
             await this.backend.disableRoute(source_id, destination_id);
             
             await this.loadRoutes();
             
-            this.notifications?.success('Route disabled', `Route ${source_id} → ${destination_id} disabled`);
+            this.notifications?.success('Route disabled', `Route ${source_id} â†’ ${destination_id} disabled`);
             
         } catch (error) {
             this.logger?.error?.('RoutingController', 'disableRoute failed:', error);
@@ -252,7 +260,7 @@ class RoutingController extends BaseController {
     }
     
     /**
-     * Vérifie si une route existe
+     * VÃ©rifie si une route existe
      */
     routeExists(source_id, destination_id) {
         const key = `${source_id}:${destination_id}`;
