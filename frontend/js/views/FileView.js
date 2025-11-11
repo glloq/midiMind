@@ -374,7 +374,7 @@ class FileView extends BaseView {
         if (!this.eventBus) return;
         
         // files.list response
-        this.eventBus.on('files:listed', (data) => {
+        this.eventBus.on('files:list-updated', (data) => {
             this.log('debug', 'FileView', `Received ${data.files?.length || 0} files`);
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
@@ -437,11 +437,9 @@ class FileView extends BaseView {
         this.viewState.isLoading = true;
         this.render();
         
-        // Demander la liste via files.list API
+        // Demander la liste via file:refresh que FileController écoute
         if (this.eventBus) {
-            this.eventBus.emit('file:list_requested', {
-                path: this.viewState.currentPath
-            });
+            this.eventBus.emit('file:refresh');
         }
     }
     
