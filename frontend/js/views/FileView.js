@@ -1,13 +1,16 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v4.0.2 - FIX ERREURS DE RENDU
-// Date: 2025-11-11
+// Version: v4.0.1 - CONFORMITÃ‰ API + MÃ‰THODES RENDER
+// Date: 2025-11-08
 // ============================================================================
-// CORRECTIONS v4.0.2:
-// ✅ Fix: Meilleure gestion d'erreurs dans render()
-// ✅ Fix: Vérification container avant buildTemplate()
-// ✅ Fix: Protection contre erreurs dans renderFilesList()
-// ✅ Fix: Utilisation correcte de this.log() au lieu de logger direct
+// AMÃ‰LIORATIONS v4.0.1:
+// âœ… Ajout mÃ©thode render() pour insertion DOM
+// âœ… Ajout mÃ©thode show() pour affichage
+// âœ… Ajout mÃ©thode hide() pour masquage
+// âœ… ConformitÃ© API v4.2.2 (files.list, files.read, files.write, files.delete)
+// âœ… Gestion rÃ©ponses {success: true, data: {...}}
+// âœ… Upload et gestion fichiers MIDI
+// âœ… PrÃ©visualisation et mÃ©tadonnÃ©es
 // ============================================================================
 
 class FileView extends BaseView {
@@ -16,7 +19,7 @@ class FileView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // État spécifique à la vue
+        // Ã‰tat spÃ©cifique Ã  la vue
         this.viewState = {
             files: [],
             selectedFile: null,
@@ -27,7 +30,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', '[FileView] ✅ FileView v4.0.2 initialized (Fix Render Errors)');
+        this.log('info', 'FileView', 'âœ… FileView v4.0.1 initialized (API-compliant + render)');
     }
     
     // ========================================================================
@@ -35,100 +38,94 @@ class FileView extends BaseView {
     // ========================================================================
     
     buildTemplate(data = {}) {
-        try {
-            const state = { ...this.viewState, ...data };
-            
-            return `
-                <div class="file-view-container">
-                    <div class="page-header">
-                        <h1>📁 Fichiers MIDI</h1>
-                        <div class="header-actions">
-                            <button class="btn-upload" data-action="upload-file">
-                                📤 Upload
-                            </button>
-                            <button class="btn-refresh" data-action="refresh-files">
-                                🔄 Actualiser
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Barre de contrôle -->
-                    <div class="files-toolbar">
-                        <div class="files-path">
-                            <span class="path-label">Dossier:</span>
-                            <input type="text" class="path-input" value="${this.escapeHtml(state.currentPath)}" 
-                                   data-action="change-path" />
-                        </div>
-                        
-                        <div class="files-search">
-                            <input type="text" class="search-input" placeholder="Rechercher..." 
-                                   value="${this.escapeHtml(state.filter)}" data-action="filter-files" />
-                        </div>
-                        
-                        <div class="files-sort">
-                            <select class="sort-select" data-action="change-sort">
-                                <option value="name" ${state.sortBy === 'name' ? 'selected' : ''}>Nom</option>
-                                <option value="date" ${state.sortBy === 'date' ? 'selected' : ''}>Date</option>
-                                <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
-                            </select>
-                            <button class="btn-sort-order" data-action="toggle-sort-order">
-                                ${state.sortOrder === 'asc' ? '↑' : '↓'}
-                            </button>
-                        </div>
-                        
-                        <div class="files-count">
-                            <span>${state.files.length} fichier(s)</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Contenu des fichiers -->
-                    <div class="files-section">
-                        <div class="files-content">
-                            ${state.isLoading ? this.renderLoading() : this.renderFilesList(state)}
-                        </div>
-                    </div>
-                    
-                    <!-- Panneau de détails -->
-                    <div class="file-details" id="fileDetails">
-                        ${state.selectedFile ? this.renderFileDetails(state.selectedFile) : this.renderNoSelection()}
+        const state = { ...this.viewState, ...data };
+        
+        return `
+            <div class="file-view-container">
+                <div class="page-header">
+                    <h1>ðŸ“ Fichiers MIDI</h1>
+                    <div class="header-actions">
+                        <button class="btn-upload" data-action="upload-file">
+                            ðŸ“¤ Upload
+                        </button>
+                        <button class="btn-refresh" data-action="refresh-files">
+                            ðŸ”„ Actualiser
+                        </button>
                     </div>
                 </div>
-            `;
-        } catch (error) {
-            this.log('error', '[FileView] buildTemplate failed:', error);
-            return '<div class="error-message">Erreur lors de la construction du template</div>';
-        }
+                
+                <!-- Barre de contrÃ´le -->
+                <div class="files-toolbar">
+                    <div class="files-path">
+                        <span class="path-label">Dossier:</span>
+                        <input type="text" class="path-input" value="${state.currentPath}" 
+                               data-action="change-path" />
+                    </div>
+                    
+                    <div class="files-search">
+                        <input type="text" class="search-input" placeholder="Rechercher..." 
+                               value="${state.filter}" data-action="filter-files" />
+                    </div>
+                    
+                    <div class="files-sort">
+                        <select class="sort-select" data-action="change-sort">
+                            <option value="name" ${state.sortBy === 'name' ? 'selected' : ''}>Nom</option>
+                            <option value="date" ${state.sortBy === 'date' ? 'selected' : ''}>Date</option>
+                            <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
+                        </select>
+                        <button class="btn-sort-order" data-action="toggle-sort-order">
+                            ${state.sortOrder === 'asc' ? 'â†‘' : 'â†“'}
+                        </button>
+                    </div>
+                    
+                    <div class="files-count">
+                        <span>${state.files.length} fichier(s)</span>
+                    </div>
+                </div>
+                
+                <!-- Contenu des fichiers -->
+                <div class="files-section">
+                    <div class="files-content">
+                        ${state.isLoading ? this.renderLoading() : this.renderFilesList(state)}
+                    </div>
+                </div>
+                
+                <!-- Panneau de dÃ©tails -->
+                <div class="file-details" id="fileDetails">
+                    ${state.selectedFile ? this.renderFileDetails(state.selectedFile) : this.renderNoSelection()}
+                </div>
+            </div>
+        `;
     }
     
     // ========================================================================
-    // RENDERING - MÉTHODES PRINCIPALES
+    // RENDERING - MÃ‰THODES PRINCIPALES
     // ========================================================================
     
     /**
      * Rendre la vue
-     * @param {Object} data - Données optionnelles pour le rendu
+     * @param {Object} data - DonnÃ©es optionnelles pour le rendu
      */
     render(data = null) {
         if (!this.container) {
-            this.log('error', '[FileView] Cannot render: container not found');
+            this.log('error', 'FileView', 'Cannot render: container not found');
             return;
         }
         
         const startTime = performance.now();
         
         try {
-            // Générer et insérer le HTML
-            const html = this.buildTemplate(data || this.viewState);
-            this.container.innerHTML = html;
+            // GÃ©nÃ©rer et insÃ©rer le HTML
+            this.container.innerHTML = this.buildTemplate(data || this.viewState);
             
-            // Attacher les événements
+            // Attacher les Ã©vÃ©nements
             this.attachEvents();
             
-            // Mettre à jour l'état
+            // Mettre Ã  jour l'Ã©tat
             this.state.rendered = true;
             this.state.lastUpdate = Date.now();
             
-            // Émettre événement
+            // Ã‰mettre Ã©vÃ©nement
             if (this.eventBus) {
                 this.eventBus.emit('file-view:rendered', {
                     filesCount: this.viewState.files.length
@@ -136,14 +133,11 @@ class FileView extends BaseView {
             }
             
             const renderTime = performance.now() - startTime;
-            this.log('debug', '[FileView]', `✓ Rendered in ${renderTime.toFixed(2)}ms`);
+            this.log('debug', 'FileView', `âœ“ Rendered in ${renderTime.toFixed(2)}ms`);
             
         } catch (error) {
-            this.log('error', '[FileView] Render failed:', error);
-            // Ne pas appeler handleError qui pourrait créer une boucle infinie
-            if (this.container) {
-                this.container.innerHTML = '<div class="error-message">Erreur lors du rendu de la vue</div>';
-            }
+            this.log('error', 'FileView', 'Render failed:', error);
+            this.handleError('Render failed', error);
         }
     }
 
@@ -155,7 +149,7 @@ class FileView extends BaseView {
             this.container.style.display = 'block';
             this.state.visible = true;
             
-            // Recharger les données si nécessaire
+            // Recharger les donnÃ©es si nÃ©cessaire
             if (this.viewState.files.length === 0) {
                 this.refreshFiles();
             }
@@ -193,157 +187,137 @@ class FileView extends BaseView {
     }
     
     renderFilesList(state) {
-        try {
-            let files = this.filterFiles(state.files, state.filter);
-            files = this.sortFiles(files, state.sortBy, state.sortOrder);
-            
-            if (files.length === 0) {
-                return `
-                    <div class="files-empty">
-                        <div class="empty-icon">📂</div>
-                        <p>Aucun fichier MIDI trouvé</p>
-                        <p class="text-muted">Uploadez des fichiers ou vérifiez le chemin</p>
-                    </div>
-                `;
-            }
-            
+        let files = this.filterFiles(state.files, state.filter);
+        files = this.sortFiles(files, state.sortBy, state.sortOrder);
+        
+        if (files.length === 0) {
             return `
-                <div class="files-grid">
-                    ${files.map(file => this.renderFileCard(file, state.selectedFile)).join('')}
+                <div class="files-empty">
+                    <div class="empty-icon">ðŸ“‚</div>
+                    <p>Aucun fichier MIDI trouvÃ©</p>
+                    <p class="text-muted">Uploadez des fichiers ou vÃ©rifiez le chemin</p>
                 </div>
             `;
-        } catch (error) {
-            this.log('error', '[FileView] renderFilesList failed:', error);
-            return '<div class="error-message">Erreur lors de l\'affichage des fichiers</div>';
         }
+        
+        return `
+            <div class="files-grid">
+                ${files.map(file => this.renderFileCard(file, state.selectedFile)).join('')}
+            </div>
+        `;
     }
     
     renderFileCard(file, selectedFile) {
-        try {
-            const isSelected = selectedFile && 
-                              (selectedFile.path === file.path || selectedFile.name === file.name);
-            
-            const size = file.size ? this.formatFileSize(file.size) : '—';
-            const date = file.modified || file.created;
-            const dateStr = date ? this.formatDate(date) : '—';
-            
-            return `
-                <div class="file-card ${isSelected ? 'selected' : ''}" 
-                     data-file-path="${this.escapeHtml(file.path || file.name)}">
-                    <div class="file-icon">🎵</div>
-                    <div class="file-info">
-                        <div class="file-name" title="${this.escapeHtml(file.name)}">${this.escapeHtml(file.name)}</div>
-                        <div class="file-meta">
-                            <span class="file-size">${size}</span>
-                            <span>•</span>
-                            <span class="file-date">${dateStr}</span>
-                        </div>
-                    </div>
-                    <div class="file-actions">
-                        <button class="btn-icon" data-action="select-file" title="Sélectionner">
-                            📋
-                        </button>
-                        <button class="btn-icon" data-action="play-file" title="Lire">
-                            ▶
-                        </button>
-                        <button class="btn-icon" data-action="delete-file" title="Supprimer">
-                            🗑️
-                        </button>
+        const isSelected = selectedFile && 
+                          (selectedFile.path === file.path || selectedFile.name === file.name);
+        
+        const size = file.size ? this.formatFileSize(file.size) : 'â€”';
+        const date = file.modified || file.created;
+        const dateStr = date ? this.formatDate(date) : 'â€”';
+        
+        return `
+            <div class="file-card ${isSelected ? 'selected' : ''}" 
+                 data-file-path="${file.path || file.name}">
+                <div class="file-icon">ðŸŽµ</div>
+                <div class="file-info">
+                    <div class="file-name" title="${file.name}">${file.name}</div>
+                    <div class="file-meta">
+                        <span class="file-size">${size}</span>
+                        <span>â€¢</span>
+                        <span class="file-date">${dateStr}</span>
                     </div>
                 </div>
-            `;
-        } catch (error) {
-            this.log('error', '[FileView] renderFileCard failed:', error);
-            return '';
-        }
+                <div class="file-actions">
+                    <button class="btn-icon" data-action="select-file" title="SÃ©lectionner">
+                        ðŸ“‹
+                    </button>
+                    <button class="btn-icon" data-action="play-file" title="Lire">
+                        â–¶
+                    </button>
+                    <button class="btn-icon" data-action="delete-file" title="Supprimer">
+                        ðŸ—‘ï¸
+                    </button>
+                </div>
+            </div>
+        `;
     }
     
     renderFileDetails(file) {
-        try {
-            const size = file.size ? this.formatFileSize(file.size) : '—';
-            const date = file.modified || file.created;
-            const dateStr = date ? this.formatDate(date) : '—';
-            
-            return `
-                <div class="details-header">
-                    <h3>Détails du fichier</h3>
-                    <button class="btn-close" data-action="close-details">✕</button>
-                </div>
-                <div class="details-content">
-                    <div class="detail-icon">🎵</div>
-                    <div class="detail-name">${this.escapeHtml(file.name)}</div>
-                    
-                    <div class="details-section">
-                        <h4>Informations</h4>
-                        <div class="detail-row">
-                            <span class="detail-label">Chemin:</span>
-                            <span class="detail-value">${this.escapeHtml(file.path || file.name)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Taille:</span>
-                            <span class="detail-value">${size}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Date:</span>
-                            <span class="detail-value">${dateStr}</span>
-                        </div>
+        const size = file.size ? this.formatFileSize(file.size) : 'â€”';
+        const date = file.modified || file.created;
+        const dateStr = date ? this.formatDate(date) : 'â€”';
+        
+        return `
+            <div class="details-header">
+                <h3>DÃ©tails du fichier</h3>
+                <button class="btn-close" data-action="close-details">âœ•</button>
+            </div>
+            <div class="details-content">
+                <div class="detail-icon">ðŸŽµ</div>
+                <div class="detail-name">${file.name}</div>
+                
+                <div class="details-section">
+                    <h4>Informations</h4>
+                    <div class="detail-row">
+                        <span class="detail-label">Chemin:</span>
+                        <span class="detail-value">${file.path || file.name}</span>
                     </div>
-                    
-                    ${file.midi_info ? this.renderMidiInfo(file.midi_info) : ''}
-                    
-                    <div class="details-actions">
-                        <button class="btn-primary" data-action="load-file">
-                            📂 Charger dans l'éditeur
-                        </button>
-                        <button class="btn-secondary" data-action="play-file">
-                            ▶ Lire
-                        </button>
-                        <button class="btn-danger" data-action="delete-file">
-                            🗑️ Supprimer
-                        </button>
+                    <div class="detail-row">
+                        <span class="detail-label">Taille:</span>
+                        <span class="detail-value">${size}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Date:</span>
+                        <span class="detail-value">${dateStr}</span>
                     </div>
                 </div>
-            `;
-        } catch (error) {
-            this.log('error', '[FileView] renderFileDetails failed:', error);
-            return '<div class="error-message">Erreur lors de l\'affichage des détails</div>';
-        }
+                
+                ${file.midi_info ? this.renderMidiInfo(file.midi_info) : ''}
+                
+                <div class="details-actions">
+                    <button class="btn-primary" data-action="load-file">
+                        ðŸ“‚ Charger dans l'Ã©diteur
+                    </button>
+                    <button class="btn-secondary" data-action="play-file">
+                        â–¶ Lire
+                    </button>
+                    <button class="btn-danger" data-action="delete-file">
+                        ðŸ—‘ï¸ Supprimer
+                    </button>
+                </div>
+            </div>
+        `;
     }
     
     renderMidiInfo(midiInfo) {
-        try {
-            return `
-                <div class="details-section">
-                    <h4>Informations MIDI</h4>
-                    <div class="detail-row">
-                        <span class="detail-label">Format:</span>
-                        <span class="detail-value">${midiInfo.format || '—'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Pistes:</span>
-                        <span class="detail-value">${midiInfo.tracks || '—'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">PPQ:</span>
-                        <span class="detail-value">${midiInfo.ppq || '—'}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Durée:</span>
-                        <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : '—'}</span>
-                    </div>
+        return `
+            <div class="details-section">
+                <h4>Informations MIDI</h4>
+                <div class="detail-row">
+                    <span class="detail-label">Format:</span>
+                    <span class="detail-value">${midiInfo.format || 'â€”'}</span>
                 </div>
-            `;
-        } catch (error) {
-            this.log('error', '[FileView] renderMidiInfo failed:', error);
-            return '';
-        }
+                <div class="detail-row">
+                    <span class="detail-label">Pistes:</span>
+                    <span class="detail-value">${midiInfo.tracks || 'â€”'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">PPQ:</span>
+                    <span class="detail-value">${midiInfo.ppq || 'â€”'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">DurÃ©e:</span>
+                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : 'â€”'}</span>
+                </div>
+            </div>
+        `;
     }
     
     renderNoSelection() {
         return `
             <div class="details-placeholder">
-                <div class="placeholder-icon">📋</div>
-                <p>Sélectionnez un fichier pour voir ses détails</p>
+                <div class="placeholder-icon">ðŸ“‹</div>
+                <p>SÃ©lectionnez un fichier pour voir ses dÃ©tails</p>
             </div>
         `;
     }
@@ -417,7 +391,7 @@ class FileView extends BaseView {
         
         // files.list response
         this.eventBus.on('files:listed', (data) => {
-            this.log('debug', '[FileView]', `Received ${data.files?.length || 0} files`);
+            this.log('debug', 'FileView', `Received ${data.files?.length || 0} files`);
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
             this.render();
@@ -425,19 +399,19 @@ class FileView extends BaseView {
         
         // files.write response (upload)
         this.eventBus.on('file:uploaded', (data) => {
-            this.log('info', '[FileView]', `File uploaded: ${data.file_path}`);
+            this.log('info', 'FileView', `File uploaded: ${data.file_path}`);
             this.handleRefresh(); // Recharger la liste
         });
         
         // files.delete response
         this.eventBus.on('file:deleted', (data) => {
-            this.log('info', '[FileView]', `File deleted: ${data.file_path}`);
+            this.log('info', 'FileView', `File deleted: ${data.file_path}`);
             this.handleRefresh(); // Recharger la liste
         });
         
         // Erreurs
         this.eventBus.on('files:error', (data) => {
-            this.log('error', '[FileView]', `Error: ${data.error}`);
+            this.log('error', 'FileView', `Error: ${data.error}`);
             this.viewState.isLoading = false;
             this.render();
         });
@@ -448,36 +422,29 @@ class FileView extends BaseView {
     // ========================================================================
     
     handleUpload() {
-        // Créer un input file
+        // CrÃ©er un input file
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.mid,.midi';
         input.multiple = true;
         
-        input.addEventListener('change', async (e) => {
+        
+        input.onchange = async (e) => {
             const files = Array.from(e.target.files);
             
             for (const file of files) {
                 try {
-                    // Lire le fichier
-                    const arrayBuffer = await file.arrayBuffer();
-                    const base64Data = this.arrayBufferToBase64(arrayBuffer);
+                    // ✅ FIX: Émettre événement que FileController écoute
+                    this.eventBus.emit('file:upload', {
+                        file: file  // Objet File natif
+                    });
                     
-                    // Émettre événement d'upload
-                    if (this.eventBus) {
-                        this.eventBus.emit('file:upload_requested', {
-                            file_name: file.name,
-                            file_data: base64Data,
-                            file_path: `${this.viewState.currentPath}/${file.name}`
-                        });
-                    }
-                    
-                    this.log('info', '[FileView]', `Uploading file: ${file.name}`);
+                    this.log('info', 'FileView', `Upload requested: ${file.name}`);
                 } catch (error) {
-                    this.log('error', '[FileView]', `Failed to upload ${file.name}:`, error);
+                    this.log('error', 'FileView', `Upload error: ${error.message}`);
                 }
             }
-        });
+        };
         
         input.click();
     }
@@ -486,7 +453,7 @@ class FileView extends BaseView {
         this.viewState.isLoading = true;
         this.render();
         
-        // Demander liste des fichiers via files.list API
+        // Demander la liste via files.list API
         if (this.eventBus) {
             this.eventBus.emit('file:list_requested', {
                 path: this.viewState.currentPath
@@ -503,7 +470,7 @@ class FileView extends BaseView {
             this.viewState.selectedFile = file;
             this.render();
             
-            // Émettre événement
+            // Ã‰mettre Ã©vÃ©nement
             if (this.eventBus) {
                 this.eventBus.emit('file:selected', { file });
             }
@@ -524,7 +491,7 @@ class FileView extends BaseView {
         
         const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
         
-        // Demander chargement dans l'éditeur via files.read puis conversion
+        // Demander chargement dans l'Ã©diteur via files.read puis conversion
         if (this.eventBus) {
             this.eventBus.emit('file:load_editor_requested', {
                 file_path: filePath
@@ -543,7 +510,7 @@ class FileView extends BaseView {
             });
         }
         
-        // Clear selection si c'est le fichier sélectionné
+        // Clear selection si c'est le fichier sÃ©lectionnÃ©
         if (this.viewState.selectedFile && 
             (this.viewState.selectedFile.path === filePath || 
              this.viewState.selectedFile.name === filePath)) {
