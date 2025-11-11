@@ -21,7 +21,7 @@
 #include "../storage/PresetManager.h"
 #include "../storage/MidiDatabase.h"
 #include "../storage/PlaylistManager.h"
-#include "../events/EventBus.h"
+#include "../core/EventBus.h"
 #include <string>
 #include <memory>
 #include <unordered_map>
