@@ -1,8 +1,8 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin réel: frontend/js/controllers/NavigationController.js
-// Version: v4.2.0 - FIX INITIALISATION PAGEVIEWMAP
-// Date: 2025-11-10
+// Version: v4.3.0 - FIX HIDEALLPAGES NULL CHECK
+// Date: 2025-11-11
 // ============================================================================
 // CORRECTIONS v4.2.0:
 // ✅ CRITIQUE: Fix pageViewMap undefined
@@ -53,7 +53,7 @@ class NavigationController extends BaseController {
         // ✅ CRITIQUE: Mapping page -> vue créé ICI
         this.pageViewMap = new Map();
         
-        this.log('debug', 'NavigationController', '✓ NavigationController v4.2.0 created');
+        this.log('debug', 'NavigationController', '✅ NavigationController v4.2.0 created');
     }
     
     // ========================================================================
@@ -86,7 +86,7 @@ class NavigationController extends BaseController {
         
         this.state.initialized = true;
         
-        this.log('info', 'NavigationController', '✓ Navigation system initialized');
+        this.log('info', 'NavigationController', '✅ Navigation system initialized');
     }
     
     /**
@@ -168,14 +168,14 @@ class NavigationController extends BaseController {
                 try {
                     view.init();
                     initializedCount++;
-                    this.log('debug', 'NavigationController', `✓ Initialized view: ${page}`);
+                    this.log('debug', 'NavigationController', `✅ Initialized view: ${page}`);
                 } catch (error) {
                     this.log('error', 'NavigationController', `Failed to init view ${page}:`, error);
                 }
             }
         }
         
-        this.log('info', 'NavigationController', `✓ Initialized ${initializedCount} views`);
+        this.log('info', 'NavigationController', `✅ Initialized ${initializedCount} views`);
     }
     
     /**
@@ -311,7 +311,7 @@ class NavigationController extends BaseController {
                 this.notifications.show(`Page: ${pageName}`, 'info', 2000);
             }
             
-            this.log('info', 'NavigationController', `✓ Navigated to page: ${pageName}`);
+            this.log('info', 'NavigationController', `✅ Navigated to page: ${pageName}`);
             
             return true;
             
@@ -499,7 +499,7 @@ class NavigationController extends BaseController {
         // Nettoyer les caches
         this.pageViewMap.clear();
         
-        this.log('info', 'NavigationController', '✓ Navigation system destroyed');
+        this.log('info', 'NavigationController', '✅ Navigation system destroyed');
     }
 }
 
