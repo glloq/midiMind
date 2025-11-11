@@ -602,6 +602,15 @@ class Application {
                 this.debugConsole,
                 this.services.backend  // âœ¦ BACKEND PASSED
             );
+            
+            // ✅ FIX CRITIQUE v4.5.0: Initialiser explicitement AVANT Router
+            if (typeof this.controllers.navigation.init === 'function') {
+                this.controllers.navigation.init();
+                this.log('info', '✓ NavigationController initialized');
+            } else if (typeof this.controllers.navigation.onInitialize === 'function') {
+                this.controllers.navigation.onInitialize();
+                this.log('info', '✓ NavigationController.onInitialize() called');
+            }
         }
         
         // Router ensuite
