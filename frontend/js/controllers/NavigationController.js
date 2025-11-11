@@ -1,31 +1,36 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
-// Chemin rÃ©el: frontend/js/controllers/NavigationController.js
-// Version: v4.4.0 - DETAILED ERROR LOGGING
-// Date: 2025-11-11
+// Chemin réel: frontend/js/controllers/NavigationController.js
+// Version: v4.5.0 - FIXED UTF-8 ENCODING
+// Date: 2025-11-12
 // ============================================================================
+// CORRECTIONS v4.5.0:
+// ✓ Encodage UTF-8 corrigé (émojis, accents)
+// ✓ Amélioration du logging des erreurs
+// ✓ Vérification renforcée du mapping page->vue
+//
 // CORRECTIONS v4.2.0:
-// âœ… CRITIQUE: Fix pageViewMap undefined
-// âœ… Solution: pageViewMap crÃ©Ã© AVANT appel Ã  super()
-// âœ… onInitialize() vÃ©rifie existence de pageViewMap
+// ✓ CRITIQUE: Fix pageViewMap undefined
+// ✓ Solution: pageViewMap créé AVANT appel à super()
+// ✓ onInitialize() vérifie existence de pageViewMap
 //
 // CORRECTIONS v4.1.0:
-// âœ… CRITIQUE: Suppression rÃ©fÃ©rence inexistante this.controllers
-// âœ… Communication controllers via EventBus
+// ✓ CRITIQUE: Suppression référence inexistante this.controllers
+// ✓ Communication controllers via EventBus
 // ============================================================================
 
 class NavigationController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
-        // âœ… CRITIQUE: CrÃ©er les structures AVANT super()
-        // Note: En JavaScript, on ne peut pas accÃ©der Ã  `this` avant super()
-        // Donc on passe une config qui dÃ©sactive autoInitialize
+        // ✓ CRITIQUE: Créer les structures AVANT super()
+        // Note: En JavaScript, on ne peut pas accéder à `this` avant super()
+        // Donc on passe une config qui désactive autoInitialize
         
         super(eventBus, models, views, notifications, debugConsole, backend);
         
-        // âœ… DÃ©sactiver l'auto-initialisation hÃ©ritÃ©e
+        // ✓ Désactiver l'auto-initialisation héritée
         this.state.isInitialized = false;
         
-        // Configuration spÃ©cifique
+        // Configuration spécifique
         Object.assign(this.config, {
             pageSelector: '.page',
             navItemSelector: '.nav-item',
@@ -35,7 +40,7 @@ class NavigationController extends BaseController {
             defaultPage: 'home'
         });
         
-        // Ã‰tat spÃ©cifique
+        // État spécifique
         Object.assign(this.state, {
             currentPage: null,
             previousPage: null,
@@ -43,17 +48,17 @@ class NavigationController extends BaseController {
             history: []
         });
         
-        // Cache des Ã©lÃ©ments DOM
+        // Cache des éléments DOM
         this.elements = {
             pages: null,
             navItems: null,
             appMain: null
         };
         
-        // âœ… CRITIQUE: Mapping page -> vue crÃ©Ã© ICI
+        // ✓ CRITIQUE: Mapping page -> vue créé ICI
         this.pageViewMap = new Map();
         
-        this.log('debug', 'NavigationController', 'âœ“ NavigationController v4.2.0 created');
+        this.log('debug', 'NavigationController', '✓ NavigationController v4.5.0 created');
     }
     
     // ========================================================================
@@ -61,7 +66,7 @@ class NavigationController extends BaseController {
     // ========================================================================
     
     onInitialize() {
-        // âœ… VÃ©rification de sÃ©curitÃ©
+        // ✓ Vérification de sécurité
         if (!this.pageViewMap) {
             this.log('error', 'NavigationController', 'CRITICAL: pageViewMap not initialized!');
             this.pageViewMap = new Map();
@@ -69,28 +74,32 @@ class NavigationController extends BaseController {
         
         this.log('info', 'NavigationController', 'Initializing navigation system...');
         
-        // Cacher tous les Ã©lÃ©ments DOM
-        this.cacheElements();
-        
-        // Enregistrer les vues
-        this.registerPageMappings();
-        
-        // Attacher Ã©vÃ©nements navigation
-        this.attachNavigationEvents();
-        
-        // Initialiser toutes les vues
-        this.initializeViews();
-        
-        // Ã‰couter Ã©vÃ©nements
-        this.setupEventListeners();
-        
-        this.state.initialized = true;
-        
-        this.log('info', 'NavigationController', 'âœ“ Navigation system initialized');
+        try {
+            // Cacher tous les éléments DOM
+            this.cacheElements();
+            
+            // Enregistrer les vues
+            this.registerPageMappings();
+            
+            // Attacher événements navigation
+            this.attachNavigationEvents();
+            
+            // Initialiser toutes les vues
+            this.initializeViews();
+            
+            // Écouter événements
+            this.setupEventListeners();
+            
+            this.state.initialized = true;
+            
+            this.log('info', 'NavigationController', '✓ Navigation system initialized');
+        } catch (error) {
+            this.log('error', 'NavigationController', 'Initialization failed', error);
+        }
     }
     
     /**
-     * Cacher les Ã©lÃ©ments DOM
+     * Cacher les éléments DOM
      */
     cacheElements() {
         this.elements.pages = document.querySelectorAll(this.config.pageSelector);
@@ -104,7 +113,7 @@ class NavigationController extends BaseController {
      * Enregistrer les mappings page -> vue
      */
     registerPageMappings() {
-        // âœ… Double vÃ©rification de sÃ©curitÃ©
+        // ✓ Double vérification de sécurité
         if (!this.pageViewMap) {
             this.log('error', 'NavigationController', 'pageViewMap is null in registerPageMappings!');
             return;
@@ -123,9 +132,13 @@ class NavigationController extends BaseController {
             'visualizer': this.views.visualizer
         };
         
+        // Enregistrer les mappings et logger les manquants
         for (const [page, view] of Object.entries(pageMappings)) {
             if (view) {
                 this.pageViewMap.set(page, view);
+                this.log('debug', 'NavigationController', `✓ Registered mapping: ${page} -> ${view.constructor.name}`);
+            } else {
+                this.log('warn', 'NavigationController', `⚠ Missing view for page: ${page}`);
             }
         }
         
@@ -133,7 +146,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Attacher les Ã©vÃ©nements de navigation
+     * Attacher les événements de navigation
      */
     attachNavigationEvents() {
         // Cliquer sur les items de navigation
@@ -147,7 +160,7 @@ class NavigationController extends BaseController {
             });
         });
         
-        // Ã‰couter les changements de hash
+        // Écouter les changements de hash
         window.addEventListener('hashchange', () => {
             const hash = window.location.hash.slice(1); // Retirer le #
             const page = hash || this.config.defaultPage;
@@ -168,21 +181,21 @@ class NavigationController extends BaseController {
                 try {
                     view.init();
                     initializedCount++;
-                    this.log('debug', 'NavigationController', `âœ“ Initialized view: ${page}`);
+                    this.log('debug', 'NavigationController', `✓ Initialized view: ${page}`);
                 } catch (error) {
                     this.log('error', 'NavigationController', `Failed to init view ${page}:`, error);
                 }
             }
         }
         
-        this.log('info', 'NavigationController', `âœ“ Initialized ${initializedCount} views`);
+        this.log('info', 'NavigationController', `✓ Initialized ${initializedCount} views`);
     }
     
     /**
-     * Ã‰couter les Ã©vÃ©nements globaux
+     * Écouter les événements globaux
      */
     setupEventListeners() {
-        // Ã‰couter les demandes de navigation via EventBus
+        // Écouter les demandes de navigation via EventBus
         if (this.eventBus) {
             this.on('navigation:goto', (data) => {
                 this.showPage(data.page, data.options);
@@ -214,13 +227,13 @@ class NavigationController extends BaseController {
             return false;
         }
         
-        // Si dÃ©jÃ  en transition, ignorer (sauf si force)
+        // Si déjà en transition, ignorer (sauf si force)
         if (this.state.isTransitioning && !options.force) {
             this.log('debug', 'NavigationController', `Already transitioning, ignoring showPage(${pageName})`);
             return false;
         }
         
-        // Si c'est dÃ©jÃ  la page actuelle, ignorer (sauf si reload)
+        // Si c'est déjà la page actuelle, ignorer (sauf si reload)
         if (this.state.currentPage === pageName && !options.reload) {
             this.log('debug', 'NavigationController', `Already on page ${pageName}`);
             return false;
@@ -233,7 +246,7 @@ class NavigationController extends BaseController {
             
             const previousPage = this.state.currentPage;
             
-            // âœ… Ã‰mettre Ã©vÃ©nement before navigation
+            // ✓ Émettre événement before navigation
             this.emit('navigation:before', {
                 from: previousPage,
                 to: pageName
@@ -250,44 +263,45 @@ class NavigationController extends BaseController {
             // Afficher la nouvelle page
             const pageElement = document.getElementById(pageName);
             if (!pageElement) {
-                throw new Error(`Page element #${pageName} not found`);
+                throw new Error(`Page element #${pageName} not found in DOM`);
             }
             
             pageElement.classList.add(this.config.activeClass);
             pageElement.style.display = 'block';
             
-            // Mettre Ã  jour la navigation
+            // Mettre à jour la navigation
             this.updateNavigation(pageName);
             
-            // Initialiser/Rendre la vue si nÃ©cessaire
+            // Initialiser/Rendre la vue si nécessaire
             const view = this.pageViewMap.get(pageName);
             if (view) {
-                // Si la vue n'est pas initialisÃ©e, l'initialiser
+                // Si la vue n'est pas initialisée, l'initialiser
                 if (!view.state?.initialized && typeof view.init === 'function') {
                     this.log('debug', 'NavigationController', `Initializing view: ${pageName}`);
                     view.init();
                 }
                 
-                // Si la vue a une mÃ©thode render, la rendre
+                // Si la vue a une méthode render, la rendre
                 if (typeof view.render === 'function') {
                     this.log('debug', 'NavigationController', `Rendering view: ${pageName}`);
                     view.render();
                 }
                 
-                // Si la vue a une mÃ©thode show, l'appeler
+                // Si la vue a une méthode show, l'appeler
                 if (typeof view.show === 'function') {
                     view.show();
                 }
             } else {
                 this.log('warn', 'NavigationController', `No view found for page: ${pageName}`);
+                this.log('debug', 'NavigationController', `Available pages: ${Array.from(this.pageViewMap.keys()).join(', ')}`);
             }
             
-            // Transition entrÃ©e
+            // Transition entrée
             if (this.config.useTransitions) {
                 await this.transitionIn(pageName);
             }
             
-            // Mettre Ã  jour l'Ã©tat
+            // Mettre à jour l'état
             this.state.previousPage = previousPage;
             this.state.currentPage = pageName;
             this.state.history.push({
@@ -295,23 +309,23 @@ class NavigationController extends BaseController {
                 timestamp: Date.now()
             });
             
-            // Mettre Ã  jour le hash URL si pas dÃ©jÃ  fait par hashchange
+            // Mettre à jour le hash URL si pas déjà fait par hashchange
             if (!options.fromHashChange) {
                 window.location.hash = pageName;
             }
             
-            // âœ… Ã‰mettre Ã©vÃ©nement after navigation
+            // ✓ Émettre événement after navigation
             this.emit('navigation:after', {
                 from: previousPage,
                 to: pageName
             });
             
-            // Notification si activÃ©e
+            // Notification si activée
             if (this.notifications && options.notify) {
                 this.notifications.show(`Page: ${pageName}`, 'info', 2000);
             }
             
-            this.log('info', 'NavigationController', `âœ“ Navigated to page: ${pageName}`);
+            this.log('info', 'NavigationController', `✓ Navigated to page: ${pageName}`);
             
             return true;
             
@@ -325,7 +339,9 @@ class NavigationController extends BaseController {
                 pageName: pageName,
                 pageElement: !!document.getElementById(pageName),
                 elementsPages: !!this.elements.pages,
-                pagesCount: this.elements.pages?.length || 0
+                pagesCount: this.elements.pages?.length || 0,
+                pageViewMapSize: this.pageViewMap?.size || 0,
+                availablePages: this.pageViewMap ? Array.from(this.pageViewMap.keys()) : []
             });
             
             this.log('error', 'NavigationController', `Failed to show page ${pageName}:`, error.message);
@@ -344,7 +360,7 @@ class NavigationController extends BaseController {
         this.elements.pages.forEach(page => {
             page.classList.remove(this.config.activeClass);
             
-            // Pour les pages modales, les masquer complÃ¨tement
+            // Pour les pages modales, les masquer complètement
             if (page.classList.contains('page-modal') || page.classList.contains('page-fullscreen')) {
                 page.style.display = 'none';
             }
@@ -352,7 +368,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Mettre Ã  jour la navigation active
+     * Mettre à jour la navigation active
      */
     updateNavigation(pageName) {
         this.elements.navItems.forEach(navItem => {
@@ -367,21 +383,21 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Revenir Ã  la page prÃ©cÃ©dente
+     * Revenir à la page précédente
      */
     goBack() {
         if (this.state.history.length > 1) {
             // Retirer la page actuelle
             this.state.history.pop();
             
-            // Obtenir la page prÃ©cÃ©dente
+            // Obtenir la page précédente
             const previousEntry = this.state.history[this.state.history.length - 1];
             
             if (previousEntry) {
                 this.showPage(previousEntry.page, { fromHistory: true });
             }
         } else {
-            // Si pas d'historique, aller Ã  home
+            // Si pas d'historique, aller à home
             this.showPage(this.config.defaultPage);
         }
     }
@@ -390,7 +406,7 @@ class NavigationController extends BaseController {
      * Aller en avant (si applicable)
      */
     goForward() {
-        // TODO: ImplÃ©menter si besoin d'un systÃ¨me de navigation avant/arriÃ¨re complet
+        // TODO: Implémenter si besoin d'un système de navigation avant/arrière complet
         this.log('debug', 'NavigationController', 'goForward not implemented');
     }
     
@@ -413,7 +429,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Transition d'entrÃ©e d'une page
+     * Transition d'entrée d'une page
      */
     async transitionIn(pageName) {
         const pageElement = document.getElementById(pageName);
@@ -432,7 +448,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Attendre un dÃ©lai
+     * Attendre un délai
      */
     wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -450,7 +466,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Obtenir la page prÃ©cÃ©dente
+     * Obtenir la page précédente
      */
     getPreviousPage() {
         return this.state.previousPage;
@@ -464,14 +480,14 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * VÃ©rifier si une page est active
+     * Vérifier si une page est active
      */
     isPageActive(pageName) {
         return this.state.currentPage === pageName;
     }
     
     // ========================================================================
-    // MÃ‰THODES PUBLIQUES
+    // MÉTHODES PUBLIQUES
     // ========================================================================
     
     /**
@@ -484,7 +500,7 @@ class NavigationController extends BaseController {
     }
     
     /**
-     * Aller Ã  la page par dÃ©faut
+     * Aller à la page par défaut
      */
     goHome() {
         this.showPage(this.config.defaultPage);
@@ -504,7 +520,7 @@ class NavigationController extends BaseController {
     onDestroy() {
         this.log('info', 'NavigationController', 'Destroying navigation system...');
         
-        // Retirer les Ã©vÃ©nements
+        // Retirer les événements
         this.elements.navItems.forEach(navItem => {
             navItem.replaceWith(navItem.cloneNode(true));
         });
@@ -512,7 +528,7 @@ class NavigationController extends BaseController {
         // Nettoyer les caches
         this.pageViewMap.clear();
         
-        this.log('info', 'NavigationController', 'âœ“ Navigation system destroyed');
+        this.log('info', 'NavigationController', '✓ Navigation system destroyed');
     }
 }
 
