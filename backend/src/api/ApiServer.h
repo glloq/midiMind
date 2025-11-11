@@ -14,7 +14,7 @@
 #pragma once
 
 #include "MessageEnvelope.h"
-#include "../events/EventBus.h"
+#include "../core/EventBus.h"
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <set>
