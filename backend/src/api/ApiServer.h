@@ -1,8 +1,12 @@
 // ============================================================================
 // File: backend/src/api/ApiServer.h
-// Version: 4.2.7
+// Version: 4.2.8
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.2.8:
+//   - FIXED: Removed inline definitions causing redefinition errors
+//   - isRunning() and setCommandCallback() now declared only (defined in .cpp)
 //
 // Changes v4.2.7:
 //   - FIXED: start() signature matches implementation (bool return + uint16_t)
@@ -54,7 +58,7 @@ public:
     // Server management
     bool start(uint16_t port = 8080);
     void stop();
-    bool isRunning() const { return running_; }
+    bool isRunning() const;
     size_t getConnectionCount() const;
     Stats getStats() const;
     
@@ -71,9 +75,7 @@ public:
                        protocol::EventPriority priority = protocol::EventPriority::NORMAL);
     
     // Callback registration
-    void setCommandCallback(CommandCallback callback) {
-        commandCallback_ = callback;
-    }
+    void setCommandCallback(CommandCallback callback);
     
     // EventBus configuration
     void setEventBus(std::shared_ptr<EventBus> eventBus);
@@ -108,5 +110,5 @@ private:
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE ApiServer.h v4.2.7
+// END OF FILE ApiServer.h v4.2.8
 // ============================================================================
