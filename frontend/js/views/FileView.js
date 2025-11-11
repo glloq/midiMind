@@ -1,13 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Version: v4.0.4 - CORRECTIONS COMPLÈTES
+// Chemin réel: frontend/js/views/FileView.js
+// Version: v4.0.5 - CORRECTION CRITIQUE
 // Date: 2025-11-11
 // ============================================================================
-// CORRECTIONS v4.0.4:
-// ✅ Fix upload bloqué (input permanent dans DOM)
+// CORRECTIONS v4.0.5:
+// ✅ CRITIQUE: Retrait de super.attachEvents() (méthode inexistante dans BaseView)
 // ✅ Gestion d'erreur robuste dans render()
 // ✅ Sécurisation filterFiles() et sortFiles()
 // ✅ Vérification state.files avant utilisation
+// ✅ Fix upload bloqué (input permanent dans DOM)
 // ✅ Encodage UTF-8 propre
 // ============================================================================
 
@@ -28,7 +30,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.log('info', 'FileView', '✅ FileView v4.0.4 initialized (fixed)');
+        this.log('info', 'FileView', '✅ FileView v4.0.5 initialized (fixed attachEvents)');
     }
     
     // ========================================================================
@@ -52,46 +54,164 @@ class FileView extends BaseView {
                     </div>
                 </div>
                 
-                <!-- Barre de contrôle -->
-                <div class="files-toolbar">
-                    <div class="files-path">
-                        <span class="path-label">Dossier:</span>
-                        <input type="text" class="path-input" value="${state.currentPath}" 
-                               data-action="change-path" />
-                    </div>
-                    
-                    <div class="files-search">
-                        <input type="text" class="search-input" placeholder="Rechercher..." 
-                               value="${state.filter}" data-action="filter-files" />
-                    </div>
-                    
-                    <div class="files-sort">
-                        <select class="sort-select" data-action="change-sort">
-                            <option value="name" ${state.sortBy === 'name' ? 'selected' : ''}>Nom</option>
-                            <option value="date" ${state.sortBy === 'date' ? 'selected' : ''}>Date</option>
-                            <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
-                        </select>
-                        <button class="btn-sort-order" data-action="toggle-sort-order">
-                            ${state.sortOrder === 'asc' ? '↑' : '↓'}
-                        </button>
-                    </div>
-                    
-                    <div class="files-count">
-                        <span>${state.files ? state.files.length : 0} fichier(s)</span>
-                    </div>
+                <div class="toolbar">
+                    ${this.buildToolbar(state)}
                 </div>
                 
-                <!-- Contenu des fichiers -->
-                <div class="files-section">
-                    <div class="files-content">
-                        ${state.isLoading ? this.renderLoading() : this.renderFilesList(state)}
+                <div class="content-area">
+                    <div class="file-list">
+                        ${state.isLoading ? this.buildLoadingState() : this.buildFileGrid(state)}
+                    </div>
+                    
+                    ${state.selectedFile ? this.buildFileDetails(state.selectedFile) : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    buildToolbar(state) {
+        return `
+            <div class="toolbar-section">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    placeholder="🔍 Rechercher..." 
+                    data-action="filter-files"
+                    value="${this.escapeHtml(state.filter)}"
+                />
+                
+                <select class="sort-select" data-action="change-sort">
+                    <option value="name" ${state.sortBy === 'name' ? 'selected' : ''}>Nom</option>
+                    <option value="date" ${state.sortBy === 'date' ? 'selected' : ''}>Date</option>
+                    <option value="size" ${state.sortBy === 'size' ? 'selected' : ''}>Taille</option>
+                </select>
+                
+                <button 
+                    class="btn-icon" 
+                    data-action="toggle-sort-order"
+                    title="Ordre de tri"
+                >
+                    ${state.sortOrder === 'asc' ? '⬆️' : '⬇️'}
+                </button>
+            </div>
+        `;
+    }
+    
+    buildFileGrid(state) {
+        // ✅ SÉCURITÉ: Vérifier que state.files existe et est un tableau
+        if (!state.files || !Array.isArray(state.files)) {
+            return this.buildEmptyState();
+        }
+        
+        const filteredFiles = this.filterFiles(state.files, state.filter);
+        const sortedFiles = this.sortFiles(filteredFiles, state.sortBy, state.sortOrder);
+        
+        if (sortedFiles.length === 0) {
+            return this.buildEmptyState();
+        }
+        
+        return `
+            <div class="file-grid">
+                ${sortedFiles.map(file => this.buildFileCard(file)).join('')}
+            </div>
+        `;
+    }
+    
+    buildFileCard(file) {
+        const isSelected = this.viewState.selectedFile?.path === file.path;
+        
+        return `
+            <div 
+                class="file-card ${isSelected ? 'selected' : ''}" 
+                data-file-path="${this.escapeHtml(file.path || file.name)}"
+            >
+                <div class="file-icon">🎵</div>
+                <div class="file-info">
+                    <div class="file-name" title="${this.escapeHtml(file.name)}">
+                        ${this.escapeHtml(file.name)}
+                    </div>
+                    <div class="file-meta">
+                        ${this.formatFileSize(file.size)} • ${this.formatDate(file.modified)}
                     </div>
                 </div>
-                
-                <!-- Panneau de détails -->
-                <div class="file-details" id="fileDetails">
-                    ${state.selectedFile ? this.renderFileDetails(state.selectedFile) : this.renderNoSelection()}
+                <div class="file-actions">
+                    <button class="btn-icon" data-action="select-file" title="Sélectionner">
+                        👁️
+                    </button>
+                    <button class="btn-icon" data-action="play-file" title="Jouer">
+                        ▶️
+                    </button>
+                    <button class="btn-icon" data-action="delete-file" title="Supprimer">
+                        🗑️
+                    </button>
                 </div>
+            </div>
+        `;
+    }
+    
+    buildFileDetails(file) {
+        return `
+            <div class="file-details">
+                <div class="details-header">
+                    <h3>📄 Détails du fichier</h3>
+                    <button class="btn-close" data-action="close-details">✕</button>
+                </div>
+                
+                <div class="details-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Nom:</span>
+                        <span class="detail-value">${this.escapeHtml(file.name)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Chemin:</span>
+                        <span class="detail-value">${this.escapeHtml(file.path || file.name)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Taille:</span>
+                        <span class="detail-value">${this.formatFileSize(file.size)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Modifié:</span>
+                        <span class="detail-value">${this.formatDate(file.modified)}</span>
+                    </div>
+                    ${file.tracks ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Pistes:</span>
+                            <span class="detail-value">${file.tracks}</span>
+                        </div>
+                    ` : ''}
+                    ${file.duration ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Durée:</span>
+                            <span class="detail-value">${this.formatDuration(file.duration)}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="details-actions">
+                    <button class="btn-primary" data-action="load-file">
+                        📂 Charger dans l'éditeur
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    buildLoadingState() {
+        return `
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Chargement des fichiers...</p>
+            </div>
+        `;
+    }
+    
+    buildEmptyState() {
+        return `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <h3>Aucun fichier</h3>
+                <p>Uploadez des fichiers MIDI pour commencer</p>
             </div>
         `;
     }
@@ -198,174 +318,140 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // RENDERING - SOUS-COMPOSANTS
+    // FILTRE ET TRI
     // ========================================================================
     
-    renderLoading() {
-        return `
-            <div class="files-loading">
-                <div class="spinner"></div>
-                <p>Chargement des fichiers...</p>
-            </div>
-        `;
-    }
-    
-    renderFilesList(state) {
-        try {
-            // ✅ Vérification robuste
-            if (!state || !state.files) {
-                return `
-                    <div class="files-empty">
-                        <div class="empty-icon">📂</div>
-                        <p>Aucune donnée disponible</p>
-                        <button class="btn-refresh" data-action="refresh-files">🔄 Actualiser</button>
-                    </div>
-                `;
-            }
-            
-            let files = this.filterFiles(state.files, state.filter);
-            files = this.sortFiles(files, state.sortBy, state.sortOrder);
-            
-            if (files.length === 0) {
-                return `
-                    <div class="files-empty">
-                        <div class="empty-icon">📂</div>
-                        <p>Aucun fichier MIDI trouvé</p>
-                        <p class="text-muted">Uploadez des fichiers ou vérifiez le chemin</p>
-                    </div>
-                `;
-            }
-            
-            return `
-                <div class="files-grid">
-                    ${files.map(file => this.renderFileCard(file, state.selectedFile)).join('')}
-                </div>
-            `;
-        } catch (error) {
-            this.log('error', 'FileView', 'renderFilesList error:', error);
-            return `
-                <div class="files-empty">
-                    <div class="empty-icon">⚠️</div>
-                    <p>Erreur lors du chargement des fichiers</p>
-                    <button class="btn-refresh" data-action="refresh-files">🔄 Réessayer</button>
-                </div>
-            `;
+    /**
+     * Filtrer les fichiers selon une recherche
+     * @param {Array} files - Liste des fichiers
+     * @param {string} filter - Terme de recherche
+     * @returns {Array} Fichiers filtrés
+     */
+    filterFiles(files, filter) {
+        // ✅ SÉCURITÉ: Vérifier que files est un tableau
+        if (!Array.isArray(files)) {
+            console.warn('[FileView] filterFiles: files is not an array', files);
+            return [];
         }
-    }
-    
-    renderFileCard(file, selectedFile) {
-        const isSelected = selectedFile && 
-                          (selectedFile.path === file.path || selectedFile.name === file.name);
         
-        const size = file.size ? this.formatFileSize(file.size) : '–';
-        const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : '–';
+        if (!filter || filter.trim() === '') {
+            return files;
+        }
         
-        return `
-            <div class="file-card ${isSelected ? 'selected' : ''}" 
-                 data-file-path="${file.path || file.name}">
-                <div class="file-icon">🎵</div>
-                <div class="file-info">
-                    <div class="file-name" title="${file.name}">${file.name}</div>
-                    <div class="file-meta">
-                        <span class="file-size">${size}</span>
-                        <span>•</span>
-                        <span class="file-date">${dateStr}</span>
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="btn-icon" data-action="select-file" title="Sélectionner">
-                        📋
-                    </button>
-                    <button class="btn-icon" data-action="play-file" title="Lire">
-                        ▶
-                    </button>
-                    <button class="btn-icon" data-action="delete-file" title="Supprimer">
-                        🗑️
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-    
-    renderFileDetails(file) {
-        const size = file.size ? this.formatFileSize(file.size) : '–';
-        const date = file.modified || file.created;
-        const dateStr = date ? this.formatDate(date) : '–';
+        const searchTerm = filter.toLowerCase();
         
-        return `
-            <div class="details-header">
-                <h3>Détails du fichier</h3>
-                <button class="btn-close" data-action="close-details">✕</button>
-            </div>
-            <div class="details-content">
-                <div class="detail-icon">🎵</div>
-                <div class="detail-name">${file.name}</div>
-                
-                <div class="details-section">
-                    <h4>Informations</h4>
-                    <div class="detail-row">
-                        <span class="detail-label">Chemin:</span>
-                        <span class="detail-value">${file.path || file.name}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Taille:</span>
-                        <span class="detail-value">${size}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Date:</span>
-                        <span class="detail-value">${dateStr}</span>
-                    </div>
-                </div>
-                
-                ${file.midi_info ? this.renderMidiInfo(file.midi_info) : ''}
-                
-                <div class="details-actions">
-                    <button class="btn-primary" data-action="load-file">
-                        📂 Charger dans l'éditeur
-                    </button>
-                    <button class="btn-secondary" data-action="play-file">
-                        ▶ Lire
-                    </button>
-                    <button class="btn-danger" data-action="delete-file">
-                        🗑️ Supprimer
-                    </button>
-                </div>
-            </div>
-        `;
+        return files.filter(file => {
+            if (!file || !file.name) return false;
+            return file.name.toLowerCase().includes(searchTerm);
+        });
     }
     
-    renderMidiInfo(midiInfo) {
-        return `
-            <div class="details-section">
-                <h4>Informations MIDI</h4>
-                <div class="detail-row">
-                    <span class="detail-label">Format:</span>
-                    <span class="detail-value">${midiInfo.format || '–'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Pistes:</span>
-                    <span class="detail-value">${midiInfo.tracks || '–'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">PPQ:</span>
-                    <span class="detail-value">${midiInfo.ppq || '–'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Durée:</span>
-                    <span class="detail-value">${midiInfo.duration ? this.formatDuration(midiInfo.duration) : '–'}</span>
-                </div>
-            </div>
-        `;
+    /**
+     * Trier les fichiers
+     * @param {Array} files - Liste des fichiers
+     * @param {string} sortBy - Critère de tri
+     * @param {string} sortOrder - Ordre (asc/desc)
+     * @returns {Array} Fichiers triés
+     */
+    sortFiles(files, sortBy, sortOrder) {
+        // ✅ SÉCURITÉ: Vérifier que files est un tableau
+        if (!Array.isArray(files)) {
+            console.warn('[FileView] sortFiles: files is not an array', files);
+            return [];
+        }
+        
+        const sorted = [...files];
+        
+        sorted.sort((a, b) => {
+            let comparison = 0;
+            
+            switch (sortBy) {
+                case 'name':
+                    comparison = (a.name || '').localeCompare(b.name || '');
+                    break;
+                case 'date':
+                    comparison = (a.modified || 0) - (b.modified || 0);
+                    break;
+                case 'size':
+                    comparison = (a.size || 0) - (b.size || 0);
+                    break;
+                default:
+                    comparison = 0;
+            }
+            
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
+        
+        return sorted;
     }
     
-    renderNoSelection() {
-        return `
-            <div class="details-placeholder">
-                <div class="placeholder-icon">📋</div>
-                <p>Sélectionnez un fichier pour voir ses détails</p>
-            </div>
-        `;
+    toggleSortOrder() {
+        this.viewState.sortOrder = this.viewState.sortOrder === 'asc' ? 'desc' : 'asc';
+        this.render();
+    }
+    
+    // ========================================================================
+    // FORMATAGE
+    // ========================================================================
+    
+    formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    }
+    
+    formatDate(timestamp) {
+        if (!timestamp) return 'N/A';
+        
+        const date = new Date(timestamp * 1000);
+        const now = new Date();
+        const diff = now - date;
+        
+        // Moins d'une heure
+        if (diff < 3600000) {
+            const minutes = Math.floor(diff / 60000);
+            return `il y a ${minutes} min`;
+        }
+        
+        // Moins d'un jour
+        if (diff < 86400000) {
+            const hours = Math.floor(diff / 3600000);
+            return `il y a ${hours}h`;
+        }
+        
+        // Moins d'une semaine
+        if (diff < 604800000) {
+            const days = Math.floor(diff / 86400000);
+            return `il y a ${days}j`;
+        }
+        
+        // Format complet
+        return date.toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }
+    
+    formatDuration(seconds) {
+        if (!seconds) return '0:00';
+        
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    escapeHtml(text) {
+        if (!text) return '';
+        
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     // ========================================================================
@@ -373,7 +459,7 @@ class FileView extends BaseView {
     // ========================================================================
     
     attachEvents() {
-        super.attachEvents();
+        // ✅ PAS d'appel à super.attachEvents() car BaseView n'a pas cette méthode
         
         if (!this.container) return;
         
@@ -551,22 +637,8 @@ class FileView extends BaseView {
         }
     }
     
-    handleLoadFile() {
-        if (!this.viewState.selectedFile) return;
-        
-        const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
-        
-        // Demander chargement dans l'éditeur via files.read puis conversion
-        if (this.eventBus) {
-            this.eventBus.emit('file:load_editor_requested', {
-                file_path: filePath
-            });
-        }
-    }
-    
-    async handleDeleteFile(filePath) {
-        const confirm = window.confirm(`Supprimer le fichier ${filePath} ?`);
-        if (!confirm) return;
+    handleDeleteFile(filePath) {
+        if (!confirm(`Supprimer ${filePath} ?`)) return;
         
         // Demander suppression via files.delete API
         if (this.eventBus) {
@@ -574,12 +646,23 @@ class FileView extends BaseView {
                 file_path: filePath
             });
         }
+    }
+    
+    handleLoadFile() {
+        if (!this.viewState.selectedFile) return;
         
-        // Clear selection si c'est le fichier sélectionné
-        if (this.viewState.selectedFile && 
-            (this.viewState.selectedFile.path === filePath || 
-             this.viewState.selectedFile.name === filePath)) {
-            this.viewState.selectedFile = null;
+        const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
+        
+        // Demander chargement dans l'éditeur
+        if (this.eventBus) {
+            this.eventBus.emit('file:load_in_editor', {
+                file_path: filePath
+            });
+        }
+        
+        // Navigation vers l'éditeur
+        if (window.app?.router) {
+            window.app.router.navigateTo('/editor');
         }
     }
     
@@ -588,115 +671,79 @@ class FileView extends BaseView {
         this.render();
     }
     
-    toggleSortOrder() {
-        this.viewState.sortOrder = this.viewState.sortOrder === 'asc' ? 'desc' : 'asc';
-        this.render();
-    }
-    
     // ========================================================================
     // UTILITAIRES
     // ========================================================================
     
-    filterFiles(files, filter) {
-        // ✅ Vérification robuste
-        if (!files || !Array.isArray(files)) {
-            this.log('warn', 'FileView', 'filterFiles: files is not an array');
-            return [];
+    /**
+     * Mettre à jour la liste des fichiers
+     * @param {Array} files - Nouvelle liste de fichiers
+     */
+    updateFiles(files) {
+        this.viewState.files = files || [];
+        this.viewState.isLoading = false;
+        this.render();
+    }
+    
+    /**
+     * Définir l'état de chargement
+     * @param {boolean} loading - État de chargement
+     */
+    setLoading(loading) {
+        this.viewState.isLoading = loading;
+        this.render();
+    }
+    
+    /**
+     * Obtenir le fichier sélectionné
+     * @returns {Object|null}
+     */
+    getSelectedFile() {
+        return this.viewState.selectedFile;
+    }
+    
+    /**
+     * Définir le fichier sélectionné
+     * @param {Object} file - Fichier à sélectionner
+     */
+    setSelectedFile(file) {
+        this.viewState.selectedFile = file;
+        this.render();
+    }
+    
+    /**
+     * Nettoyer la vue
+     */
+    destroy() {
+        // Nettoyer l'input file si existant
+        const input = document.getElementById('file-upload-input');
+        if (input) {
+            input.remove();
         }
         
-        if (!filter) return files;
-        
-        const lowerFilter = filter.toLowerCase();
-        return files.filter(file => 
-            file.name && file.name.toLowerCase().includes(lowerFilter)
-        );
-    }
-    
-    sortFiles(files, sortBy, sortOrder) {
-        // ✅ Vérification robuste
-        if (!files || !Array.isArray(files)) {
-            this.log('warn', 'FileView', 'sortFiles: files is not an array');
-            return [];
-        }
-        
-        const sorted = [...files].sort((a, b) => {
-            let aVal, bVal;
-            
-            switch (sortBy) {
-                case 'name':
-                    aVal = (a.name || '').toLowerCase();
-                    bVal = (b.name || '').toLowerCase();
-                    break;
-                case 'date':
-                    aVal = a.modified || a.created || 0;
-                    bVal = b.modified || b.created || 0;
-                    break;
-                case 'size':
-                    aVal = a.size || 0;
-                    bVal = b.size || 0;
-                    break;
-                default:
-                    return 0;
-            }
-            
-            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
-        return sorted;
-    }
-    
-    formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-    
-    formatDate(timestamp) {
-        try {
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        } catch (error) {
-            return '–';
+        // Appeler la méthode destroy du parent si elle existe
+        if (super.destroy) {
+            super.destroy();
         }
     }
     
-    formatDuration(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
-    
-    arrayBufferToBase64(buffer) {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return window.btoa(binary);
-    }
-    
-    // ========================================================================
-    // INITIALISATION
-    // ========================================================================
-    
-    init() {
-        super.init();
+    /**
+     * Logger avec préfixe
+     */
+    log(level, context, ...args) {
+        if (!this.logger) return;
         
-        // Charger la liste des fichiers
-        this.handleRefresh();
+        const prefix = `[FileView${context ? ':' + context : ''}]`;
+        
+        if (typeof this.logger[level] === 'function') {
+            this.logger[level](prefix, ...args);
+        } else {
+            console[level](prefix, ...args);
+        }
     }
 }
 
-// ============================================================================
-// EXPORT
-// ============================================================================
-
+// Export pour utilisation en tant que module
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FileView;
-}
-
-if (typeof window !== 'undefined') {
-    window.FileView = FileView;
 }
