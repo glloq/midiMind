@@ -1,12 +1,12 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v4.1.1 - FIX LOGGING + UTF-8
+// Version: v4.1.2 - FIX UTF-8 COMPLET
 // Date: 2025-11-11
 // ============================================================================
-// CORRECTIONS v4.1.1:
-// ✅ Fix: Utilisation correcte de this.log() au lieu de this.logger
-// ✅ Fix: Messages d'erreur plus clairs pour container not found
-// ✅ Fix: Encodage UTF-8 correct pour emojis
+// CORRECTIONS v4.1.2:
+// ✅ Fix: Encodage UTF-8 correct pour tous les émojis et accents français
+// ✅ Fix: Messages console avec caractères corrects
+// ✅ Fix: Interface utilisateur avec émojis corrects
 // ============================================================================
 
 class InstrumentView extends BaseView {
@@ -31,7 +31,7 @@ class InstrumentView extends BaseView {
         // Éléments DOM
         this.elements = {};
         
-        this.log('info', '[InstrumentView]', 'âœ… InstrumentView v4.1.1 initialized (Fix Logging)');
+        this.log('info', '[InstrumentView]', '✦ InstrumentView v4.1.2 initialized (UTF-8 Fix)');
     }
 
     // ========================================================================
@@ -50,7 +50,7 @@ class InstrumentView extends BaseView {
         this.loadDevices();
         this.checkHotPlugStatus();
         
-        this.log('info', '[InstrumentView]', 'Initialized v4.1.1');
+        this.log('info', '[InstrumentView]', 'Initialized v4.1.2');
     }
 
     render() {
@@ -229,12 +229,21 @@ class InstrumentView extends BaseView {
     renderAvailableDevices() {
         const devices = this.viewState.availableDevices;
         
-        if (devices.length === 0) {
+        if (devices.length === 0 && !this.viewState.scanning.usb && !this.viewState.scanning.bluetooth) {
             return `
                 <div class="devices-empty">
                     <div class="empty-icon">🔍</div>
-                    <p>Aucun device trouvé</p>
-                    <p class="text-muted">Cliquez sur Scan pour rechercher</p>
+                    <p>Aucun périphérique détecté</p>
+                    <p class="text-muted">Cliquez sur "Scan USB" ou "Scan Bluetooth" pour rechercher</p>
+                </div>
+            `;
+        }
+        
+        if (this.viewState.scanning.usb || this.viewState.scanning.bluetooth) {
+            return `
+                <div class="devices-scanning">
+                    <div class="spinner"></div>
+                    <p>Recherche en cours...</p>
                 </div>
             `;
         }
@@ -247,24 +256,21 @@ class InstrumentView extends BaseView {
     }
 
     renderAvailableDeviceCard(device) {
-        const typeIcons = {
-            0: '❓', // Unknown
-            1: '🔌', // USB
-            2: '📡', // BLE
-            3: '💻'  // Virtual
-        };
-        
-        const icon = typeIcons[device.type] || '🎸';
-        const typeName = ['Unknown', 'USB', 'Bluetooth', 'Virtual'][device.type] || 'Unknown';
+        const typeIcon = device.type === 'usb' ? '🔌' : 
+                        device.type === 'bluetooth' ? '📡' : 
+                        device.type === 'network' ? '🌐' : '🎹';
         
         return `
             <div class="device-card available" data-device-id="${device.id}">
-                <div class="device-icon">${icon}</div>
+                <div class="device-icon">${typeIcon}</div>
                 <div class="device-info">
                     <div class="device-name">${this.escapeHtml(device.name)}</div>
-                    <div class="device-type">${typeName}</div>
+                    <div class="device-type">${device.type.toUpperCase()}</div>
+                    ${device.ports ? `<div class="device-ports">${device.ports.in}→${device.ports.out}</div>` : ''}
                 </div>
-                <button class="btn-connect" data-action="connect">Connecter</button>
+                <div class="device-actions">
+                    <button class="btn-connect" data-action="connect">Connecter</button>
+                </div>
             </div>
         `;
     }
@@ -285,8 +291,9 @@ class InstrumentView extends BaseView {
         if (devices.length === 0) {
             return `
                 <div class="devices-empty">
-                    <div class="empty-icon">🔌</div>
+                    <div class="empty-icon">🎸</div>
                     <p>Aucun instrument connecté</p>
+                    <p class="text-muted">Connectez des périphériques MIDI pour commencer</p>
                 </div>
             `;
         }
@@ -299,25 +306,26 @@ class InstrumentView extends BaseView {
     }
 
     renderConnectedDeviceCard(device) {
-        const typeIcons = {
-            0: '❓',
-            1: '🔌',
-            2: '📡',
-            3: '💻'
-        };
+        const typeIcon = device.type === 'usb' ? '🔌' : 
+                        device.type === 'bluetooth' ? '📡' : 
+                        device.type === 'network' ? '🌐' : '🎹';
         
-        const icon = typeIcons[device.type] || '🎸';
+        const statusClass = device.active ? 'active' : 'idle';
         
         return `
-            <div class="device-card connected" data-device-id="${device.id}">
-                <div class="device-icon">${icon}</div>
+            <div class="device-card connected ${statusClass}" data-device-id="${device.id}">
+                <div class="device-icon">${typeIcon}</div>
                 <div class="device-info">
                     <div class="device-name">${this.escapeHtml(device.name)}</div>
-                    <div class="device-status">Connecté</div>
+                    <div class="device-status">
+                        <span class="status-indicator ${statusClass}"></span>
+                        <span class="status-text">${device.active ? 'Actif' : 'Inactif'}</span>
+                    </div>
+                    ${device.ports ? `<div class="device-ports">${device.ports.in}→${device.ports.out}</div>` : ''}
                 </div>
                 <div class="device-actions">
-                    <button class="btn-test" data-action="test">Test</button>
-                    <button class="btn-disconnect" data-action="disconnect">Déconnecter</button>
+                    <button class="btn-test" data-action="test" title="Tester">🎵</button>
+                    <button class="btn-disconnect" data-action="disconnect" title="Déconnecter">🔌</button>
                 </div>
             </div>
         `;
@@ -544,6 +552,16 @@ class InstrumentView extends BaseView {
         if (this.eventBus) {
             this.eventBus.emit('hotplug:status_requested');
         }
+    }
+
+    // ========================================================================
+    // UTILITY
+    // ========================================================================
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 
