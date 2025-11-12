@@ -448,14 +448,16 @@ create_directories() {
     
     # Répertoires principaux /opt/midimind
     mkdir -p "$INSTALL_DIR"/{bin,lib,logs,presets,sessions}
-	mkdir -p "$INSTALL_DIR"/data/{migrations,uploads,midi,playlists,sessions,recordings}    mkdir -p /etc/midimind
+    mkdir -p "$INSTALL_DIR"/data/{migrations,uploads,midi,playlists,sessions,recordings}
+    mkdir -p /etc/midimind
     mkdir -p "$WEB_DIR"
     
     # Répertoires utilisateur ~/.midimind
     mkdir -p "$USER_DIR"/{presets,sessions,exports}
     
     # ✅ FIX v4.1.5: Créer aussi dans /home/pi/MidiMind (chemin par défaut backend)
-	mkdir -p "$DATA_DIR"/data/{migrations,uploads,midi,playlists,sessions,recordings}    
+    mkdir -p "$DATA_DIR"/data/{migrations,uploads,midi,playlists,sessions,recordings}
+    
     success "Structure de répertoires créée"
     
     # Permissions
@@ -655,7 +657,7 @@ Type=simple
 User=$REAL_USER
 Group=$REAL_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/bin/midimind --config=/etc/midimind/config.json
+ExecStart=$INSTALL_DIR/bin/midimind --config /etc/midimind/config.json
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
