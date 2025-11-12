@@ -66,6 +66,39 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
+    // RENDU
+    // ========================================================================
+    
+    /**
+     * Rend la vue FileView dans son container
+     * @param {Object} data - Données optionnelles pour le rendu
+     */
+    render(data = null) {
+        if (!this.container) {
+            this.log('error', 'FileView', 'Cannot render: container not found');
+            return;
+        }
+        
+        try {
+            // Générer le template HTML
+            const template = this.buildTemplate(data);
+            
+            // Insérer dans le DOM
+            this.container.innerHTML = template;
+            
+            // Mettre à jour l'état
+            this.state.rendered = true;
+            this.state.lastUpdate = Date.now();
+            
+            this.log('debug', 'FileView', 'Rendered successfully');
+            
+        } catch (error) {
+            this.log('error', 'FileView', 'Render failed:', error);
+            this.state.error = error.message;
+        }
+    }
+    
+    // ========================================================================
     // TEMPLATE PRINCIPAL
     // ========================================================================
     
