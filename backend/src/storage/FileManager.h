@@ -1,8 +1,12 @@
 // ============================================================================
 // File: backend/src/storage/FileManager.h
-// Version: 4.4.0 - SECURE
+// Version: 4.4.1 - SECURE
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Changes v4.4.1:
+//   - Fixed: writeBinaryFile now creates parent directory automatically
+//   - Fixed: writeTextFile now creates parent directory automatically
 //
 // Changes v4.4.0:
 //   - Fixed: Unsafe namespace (was struct) with proper error logging
@@ -174,6 +178,21 @@ namespace FileManagerUnsafe {
     }
     
     inline bool writeTextFile(const std::string& path, const std::string& content) {
+        // Ensure parent directory exists
+        try {
+            fs::path p(path);
+            fs::path parent = p.parent_path();
+            if (!parent.empty() && !fs::exists(parent)) {
+                if (!fs::create_directories(parent)) {
+                    Logger::error("FileManagerUnsafe", "Failed to create parent directory: " + parent.string());
+                    return false;
+                }
+            }
+        } catch (const std::exception& e) {
+            Logger::error("FileManagerUnsafe", "Path validation failed: " + std::string(e.what()));
+            return false;
+        }
+        
         std::ofstream file(path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {
             Logger::error("FileManagerUnsafe", "Failed to open for writing: " + path);
@@ -227,6 +246,21 @@ namespace FileManagerUnsafe {
     
     inline bool writeBinaryFile(const std::string& path, 
                                const std::vector<uint8_t>& data) {
+        // Ensure parent directory exists
+        try {
+            fs::path p(path);
+            fs::path parent = p.parent_path();
+            if (!parent.empty() && !fs::exists(parent)) {
+                if (!fs::create_directories(parent)) {
+                    Logger::error("FileManagerUnsafe", "Failed to create parent directory: " + parent.string());
+                    return false;
+                }
+            }
+        } catch (const std::exception& e) {
+            Logger::error("FileManagerUnsafe", "Path validation failed: " + std::string(e.what()));
+            return false;
+        }
+        
         std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!file.is_open()) {
             Logger::error("FileManagerUnsafe", "Failed to open for writing: " + path);
@@ -397,3 +431,7 @@ private:
 };
 
 } // namespace midiMind
+
+// ============================================================================
+// END OF FILE FileManager.h v4.4.1
+// ============================================================================

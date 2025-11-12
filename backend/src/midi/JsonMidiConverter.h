@@ -9,12 +9,12 @@
 //   Enables easy editing and manipulation of MIDI data in JSON.
 //
 // Features:
-//   - MIDI File → JsonMidi conversion
-//   - JsonMidi → MIDI File conversion
+//   - MIDI File â†’ JsonMidi conversion
+//   - JsonMidi â†’ MIDI File conversion
 //   - Automatic note duration calculation
 //   - Metadata extraction
 //   - Track merging/splitting
-//   - Time conversion (ticks ↔ milliseconds)
+//   - Time conversion (ticks â†” milliseconds)
 //
 // Author: MidiMind Team
 // Date: 2025-10-31
@@ -216,17 +216,17 @@ struct JsonMidi {
 
 /**
  * @class JsonMidiConverter
- * @brief Bidirectional MIDI ↔ JsonMidi converter
+ * @brief Bidirectional MIDI â†” JsonMidi converter
  * 
  * Converts between binary MIDI files (Standard MIDI File format)
  * and editable JSON format (JsonMidi).
  * 
  * Features:
- * - Track merging (MIDI → JsonMidi)
- * - Track splitting (JsonMidi → MIDI)
+ * - Track merging (MIDI â†’ JsonMidi)
+ * - Track splitting (JsonMidi â†’ MIDI)
  * - Automatic note duration calculation
  * - Metadata extraction/embedding
- * - Time conversion (ticks ↔ ms)
+ * - Time conversion (ticks â†” ms)
  * 
  * Thread Safety: YES (stateless)
  * 
@@ -234,11 +234,11 @@ struct JsonMidi {
  * ```cpp
  * JsonMidiConverter converter;
  * 
- * // MIDI → JSON
+ * // MIDI â†’ JSON
  * JsonMidi jsonMidi = converter.fromMidiFile("input.mid");
  * std::string jsonStr = jsonMidi.toString();
  * 
- * // JSON → MIDI
+ * // JSON â†’ MIDI
  * JsonMidi loaded = JsonMidi::fromString(jsonStr);
  * converter.toMidiFile(loaded, "output.mid");
  * ```
@@ -260,7 +260,7 @@ public:
     ~JsonMidiConverter() = default;
     
     // ========================================================================
-    // CONVERSION: MIDI → JsonMidi
+    // CONVERSION: MIDI â†’ JsonMidi
     // ========================================================================
     
     /**
@@ -286,7 +286,7 @@ public:
     JsonMidi fromMidiFile(const std::string& filepath);
     
     // ========================================================================
-    // CONVERSION: JsonMidi → MIDI
+    // CONVERSION: JsonMidi â†’ MIDI
     // ========================================================================
     
     /**
@@ -429,6 +429,14 @@ private:
      * @return Milliseconds
      */
     uint32_t ticksToMilliseconds(uint32_t ticks, uint16_t ticksPerBeat, uint32_t tempo) const;
+    
+    /**
+     * @brief Extract tempo (BPM) from MIDI file Meta events
+     * @param midiFile MIDI file to extract tempo from
+     * @return Tempo in BPM (default 120 if not found)
+     * @note Searches for first Meta Tempo event (0x51) and converts µs/qn -> BPM
+     */
+    uint32_t extractTempoFromMidiFile(const MidiFile& midiFile) const;
     
     // ========================================================================
     // MEMBER VARIABLES

@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/file/MidiFileReader.h
-// Version: 4.1.0
+// Version: 4.3.1 - JSON SUPPORT FIX
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -16,16 +16,13 @@
 //   - Complete meta-events
 //   - SysEx messages
 //   - Format validation
+//   - JSON export support
 //
 // Author: MidiMind Team
-// Date: 2025-10-16
+// Date: 2025-11-12
 //
-// Changes v4.1.0:
-//   - Aligned with MidiMessage v4.1.0
-//   - Enhanced error handling
-//   - Better memory management
-//   - Improved bounds checking
-//   - Added overflow protection
+// Changes v4.3.1:
+//   - FIXED: Added <nlohmann/json.hpp> include for MidiFile::toJson()
 //
 // ============================================================================
 
@@ -33,6 +30,7 @@
 
 #include "../MidiMessage.h"
 #include "../../core/Error.h"
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 #include <cstdint>
