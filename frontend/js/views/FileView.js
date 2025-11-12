@@ -634,7 +634,20 @@ class FileView extends BaseView {
     }
 }
 
+// ============================================================================
+// EXPORT - CRITIQUE !
+// ============================================================================
+
 // Export pour utilisation en tant que module
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FileView;
 }
+
+// ✅ CRITIQUE: Export vers window pour utilisation dans le navigateur
+if (typeof window !== 'undefined') {
+    window.FileView = FileView;
+}
+
+// ============================================================================
+// FIN - FileView.js v4.2.0
+// ============================================================================
