@@ -1,8 +1,13 @@
 // ============================================================================
 // File: backend/src/storage/Database.cpp
-// Version: 4.2.2 - SCHEMA_VERSION FIX
+// Version: 4.2.6 - MIGRATION VERSION PERSISTENCE FIX
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
+//
+// Corrections v4.2.6:
+//   - Fixed: executeMigration() now uses INSERT OR REPLACE to keep all migration versions
+//   - Fixed: getSchemaVersion() now returns MAX(version) instead of random version
+//   - Fixed: Migrations now persist in schema_version table (no DELETE ALL)
 //
 // Corrections v4.2.2:
 //   - Fixed: Added 'description' column to schema_version table
@@ -381,7 +386,8 @@ void Database::initSchemaVersionTable() {
 }
 
 int Database::getSchemaVersion() const {
-    std::string versionStr = queryScalar("SELECT version FROM schema_version");
+    // CORRECTION v4.2.6: Utiliser MAX(version) pour retourner la version la plus récente
+    std::string versionStr = queryScalar("SELECT MAX(version) FROM schema_version");
     
     if (versionStr.empty()) {
         return 0;
@@ -459,7 +465,7 @@ std::vector<std::string> Database::getMigrationFiles(const std::string& dir) {
     return files;
 }
 
-// CORRECTION CRITIQUE: Pas de lock supplémentaire dans le callback de transaction
+// CORRECTION v4.2.6: Utiliser INSERT OR REPLACE au lieu de DELETE + INSERT
 bool Database::executeMigration(const std::string& filepath, int version) {
     // Read migration file
     std::ifstream file(filepath);
@@ -484,12 +490,9 @@ bool Database::executeMigration(const std::string& filepath, int version) {
         description = filename.substr(underscorePos + 1, dotPos - underscorePos - 1);
     }
     
-    // Execute in transaction - PAS de lock ici, transaction() le fait déjà
+    // Execute in transaction
     bool success = transaction([&]() {
-        // NE PAS prendre mutex_ ici - déjà pris par executeStatement dans transaction()
-        
-        // Execute migration SQL directly - mutex déjà pris
-        sqlite3_stmt* stmt = nullptr;
+        // Execute migration SQL
         char* errMsg = nullptr;
         int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &errMsg);
         
@@ -499,26 +502,21 @@ bool Database::executeMigration(const std::string& filepath, int version) {
             throw std::runtime_error("Migration SQL failed: " + error);
         }
         
-        // Update schema version - utiliser sqlite3 directement car mutex déjà pris
-        rc = sqlite3_prepare_v2(db_, "DELETE FROM schema_version", -1, &stmt, nullptr);
-        if (rc == SQLITE_OK) {
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
-            if (rc != SQLITE_DONE) {
-                throw std::runtime_error("Failed to delete old schema version");
-            }
-        }
-        
+        // CORRECTION v4.2.6: Utiliser INSERT OR REPLACE pour garder toutes les versions
+        // Au lieu de DELETE FROM schema_version (qui supprimait TOUTES les versions)
+        sqlite3_stmt* stmt = nullptr;
         rc = sqlite3_prepare_v2(db_, 
-            "INSERT INTO schema_version (version, description) VALUES (?, ?)", 
+            "INSERT OR REPLACE INTO schema_version (version, description) VALUES (?, ?)", 
             -1, &stmt, nullptr);
+            
         if (rc == SQLITE_OK) {
             sqlite3_bind_int(stmt, 1, version);
             sqlite3_bind_text(stmt, 2, description.c_str(), -1, SQLITE_TRANSIENT);
             rc = sqlite3_step(stmt);
             sqlite3_finalize(stmt);
+            
             if (rc != SQLITE_DONE) {
-                throw std::runtime_error("Failed to insert new schema version");
+                throw std::runtime_error("Failed to record schema version");
             }
         } else {
             throw std::runtime_error("Failed to prepare schema version update");
@@ -649,8 +647,7 @@ json Database::getStatistics() const {
             Logger::error("Database", "Invalid page_size: " + pageSize);
         }
         
-        // Table count - getTables() prend déjà le mutex donc on ne peut pas l'appeler ici
-        // Il faut une version unlocked ou faire le comptage directement
+        // Table count
         const char* sql = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
                          "AND name NOT LIKE 'sqlite_%'";
         auto tableCount = queryScalarUnlocked(sql);
@@ -662,8 +659,8 @@ json Database::getStatistics() const {
             Logger::error("Database", "Invalid table_count: " + tableCount);
         }
         
-        // Schema version
-        auto schemaVersion = queryScalarUnlocked("SELECT version FROM schema_version");
+        // Schema version - CORRECTION v4.2.6: utiliser MAX()
+        auto schemaVersion = queryScalarUnlocked("SELECT MAX(version) FROM schema_version");
         try {
             if (!schemaVersion.empty()) {
                 stats["schema_version"] = std::stoi(schemaVersion);
@@ -682,5 +679,5 @@ json Database::getStatistics() const {
 } // namespace midiMind
 
 // ============================================================================
-// END OF FILE Database.cpp v4.2.2
+// END OF FILE Database.cpp v4.2.6
 // ============================================================================
