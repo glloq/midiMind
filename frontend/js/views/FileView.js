@@ -1,15 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
-// Chemin réel: frontend/js/views/FileView.js
-// Version: v4.2.0 - INTERFACE COMPACTE + BOUTONS COMPLETS
-// Date: 2025-11-12
+// Chemin rÃ©el: frontend/js/views/FileView.js
+// Version: v4.1.0 - ENCODAGE UTF-8 CORRIGÃ‰
+// Date: 2025-11-11
 // ============================================================================
-// CORRECTIONS v4.2.0:
-// ✅ Affichage compact (40px par ligne au lieu de 80px)
-// ✅ Boutons édition et routage ajoutés
-// ✅ Réattachement événements lors show()
-// ✅ Upload corrigé (émission avec File object)
-// ✅ Encodage UTF-8 propre
+// CORRECTIONS v4.1.0:
+// âœ… Encodage UTF-8 complet (tous caractÃ¨res franÃ§ais corrigÃ©s)
+// âœ… Gestion Ã©vÃ©nements robuste
+// âœ… Upload permanent dans DOM
+// âœ… Affichage liste fichiers
 // ============================================================================
 
 class FileView extends BaseView {
@@ -18,7 +17,7 @@ class FileView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // État spécifique à la vue
+        // Ã‰tat spÃ©cifique Ã  la vue
         this.viewState = {
             files: [],
             selectedFile: null,
@@ -29,9 +28,7 @@ class FileView extends BaseView {
             filter: '' // filtre de recherche
         };
         
-        this.needsEventReattach = false;
-        
-        this.log('info', 'FileView', '✅ FileView v4.2.0 initialized (Compact + Full buttons)');
+        this.log('info', 'FileView', 'âœ… FileView v4.1.0 initialized (UTF-8 fixed)');
     }
     
     // ========================================================================
@@ -44,13 +41,13 @@ class FileView extends BaseView {
         return `
             <div class="file-view-container">
                 <div class="page-header">
-                    <h1>📁 Fichiers MIDI</h1>
+                    <h1>ðŸ“ Fichiers MIDI</h1>
                     <div class="header-actions">
                         <button class="btn-upload" data-action="upload-file">
-                            📤 Upload
+                            ðŸ“¤ Upload
                         </button>
                         <button class="btn-refresh" data-action="refresh-files">
-                            🔄 Actualiser
+                            ðŸ”„ Actualiser
                         </button>
                     </div>
                 </div>
@@ -61,7 +58,7 @@ class FileView extends BaseView {
                 
                 <div class="content-area">
                     <div class="file-list">
-                        ${state.isLoading ? this.buildLoadingState() : this.buildFileList(state)}
+                        ${state.isLoading ? this.buildLoadingState() : this.buildFileGrid(state)}
                     </div>
                     
                     ${state.selectedFile ? this.buildFileDetails(state.selectedFile) : ''}
@@ -76,7 +73,7 @@ class FileView extends BaseView {
                 <input 
                     type="text" 
                     class="search-input" 
-                    placeholder="🔍 Rechercher..." 
+                    placeholder="ðŸ” Rechercher..." 
                     data-action="filter-files"
                     value="${this.escapeHtml(state.filter)}"
                 />
@@ -92,14 +89,14 @@ class FileView extends BaseView {
                     data-action="toggle-sort-order"
                     title="Ordre de tri"
                 >
-                    ${state.sortOrder === 'asc' ? '⬆️' : '⬇️'}
+                    ${state.sortOrder === 'asc' ? 'â¬†ï¸' : 'â¬‡ï¸'}
                 </button>
             </div>
         `;
     }
     
-    buildFileList(state) {
-        // ✅ SÉCURITÉ: Vérifier que state.files existe et est un tableau
+    buildFileGrid(state) {
+        // âœ… SÃ‰CURITÃ‰: VÃ©rifier que state.files existe et est un tableau
         if (!state.files || !Array.isArray(state.files)) {
             return this.buildEmptyState();
         }
@@ -112,57 +109,88 @@ class FileView extends BaseView {
         }
         
         return `
-            <div class="file-list-compact">
-                ${sortedFiles.map(file => this.buildFileRow(file)).join('')}
+            <div class="file-list-table">
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th class="col-icon"></th>
+                            <th class="col-name">Nom</th>
+                            <th class="col-size">Taille</th>
+                            <th class="col-date">Date</th>
+                            <th class="col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedFiles.map(file => this.buildFileCard(file)).join('')}
+                    </tbody>
+                </table>
             </div>
         `;
     }
     
-    buildFileRow(file) {
+    buildFileCard(file) {
         const isSelected = this.viewState.selectedFile?.path === file.path;
+        const filePath = this.escapeHtml(file.path || file.name);
+        const fileName = this.escapeHtml(file.name);
         
         return `
-            <div 
-                class="file-row ${isSelected ? 'selected' : ''}" 
-                data-file-path="${this.escapeHtml(file.path || file.name)}"
-            >
-                <div class="file-icon">🎵</div>
-                <div class="file-info">
-                    <div class="file-name" title="${this.escapeHtml(file.name)}">
-                        ${this.escapeHtml(file.name)}
+            <tr class="file-row ${isSelected ? 'selected' : ''}" data-file-path="${filePath}">
+                <td class="col-icon">
+                    <span class="file-icon">🎵</span>
+                </td>
+                <td class="col-name">
+                    <span class="file-name">${fileName}</span>
+                </td>
+                <td class="col-size">
+                    ${this.formatFileSize(file.size)}
+                </td>
+                <td class="col-date">
+                    ${this.formatDate(file.modified)}
+                </td>
+                <td class="col-actions">
+                    <div class="file-actions-group">
+                        <button 
+                            class="btn-action btn-play" 
+                            data-action="play-file" 
+                            title="Jouer">
+                            ▶️
+                        </button>
+                        <button 
+                            class="btn-action btn-routing" 
+                            data-action="open-routing" 
+                            title="Routage">
+                            🔀
+                        </button>
+                        <button 
+                            class="btn-action btn-edit" 
+                            data-action="edit-file" 
+                            title="Éditer">
+                            ✏️
+                        </button>
+                        <button 
+                            class="btn-action btn-info" 
+                            data-action="select-file" 
+                            title="Détails">
+                            👁️
+                        </button>
+                        <button 
+                            class="btn-action btn-delete" 
+                            data-action="delete-file" 
+                            title="Supprimer">
+                            🗑️
+                        </button>
                     </div>
-                    <div class="file-meta">
-                        ${this.formatFileSize(file.size)} • ${this.formatDate(file.modified)}
-                        ${file.tracks ? ` • ${file.tracks} pistes` : ''}
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="btn-icon" data-action="select-file" title="Sélectionner">
-                        👁️
-                    </button>
-                    <button class="btn-icon" data-action="edit-file" title="Éditer">
-                        ✏️
-                    </button>
-                    <button class="btn-icon" data-action="route-file" title="Router">
-                        🔀
-                    </button>
-                    <button class="btn-icon" data-action="play-file" title="Jouer">
-                        ▶️
-                    </button>
-                    <button class="btn-icon" data-action="delete-file" title="Supprimer">
-                        🗑️
-                    </button>
-                </div>
-            </div>
+                </td>
+            </tr>
         `;
     }
     
-    buildFileDetails(file) {
+        buildFileDetails(file) {
         return `
             <div class="file-details">
                 <div class="details-header">
-                    <h3>📄 Détails du fichier</h3>
-                    <button class="btn-close" data-action="close-details">✕</button>
+                    <h3>ðŸ“„ DÃ©tails du fichier</h3>
+                    <button class="btn-close" data-action="close-details">âœ•</button>
                 </div>
                 
                 <div class="details-content">
@@ -179,7 +207,7 @@ class FileView extends BaseView {
                         <span class="detail-value">${this.formatFileSize(file.size)}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Modifié:</span>
+                        <span class="detail-label">ModifiÃ©:</span>
                         <span class="detail-value">${this.formatDate(file.modified)}</span>
                     </div>
                     ${file.tracks ? `
@@ -190,7 +218,7 @@ class FileView extends BaseView {
                     ` : ''}
                     ${file.duration ? `
                         <div class="detail-row">
-                            <span class="detail-label">Durée:</span>
+                            <span class="detail-label">DurÃ©e:</span>
                             <span class="detail-value">${this.formatDuration(file.duration)}</span>
                         </div>
                     ` : ''}
@@ -198,7 +226,7 @@ class FileView extends BaseView {
                 
                 <div class="details-actions">
                     <button class="btn-primary" data-action="load-file">
-                        📂 Charger dans l'éditeur
+                        ðŸ“‚ Charger dans l'Ã©diteur
                     </button>
                 </div>
             </div>
@@ -217,7 +245,7 @@ class FileView extends BaseView {
     buildEmptyState() {
         return `
             <div class="empty-state">
-                <div class="empty-icon">🔭</div>
+                <div class="empty-icon">ðŸ“­</div>
                 <h3>Aucun fichier</h3>
                 <p>Uploadez des fichiers MIDI pour commencer</p>
             </div>
@@ -225,12 +253,12 @@ class FileView extends BaseView {
     }
     
     // ========================================================================
-    // RENDERING - MÉTHODES PRINCIPALES
+    // RENDERING - MÃ‰THODES PRINCIPALES
     // ========================================================================
     
     /**
      * Rendre la vue
-     * @param {Object} data - Données optionnelles pour le rendu
+     * @param {Object} data - DonnÃ©es optionnelles pour le rendu
      */
     render(data = null) {
         if (!this.container) {
@@ -241,31 +269,52 @@ class FileView extends BaseView {
         const startTime = performance.now();
         
         try {
-            // Générer et insérer le HTML
+            // DEBUG: Afficher l'Ã©tat actuel
+            console.log('[FileView] render() - viewState:', JSON.stringify(this.viewState));
+            console.log('[FileView] render() - data:', data);
+            
+            // GÃ©nÃ©rer et insÃ©rer le HTML
             const template = this.buildTemplate(data || this.viewState);
+            console.log('[FileView] Template generated, length:', template.length);
             
             this.container.innerHTML = template;
+            console.log('[FileView] innerHTML set');
             
-            // Attacher les événements
+            // Attacher les Ã©vÃ©nements
             this.attachEvents();
+            console.log('[FileView] Events attached');
             
-            // Mettre à jour l'état
+            // Mettre Ã  jour l'Ã©tat
             this.state.rendered = true;
-            this.state.lastRender = Date.now();
+            this.state.lastUpdate = Date.now();
             
-            const elapsed = performance.now() - startTime;
-            this.log('debug', 'FileView', `✅ Rendered in ${elapsed.toFixed(2)}ms`);
+            // Ã‰mettre Ã©vÃ©nement
+            if (this.eventBus) {
+                this.eventBus.emit('file-view:rendered', {
+                    filesCount: this.viewState.files ? this.viewState.files.length : 0
+                });
+            }
+            
+            const renderTime = performance.now() - startTime;
+            this.log('info', 'FileView', `âœ… Rendered in ${renderTime.toFixed(2)}ms`);
             
         } catch (error) {
-            this.log('error', 'FileView', 'Render error:', error);
+            // LOG COMPLET de l'erreur
+            console.error('[FileView] RENDER ERROR:', error);
+            console.error('[FileView] Error stack:', error.stack);
+            console.error('[FileView] Error message:', error.message);
+            console.error('[FileView] viewState at error:', this.viewState);
             
-            // Afficher message d'erreur
+            this.log('error', 'FileView', 'Render failed:', error.message || error);
+            
+            // Afficher un message d'erreur Ã  l'utilisateur
             if (this.container) {
                 this.container.innerHTML = `
-                    <div class="error-state">
-                        <div class="error-icon">⚠️</div>
-                        <h3>Erreur d'affichage</h3>
-                        <p>${error.message}</p>
+                    <div class="error-message" style="padding: 20px; text-align: center;">
+                        <h3>âŒ Erreur d'affichage</h3>
+                        <p>${error.message || 'Erreur inconnue'}</p>
+                        <pre style="text-align: left; background: #f5f5f5; padding: 10px; overflow: auto;">${error.stack || ''}</pre>
+                        <button onclick="window.location.reload()" style="margin-top: 10px; padding: 10px 20px;">Recharger la page</button>
                     </div>
                 `;
             }
@@ -280,13 +329,7 @@ class FileView extends BaseView {
             this.container.style.display = 'block';
             this.state.visible = true;
             
-            // ✅ Réattacher événements si nécessaire
-            if (this.needsEventReattach) {
-                this.attachEvents();
-                this.needsEventReattach = false;
-            }
-            
-            // Recharger les données si nécessaire
+            // Recharger les donnÃ©es si nÃ©cessaire
             if (!this.viewState.files || this.viewState.files.length === 0) {
                 this.refreshFiles();
             }
@@ -300,9 +343,6 @@ class FileView extends BaseView {
         if (this.container) {
             this.container.style.display = 'none';
             this.state.visible = false;
-            
-            // Marquer pour réattachement lors du prochain show()
-            this.needsEventReattach = true;
         }
     }
 
@@ -321,10 +361,10 @@ class FileView extends BaseView {
      * Filtrer les fichiers selon une recherche
      * @param {Array} files - Liste des fichiers
      * @param {string} filter - Terme de recherche
-     * @returns {Array} Fichiers filtrés
+     * @returns {Array} Fichiers filtrÃ©s
      */
     filterFiles(files, filter) {
-        // ✅ SÉCURITÉ: Vérifier que files est un tableau
+        // âœ… SÃ‰CURITÃ‰: VÃ©rifier que files est un tableau
         if (!Array.isArray(files)) {
             console.warn('[FileView] filterFiles: files is not an array', files);
             return [];
@@ -345,12 +385,12 @@ class FileView extends BaseView {
     /**
      * Trier les fichiers
      * @param {Array} files - Liste des fichiers
-     * @param {string} sortBy - Critère de tri
+     * @param {string} sortBy - CritÃ¨re de tri
      * @param {string} sortOrder - Ordre (asc/desc)
-     * @returns {Array} Fichiers triés
+     * @returns {Array} Fichiers triÃ©s
      */
     sortFiles(files, sortBy, sortOrder) {
-        // ✅ SÉCURITÉ: Vérifier que files est un tableau
+        // âœ… SÃ‰CURITÃ‰: VÃ©rifier que files est un tableau
         if (!Array.isArray(files)) {
             console.warn('[FileView] sortFiles: files is not an array', files);
             return [];
@@ -397,26 +437,33 @@ class FileView extends BaseView {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         
-        return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+        return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
     }
     
     formatDate(timestamp) {
         if (!timestamp) return 'N/A';
         
-        let date;
+        const date = new Date(timestamp * 1000);
+        const now = new Date();
+        const diff = now - date;
         
-        // Gérer timestamp Unix (nombre) ou ISO string
-        if (typeof timestamp === 'number') {
-            // Si timestamp en millisecondes
-            date = new Date(timestamp);
-        } else if (typeof timestamp === 'string') {
-            date = new Date(timestamp);
-        } else {
-            return 'N/A';
+        // Moins d'une heure
+        if (diff < 3600000) {
+            const minutes = Math.floor(diff / 60000);
+            return `il y a ${minutes} min`;
         }
         
-        // Vérifier validité
-        if (isNaN(date.getTime())) return 'N/A';
+        // Moins d'un jour
+        if (diff < 86400000) {
+            const hours = Math.floor(diff / 3600000);
+            return `il y a ${hours}h`;
+        }
+        
+        // Moins d'une semaine
+        if (diff < 604800000) {
+            const days = Math.floor(diff / 86400000);
+            return `il y a ${days}j`;
+        }
         
         // Format complet
         return date.toLocaleDateString('fr-FR', {
@@ -448,6 +495,8 @@ class FileView extends BaseView {
     // ========================================================================
     
     attachEvents() {
+        // âœ… PAS d'appel Ã  super.attachEvents() car BaseView n'a pas cette mÃ©thode
+        
         if (!this.container) return;
         
         // Actions des boutons
@@ -468,17 +517,17 @@ class FileView extends BaseView {
                 case 'select-file':
                     if (filePath) this.handleSelectFile(filePath);
                     break;
-                case 'edit-file':
-                    if (filePath) this.handleEditFile(filePath);
-                    break;
-                case 'route-file':
-                    if (filePath) this.handleRouteFile(filePath);
-                    break;
                 case 'play-file':
                     if (filePath) this.handlePlayFile(filePath);
                     break;
                 case 'delete-file':
                     if (filePath) this.handleDeleteFile(filePath);
+                case 'edit-file':
+                    if (filePath) this.handleEditFile(filePath);
+                    break;
+                case 'open-routing':
+                    if (filePath) this.handleOpenRouting(filePath);
+                    break;
                     break;
                 case 'load-file':
                     this.handleLoadFile();
@@ -547,7 +596,7 @@ class FileView extends BaseView {
     // ========================================================================
     
     handleUpload() {
-        // ✅ Utiliser ou créer un input file permanent attaché au DOM
+        // âœ… Utiliser ou crÃ©er un input file permanent attachÃ© au DOM
         let input = document.getElementById('file-upload-input');
         
         if (!input) {
@@ -571,7 +620,7 @@ class FileView extends BaseView {
                 
                 for (const file of files) {
                     try {
-                        // ✅ Émettre événement que FileController écoute
+                        // âœ… Ã‰mettre Ã©vÃ©nement que FileController Ã©coute
                         if (this.eventBus) {
                             this.eventBus.emit('file:upload', {
                                 file: file  // Objet File natif
@@ -583,12 +632,12 @@ class FileView extends BaseView {
                     }
                 }
                 
-                // Réinitialiser pour permettre de réuploader le même fichier
+                // RÃ©initialiser pour permettre de rÃ©uploader le mÃªme fichier
                 input.value = '';
             });
         }
         
-        // Déclencher le sélecteur de fichiers
+        // DÃ©clencher le sÃ©lecteur de fichiers
         this.log('debug', 'FileView', 'Triggering file selector');
         input.click();
     }
@@ -614,38 +663,11 @@ class FileView extends BaseView {
             this.viewState.selectedFile = file;
             this.render();
             
-            // Émettre événement
+            // Ã‰mettre Ã©vÃ©nement
             if (this.eventBus) {
                 this.eventBus.emit('file:selected', { file });
             }
         }
-    }
-    
-    handleEditFile(filePath) {
-        // Charger dans l'éditeur
-        if (this.eventBus) {
-            this.eventBus.emit('file:load_in_editor', {
-                file_path: filePath
-            });
-        }
-        
-        // Naviguer vers l'éditeur
-        if (window.app?.router) {
-            window.app.router.navigateTo('/editor');
-        }
-        
-        this.log('info', 'FileView', `Edit requested: ${filePath}`);
-    }
-    
-    handleRouteFile(filePath) {
-        // Ouvrir modal de configuration de routage
-        if (this.eventBus) {
-            this.eventBus.emit('routing:configure', {
-                file_path: filePath
-            });
-        }
-        
-        this.log('info', 'FileView', `Routing requested: ${filePath}`);
     }
     
     handlePlayFile(filePath) {
@@ -668,19 +690,48 @@ class FileView extends BaseView {
         }
     }
     
-    handleLoadFile() {
-        if (!this.viewState.selectedFile) return;
+    
+    handleEditFile(filePath) {
+        this.log('info', 'FileView', `Opening editor for: ${filePath}`);
         
-        const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
-        
-        // Demander chargement dans l'éditeur
         if (this.eventBus) {
             this.eventBus.emit('file:load_in_editor', {
                 file_path: filePath
             });
         }
         
-        // Navigation vers l'éditeur
+        if (window.app?.router) {
+            window.app.router.navigateTo('/editor');
+        }
+    }
+    
+    handleOpenRouting(filePath) {
+        this.log('info', 'FileView', `Opening routing for: ${filePath}`);
+        
+        if (this.eventBus) {
+            this.eventBus.emit('file:load_for_routing', {
+                file_path: filePath
+            });
+        }
+        
+        if (window.app?.router) {
+            window.app.router.navigateTo('/routing');
+        }
+    }
+    
+        handleLoadFile() {
+        if (!this.viewState.selectedFile) return;
+        
+        const filePath = this.viewState.selectedFile.path || this.viewState.selectedFile.name;
+        
+        // Demander chargement dans l'Ã©diteur
+        if (this.eventBus) {
+            this.eventBus.emit('file:load_in_editor', {
+                file_path: filePath
+            });
+        }
+        
+        // Navigation vers l'Ã©diteur
         if (window.app?.router) {
             window.app.router.navigateTo('/editor');
         }
@@ -696,7 +747,7 @@ class FileView extends BaseView {
     // ========================================================================
     
     /**
-     * Mettre à jour la liste des fichiers
+     * Mettre Ã  jour la liste des fichiers
      * @param {Array} files - Nouvelle liste de fichiers
      */
     updateFiles(files) {
@@ -706,8 +757,8 @@ class FileView extends BaseView {
     }
     
     /**
-     * Définir l'état de chargement
-     * @param {boolean} loading - État de chargement
+     * DÃ©finir l'Ã©tat de chargement
+     * @param {boolean} loading - Ã‰tat de chargement
      */
     setLoading(loading) {
         this.viewState.isLoading = loading;
@@ -715,7 +766,7 @@ class FileView extends BaseView {
     }
     
     /**
-     * Obtenir le fichier sélectionné
+     * Obtenir le fichier sÃ©lectionnÃ©
      * @returns {Object|null}
      */
     getSelectedFile() {
@@ -723,8 +774,8 @@ class FileView extends BaseView {
     }
     
     /**
-     * Définir le fichier sélectionné
-     * @param {Object} file - Fichier à sélectionner
+     * DÃ©finir le fichier sÃ©lectionnÃ©
+     * @param {Object} file - Fichier Ã  sÃ©lectionner
      */
     setSelectedFile(file) {
         this.viewState.selectedFile = file;
@@ -741,14 +792,14 @@ class FileView extends BaseView {
             input.remove();
         }
         
-        // Appeler la méthode destroy du parent si elle existe
+        // Appeler la mÃ©thode destroy du parent si elle existe
         if (super.destroy) {
             super.destroy();
         }
     }
     
     /**
-     * Logger avec préfixe
+     * Logger avec prÃ©fixe
      */
     log(level, context, ...args) {
         if (!this.logger) return;
