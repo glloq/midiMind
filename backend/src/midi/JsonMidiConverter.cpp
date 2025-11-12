@@ -1,6 +1,6 @@
 // ============================================================================
 // File: backend/src/midi/JsonMidiConverter.cpp
-// Version: 4.2.2
+// Version: 4.2.7 - UTF-8 SANITIZATION FIX
 // Project: MidiMind - MIDI Orchestration System for Raspberry Pi
 // ============================================================================
 //
@@ -9,6 +9,10 @@
 //
 // Author: MidiMind Team
 // Date: 2025-10-16
+//
+// Changes v4.2.7:
+//   - Added: UTF-8 sanitization for text fields to prevent JSON encoding errors
+//   - Fixed: Meta event text fields with non-UTF-8 bytes now handled correctly
 //
 // Changes v4.2.2:
 //   - Fixed bank extraction (MSB/LSB from CC 0/32)
@@ -25,6 +29,84 @@
 #include <fstream>
 
 namespace midiMind {
+
+// ============================================================================
+// UTF-8 SANITIZATION HELPER
+// ============================================================================
+
+/**
+ * Sanitize a string to ensure it's valid UTF-8.
+ * Invalid bytes are replaced with '?'.
+ * Control characters (except \n \r \t) are replaced with spaces.
+ */
+static std::string sanitizeUtf8(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    
+    for (size_t i = 0; i < str.size(); ) {
+        unsigned char c = static_cast<unsigned char>(str[i]);
+        
+        // ASCII 7-bit (0x00-0x7F)
+        if (c < 0x80) {
+            // Replace control characters with space (except \n \r \t)
+            if (c < 0x20 && c != '\n' && c != '\r' && c != '\t') {
+                result += ' ';
+            } else {
+                result += c;
+            }
+            i++;
+        }
+        // UTF-8 2-byte (0xC0-0xDF)
+        else if ((c & 0xE0) == 0xC0) {
+            if (i + 1 < str.size() && 
+                (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80) {
+                result += str[i];
+                result += str[i+1];
+                i += 2;
+            } else {
+                result += '?';
+                i++;
+            }
+        }
+        // UTF-8 3-byte (0xE0-0xEF)
+        else if ((c & 0xF0) == 0xE0) {
+            if (i + 2 < str.size() &&
+                (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80 &&
+                (static_cast<unsigned char>(str[i+2]) & 0xC0) == 0x80) {
+                result += str[i];
+                result += str[i+1];
+                result += str[i+2];
+                i += 3;
+            } else {
+                result += '?';
+                i++;
+            }
+        }
+        // UTF-8 4-byte (0xF0-0xF7)
+        else if ((c & 0xF8) == 0xF0) {
+            if (i + 3 < str.size() &&
+                (static_cast<unsigned char>(str[i+1]) & 0xC0) == 0x80 &&
+                (static_cast<unsigned char>(str[i+2]) & 0xC0) == 0x80 &&
+                (static_cast<unsigned char>(str[i+3]) & 0xC0) == 0x80) {
+                result += str[i];
+                result += str[i+1];
+                result += str[i+2];
+                result += str[i+3];
+                i += 4;
+            } else {
+                result += '?';
+                i++;
+            }
+        }
+        // Invalid byte
+        else {
+            result += '?';
+            i++;
+        }
+    }
+    
+    return result;
+}
 
 // ============================================================================
 // JsonMidiEvent IMPLEMENTATION
@@ -46,7 +128,12 @@ json JsonMidiEvent::toJson() const {
     if (pitchBend.has_value()) j["pitchBend"] = pitchBend.value();
     if (program.has_value()) j["program"] = program.value();
     if (tempo.has_value()) j["tempo"] = tempo.value();
-    if (text.has_value()) j["text"] = text.value();
+    
+    // CORRECTION v4.2.7: Sanitize text to prevent UTF-8 encoding errors
+    if (text.has_value()) {
+        j["text"] = sanitizeUtf8(text.value());
+    }
+    
     if (data.has_value()) j["data"] = data.value();
     
     return j;
@@ -104,21 +191,21 @@ JsonMidiEvent JsonMidiEvent::fromJson(const json& j) {
 
 json JsonMidiMetadata::toJson() const {
     return {
-        {"title", title},
-        {"artist", artist},
-        {"album", album},
-        {"genre", genre},
-        {"copyright", copyright},
-        {"comment", comment},
+        {"title", sanitizeUtf8(title)},
+        {"artist", sanitizeUtf8(artist)},
+        {"album", sanitizeUtf8(album)},
+        {"genre", sanitizeUtf8(genre)},
+        {"copyright", sanitizeUtf8(copyright)},
+        {"comment", sanitizeUtf8(comment)},
         {"tempo", tempo},
-        {"timeSignature", timeSignature},
-        {"keySignature", keySignature},
+        {"timeSignature", sanitizeUtf8(timeSignature)},
+        {"keySignature", sanitizeUtf8(keySignature)},
         {"duration", duration},
         {"ticksPerBeat", ticksPerBeat},
         {"midiFormat", midiFormat},
         {"trackCount", trackCount},
-        {"createdAt", createdAt},
-        {"modifiedAt", modifiedAt}
+        {"createdAt", sanitizeUtf8(createdAt)},
+        {"modifiedAt", sanitizeUtf8(modifiedAt)}
     };
 }
 
@@ -151,18 +238,18 @@ JsonMidiMetadata JsonMidiMetadata::fromJson(const json& j) {
 json JsonMidiTrack::toJson() const {
     return {
         {"id", id},
-        {"name", name},
+        {"name", sanitizeUtf8(name)},
         {"channel", channel},
         {"muted", muted},
         {"solo", solo},
         {"volume", volume},
         {"pan", pan},
         {"transpose", transpose},
-        {"color", color},
+        {"color", sanitizeUtf8(color)},
         {"instrument", {
             {"program", instrument.program},
             {"bank", instrument.bank},
-            {"name", instrument.name}
+            {"name", sanitizeUtf8(instrument.name)}
         }}
     };
 }
@@ -199,7 +286,7 @@ json JsonMidiMarker::toJson() const {
         {"id", id},
         {"time", time},
         {"label", label},
-        {"color", color}
+        {"color", sanitizeUtf8(color)}
     };
 }
 
@@ -296,7 +383,7 @@ JsonMidiConverter::JsonMidiConverter() {
 }
 
 // ============================================================================
-// CONVERSION: MIDI → JsonMidi
+// CONVERSION: MIDI â†’ JsonMidi
 // ============================================================================
 
 JsonMidi JsonMidiConverter::fromMidiMessages(
@@ -347,7 +434,7 @@ JsonMidi JsonMidiConverter::fromMidiMessages(
     jsonMidi.metadata.tempo = extractTempo(jsonMidi.timeline);
     
     Logger::info("JsonMidiConverter", 
-                "✓ Converted to " + std::to_string(jsonMidi.timeline.size()) + " events");
+                "âœ“ Converted to " + std::to_string(jsonMidi.timeline.size()) + " events");
     
     return jsonMidi;
 }
@@ -380,7 +467,7 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
     jsonMidi.format = "jsonmidi-v1.0";
     jsonMidi.version = "1.0.0";
     
-    // 4. Remplir les métadonnées
+    // 4. Remplir les mÃ©tadonnÃ©es
     jsonMidi.metadata.tempo = midiFile.tempo;
     jsonMidi.metadata.duration = midiFile.durationMs;
     jsonMidi.metadata.ticksPerBeat = midiFile.header.division;
@@ -404,7 +491,7 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
         jsonMidi.tracks.push_back(jsonTrack);
     }
     
-    // 6. Convertir les events en timeline unifiée
+    // 6. Convertir les events en timeline unifiÃ©e
     jsonMidi.timeline = convertMidiEventsToTimeline(midiFile, midiFile.header.division);
     
     // 7. Trier la timeline par temps
@@ -413,18 +500,18 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
                  return a.time < b.time;
              });
     
-    // 8. Calculer les durées des notes
+    // 8. Calculer les durÃ©es des notes
     calculateNoteDurations(jsonMidi.timeline);
     
     Logger::info("JsonMidiConverter", 
-        "✓ Converted to " + std::to_string(jsonMidi.timeline.size()) + 
+        "âœ“ Converted to " + std::to_string(jsonMidi.timeline.size()) + 
         " events across " + std::to_string(jsonMidi.tracks.size()) + " tracks");
     
     return jsonMidi;
 }
 
 // ============================================================================
-// CONVERSION: JsonMidi → MIDI
+// CONVERSION: JsonMidi â†’ MIDI
 // ============================================================================
 
 std::vector<MidiMessage> JsonMidiConverter::toMidiMessages(const JsonMidi& jsonMidi) {
@@ -446,7 +533,7 @@ std::vector<MidiMessage> JsonMidiConverter::toMidiMessages(const JsonMidi& jsonM
     }
     
     Logger::info("JsonMidiConverter", 
-                "✓ Converted to " + std::to_string(messages.size()) + " MIDI messages");
+                "âœ“ Converted to " + std::to_string(messages.size()) + " MIDI messages");
     
     return messages;
 }
@@ -563,7 +650,7 @@ void JsonMidiConverter::calculateNoteDurations(std::vector<JsonMidiEvent>& timel
         }
     }
     
-    Logger::debug("JsonMidiConverter", "✓ Note durations calculated");
+    Logger::debug("JsonMidiConverter", "âœ“ Note durations calculated");
 }
 
 uint32_t JsonMidiConverter::ticksToMs(uint32_t ticks, uint16_t ticksPerBeat, uint32_t tempo) {
@@ -775,7 +862,7 @@ JsonMidiTrack JsonMidiConverter::convertMidiTrackToJsonTrack(
     jsonTrack.volume = 100;
     jsonTrack.pan = 64;
     jsonTrack.transpose = 0;
-    jsonTrack.color = "#667eea";  // Couleur par défaut
+    jsonTrack.color = "#667eea";  // Couleur par dÃ©faut
     
     // Extraire Bank Select (CC 0/32) et Program Change
     uint8_t bankMSB = 0;
@@ -808,14 +895,14 @@ std::vector<JsonMidiEvent> JsonMidiConverter::convertMidiEventsToTimeline(
     uint16_t ticksPerBeat) {
     
     std::vector<JsonMidiEvent> timeline;
-    uint32_t currentTempo = 500000;  // Défaut: 120 BPM
+    uint32_t currentTempo = 500000;  // DÃ©faut: 120 BPM
     
     // Parcourir tous les tracks
     for (size_t trackIdx = 0; trackIdx < midiFile.tracks.size(); trackIdx++) {
         const auto& track = midiFile.tracks[trackIdx];
         
         for (const auto& event : track.events) {
-            // Mettre à jour le tempo si meta-event tempo
+            // Mettre Ã  jour le tempo si meta-event tempo
             if (event.type == MidiEventType::META && event.metaType == 0x51) {
                 if (event.data.size() >= 3) {
                     currentTempo = (event.data[0] << 16) | 
@@ -824,7 +911,7 @@ std::vector<JsonMidiEvent> JsonMidiConverter::convertMidiEventsToTimeline(
                 }
             }
             
-            // Convertir ticks → millisecondes
+            // Convertir ticks â†’ millisecondes
             uint32_t timeMs = ticksToMilliseconds(
                 event.absoluteTime, 
                 ticksPerBeat, 
@@ -855,7 +942,7 @@ JsonMidiEvent JsonMidiConverter::convertMidiEventToJsonEvent(
     JsonMidiEvent jsonEvent;
     jsonEvent.time = timeMs;
     
-    // Générer ID unique
+    // GÃ©nÃ©rer ID unique
     std::ostringstream idStream;
     idStream << event.messageType << "_" << timeMs << "_" 
              << std::hex << std::setfill('0') << std::setw(8) 
@@ -866,7 +953,7 @@ JsonMidiEvent JsonMidiConverter::convertMidiEventToJsonEvent(
     jsonEvent.type = event.messageType;
     jsonEvent.channel = event.channel > 0 ? event.channel : trackChannel;
     
-    // Données spécifiques selon le type
+    // DonnÃ©es spÃ©cifiques selon le type
     if (event.messageType == "noteOn" || event.messageType == "noteOff") {
         jsonEvent.note = event.note;
         jsonEvent.velocity = event.velocity;
