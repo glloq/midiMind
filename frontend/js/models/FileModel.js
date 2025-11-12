@@ -1,18 +1,18 @@
 // ============================================================================
 // Fichier: frontend/js/models/FileModel.js
-// Chemin rÃ©el: frontend/js/models/FileModel.js
+// Chemin rÃƒÂ©el: frontend/js/models/FileModel.js
 // Version: v4.2.2 - API COMPATIBLE v4.2.2
 // Date: 2025-11-02
 // ============================================================================
 // CORRECTIONS v4.2.2:
-// âœ… list_files â†’ files.list
-// âœ… load_file â†’ playback.load
-// âœ… unload_file â†’ playback.stop
-// âœ… get_file_info â†’ files.getInfo
-// âœ… delete_file â†’ files.delete
-// âœ… import_file â†’ files.write
-// âœ… export_file â†’ files.read
-// âœ… Extraction response.data corrigÃ©e
+// Ã¢Å“â€¦ list_files Ã¢â€ â€™ files.list
+// Ã¢Å“â€¦ load_file Ã¢â€ â€™ playback.load
+// Ã¢Å“â€¦ unload_file Ã¢â€ â€™ playback.stop
+// Ã¢Å“â€¦ get_file_info Ã¢â€ â€™ files.getInfo
+// Ã¢Å“â€¦ delete_file Ã¢â€ â€™ files.delete
+// Ã¢Å“â€¦ import_file Ã¢â€ â€™ files.write
+// Ã¢Å“â€¦ export_file Ã¢â€ â€™ files.read
+// Ã¢Å“â€¦ Extraction response.data corrigÃƒÂ©e
 // ============================================================================
 
 class FileModel extends BaseModel {
@@ -38,7 +38,7 @@ class FileModel extends BaseModel {
         this.data.selectedFile = this.data.selectedFile || null;
         this.data.recentFiles = this.data.recentFiles || [];
         
-        this.log('debug', 'FileModel', 'âœ“ FileModel v4.2.2 initialized (API v4.2.2)');
+        this.log('debug', 'FileModel', 'Ã¢Å“â€œ FileModel v4.2.2 initialized (API v4.2.2)');
     }
     
     // ========================================================================
@@ -46,8 +46,8 @@ class FileModel extends BaseModel {
     // ========================================================================
     
     /**
-     * RafraÃ®chit la liste des fichiers
-     * âœ… API v4.2.2: files.list
+     * RafraÃƒÂ®chit la liste des fichiers
+     * Ã¢Å“â€¦ API v4.2.2: files.list
      */
     async refreshFileList(path = null) {
         const targetPath = path || this.getCurrentPath();
@@ -61,7 +61,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Refreshing file list: ${targetPath}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.list', {
                 path: targetPath
             });
@@ -89,7 +89,7 @@ class FileModel extends BaseModel {
     
     /**
      * Charge un fichier MIDI pour lecture
-     * âœ… API v4.2.2: playback.load
+     * Ã¢Å“â€¦ API v4.2.2: playback.load
      */
     async loadFile(filePath) {
         if (!this.backend) {
@@ -99,7 +99,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Loading file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.2.2 - charge pour lecture
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2 - charge pour lecture
             const response = await this.backend.sendCommand('playback.load', {
                 filename: filePath
             });
@@ -125,7 +125,7 @@ class FileModel extends BaseModel {
     
     /**
      * Lit le contenu d'un fichier
-     * âœ… API v4.2.2: files.read
+     * Ã¢Å“â€¦ API v4.2.2: files.read
      */
     async readFile(filePath) {
         if (!this.backend) {
@@ -135,7 +135,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Reading file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.read', {
                 filename: filePath
             });
@@ -150,8 +150,8 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * DÃ©charge le fichier actuel
-     * âœ… API v4.2.2: playback.stop
+     * DÃƒÂ©charge le fichier actuel
+     * Ã¢Å“â€¦ API v4.2.2: playback.stop
      */
     async unloadFile() {
         if (!this.backend) {
@@ -161,7 +161,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', 'Unloading current file');
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('playback.stop');
             const data = response.data || response;
             
@@ -183,7 +183,7 @@ class FileModel extends BaseModel {
     
     /**
      * Obtient les informations d'un fichier
-     * âœ… API v4.2.2: files.getInfo
+     * Ã¢Å“â€¦ API v4.2.2: files.getInfo
      */
     async getFileInfo(filePath) {
         if (!this.backend) {
@@ -193,7 +193,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Getting file info: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.getInfo', {
                 filename: filePath
             });
@@ -209,7 +209,7 @@ class FileModel extends BaseModel {
     
     /**
      * Supprime un fichier
-     * âœ… API v4.2.2: files.delete
+     * Ã¢Å“â€¦ API v4.2.2: files.delete
      */
     async deleteFile(filePath) {
         if (!this.backend) {
@@ -219,7 +219,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Deleting file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.delete', {
                 filename: filePath
             });
@@ -248,7 +248,7 @@ class FileModel extends BaseModel {
     
     /**
      * Importe/Upload un fichier
-     * âœ… API v4.2.2: files.write
+     * Ã¢Å“â€¦ API v4.2.2: files.write
      */
     async importFile(fileName, fileData, size, type = 'audio/midi') {
         if (!this.backend) {
@@ -258,11 +258,11 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Importing file: ${fileName}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.write', {
-                path: `/midi/${fileName}`,
+                filename: `/midi/${fileName}`,
                 content: fileData,
-                encoding: 'base64'
+                base64: true
             });
             const data = response.data || response;
             
@@ -284,8 +284,8 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Exporte/TÃ©lÃ©charge un fichier
-     * âœ… API v4.2.2: files.read
+     * Exporte/TÃƒÂ©lÃƒÂ©charge un fichier
+     * Ã¢Å“â€¦ API v4.2.2: files.read
      */
     async exportFile(filePath, format = 'midi') {
         if (!this.backend) {
@@ -295,7 +295,7 @@ class FileModel extends BaseModel {
         try {
             this.log('info', 'FileModel', `Exporting file: ${filePath}`);
             
-            // âœ… Nouvelle commande API v4.2.2
+            // Ã¢Å“â€¦ Nouvelle commande API v4.2.2
             const response = await this.backend.sendCommand('files.read', {
                 filename: filePath
             });
@@ -318,22 +318,22 @@ class FileModel extends BaseModel {
     }
     
     // ========================================================================
-    // GESTION FICHIERS RÃ‰CENTS
+    // GESTION FICHIERS RÃƒâ€°CENTS
     // ========================================================================
     
     /**
-     * Ajoute un fichier aux rÃ©cents
+     * Ajoute un fichier aux rÃƒÂ©cents
      */
     addToRecent(filePath) {
         let recentFiles = this.get('recentFiles');
         
-        // Retirer le fichier s'il existe dÃ©jÃ 
+        // Retirer le fichier s'il existe dÃƒÂ©jÃƒÂ 
         recentFiles = recentFiles.filter(f => f !== filePath);
         
-        // Ajouter en tÃªte
+        // Ajouter en tÃƒÂªte
         recentFiles.unshift(filePath);
         
-        // Limiter Ã  10 fichiers
+        // Limiter ÃƒÂ  10 fichiers
         if (recentFiles.length > 10) {
             recentFiles = recentFiles.slice(0, 10);
         }
@@ -342,7 +342,7 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Retire un fichier des rÃ©cents
+     * Retire un fichier des rÃƒÂ©cents
      */
     removeFromRecent(filePath) {
         let recentFiles = this.get('recentFiles');
@@ -351,14 +351,14 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * Obtient les fichiers rÃ©cents
+     * Obtient les fichiers rÃƒÂ©cents
      */
     getRecentFiles() {
         return this.get('recentFiles');
     }
     
     /**
-     * Efface les fichiers rÃ©cents
+     * Efface les fichiers rÃƒÂ©cents
      */
     clearRecentFiles() {
         this.set('recentFiles', []);
@@ -383,21 +383,21 @@ class FileModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit le chemin actuel
+     * DÃƒÂ©finit le chemin actuel
      */
     setCurrentPath(path) {
         this.set('currentPath', path);
     }
     
     /**
-     * Obtient le fichier sÃ©lectionnÃ©
+     * Obtient le fichier sÃƒÂ©lectionnÃƒÂ©
      */
     getSelectedFile() {
         return this.get('selectedFile');
     }
     
     /**
-     * DÃ©finit le fichier sÃ©lectionnÃ©
+     * DÃƒÂ©finit le fichier sÃƒÂ©lectionnÃƒÂ©
      */
     setSelectedFile(file) {
         this.set('selectedFile', file);
