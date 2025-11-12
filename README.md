@@ -21,34 +21,11 @@ cd midiMind
 # Lancer l'installation
 sudo ./scripts/install.sh
 ```
+```bash
+# debug
 
-### Options d'installation
-
-Le script vous proposera 3 modes d'installation :
-
-1. **Installation complète** (Recommandé)
-   - Backend API WebSocket
-   - Interface web frontend
-   - Serveur Nginx configuré
-   - Interface accessible sur port 8000
-
-2. **Backend uniquement**
-   - API WebSocket seule
-   - Idéal pour intégration custom
-   - Pas d'interface web
-
-3. **Mode développeur**
-   - Backend + Frontend
-   - Sans Nginx (serveur dev manuel)
-   - Pour développement local
-
-### Durée d'installation
-
-- Téléchargement des dépendances : ~5 min
-- Compilation du backend : ~5-10 min
-- Configuration système : ~2 min
-
-**Total : environ 15-20 minutes**
+journalctl -u midimind -f --no-pager
+```
 
 ## 🚀 Démarrage
 
