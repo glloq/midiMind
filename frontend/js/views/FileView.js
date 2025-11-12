@@ -1,11 +1,11 @@
 // ============================================================================
 // Fichier: frontend/js/views/FileView.js
 // Chemin réel: frontend/js/views/FileView.js
-// Version: v4.3.1 - COMPLET + INTERFACE COMPACTE + TOUS BOUTONS
+// Version: v4.3.0 - COMPLET + INTERFACE COMPACTE + TOUS BOUTONS
 // Date: 2025-11-12
 // ============================================================================
-// CORRECTIONS v4.3.1:
-// ✅ CRITIQUE: Suppression appel ligne 562 setupEventBusListeners (doublon): Méthode init() ajoutée (requise par BaseView)
+// CORRECTIONS v4.3.0:
+// ✅ CRITIQUE: Méthode init() ajoutée (requise par BaseView)
 // ✅ Interface compacte (40px par ligne avec buildFileRow)
 // ✅ 5 boutons: Détails, Éditer, Router, Jouer, Supprimer
 // ✅ Handlers complets: handleEditFile(), handleRouteFile()
@@ -33,7 +33,7 @@ class FileView extends BaseView {
         // Flag pour réattachement événements
         this.needsEventReattach = false;
         
-        this.log('debug', 'FileView', '✅ FileView v4.3.1 constructed');
+        this.log('debug', 'FileView', '✅ FileView v4.3.0 constructed');
     }
     
     // ========================================================================
@@ -63,7 +63,7 @@ class FileView extends BaseView {
             // Marquer comme initialisée
             this.state.initialized = true;
             
-            this.log('info', 'FileView', '✅ FileView v4.3.1 initialized (Compact + Full buttons)');
+            this.log('info', 'FileView', '✅ FileView v4.3.0 initialized (Compact + Full buttons)');
             
         } catch (error) {
             this.log('error', 'FileView', 'Initialization failed:', error);
@@ -559,7 +559,7 @@ class FileView extends BaseView {
         }
         
         // Attacher listeners EventBus
-        // ✅ setupEventBusListeners() appelé dans init() - pas ici pour éviter double listeners
+        // setupEventBusListeners() appelé dans init() - pas ici
     }
     
     setupEventBusListeners() {
