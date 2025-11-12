@@ -1,14 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
 // Chemin réel: frontend/js/controllers/FileController.js
-// Version: v4.4.0 - FIX COMPLET PAGE FICHIERS
-// Date: 2025-11-11
+// Version: v4.5.0 - SUPPORT ROUTAGE + ÉDITION
+// Date: 2025-11-12
 // ============================================================================
-// CORRECTIONS v4.4.0:
-// ✅ CRITIQUE: Fix syntaxe ligne 80 (accolade supplémentaire supprimée)
-// ✅ CRITIQUE: Ajout événements manquants (list_requested, delete_requested, etc.)
-// ✅ Encodage UTF-8 propre
-// ✅ Gestion complète upload/delete/play/load
+// CORRECTIONS v4.5.0:
+// ✅ Support événement file:load_for_routing (routage MIDI)
+// ✅ Upload fonctionnel vérifié
+// ✅ Tous événements FileView gérés
 // ============================================================================
 
 class FileController extends BaseController {
@@ -52,11 +51,12 @@ class FileController extends BaseController {
         this.eventBus.on('file:refresh', () => this.refreshFileList());
         this.eventBus.on('file:upload', (data) => this.handleFileUpload(data.file));
         
-        // ✅ NOUVEAUX ÉVÉNEMENTS depuis FileView
+        // ✅ ÉVÉNEMENTS depuis FileView
         this.eventBus.on('file:list_requested', (data) => this.handleListRequest(data));
         this.eventBus.on('file:delete_requested', (data) => this.handleDeleteRequest(data));
         this.eventBus.on('file:play_requested', (data) => this.handlePlayRequest(data));
         this.eventBus.on('file:load_in_editor', (data) => this.handleLoadInEditor(data));
+        this.eventBus.on('file:load_for_routing', (data) => this.handleLoadForRouting(data));
         
         // Backend
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
@@ -71,11 +71,11 @@ class FileController extends BaseController {
             }
         });
         
-        this.log('info', 'FileController', '✅ Events bound (v4.4.0)');
+        this.log('info', 'FileController', '✅ Events bound (v4.5.0 - routing support)');
     }
     
     // ========================================================================
-    // NOUVEAUX HANDLERS POUR ÉVÉNEMENTS FILEVIEW
+    // HANDLERS POUR ÉVÉNEMENTS FILEVIEW
     // ========================================================================
     
     /**
@@ -181,9 +181,13 @@ class FileController extends BaseController {
         }
         
         try {
+            // Charger le fichier MIDI
+            const response = await this.backend.loadMidi(filePath);
+            
             // Émettre vers EditorController
             this.eventBus.emit('editor:load_file', { 
-                file_path: filePath 
+                file_path: filePath,
+                midi_json: response.midi_json || response.data
             });
             
             this.log('info', 'FileController', `Loading in editor: ${filePath}`);
@@ -193,6 +197,41 @@ class FileController extends BaseController {
             }
         } catch (error) {
             this.log('error', 'FileController', 'handleLoadInEditor failed:', error);
+            
+            if (this.notifications) {
+                this.notifications.show('Erreur', `Échec chargement: ${error.message}`, 'error', 3000);
+            }
+        }
+    }
+    
+    /**
+     * ✅ NOUVEAU: Handler: Charger pour routage
+     */
+    async handleLoadForRouting(data) {
+        const filePath = data?.file_path;
+        
+        if (!filePath) {
+            this.log('error', 'FileController', 'handleLoadForRouting: missing file_path');
+            return;
+        }
+        
+        try {
+            // Charger le fichier MIDI
+            const response = await this.backend.loadMidi(filePath);
+            
+            // Émettre vers RoutingController
+            this.eventBus.emit('routing:load_file', { 
+                file_path: filePath,
+                midi_json: response.midi_json || response.data
+            });
+            
+            this.log('info', 'FileController', `Loading for routing: ${filePath}`);
+            
+            if (this.notifications) {
+                this.notifications.show('Routage', `Configuration du routage pour ${filePath}`, 'info', 2000);
+            }
+        } catch (error) {
+            this.log('error', 'FileController', 'handleLoadForRouting failed:', error);
             
             if (this.notifications) {
                 this.notifications.show('Erreur', `Échec chargement: ${error.message}`, 'error', 3000);
@@ -299,31 +338,45 @@ class FileController extends BaseController {
         );
     }
     
-    /**
-     * ✅ Écrit fichier - files.write
-     */
-    async writeFile(filename, content) {
+    async selectFile(fileId) {
+        const file = this.fileModel?.get('files')?.find(f => f.id === fileId || f.name === fileId);
+        
+        if (file) {
+            this.state.selectedFile = file;
+            this.eventBus.emit('file:selected', { file });
+        }
+    }
+    
+    async loadFile(fileId) {
+        const file = this.state.selectedFile || 
+                     this.fileModel?.get('files')?.find(f => f.id === fileId || f.name === fileId);
+        
+        if (file) {
+            this.eventBus.emit('file:loaded', { file });
+        }
+    }
+    
+    async saveFile(fileId, content) {
         return this.withBackend(
             async () => {
-                this.log('info', 'FileController', `Writing file: ${filename}`);
+                const filename = fileId;
+                
+                this.log('info', 'FileController', `Saving file: ${filename}`);
                 
                 await this.backend.writeFile(filename, content);
                 
-                this.log('info', 'FileController', `✅ File written: ${filename}`);
-                this.eventBus.emit('file:write-complete', { filename });
+                this.log('info', 'FileController', `✅ File saved: ${filename}`);
+                this.eventBus.emit('file:save-complete', { filename });
                 
                 await this.refreshFileList();
                 
                 return true;
             },
-            'write file',
+            'save file',
             false
         );
     }
     
-    /**
-     * ✅ Supprime fichier - files.delete
-     */
     async deleteFile(filename) {
         return this.withBackend(
             async () => {
@@ -432,126 +485,41 @@ class FileController extends BaseController {
     
     async refreshFileList() {
         try {
-            return await this.listFiles();
-        } catch (error) {
-            // Ne pas afficher d'erreur si mode offline
-            if (!error.offline) {
-                this.log('error', 'FileController', 'refreshFileList failed:', error);
-                if (this.notifications) {
-                    this.notifications.show('Erreur', 'Échec actualisation liste', 'error', 3000);
-                }
-            }
-            throw error;
-        }
-    }
-    
-    async loadFile(fileId) {
-        try {
-            this.log('info', 'FileController', `Loading file: ${fileId}`);
-            
-            const content = await this.readFile(fileId);
-            
-            this.state.selectedFile = fileId;
-            if (this.fileModel) {
-                this.fileModel.set('selectedFile', { id: fileId, content });
-            }
-            
-            this.eventBus.emit('file:loaded', { fileId, content });
-            
-            if (this.notifications) {
-                this.notifications.show('Fichier Chargé', `${fileId} chargé`, 'success', 2000);
-            }
-            
-            return content;
+            await this.listFiles();
+            this.log('debug', 'FileController', 'File list refreshed');
         } catch (error) {
             if (!error.offline) {
-                this.log('error', 'FileController', 'loadFile failed:', error);
-                if (this.notifications) {
-                    this.notifications.show('Erreur', `Échec chargement: ${error.message}`, 'error', 3000);
-                }
-            }
-            throw error;
-        }
-    }
-    
-    async saveFile(fileId, content) {
-        try {
-            this.log('info', 'FileController', `Saving file: ${fileId}`);
-            
-            await this.writeFile(fileId, content);
-            
-            if (this.notifications) {
-                this.notifications.show('Fichier Sauvegardé', `${fileId} sauvegardé`, 'success', 2000);
-            }
-            
-            return true;
-        } catch (error) {
-            if (!error.offline) {
-                this.log('error', 'FileController', 'saveFile failed:', error);
-                if (this.notifications) {
-                    this.notifications.show('Erreur', `Échec sauvegarde: ${error.message}`, 'error', 3000);
-                }
-            }
-            throw error;
-        }
-    }
-    
-    selectFile(fileId) {
-        this.state.selectedFile = fileId;
-        
-        if (this.fileModel) {
-            const files = this.fileModel.get('files') || [];
-            const file = files.find(f => f.id === fileId || f.name === fileId);
-            if (file) {
-                this.fileModel.setSelected(file);
+                this.log('error', 'FileController', 'Failed to refresh file list:', error);
             }
         }
-        
-        this.eventBus.emit('file:selected', { fileId });
     }
     
     startAutoRefresh() {
-        if (this.refreshTimer) return;
-        
-        // Ne démarrer l'auto-refresh que si backend disponible
-        if (!this.isBackendReady()) {
-            this.log('info', 'FileController', 'Auto-refresh skipped - backend not ready');
-            return;
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
         }
         
-        this.log('info', 'FileController', 'Starting auto-refresh...');
-        
         this.refreshTimer = setInterval(() => {
-            // Vérifier backend avant chaque refresh
-            if (!this.isBackendReady()) {
-                this.stopAutoRefresh();
-                return;
-            }
-            
-            this.refreshFileList().catch(err => {
-                // Silencieux si offline
-                if (!err.offline) {
-                    this.log('error', 'FileController', 'Auto-refresh failed:', err);
-                }
-            });
+            this.refreshFileList();
         }, this.config.refreshInterval);
+        
+        this.log('debug', 'FileController', 'Auto-refresh started');
     }
     
     stopAutoRefresh() {
         if (this.refreshTimer) {
             clearInterval(this.refreshTimer);
             this.refreshTimer = null;
-            this.log('info', 'FileController', 'Auto-refresh stopped');
+            this.log('debug', 'FileController', 'Auto-refresh stopped');
         }
     }
     
-    log(level, ...args) {
-        if (this.logger && typeof this.logger[level] === 'function') {
-            this.logger[level](...args);
-        }
+    destroy() {
+        this.stopAutoRefresh();
+        super.destroy?.();
     }
 }
 
-if (typeof window !== 'undefined') {
-    window.FileController = FileController;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = FileController;
 }
