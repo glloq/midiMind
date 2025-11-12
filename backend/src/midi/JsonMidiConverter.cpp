@@ -504,19 +504,15 @@ JsonMidi JsonMidiConverter::fromMidiMessages(
 }
 
 JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
-    MidiFile midiFile;
-    std::string errorMessage;
-    
-    if (!MidiFileReader::read(filepath, midiFile, errorMessage)) {
-        throw std::runtime_error("Failed to read MIDI file: " + errorMessage);
-    }
+    MidiFileReader reader;
+    MidiFile midiFile = reader.readFromFile(filepath);
     
     JsonMidi jsonMidi;
     jsonMidi.format = "jsonmidi-v1.0";
     jsonMidi.version = "1.0.0";
     
-    jsonMidi.metadata.ticksPerBeat = midiFile.ticksPerBeat;
-    jsonMidi.metadata.midiFormat = midiFile.format;
+    jsonMidi.metadata.ticksPerBeat = midiFile.header.division;
+    jsonMidi.metadata.midiFormat = midiFile.header.format;
     jsonMidi.metadata.trackCount = static_cast<uint16_t>(midiFile.tracks.size());
     jsonMidi.metadata.tempo = extractTempoFromMidiFile(midiFile);
     jsonMidi.metadata.timeSignature = "4/4";
@@ -536,7 +532,7 @@ JsonMidi JsonMidiConverter::fromMidiFile(const std::string& filepath) {
         jsonMidi.tracks.push_back(jsonTrack);
     }
     
-    jsonMidi.timeline = convertMidiEventsToTimeline(midiFile, midiFile.ticksPerBeat);
+    jsonMidi.timeline = convertMidiEventsToTimeline(midiFile, midiFile.header.division);
     
     std::sort(jsonMidi.timeline.begin(), jsonMidi.timeline.end(),
         [](const JsonMidiEvent& a, const JsonMidiEvent& b) {
