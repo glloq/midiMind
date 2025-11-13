@@ -721,10 +721,9 @@ class BackendService {
     
     // MIDI
     async convertMidi(filename) { return this.sendCommand('midi.convert', { filename }); }
-    async loadMidi(filepath) { return this.sendCommand('midi.load', { filepath }); }
-    async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
-    async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
-    
+	async loadMidi(filepath) { return this.sendCommand('midi.load', { filepath }); }
+	async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
+	async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
     /**
      * âœ… v4.4.2: Upload File object (wrapper pour importMidi)
      * UtilisÃ© comme fallback dans FileController
@@ -1031,3 +1030,4 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = BackendService;
 }
 window.BackendService = BackendService;
+
