@@ -569,7 +569,7 @@ class FileView extends BaseView {
         if (!this.eventBus) return;
         
         // files.list response
-        this.eventBus.on('files:list-updated', (data) => {
+        this.eventBus.on('files:listUpdated', (data) => {
             this.log('info', 'FileView', `Received ${data.files?.length || 0} files`);
             this.viewState.files = data.files || [];
             this.viewState.isLoading = false;
