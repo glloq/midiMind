@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/services/BackendService.js
-// Chemin rÃ©el: frontend/js/services/BackendService.js  
+// Chemin rÃƒÂ©el: frontend/js/services/BackendService.js  
 // Version: v4.4.1 - API v4.2.2 ENVELOPE + VALIDATION
 // Date: 2025-11-10
 // ============================================================================
 // CORRECTIONS v4.4.1 (VALIDATION ENVELOPE):
-// âœ… validateEnvelopeFormat() - Validation messages avant envoi
-// âœ… Validation dans send() et flushMessageQueue()
-// âœ… Rejet messages invalides sans mise en queue
-// âœ… FIXES SYNTAXE: 3 erreurs corrigÃ©es (backticks, parenthÃ¨ses)
+// Ã¢Å“â€¦ validateEnvelopeFormat() - Validation messages avant envoi
+// Ã¢Å“â€¦ Validation dans send() et flushMessageQueue()
+// Ã¢Å“â€¦ Rejet messages invalides sans mise en queue
+// Ã¢Å“â€¦ FIXES SYNTAXE: 3 erreurs corrigÃƒÂ©es (backticks, parenthÃƒÂ¨ses)
 // ============================================================================
 
 class BackendService {
@@ -76,18 +76,18 @@ class BackendService {
     }
     
     /**
-     * âœ… v4.4.1: Valide format envelope avant envoi
+     * Ã¢Å“â€¦ v4.4.1: Valide format envelope avant envoi
      */
     validateEnvelopeFormat(message) {
         if (typeof message !== 'object' || message === null) {
-            this.logger.error('BackendService', 'âŒ Not an object');
+            this.logger.error('BackendService', 'Ã¢ÂÅ’ Not an object');
             return false;
         }
         
         const required = ['id', 'type', 'timestamp', 'version', 'payload'];
         for (const field of required) {
             if (!message.hasOwnProperty(field)) {
-                this.logger.error('BackendService', `âŒ Missing field: ${field}`);
+                this.logger.error('BackendService', `Ã¢ÂÅ’ Missing field: ${field}`);
                 return false;
             }
         }
@@ -96,7 +96,7 @@ class BackendService {
             const payloadRequired = ['id', 'command', 'params'];
             for (const field of payloadRequired) {
                 if (!message.payload.hasOwnProperty(field)) {
-                    this.logger.error('BackendService', `âŒ Missing payload field: ${field}`);
+                    this.logger.error('BackendService', `Ã¢ÂÅ’ Missing payload field: ${field}`);
                     return false;
                 }
             }
@@ -173,7 +173,7 @@ class BackendService {
         this.reconnectAttempts = 0;
         this.connectionStartTime = Date.now();
         
-        this.logger.info('BackendService', 'âœ… Connected successfully');
+        this.logger.info('BackendService', 'Ã¢Å“â€¦ Connected successfully');
         this.eventBus.emit('backend:connected');
         
         this.saveConnectionEvent('connected', {
@@ -223,7 +223,7 @@ class BackendService {
         this.connecting = false;
         this.stopHeartbeat();
         
-        this.logger.error('BackendService', 'âŒ CONNEXION FERMÃ‰E:', JSON.stringify(diagnostic, null, 2));
+        this.logger.error('BackendService', 'Ã¢ÂÅ’ CONNEXION FERMÃƒâ€°E:', JSON.stringify(diagnostic, null, 2));
         
         const closeReason = this.getCloseReason(event.code);
         this.logger.warn('BackendService', `Code ${event.code}: ${closeReason}`);
@@ -283,7 +283,7 @@ class BackendService {
         this.reconnectAttempts++;
         
         this.logger.info('BackendService', 
-            `â†» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
+            `Ã¢â€ Â» Reconnection attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${Math.round(delay/1000)}s`);
         
         this.eventBus.emit('backend:reconnecting', {
             attempt: this.reconnectAttempts,
@@ -299,7 +299,7 @@ class BackendService {
     
     enterOfflineMode() {
         this.offlineMode = true;
-        this.logger.warn('BackendService', 'âš ï¸ Entering offline mode');
+        this.logger.warn('BackendService', 'Ã¢Å¡Â Ã¯Â¸Â Entering offline mode');
         
         this.eventBus.emit('backend:offline-mode', {
             timestamp: Date.now()
@@ -324,14 +324,14 @@ class BackendService {
             this.checkHeartbeat();
         }, this.config.heartbeatInterval);
         
-        this.logger.debug('BackendService', `ðŸ’— Heartbeat started (interval: ${this.config.heartbeatInterval}ms)`);
+        this.logger.debug('BackendService', `Ã°Å¸â€™â€” Heartbeat started (interval: ${this.config.heartbeatInterval}ms)`);
     }
     
     stopHeartbeat() {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
             this.heartbeatTimer = null;
-            this.logger.debug('BackendService', 'ðŸ’” Heartbeat stopped');
+            this.logger.debug('BackendService', 'Ã°Å¸â€™â€ Heartbeat stopped');
         }
     }
     
@@ -342,17 +342,17 @@ class BackendService {
             this.heartbeatFailures++;
             
             this.logger.warn('BackendService', 
-                `âš ï¸ Heartbeat timeout! No activity for ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures}/${this.config.maxHeartbeatFailures})`);
+                `Ã¢Å¡Â Ã¯Â¸Â Heartbeat timeout! No activity for ${Math.round(timeSinceActivity/1000)}s (failure #${this.heartbeatFailures}/${this.config.maxHeartbeatFailures})`);
             
             if (this.heartbeatFailures >= this.config.maxHeartbeatFailures) {
-                this.logger.error('BackendService', `ðŸ’” ${this.config.maxHeartbeatFailures} consecutive heartbeat failures`);
+                this.logger.error('BackendService', `Ã°Å¸â€™â€ ${this.config.maxHeartbeatFailures} consecutive heartbeat failures`);
                 this.forceReconnect(`Heartbeat timeout - ${this.config.maxHeartbeatFailures} failures`);
                 return;
             }
         }
         
         if (this.heartbeatPending) {
-            this.logger.warn('BackendService', 'â³ Heartbeat already pending, skipping');
+            this.logger.warn('BackendService', 'Ã¢ÂÂ³ Heartbeat already pending, skipping');
             return;
         }
         
@@ -360,7 +360,7 @@ class BackendService {
             this.heartbeatPending = true;
             this.lastHeartbeatCheck = Date.now();
             
-            this.logger.debug('BackendService', 'ðŸ’— Sending heartbeat (system.ping)');
+            this.logger.debug('BackendService', 'Ã°Å¸â€™â€” Sending heartbeat (system.ping)');
             
             const startTime = Date.now();
             const result = await this.sendCommand('system.ping', {}, this.config.heartbeatCommandTimeout);
@@ -369,7 +369,7 @@ class BackendService {
             this.heartbeatPending = false;
             this.heartbeatFailures = 0;
             
-            this.logger.debug('BackendService', `ðŸ’š Heartbeat OK (${latency}ms)`);
+            this.logger.debug('BackendService', `Ã°Å¸â€™Å¡ Heartbeat OK (${latency}ms)`);
             
             this.eventBus.emit('backend:heartbeat', {
                 latency: latency,
@@ -381,7 +381,7 @@ class BackendService {
             this.heartbeatPending = false;
             this.heartbeatFailures++;
             
-            this.logger.error('BackendService', `âŒ Heartbeat failed (failure #${this.heartbeatFailures}/${this.config.maxHeartbeatFailures}):`, error.message);
+            this.logger.error('BackendService', `Ã¢ÂÅ’ Heartbeat failed (failure #${this.heartbeatFailures}/${this.config.maxHeartbeatFailures}):`, error.message);
             
             this.eventBus.emit('backend:heartbeat', {
                 timestamp: Date.now(),
@@ -391,7 +391,7 @@ class BackendService {
             });
             
             if (this.heartbeatFailures >= this.config.maxHeartbeatFailures) {
-                this.logger.error('BackendService', `ðŸ’” ${this.config.maxHeartbeatFailures} heartbeat failures, forcing reconnect`);
+                this.logger.error('BackendService', `Ã°Å¸â€™â€ ${this.config.maxHeartbeatFailures} heartbeat failures, forcing reconnect`);
                 this.forceReconnect(`${this.config.maxHeartbeatFailures} consecutive heartbeat failures`);
             }
         }
@@ -432,11 +432,11 @@ class BackendService {
             this.logger.debug('BackendService', '[DEBUG] RAW MESSAGE:', JSON.stringify(message, null, 2));
             
             if (!message.id || !message.type || !message.timestamp || !message.version || !message.payload) {
-                this.logger.error('BackendService', 'âŒ INVALID MESSAGE FORMAT (missing envelope fields):', message);
+                this.logger.error('BackendService', 'Ã¢ÂÅ’ INVALID MESSAGE FORMAT (missing envelope fields):', message);
                 return;
             }
             
-            this.logger.debug('BackendService', 'ðŸ“© Message received:', {
+            this.logger.debug('BackendService', 'Ã°Å¸â€œÂ© Message received:', {
                 id: message.id,
                 type: message.type,
                 timestamp: message.timestamp
@@ -498,11 +498,11 @@ class BackendService {
         const eventData = message.payload.data || message.payload;
         
         if (eventName) {
-            this.logger.debug('BackendService', 'ðŸ“¡ Backend Event: ' + eventName, eventData);
+            this.logger.debug('BackendService', 'Ã°Å¸â€œÂ¡ Backend Event: ' + eventName, eventData);
             this.eventBus.emit(eventName, eventData);
             this.eventBus.emit('backend:event:' + eventName, eventData);
         } else {
-            this.logger.debug('BackendService', 'ðŸ“¡ Backend message (no event name)');
+            this.logger.debug('BackendService', 'Ã°Å¸â€œÂ¡ Backend message (no event name)');
         }
     }
     
@@ -511,7 +511,7 @@ class BackendService {
         const errorMessage = message.payload.message || message.payload.error || 'Unknown error';
         const errorCode = message.payload.code;
         
-        this.logger.error('BackendService', 'âœ— Backend error:', errorCode, errorMessage);
+        this.logger.error('BackendService', 'Ã¢Å“â€” Backend error:', errorCode, errorMessage);
         
         if (requestId && this.messageCallbacks.has(requestId)) {
             const callback = this.messageCallbacks.get(requestId);
@@ -539,7 +539,7 @@ class BackendService {
     send(data) {
         if (!this.connected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
             if (typeof data === 'object' && !this.validateEnvelopeFormat(data)) {
-                this.logger.error('BackendService', 'âŒ REJECT invalid - not queued');
+                this.logger.error('BackendService', 'Ã¢ÂÅ’ REJECT invalid - not queued');
                 return false;
             }
             if (this.messageQueue.length >= this.maxQueueSize) {
@@ -589,10 +589,10 @@ class BackendService {
                 clearTimeout(timeoutTimer);
                 
                 if (response.success === true) {
-                    this.logger.debug('BackendService', `âœ“ Command success [${id}]: ${command}`);
+                    this.logger.debug('BackendService', `Ã¢Å“â€œ Command success [${id}]: ${command}`);
                     resolve(response.data || response);
                 } else {
-                    this.logger.error('BackendService', `âœ— Command failed [${id}]: ${command}`, response.error);
+                    this.logger.error('BackendService', `Ã¢Å“â€” Command failed [${id}]: ${command}`, response.error);
                     reject(new Error(response.error || 'Command failed'));
                 }
             });
@@ -645,11 +645,11 @@ class BackendService {
         
         this.messageCallbacks.clear();
         
-        this.logger.info('BackendService', `âœ“ Cleared ${failedCount} pending callbacks`);
+        this.logger.info('BackendService', `Ã¢Å“â€œ Cleared ${failedCount} pending callbacks`);
     }
     
     // ========================================================================
-    // API MIDI COMMANDS (90+ mÃ©thodes)
+    // API MIDI COMMANDS (90+ mÃƒÂ©thodes)
     // ========================================================================
     
     // DEVICES
@@ -721,13 +721,13 @@ class BackendService {
     
     // MIDI
     async convertMidi(filename) { return this.sendCommand('midi.convert', { filename }); }
-    async loadMidi(id) { return this.sendCommand('midi.load', { id }); }
-    async saveMidi(filename, midi_json) { return this.sendCommand('midi.save', { filename, midi_json }); }
-    async importMidi(filename, content, base64 = true) { return this.sendCommand('midi.import', { filename, content, base64 }); }
+    async loadMidi(filepath) { return this.sendCommand('midi.load', { filepath }); }
+    async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
+    async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
     
     /**
-     * ✅ v4.4.2: Upload File object (wrapper pour importMidi)
-     * Utilisé comme fallback dans FileController
+     * âœ… v4.4.2: Upload File object (wrapper pour importMidi)
+     * UtilisÃ© comme fallback dans FileController
      */
     async uploadFile(file) {
         if (!file || !file.name) {

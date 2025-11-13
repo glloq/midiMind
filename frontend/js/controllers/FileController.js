@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/FileController.js
-// Chemin rÃƒÂ©el: frontend/js/controllers/FileController.js
+// Chemin rÃƒÆ’Ã‚Â©el: frontend/js/controllers/FileController.js
 // Version: v4.4.0 - FIX COMPLET PAGE FICHIERS
 // Date: 2025-11-11
 // ============================================================================
 // CORRECTIONS v4.4.0:
-// Ã¢Å“â€¦ CRITIQUE: Fix syntaxe ligne 80 (accolade supplÃƒÂ©mentaire supprimÃƒÂ©e)
-// Ã¢Å“â€¦ CRITIQUE: Ajout ÃƒÂ©vÃƒÂ©nements manquants (list_requested, delete_requested, etc.)
-// Ã¢Å“â€¦ Encodage UTF-8 propre
-// Ã¢Å“â€¦ Gestion complÃƒÂ¨te upload/delete/play/load
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Fix syntaxe ligne 80 (accolade supplÃƒÆ’Ã‚Â©mentaire supprimÃƒÆ’Ã‚Â©e)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CRITIQUE: Ajout ÃƒÆ’Ã‚Â©vÃƒÆ’Ã‚Â©nements manquants (list_requested, delete_requested, etc.)
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Encodage UTF-8 propre
+// ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Gestion complÃƒÆ’Ã‚Â¨te upload/delete/play/load
 // ============================================================================
 
 class FileController extends BaseController {
@@ -18,7 +18,7 @@ class FileController extends BaseController {
         this.logger = window.logger || console;
         this.fileModel = models.file;
         this.view = views.file;
-        // Ã¢Å“â€¦ this.backend initialisÃƒÂ© automatiquement par BaseController
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ this.backend initialisÃƒÆ’Ã‚Â© automatiquement par BaseController
         this.fileService = window.app?.services?.file;
         
         this.state = {
@@ -44,7 +44,7 @@ class FileController extends BaseController {
     }
     
     bindEvents() {
-        // Ãƒâ€°vÃƒÂ©nements standards
+        // ÃƒÆ’Ã¢â‚¬Â°vÃƒÆ’Ã‚Â©nements standards
         this.eventBus.on('file:select', (data) => this.selectFile(data.fileId));
         this.eventBus.on('file:load', (data) => this.loadFile(data.fileId));
         this.eventBus.on('file:save', (data) => this.saveFile(data.fileId, data.content));
@@ -52,14 +52,14 @@ class FileController extends BaseController {
         this.eventBus.on('file:refresh', () => this.refreshFileList());
         this.eventBus.on('file:upload', (data) => this.handleFileUpload(data.file));
         
-        // Ã¢Å“â€¦ NOUVEAUX Ãƒâ€°VÃƒâ€°NEMENTS depuis FileView
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAUX ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS depuis FileView
         this.eventBus.on('file:list_requested', (data) => this.handleListRequest(data));
         this.eventBus.on('file:delete_requested', (data) => this.handleDeleteRequest(data));
         this.eventBus.on('file:play_requested', (data) => this.handlePlayRequest(data));
         this.eventBus.on('file:load_in_editor', (data) => this.handleLoadInEditor(data));
         this.eventBus.on('file:load_for_routing', (data) => this.handleLoadForRouting(data));
         
-        // Ã¢Å“â€¦ NOUVEAUX Ãƒâ€°VÃƒâ€°NEMENTS depuis FileView
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAUX ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS depuis FileView
         
         // Backend
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
@@ -74,15 +74,15 @@ class FileController extends BaseController {
             }
         });
         
-        this.log('info', 'FileController', 'Ã¢Å“â€¦ Events bound (v4.4.0)');
+        this.log('info', 'FileController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Events bound (v4.4.0)');
     }
     
     // ========================================================================
-    // NOUVEAUX HANDLERS POUR Ãƒâ€°VÃƒâ€°NEMENTS FILEVIEW
+    // NOUVEAUX HANDLERS POUR ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS FILEVIEW
     // ========================================================================
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande liste fichiers
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande liste fichiers
      */
     async handleListRequest(data) {
         const path = data?.path || this.state.currentPath;
@@ -90,8 +90,8 @@ class FileController extends BaseController {
         try {
             const files = await this.listFiles(path);
             
-            // Ãƒâ€°mettre vers FileView
-            this.eventBus.emit('files:list-updated', { 
+            // ÃƒÆ’Ã¢â‚¬Â°mettre vers FileView
+            this.eventBus.emit('files:listUpdated', { 
                 files,
                 path 
             });
@@ -105,7 +105,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande suppression fichier
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande suppression fichier
      */
     async handleDeleteRequest(data) {
         const filePath = data?.file_path;
@@ -118,26 +118,26 @@ class FileController extends BaseController {
         try {
             await this.deleteFile(filePath);
             
-            // Ãƒâ€°mettre succÃƒÂ¨s
+            // ÃƒÆ’Ã¢â‚¬Â°mettre succÃƒÆ’Ã‚Â¨s
             this.eventBus.emit('file:deleted', { 
                 file_path: filePath 
             });
             
             if (this.notifications) {
-                this.notifications.show('SupprimÃƒÂ©', `${filePath} supprimÃƒÂ©`, 'success', 2000);
+                this.notifications.show('SupprimÃƒÆ’Ã‚Â©', `${filePath} supprimÃƒÆ’Ã‚Â©`, 'success', 2000);
             }
         } catch (error) {
             this.log('error', 'FileController', 'handleDeleteRequest failed:', error);
             this.eventBus.emit('files:error', { error: error.message });
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec suppression: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec suppression: ${error.message}`, 'error', 3000);
             }
         }
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande lecture fichier
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande lecture fichier
      */
     async handlePlayRequest(data) {
         const filePath = data?.file_path;
@@ -153,7 +153,7 @@ class FileController extends BaseController {
                 file_path: filePath 
             });
             
-            // DÃƒÂ©marrer la lecture
+            // DÃƒÆ’Ã‚Â©marrer la lecture
             setTimeout(() => {
                 this.eventBus.emit('playback:play');
             }, 100);
@@ -167,57 +167,28 @@ class FileController extends BaseController {
             this.log('error', 'FileController', 'handlePlayRequest failed:', error);
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec lecture: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec lecture: ${error.message}`, 'error', 3000);
             }
         }
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Charger dans l'ÃƒÂ©diteur
-     */
-    async handleLoadInEditor(data) {
-        const filePath = data?.file_path;
-        
-        if (!filePath) {
-            this.log('error', 'FileController', 'handleLoadInEditor: missing file_path');
-            return;
-        }
-        
-        try {
-            // Ãƒâ€°mettre vers EditorController
-            this.eventBus.emit('editor:load_file', { 
-                file_path: filePath 
-            });
-            
-            this.log('info', 'FileController', `Loading in editor: ${filePath}`);
-            
-            if (this.notifications) {
-                this.notifications.show('Ãƒâ€°diteur', `Chargement de ${filePath}`, 'info', 2000);
-            }
-        } catch (error) {
-            this.log('error', 'FileController', 'handleLoadInEditor failed:', error);
-            
-            if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec chargement: ${error.message}`, 'error', 3000);
-            }
-        }
-    }
     
     // ========================================================================
     // BACKEND EVENTS
     // ========================================================================
     
     async onBackendConnected() {
-        this.log('info', 'FileController', 'Ã¢Å“â€œ Backend connected');
+        this.log('info', 'FileController', 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Backend connected');
         
-        // NE PAS charger automatiquement les fichiers au dÃƒÂ©marrage
-        // Les fichiers seront chargÃƒÂ©s uniquement quand la page Files devient active
+        // NE PAS charger automatiquement les fichiers au dÃƒÆ’Ã‚Â©marrage
+        // Les fichiers seront chargÃƒÆ’Ã‚Â©s uniquement quand la page Files devient active
         this.log('info', 'FileController', 'Waiting for files page activation...');
     }
     
     onBackendDisconnected() {
         this.stopAutoRefresh();
-        this.log('warn', 'FileController', 'Ã¢Å¡Â Ã¯Â¸Â Backend disconnected');
+        this.log('warn', 'FileController', 'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Backend disconnected');
     }
     
     onFilesPageActive() {
@@ -242,7 +213,7 @@ class FileController extends BaseController {
     // ========================================================================
     
     /**
-     * Ã¢Å“â€¦ Liste fichiers - files.list
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Liste fichiers - files.list
      */
     async listFiles(path = null) {
         return this.withBackend(
@@ -256,7 +227,7 @@ class FileController extends BaseController {
                 
                 this.state.isLoading = false;
                 
-                // Ã¢Å“â€¦ Extraction via response (BackendService fait dÃƒÂ©jÃƒÂ )
+                // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Extraction via response (BackendService fait dÃƒÆ’Ã‚Â©jÃƒÆ’Ã‚Â )
                 const files = response.files || [];
                 
                 if (this.fileModel) {
@@ -267,7 +238,7 @@ class FileController extends BaseController {
                 this.state.currentPath = targetPath;
                 this.state.lastRefresh = Date.now();
                 
-                this.log('info', 'FileController', `Ã¢Å“â€¦ Found ${files.length} files`);
+                this.log('info', 'FileController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Found ${files.length} files`);
                 
                 return files;
             },
@@ -283,7 +254,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ Lit fichier - files.read
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Lit fichier - files.read
      */
     async readFile(filename) {
         return this.withBackend(
@@ -292,7 +263,7 @@ class FileController extends BaseController {
                 
                 const content = await this.backend.readFile(filename);
                 
-                this.log('info', 'FileController', `Ã¢Å“â€¦ File read: ${filename}`);
+                this.log('info', 'FileController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ File read: ${filename}`);
                 this.eventBus.emit('file:read-complete', { filename, content });
                 
                 return content;
@@ -303,7 +274,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ Ãƒâ€°crit fichier - files.write
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÆ’Ã¢â‚¬Â°crit fichier - files.write
      */
     async writeFile(filename, content) {
         return this.withBackend(
@@ -312,7 +283,7 @@ class FileController extends BaseController {
                 
                 await this.backend.writeFile(filename, content);
                 
-                this.log('info', 'FileController', `Ã¢Å“â€¦ File written: ${filename}`);
+                this.log('info', 'FileController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ File written: ${filename}`);
                 this.eventBus.emit('file:write-complete', { filename });
                 
                 await this.refreshFileList();
@@ -325,7 +296,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ Supprime fichier - files.delete
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Supprime fichier - files.delete
      */
     async deleteFile(filename) {
         return this.withBackend(
@@ -347,7 +318,7 @@ class FileController extends BaseController {
                     this.fileModel.set('files', filtered);
                 }
                 
-                this.log('info', 'FileController', `Ã¢Å“â€¦ File deleted: ${filename}`);
+                this.log('info', 'FileController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ File deleted: ${filename}`);
                 this.eventBus.emit('file:delete-complete', { filename });
                 
                 await this.refreshFileList();
@@ -381,7 +352,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ CORRECTION: Upload via FileService (midi.import)
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CORRECTION: Upload via FileService (midi.import)
      */
     async handleFileUpload(file) {
         return this.withBackend(
@@ -396,7 +367,7 @@ class FileController extends BaseController {
                     this.notifications.show('Upload', `Upload de ${file.name}...`, 'info', 2000);
                 }
                 
-                // Ã¢Å“â€¦ Utiliser FileService qui gÃƒÂ¨re midi.import
+                // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Utiliser FileService qui gÃƒÆ’Ã‚Â¨re midi.import
                 let result;
                 if (this.fileService) {
                     result = await this.fileService.uploadFile(file);
@@ -405,10 +376,10 @@ class FileController extends BaseController {
                     result = await this.backend.uploadFile(file);
                 }
                 
-                this.log('info', 'FileController', `Ã¢Å“â€¦ File uploaded: ${file.name}`);
+                this.log('info', 'FileController', `ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ File uploaded: ${file.name}`);
                 
                 if (this.notifications) {
-                    this.notifications.show('Upload TerminÃƒÂ©', `${file.name} uploadÃƒÂ©`, 'success', 3000);
+                    this.notifications.show('Upload TerminÃƒÆ’Ã‚Â©', `${file.name} uploadÃƒÆ’Ã‚Â©`, 'success', 3000);
                 }
                 
                 this.eventBus.emit('file:upload-complete', { file, result });
@@ -426,7 +397,7 @@ class FileController extends BaseController {
             this.log('error', 'FileController', 'Upload failed:', error);
             
             if (this.notifications && !error.offline) {
-                this.notifications.show('Ãƒâ€°chec Upload', error.message, 'error', 5000);
+                this.notifications.show('ÃƒÆ’Ã¢â‚¬Â°chec Upload', error.message, 'error', 5000);
             }
             
             throw error;
@@ -435,11 +406,11 @@ class FileController extends BaseController {
     
 
     // ========================================================================
-    // NOUVEAUX HANDLERS POUR Ãƒâ€°VÃƒâ€°NEMENTS FILEVIEW
+    // NOUVEAUX HANDLERS POUR ÃƒÆ’Ã¢â‚¬Â°VÃƒÆ’Ã¢â‚¬Â°NEMENTS FILEVIEW
     // ========================================================================
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande liste fichiers
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande liste fichiers
      */
     async handleListRequest(data) {
         const path = data?.path || this.state.currentPath;
@@ -447,8 +418,8 @@ class FileController extends BaseController {
         try {
             const files = await this.listFiles(path);
             
-            // Ãƒâ€°mettre vers FileView
-            this.eventBus.emit('files:list-updated', { 
+            // ÃƒÆ’Ã¢â‚¬Â°mettre vers FileView
+            this.eventBus.emit('files:listUpdated', { 
                 files,
                 path 
             });
@@ -462,7 +433,7 @@ class FileController extends BaseController {
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande suppression fichier
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande suppression fichier
      */
     async handleDeleteRequest(data) {
         const filePath = data?.file_path;
@@ -475,26 +446,26 @@ class FileController extends BaseController {
         try {
             await this.deleteFile(filePath);
             
-            // Ãƒâ€°mettre succÃƒÂ¨s
+            // ÃƒÆ’Ã¢â‚¬Â°mettre succÃƒÆ’Ã‚Â¨s
             this.eventBus.emit('file:deleted', { 
                 file_path: filePath 
             });
             
             if (this.notifications) {
-                this.notifications.show('SupprimÃƒÂ©', `${filePath} supprimÃƒÂ©`, 'success', 2000);
+                this.notifications.show('SupprimÃƒÆ’Ã‚Â©', `${filePath} supprimÃƒÆ’Ã‚Â©`, 'success', 2000);
             }
         } catch (error) {
             this.log('error', 'FileController', 'handleDeleteRequest failed:', error);
             this.eventBus.emit('files:error', { error: error.message });
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec suppression: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec suppression: ${error.message}`, 'error', 3000);
             }
         }
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Demande lecture fichier
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Demande lecture fichier
      */
     async handlePlayRequest(data) {
         const filePath = data?.file_path;
@@ -510,7 +481,7 @@ class FileController extends BaseController {
                 file_path: filePath 
             });
             
-            // DÃƒÂ©marrer la lecture
+            // DÃƒÆ’Ã‚Â©marrer la lecture
             setTimeout(() => {
                 this.eventBus.emit('playback:play');
             }, 100);
@@ -524,13 +495,13 @@ class FileController extends BaseController {
             this.log('error', 'FileController', 'handlePlayRequest failed:', error);
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec lecture: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec lecture: ${error.message}`, 'error', 3000);
             }
         }
     }
     
     /**
-     * Ã¢Å“â€¦ Handler: Charger dans l'ÃƒÂ©diteur
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Handler: Charger dans l'ÃƒÆ’Ã‚Â©diteur
      */
     async handleLoadInEditor(data) {
         const filePath = data?.file_path;
@@ -544,8 +515,8 @@ class FileController extends BaseController {
             // Charger le fichier MIDI
             const response = await this.backend.loadMidi(filePath);
             
-            // Ãƒâ€°mettre vers EditorController
-            this.eventBus.emit('editor:load_file', { 
+            // ÃƒÆ’Ã¢â‚¬Â°mettre vers EditorController
+            this.eventBus.emit('editor:fileLoaded', { 
                 file_path: filePath,
                 midi_json: response.midi_json || response.data
             });
@@ -553,19 +524,25 @@ class FileController extends BaseController {
             this.log('info', 'FileController', `Loading in editor: ${filePath}`);
             
             if (this.notifications) {
-                this.notifications.show('Ãƒâ€°diteur', `Chargement de ${filePath}`, 'info', 2000);
+                this.notifications.show('ÃƒÆ’Ã¢â‚¬Â°diteur', `Chargement de ${filePath}`, 'info', 2000);
             }
         } catch (error) {
-            this.log('error', 'FileController', 'handleLoadInEditor failed:', error);
+            const errorDetails = {
+                message: error?.message || error?.error || 'Unknown error',
+                code: error?.code,
+                details: error?.details,
+                filepath: filePath
+            };
+            this.log('error', 'FileController', 'handleLoadInEditor failed:', errorDetails);
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec chargement: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec chargement: ${error.message}`, 'error', 3000);
             }
         }
     }
     
     /**
-     * Ã¢Å“â€¦ NOUVEAU: Handler: Charger pour routage
+     * ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NOUVEAU: Handler: Charger pour routage
      */
     async handleLoadForRouting(data) {
         const filePath = data?.file_path;
@@ -579,8 +556,8 @@ class FileController extends BaseController {
             // Charger le fichier MIDI
             const response = await this.backend.loadMidi(filePath);
             
-            // Ãƒâ€°mettre vers RoutingController
-            this.eventBus.emit('routing:load_file', { 
+            // ÃƒÆ’Ã¢â‚¬Â°mettre vers RoutingController
+            this.eventBus.emit('routing:fileLoaded', { 
                 file_path: filePath,
                 midi_json: response.midi_json || response.data
             });
@@ -594,7 +571,7 @@ class FileController extends BaseController {
             this.log('error', 'FileController', 'handleLoadForRouting failed:', error);
             
             if (this.notifications) {
-                this.notifications.show('Erreur', `Ãƒâ€°chec chargement: ${error.message}`, 'error', 3000);
+                this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec chargement: ${error.message}`, 'error', 3000);
             }
         }
     }
@@ -607,7 +584,7 @@ class FileController extends BaseController {
             if (!error.offline) {
                 this.log('error', 'FileController', 'refreshFileList failed:', error);
                 if (this.notifications) {
-                    this.notifications.show('Erreur', 'Ãƒâ€°chec actualisation liste', 'error', 3000);
+                    this.notifications.show('Erreur', 'ÃƒÆ’Ã¢â‚¬Â°chec actualisation liste', 'error', 3000);
                 }
             }
             throw error;
@@ -628,7 +605,7 @@ class FileController extends BaseController {
             this.eventBus.emit('file:loaded', { fileId, content });
             
             if (this.notifications) {
-                this.notifications.show('Fichier ChargÃƒÂ©', `${fileId} chargÃƒÂ©`, 'success', 2000);
+                this.notifications.show('Fichier ChargÃƒÆ’Ã‚Â©', `${fileId} chargÃƒÆ’Ã‚Â©`, 'success', 2000);
             }
             
             return content;
@@ -636,7 +613,7 @@ class FileController extends BaseController {
             if (!error.offline) {
                 this.log('error', 'FileController', 'loadFile failed:', error);
                 if (this.notifications) {
-                    this.notifications.show('Erreur', `Ãƒâ€°chec chargement: ${error.message}`, 'error', 3000);
+                    this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec chargement: ${error.message}`, 'error', 3000);
                 }
             }
             throw error;
@@ -650,7 +627,7 @@ class FileController extends BaseController {
             await this.writeFile(fileId, content);
             
             if (this.notifications) {
-                this.notifications.show('Fichier SauvegardÃƒÂ©', `${fileId} sauvegardÃƒÂ©`, 'success', 2000);
+                this.notifications.show('Fichier SauvegardÃƒÆ’Ã‚Â©', `${fileId} sauvegardÃƒÆ’Ã‚Â©`, 'success', 2000);
             }
             
             return true;
@@ -658,7 +635,7 @@ class FileController extends BaseController {
             if (!error.offline) {
                 this.log('error', 'FileController', 'saveFile failed:', error);
                 if (this.notifications) {
-                    this.notifications.show('Erreur', `Ãƒâ€°chec sauvegarde: ${error.message}`, 'error', 3000);
+                    this.notifications.show('Erreur', `ÃƒÆ’Ã¢â‚¬Â°chec sauvegarde: ${error.message}`, 'error', 3000);
                 }
             }
             throw error;
@@ -682,7 +659,7 @@ class FileController extends BaseController {
     startAutoRefresh() {
         if (this.refreshTimer) return;
         
-        // Ne dÃƒÂ©marrer l'auto-refresh que si backend disponible
+        // Ne dÃƒÆ’Ã‚Â©marrer l'auto-refresh que si backend disponible
         if (!this.isBackendReady()) {
             this.log('info', 'FileController', 'Auto-refresh skipped - backend not ready');
             return;
@@ -691,7 +668,7 @@ class FileController extends BaseController {
         this.log('info', 'FileController', 'Starting auto-refresh...');
         
         this.refreshTimer = setInterval(() => {
-            // VÃƒÂ©rifier backend avant chaque refresh
+            // VÃƒÆ’Ã‚Â©rifier backend avant chaque refresh
             if (!this.isBackendReady()) {
                 this.stopAutoRefresh();
                 return;
