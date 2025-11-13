@@ -1,27 +1,27 @@
 // ============================================================================
 // Fichier: frontend/js/utils/Notifications.js
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // Version: 3.0.0
 // Date: 2025-10-14
 // ============================================================================
 // Description:
-//   SystÃ¨me de notifications toast moderne et complet.
+//   Système de notifications toast moderne et complet.
 //   Affichage notifications temporaires (success, error, warning, info).
 //
-// FonctionnalitÃ©s:
+// Fonctionnalités:
 //   - Types : Success, Error, Warning, Info
-//   - DurÃ©e auto-dismiss configurable
-//   - Position Ã©cran (top-right, bottom-center, etc.)
+//   - Durée auto-dismiss configurable
+//   - Position écran (top-right, bottom-center, etc.)
 //   - Queue de notifications
-//   - IcÃ´nes automatiques selon type
-//   - Actions personnalisÃ©es (boutons)
-//   - Fermeture manuelle (Ã—)
-//   - Animation entrÃ©e/sortie
+//   - Icônes automatiques selon type
+//   - Actions personnalisées (boutons)
+//   - Fermeture manuelle (×)
+//   - Animation entrée/sortie
 //
 // Architecture:
 //   Notifications (classe singleton)
 //   - Queue FIFO de notifications
-//   - Container DOM injectÃ©
+//   - Container DOM injecté
 //   - Timeout auto-dismiss
 //
 // Auteur: MidiMind Team
@@ -31,7 +31,7 @@ class Notifications {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus || window.eventBus || null;
         
-        // Configuration par dÃ©faut
+        // Configuration par défaut
         this.config = {
             position: options.position || 'top-right', // top-right, top-left, bottom-right, bottom-left, top-center, bottom-center
             defaultDuration: options.defaultDuration || 3000,
@@ -67,10 +67,10 @@ class Notifications {
     // ========================================================================
     
     initialize() {
-        // CrÃ©er le conteneur de notifications
+        // Créer le conteneur de notifications
         this.createContainer();
         
-        // Ã‰couter les Ã©vÃ©nements globaux
+        // Écouter les événements globaux
         this.bindEvents();
         
         // Injecter les styles CSS
@@ -87,7 +87,7 @@ class Notifications {
     bindEvents() {
         if (!this.eventBus) return;
         
-        // Ã‰couter les Ã©vÃ©nements de notification
+        // Écouter les événements de notification
         this.eventBus.on('notification:show', (data) => {
             this.show(data.message, data.type, data.options);
         });
@@ -114,7 +114,7 @@ class Notifications {
     // ========================================================================
     
     /**
-     * Affiche une notification gÃ©nÃ©rique
+     * Affiche une notification générique
      */
     show(message, type = 'info', options = {}) {
         const notification = this.createNotification(message, type, options);
@@ -123,7 +123,7 @@ class Notifications {
     }
     
     /**
-     * Affiche une notification de succÃ¨s
+     * Affiche une notification de succès
      */
     success(message, options = {}) {
         return this.show(message, 'success', options);
@@ -154,7 +154,7 @@ class Notifications {
     }
     
     /**
-     * Ferme une notification spÃ©cifique
+     * Ferme une notification spécifique
      */
     close(notificationId) {
         const notification = this.activeNotifications.find(n => n.id === notificationId);
@@ -202,7 +202,7 @@ class Notifications {
     }
     
     addToQueue(notification) {
-        // Ajouter Ã  la file d'attente
+        // Ajouter à la file d'attente
         this.queue.push(notification);
         
         // Traiter la file
@@ -218,17 +218,17 @@ class Notifications {
     }
     
     displayNotification(notification) {
-        // CrÃ©er l'Ã©lÃ©ment DOM
+        // Créer l'élément DOM
         const element = this.createNotificationElement(notification);
         notification.element = element;
         
-        // Ajouter Ã  la liste active
+        // Ajouter à la liste active
         this.activeNotifications.push(notification);
         
         // Ajouter au conteneur
         this.container.appendChild(element);
         
-        // Animer l'entrÃ©e
+        // Animer l'entrée
         requestAnimationFrame(() => {
             element.classList.add('notification-show');
         });
@@ -249,7 +249,7 @@ class Notifications {
             }, notification.duration);
         }
         
-        // Ã‰mettre Ã©vÃ©nement
+        // Émettre événement
         if (this.eventBus) {
             this.eventBus.emit('notification:displayed', {
                 id: notification.id,
@@ -276,7 +276,7 @@ class Notifications {
             ${notification.closeable ? '<button class="notification-close" aria-label="Close">&times;</button>' : ''}
         `;
         
-        // Attacher les Ã©vÃ©nements
+        // Attacher les événements
         this.attachNotificationEvents(element, notification);
         
         return element;
@@ -314,7 +314,7 @@ class Notifications {
                     action.callback(notification.id);
                 }
                 
-                // Fermer aprÃ¨s action si spÃ©cifiÃ©
+                // Fermer après action si spécifié
                 if (action && action.closeAfter !== false) {
                     this.removeNotification(notification);
                 }
@@ -344,7 +344,7 @@ class Notifications {
         notification.element.classList.remove('notification-show');
         notification.element.classList.add('notification-hide');
         
-        // Retirer aprÃ¨s animation
+        // Retirer après animation
         setTimeout(() => {
             if (notification.element && notification.element.parentNode) {
                 notification.element.parentNode.removeChild(notification.element);
@@ -359,7 +359,7 @@ class Notifications {
             // Traiter la file d'attente
             this.processQueue();
             
-            // Ã‰mettre Ã©vÃ©nement
+            // Émettre événement
             if (this.eventBus) {
                 this.eventBus.emit('notification:closed', {
                     id: notification.id,
@@ -370,18 +370,18 @@ class Notifications {
     }
     
     // ========================================================================
-    // ICÃ”NES
+    // ICÔNES
     // ========================================================================
     
     getDefaultIcon(type) {
         const icons = {
-            success: 'âœ“',
-            error: 'âœ•',
+            success: '✓',
+            error: '✕',
             warning: 'âš ',
-            info: 'â„¹'
+            info: 'ℹ'
         };
         
-        return icons[type] || 'â„¹';
+        return icons[type] || 'ℹ';
     }
     
     // ========================================================================
@@ -389,7 +389,7 @@ class Notifications {
     // ========================================================================
     
     playSound(type) {
-        // ImplÃ©menter les sons si nÃ©cessaire
+        // Implémenter les sons si nécessaire
         // Utiliser Web Audio API ou des fichiers audio
     }
     
@@ -410,7 +410,7 @@ class Notifications {
     // ========================================================================
     
     injectStyles() {
-        // VÃ©rifier si les styles existent dÃ©jÃ 
+        // Vérifier si les styles existent déjà
         if (document.getElementById('notifications-styles')) return;
         
         const style = document.createElement('style');
@@ -500,7 +500,7 @@ class Notifications {
                 border-left: 4px solid #2196f3;
             }
             
-            /* IcÃ´ne */
+            /* Icône */
             .notification-icon {
                 flex-shrink: 0;
                 width: 24px;
@@ -630,7 +630,7 @@ class Notifications {
     }
     
     /**
-     * Nettoie toutes les notifications et rÃ©initialise
+     * Nettoie toutes les notifications et réinitialise
      */
     destroy() {
         this.closeAll();

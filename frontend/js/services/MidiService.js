@@ -2,10 +2,10 @@
 // Fichier: frontend/scripts/services/MidiService.js
 // Version: 3.0.1 - LOGGER PROTECTION
 // Date: 2025-10-30
-// Projet: midiMind v3.0 - SystÃƒÂ¨me d'Orchestration MIDI pour Raspberry Pi
+// Projet: midiMind v3.0 - Système d'Orchestration MIDI pour Raspberry Pi
 // ============================================================================
 // CORRECTIONS v3.0.1:
-// Ã¢Å“â€¦ Protection logger avec mÃƒÂ©thode log() sÃƒÂ©curisÃƒÂ©e
+// ✅ Protection logger avec méthode log() sécurisée
 // ============================================================================
 
 class MidiService {
@@ -13,7 +13,7 @@ class MidiService {
         this.eventBus = eventBus || window.eventBus || null;
         this.logger = logger || console;
         
-        // Cache des mÃƒÂ©tadonnÃƒÂ©es parsÃƒÂ©es
+        // Cache des métadonnées parsées
         this.metadataCache = new Map();
         
         // Configuration
@@ -45,12 +45,12 @@ class MidiService {
     initialize() {
         this.log('info', 'MidiService', 'Initializing MIDI service...');
         
-        // Nettoyer le cache pÃƒÂ©riodiquement
+        // Nettoyer le cache périodiquement
         setInterval(() => this.cleanCache(), 60000); // Toutes les minutes
     }
     
     /**
-     * Log sÃƒÂ©curisÃƒÂ© avec fallback
+     * Log sécurisé avec fallback
      */
     log(level, ...args) {
         if (this.logger && typeof this.logger[level] === 'function') {
@@ -65,16 +65,16 @@ class MidiService {
     // ========================================================================
     
     /**
-     * Parser un fichier MIDI et extraire les mÃƒÂ©tadonnÃƒÂ©es
-     * @param {ArrayBuffer|Uint8Array} data - DonnÃƒÂ©es du fichier MIDI
+     * Parser un fichier MIDI et extraire les métadonnées
+     * @param {ArrayBuffer|Uint8Array} data - Données du fichier MIDI
      * @param {string} fileName - Nom du fichier
-     * @returns {Object} MÃƒÂ©tadonnÃƒÂ©es du fichier
+     * @returns {Object} Métadonnées du fichier
      */
     async parseFile(data, fileName = 'unknown.mid') {
         try {
             this.log('debug', 'MidiService', `Parsing file: ${fileName}`);
             
-            // VÃƒÂ©rifier le cache
+            // Vérifier le cache
             const cacheKey = this.generateCacheKey(data);
             if (this.metadataCache.has(cacheKey)) {
                 const cached = this.metadataCache.get(cacheKey);
@@ -121,7 +121,7 @@ class MidiService {
             return this.parser.parse(data);
         }
         
-        // Sinon, parser manuellement (version simplifiÃƒÂ©e)
+        // Sinon, parser manuellement (version simplifiée)
         const view = new DataView(data.buffer || data);
         const metadata = {
             fileName: fileName,
@@ -141,13 +141,13 @@ class MidiService {
             hasMarkers: false
         };
         
-        // VÃƒÂ©rifier l'en-tÃƒÂªte MThd
+        // Vérifier l'en-tête MThd
         const headerChunk = this.readChunk(view, 0);
         if (headerChunk.type !== 'MThd') {
             throw new Error('Invalid MIDI file: missing MThd header');
         }
         
-        // Lire les donnÃƒÂ©es de l'en-tÃƒÂªte
+        // Lire les données de l'en-tête
         metadata.format = view.getUint16(14, false);
         metadata.trackCount = view.getUint16(16, false);
         metadata.division = view.getUint16(18, false);
@@ -172,7 +172,7 @@ class MidiService {
             if (trackData.hasMarkers) metadata.hasMarkers = true;
         }
         
-        // Calculer la durÃƒÂ©e totale
+        // Calculer la durée totale
         metadata.duration = this.calculateDuration(metadata);
         
         return metadata;
@@ -194,7 +194,7 @@ class MidiService {
     }
     
     /**
-     * Parser une piste MIDI (simplifiÃƒÂ©)
+     * Parser une piste MIDI (simplifié)
      */
     parseTrack(view, offset) {
         const chunk = this.readChunk(view, offset);
@@ -213,7 +213,7 @@ class MidiService {
             events: []
         };
         
-        // Parser simplifiÃƒÂ© - compter les ÃƒÂ©vÃƒÂ©nements principaux
+        // Parser simplifié - compter les événements principaux
         let position = offset + 8;
         const endPosition = position + chunk.length;
         let runningStatus = 0;
@@ -239,7 +239,7 @@ class MidiService {
                 runningStatus = status;
             }
             
-            // Traiter l'ÃƒÂ©vÃƒÂ©nement
+            // Traiter l'événement
             const eventType = status & 0xF0;
             
             switch (eventType) {
@@ -313,7 +313,7 @@ class MidiService {
     }
     
     /**
-     * Lire une chaÃƒÂ®ne de caractÃƒÂ¨res
+     * Lire une chaîne de caractères
      */
     readString(view, offset, length) {
         let str = '';
@@ -328,19 +328,19 @@ class MidiService {
     // ========================================================================
     
     /**
-     * Calculer la durÃƒÂ©e totale du fichier
+     * Calculer la durée totale du fichier
      */
     calculateDuration(metadata) {
-        // Calcul simplifiÃƒÂ© basÃƒÂ© sur le tempo par dÃƒÂ©faut
-        // Pour une implÃƒÂ©mentation complÃƒÂ¨te, il faudrait parser tous les ÃƒÂ©vÃƒÂ©nements tempo
+        // Calcul simplifié basé sur le tempo par défaut
+        // Pour une implémentation complète, il faudrait parser tous les événements tempo
         const ticksPerQuarter = metadata.division;
-        const microsecondsPerQuarter = 500000; // Tempo par dÃƒÂ©faut (120 BPM)
+        const microsecondsPerQuarter = 500000; // Tempo par défaut (120 BPM)
         
-        // Trouver le dernier ÃƒÂ©vÃƒÂ©nement
+        // Trouver le dernier événement
         let maxTicks = 0;
         for (const track of metadata.tracks) {
-            // Dans une implÃƒÂ©mentation complÃƒÂ¨te, on accumulerait les delta times
-            maxTicks = Math.max(maxTicks, 10000); // Valeur par dÃƒÂ©faut
+            // Dans une implémentation complète, on accumulerait les delta times
+            maxTicks = Math.max(maxTicks, 10000); // Valeur par défaut
         }
         
         // Convertir en millisecondes
@@ -356,12 +356,12 @@ class MidiService {
      */
     extractBPM(metadata) {
         // BPM = 60,000,000 / microsecondsPerQuarter
-        // Par dÃƒÂ©faut: 120 BPM
+        // Par défaut: 120 BPM
         return metadata.tempo || 120;
     }
     
     /**
-     * Obtenir le nom de la note ÃƒÂ  partir du numÃƒÂ©ro MIDI
+     * Obtenir le nom de la note à partir du numéro MIDI
      */
     getNoteName(noteNumber) {
         if (typeof MidiConstants !== 'undefined') {
@@ -375,7 +375,7 @@ class MidiService {
     }
     
     /**
-     * Convertir la durÃƒÂ©e en format lisible
+     * Convertir la durée en format lisible
      */
     formatDuration(milliseconds) {
         const totalSeconds = Math.floor(milliseconds / 1000);
@@ -389,7 +389,7 @@ class MidiService {
     // ========================================================================
     
     /**
-     * VÃƒÂ©rifier si un fichier est un MIDI valide
+     * Vérifier si un fichier est un MIDI valide
      */
     isValidMidiFile(data) {
         if (!data || data.byteLength < 14) {
@@ -398,7 +398,7 @@ class MidiService {
         
         const view = new DataView(data.buffer || data);
         
-        // VÃƒÂ©rifier l'en-tÃƒÂªte MThd
+        // Vérifier l'en-tête MThd
         const header = String.fromCharCode(
             view.getUint8(0),
             view.getUint8(1),
@@ -410,7 +410,7 @@ class MidiService {
     }
     
     /**
-     * VÃƒÂ©rifier si une extension est supportÃƒÂ©e
+     * Vérifier si une extension est supportée
      */
     isSupportedFormat(fileName) {
         const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
@@ -422,10 +422,10 @@ class MidiService {
     // ========================================================================
     
     /**
-     * GÃƒÂ©nÃƒÂ©rer une clÃƒÂ© de cache unique pour les donnÃƒÂ©es
+     * Générer une clé de cache unique pour les données
      */
     generateCacheKey(data) {
-        // Simple hash basÃƒÂ© sur la taille et les premiers octets
+        // Simple hash basé sur la taille et les premiers octets
         const view = new DataView(data.buffer || data);
         let hash = data.byteLength;
         
@@ -438,7 +438,7 @@ class MidiService {
     }
     
     /**
-     * Nettoyer le cache expirÃƒÂ©
+     * Nettoyer le cache expiré
      */
     cleanCache() {
         const now = Date.now();

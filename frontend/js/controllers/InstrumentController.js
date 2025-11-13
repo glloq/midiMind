@@ -1,21 +1,21 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/InstrumentController.js
-// Chemin rÃ©el: frontend/js/controllers/InstrumentController.js
-// Version: v4.3.0 - COMPLET ET CORRIGÃ‰
+// Chemin réel: frontend/js/controllers/InstrumentController.js
+// Version: v4.3.0 - COMPLET ET CORRIGÉ
 // Date: 2025-11-06
 // ============================================================================
 // CORRECTIONS v4.3.0:
-// âœ… CRITIQUE: Ajout TOUS les event bindings View â†” Controller
-// âœ… CRITIQUE: MÃ©thode updateView() au lieu de render(data)
-// âœ… CRITIQUE: Gestion complÃ¨te des requÃªtes View (*_requested)
-// âœ… CRITIQUE: Ã‰mission des Ã©vÃ©nements de rÃ©ponse pour la View
-// âœ… Gestion hot-plug complÃ¨te
-// âœ… Gestion Bluetooth complÃ¨te
+// ✅ CRITIQUE: Ajout TOUS les event bindings View ↔ Controller
+// ✅ CRITIQUE: Méthode updateView() au lieu de render(data)
+// ✅ CRITIQUE: Gestion complète des requêtes View (*_requested)
+// ✅ CRITIQUE: Émission des événements de réponse pour la View
+// ✅ Gestion hot-plug complète
+// ✅ Gestion Bluetooth complète
 // ============================================================================
 // CORRECTIONS v4.2.3:
-// âœ… CRITIQUE: Ajout paramÃ¨tre backend au constructeur (6Ã¨me paramÃ¨tre)
-// âœ… Fix: super() appelle BaseController avec backend
-// âœ… this.backend initialisÃ© automatiquement via BaseController
+// ✅ CRITIQUE: Ajout paramètre backend au constructeur (6ème paramètre)
+// ✅ Fix: super() appelle BaseController avec backend
+// ✅ this.backend initialisé automatiquement via BaseController
 // ============================================================================
 
 class InstrumentController extends BaseController {
@@ -25,7 +25,7 @@ class InstrumentController extends BaseController {
         this.logger = window.logger || console;
         this.model = models.instrument;
         this.view = views.instrument;
-        // âœ… this.backend initialisÃ© automatiquement par BaseController
+        // ✅ this.backend initialisé automatiquement par BaseController
         
         this.devices = new Map();
         this.connectedDevices = new Set();
@@ -62,7 +62,7 @@ class InstrumentController extends BaseController {
 
     bindEvents() {
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS BACKEND
+        // ÉVÉNEMENTS BACKEND
         // ========================================================================
         this.eventBus.on('backend:connected', () => this.onBackendConnected());
         this.eventBus.on('backend:disconnected', () => this.onBackendDisconnected());
@@ -72,7 +72,7 @@ class InstrumentController extends BaseController {
         this.eventBus.on('backend:device:error', (data) => this.handleDeviceError(data));
         
         // ========================================================================
-        // Ã‰VÃ‰NEMENTS NAVIGATION
+        // ÉVÉNEMENTS NAVIGATION
         // ========================================================================
         this.eventBus.on('navigation:page_changed', (data) => {
             if (data.page === 'instruments') {
@@ -83,7 +83,7 @@ class InstrumentController extends BaseController {
         });
         
         // ========================================================================
-        // REQUÃŠTES DE LA VIEW (*_requested) - NOUVEAU v4.3.0
+        // REQUÊTES DE LA VIEW (*_requested) - NOUVEAU v4.3.0
         // ========================================================================
         
         // Liste des devices
@@ -101,12 +101,12 @@ class InstrumentController extends BaseController {
             this.handleConnectRequest(data);
         });
         
-        // DÃ©connexion device
+        // Déconnexion device
         this.eventBus.on('devices:disconnect_requested', (data) => {
             this.handleDisconnectRequest(data);
         });
         
-        // DÃ©connexion tous devices
+        // Déconnexion tous devices
         this.eventBus.on('devices:disconnect_all_requested', () => {
             this.handleDisconnectAllRequest();
         });
@@ -193,14 +193,14 @@ class InstrumentController extends BaseController {
     }
 
     onBackendDisconnected() {
-        this.logger?.warn?.('InstrumentController', 'âš ï¸ Backend disconnected');
+        this.logger?.warn?.('InstrumentController', '⚠️ Backend disconnected');
         this.stopHotPlugMonitoring();
         this.connectedDevices.clear();
         this.updateView();
     }
 
     // ========================================================================
-    // HANDLERS DES REQUÃŠTES VIEW - NOUVEAU v4.3.0
+    // HANDLERS DES REQUÊTES VIEW - NOUVEAU v4.3.0
     // ========================================================================
 
     async handleListRequest() {
@@ -316,7 +316,7 @@ class InstrumentController extends BaseController {
     async handleBluetoothScanRequest() {
         try {
             this.logger?.debug?.('InstrumentController', 'Handling Bluetooth scan request');
-            // TODO: ImplÃ©menter le scan Bluetooth quand backend sera prÃªt
+            // TODO: Implémenter le scan Bluetooth quand backend sera prêt
             this.eventBus.emit('bluetooth:scanned', {
                 devices: []
             });
@@ -329,7 +329,7 @@ class InstrumentController extends BaseController {
     async handleBluetoothPairedRequest() {
         try {
             this.logger?.debug?.('InstrumentController', 'Handling Bluetooth paired request');
-            // TODO: ImplÃ©menter la liste des devices Bluetooth pairÃ©s
+            // TODO: Implémenter la liste des devices Bluetooth pairés
             this.eventBus.emit('bluetooth:paired_list', {
                 devices: []
             });
@@ -460,7 +460,7 @@ class InstrumentController extends BaseController {
     // ========================================================================
 
     /**
-     * âœ… CORRECTION: Utiliser devices.scan pour obtenir count
+     * ✅ CORRECTION: Utiliser devices.scan pour obtenir count
      */
     async scanDevices(full_scan = false) {
         if (!this.backend) {
@@ -475,10 +475,10 @@ class InstrumentController extends BaseController {
         this.isScanning = true;
         
         try {
-            // âœ… CORRECTION: devices.scan retourne count
+            // ✅ CORRECTION: devices.scan retourne count
             const response = await this.backend.scanDevices(full_scan);
             
-            // âœ… Extraction via response (dÃ©jÃ  data dans BackendService)
+            // ✅ Extraction via response (déjà data dans BackendService)
             const devices = response.devices || [];
             const count = response.count || devices.length;
             
@@ -489,9 +489,9 @@ class InstrumentController extends BaseController {
             this.lastScanTime = Date.now();
             
             this.logger?.info?.('InstrumentController', 
-                `âœ“ Scan complete: ${count} devices found`);
+                `✓ Scan complete: ${count} devices found`);
             
-            // âœ… NOUVEAU: Ã‰mettre pour la View
+            // ✅ NOUVEAU: Émettre pour la View
             this.eventBus.emit('devices:scanned', { 
                 devices, 
                 count 
@@ -511,7 +511,7 @@ class InstrumentController extends BaseController {
 
     async refreshDeviceList() {
         try {
-            // âœ… devices.list n'a pas de count
+            // ✅ devices.list n'a pas de count
             const response = await this.backend.listDevices();
             const devices = response.devices || [];
             
@@ -519,7 +519,7 @@ class InstrumentController extends BaseController {
                 this.devices.set(device.id, device);
             });
             
-            // âœ… NOUVEAU: Ã‰mettre pour la View
+            // ✅ NOUVEAU: Émettre pour la View
             this.eventBus.emit('devices:listed', { devices });
             
             this.updateView();
@@ -553,7 +553,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * âœ… CORRECTION: device_id en snake_case
+     * ✅ CORRECTION: device_id en snake_case
      */
     async connectDevice(device_id) {
         if (!this.backend) {
@@ -567,7 +567,7 @@ class InstrumentController extends BaseController {
             
             this.connectedDevices.add(device_id);
             
-            // âœ… NOUVEAU: Ã‰mettre pour la View
+            // ✅ NOUVEAU: Émettre pour la View
             this.eventBus.emit('device:connected', { device_id });
             
             this.notifications?.success('Device connected', `Device ${device_id} connected successfully`);
@@ -593,7 +593,7 @@ class InstrumentController extends BaseController {
             
             this.connectedDevices.delete(device_id);
             
-            // âœ… NOUVEAU: Ã‰mettre pour la View
+            // ✅ NOUVEAU: Émettre pour la View
             this.eventBus.emit('device:disconnected', { device_id });
             
             this.notifications?.success('Device disconnected', `Device ${device_id} disconnected`);
@@ -697,7 +697,7 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // HANDLERS Ã‰VÃ‰NEMENTS BACKEND
+    // HANDLERS ÉVÉNEMENTS BACKEND
     // ========================================================================
 
     handleBackendDeviceConnected(data) {
@@ -705,7 +705,7 @@ class InstrumentController extends BaseController {
         this.logger?.info?.('InstrumentController', `Device connected: ${device_id}`);
         this.connectedDevices.add(device_id);
         
-        // âœ… Propager Ã  la View
+        // ✅ Propager à la View
         this.eventBus.emit('device:connected', { device_id });
         
         this.updateView();
@@ -716,7 +716,7 @@ class InstrumentController extends BaseController {
         this.logger?.info?.('InstrumentController', `Device disconnected: ${device_id}`);
         this.connectedDevices.delete(device_id);
         
-        // âœ… Propager Ã  la View
+        // ✅ Propager à la View
         this.eventBus.emit('device:disconnected', { device_id });
         
         this.updateView();
@@ -765,11 +765,11 @@ class InstrumentController extends BaseController {
     }
 
     // ========================================================================
-    // MISE Ã€ JOUR VIEW - NOUVEAU v4.3.0
+    // MISE À JOUR VIEW - NOUVEAU v4.3.0
     // ========================================================================
 
     /**
-     * âœ… NOUVELLE MÃ‰THODE: Mise Ã  jour de la View avec les donnÃ©es actuelles
+     * ✅ NOUVELLE MÉTHODE: Mise à jour de la View avec les données actuelles
      * Remplace l'ancien this.view.render(data) qui ne fonctionnait pas
      */
     updateView() {
@@ -777,7 +777,7 @@ class InstrumentController extends BaseController {
         
         const devicesArray = Array.from(this.devices.values());
         
-        // SÃ©parer les devices connectÃ©s et disponibles
+        // Séparer les devices connectés et disponibles
         const connectedDevices = devicesArray.filter(d => 
             this.connectedDevices.has(d.id) || d.status === 2
         );
@@ -786,7 +786,7 @@ class InstrumentController extends BaseController {
             !this.connectedDevices.has(d.id) && d.status !== 2
         );
         
-        // âœ… NOUVEAU: Ã‰mettre un Ã©vÃ©nement pour que la View se mette Ã  jour
+        // ✅ NOUVEAU: Émettre un événement pour que la View se mette à jour
         this.eventBus.emit('devices:listed', {
             devices: devicesArray
         });
@@ -795,7 +795,7 @@ class InstrumentController extends BaseController {
     }
 
     /**
-     * âœ… NOUVELLE MÃ‰THODE: Notifier le statut hot-plug Ã  la View
+     * ✅ NOUVELLE MÉTHODE: Notifier le statut hot-plug à la View
      */
     notifyHotPlugStatus() {
         this.eventBus.emit('hotplug:status', {

@@ -1,44 +1,44 @@
 // ============================================================================
 // Fichier: frontend/js/models/EditorModel.js
-// Chemin rÃ©el: frontend/js/models/EditorModel.js
-// Version: v3.3.0 - SIGNATURE CORRIGÃ‰E (5 PARAMÃˆTRES)
+// Chemin réel: frontend/js/models/EditorModel.js
+// Version: v3.3.0 - SIGNATURE CORRIGÉE (5 PARAMÈTRES)
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.3.0:
-// âœ… CRITIQUE: Ajout paramÃ¨tres initialData et options manquants
-// âœ… Signature cohÃ©rente: (eventBus, backend, logger, initialData = {}, options = {})
-// âœ… Merge intelligente des options par dÃ©faut
-// âœ… Ajout mÃ©thodes utilitaires pour l'Ã©dition
+// ✅ CRITIQUE: Ajout paramètres initialData et options manquants
+// ✅ Signature cohérente: (eventBus, backend, logger, initialData = {}, options = {})
+// ✅ Merge intelligente des options par défaut
+// ✅ Ajout méthodes utilitaires pour l'édition
 // ============================================================================
 
 class EditorModel extends BaseModel {
     constructor(eventBus, backend, logger, initialData = {}, options = {}) {
-        // âœ… NOUVEAU: Appel super() avec les 5 paramÃ¨tres
+        // ✅ NOUVEAU: Appel super() avec les 5 paramètres
         super(eventBus, backend, logger, initialData, {
             persistKey: 'editormodel',
             eventPrefix: 'editor',
-            autoPersist: false,  // Ne pas persister automatiquement les donnÃ©es d'Ã©dition
+            autoPersist: false,  // Ne pas persister automatiquement les données d'édition
             ...options
         });
         
-        // Initialisation des donnÃ©es de l'Ã©diteur avec valeurs par dÃ©faut
+        // Initialisation des données de l'éditeur avec valeurs par défaut
         this.data.midiData = this.data.midiData || null;
         this.data.selectedNotes = this.data.selectedNotes || [];
         this.data.zoom = this.data.zoom || 1.0;
         this.data.snapToGrid = this.data.snapToGrid !== undefined ? this.data.snapToGrid : true;
-        this.data.gridSize = this.data.gridSize || 16;  // 16Ã¨me de note par dÃ©faut
+        this.data.gridSize = this.data.gridSize || 16;  // 16ème de note par défaut
         
-        // Ã‰tat de l'Ã©diteur
+        // État de l'éditeur
         this.data.viewportOffset = this.data.viewportOffset || { x: 0, y: 0 };
         this.data.currentTool = this.data.currentTool || 'select';  // select, draw, erase
-        this.data.isDirty = false;  // Modifications non sauvegardÃ©es
+        this.data.isDirty = false;  // Modifications non sauvegardées
         
         this.log('debug', 'EditorModel', 'Initialized v3.3.0');
     }
     
     /**
-     * DÃ©finit les donnÃ©es MIDI Ã  Ã©diter
-     * @param {Object} midiData - DonnÃ©es MIDI
+     * Définit les données MIDI à éditer
+     * @param {Object} midiData - Données MIDI
      */
     setMidiData(midiData) {
         this.data.midiData = midiData;
@@ -47,7 +47,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re les donnÃ©es MIDI
+     * Récupère les données MIDI
      * @returns {Object|null}
      */
     getMidiData() {
@@ -55,8 +55,8 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * SÃ©lectionne des notes
-     * @param {Array} notes - Tableau de notes sÃ©lectionnÃ©es
+     * Sélectionne des notes
+     * @param {Array} notes - Tableau de notes sélectionnées
      */
     selectNotes(notes) {
         this.data.selectedNotes = notes;
@@ -64,7 +64,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re les notes sÃ©lectionnÃ©es
+     * Récupère les notes sélectionnées
      * @returns {Array}
      */
     getSelectedNotes() {
@@ -72,7 +72,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Ajoute une note Ã  la sÃ©lection
+     * Ajoute une note à la sélection
      * @param {Object} note
      */
     addToSelection(note) {
@@ -83,7 +83,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Retire une note de la sÃ©lection
+     * Retire une note de la sélection
      * @param {Object} note
      */
     removeFromSelection(note) {
@@ -95,7 +95,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Vide la sÃ©lection
+     * Vide la sélection
      */
     clearSelection() {
         this.data.selectedNotes = [];
@@ -103,8 +103,8 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit le niveau de zoom
-     * @param {number} zoom - Niveau de zoom (0.1 Ã  10)
+     * Définit le niveau de zoom
+     * @param {number} zoom - Niveau de zoom (0.1 à 10)
      */
     setZoom(zoom) {
         this.data.zoom = Math.max(0.1, Math.min(10, zoom));
@@ -112,7 +112,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re le niveau de zoom
+     * Récupère le niveau de zoom
      * @returns {number}
      */
     getZoom() {
@@ -120,7 +120,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Active/dÃ©sactive la magnÃ©tisation Ã  la grille
+     * Active/désactive la magnétisation à la grille
      * @param {boolean} enabled
      */
     setSnapToGrid(enabled) {
@@ -129,7 +129,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * VÃ©rifie si la magnÃ©tisation est active
+     * Vérifie si la magnétisation est active
      * @returns {boolean}
      */
     isSnapToGridEnabled() {
@@ -137,7 +137,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit la taille de la grille
+     * Définit la taille de la grille
      * @param {number} size - Taille en ticks MIDI
      */
     setGridSize(size) {
@@ -146,7 +146,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re la taille de la grille
+     * Récupère la taille de la grille
      * @returns {number}
      */
     getGridSize() {
@@ -154,7 +154,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit l'outil actuel
+     * Définit l'outil actuel
      * @param {string} tool - 'select', 'draw', 'erase'
      */
     setCurrentTool(tool) {
@@ -163,7 +163,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re l'outil actuel
+     * Récupère l'outil actuel
      * @returns {string}
      */
     getCurrentTool() {
@@ -171,7 +171,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit l'offset du viewport
+     * Définit l'offset du viewport
      * @param {Object} offset - {x, y}
      */
     setViewportOffset(offset) {
@@ -180,7 +180,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re l'offset du viewport
+     * Récupère l'offset du viewport
      * @returns {Object}
      */
     getViewportOffset() {
@@ -188,7 +188,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Marque l'Ã©diteur comme modifiÃ©
+     * Marque l'éditeur comme modifié
      */
     markDirty() {
         this.data.isDirty = true;
@@ -196,7 +196,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * Marque l'Ã©diteur comme sauvegardÃ©
+     * Marque l'éditeur comme sauvegardé
      */
     markClean() {
         this.data.isDirty = false;
@@ -204,7 +204,7 @@ class EditorModel extends BaseModel {
     }
     
     /**
-     * VÃ©rifie si l'Ã©diteur a des modifications non sauvegardÃ©es
+     * Vérifie si l'éditeur a des modifications non sauvegardées
      * @returns {boolean}
      */
     isDirty() {

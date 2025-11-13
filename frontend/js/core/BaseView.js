@@ -519,7 +519,7 @@ class BaseView {
         }
         
         return unsafe
-            .replace(/&/g, "&amp;")
+            .replace(/&/g, "&")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")

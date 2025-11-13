@@ -1,14 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/editor/utils/EditorRoutingManager.js
 // Version: v3.1.1 - FIXED
-// Projet: midiMind v3.0 - SystÃ¨me d'Orchestration MIDI
+// Projet: midiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // CORRECTIONS v3.1.1:
-// âœ“ Fixed: Removed duplicate "let" declaration
-// âœ“ Using assignment instead to avoid redeclaration error
+// ✓ Fixed: Removed duplicate "let" declaration
+// ✓ Using assignment instead to avoid redeclaration error
 // ============================================================================
 
-// âœ… FIX: Use assignment instead of let declaration if already declared
+// ✅ FIX: Use assignment instead of let declaration if already declared
 RoutingManager = class RoutingManager {
     constructor(eventBus, debugConsole) {
         this.eventBus = eventBus || window.eventBus || null;
@@ -19,17 +19,17 @@ RoutingManager = class RoutingManager {
             assignments: new Map(),  // channel -> instrument
             mode: 'manual',          // 'manual', 'auto', 'preset'
             currentPreset: null,
-            routes: new Map(),       // âœ… ADDED: for Phase 3
+            routes: new Map(),       // ✅ ADDED: for Phase 3
             channelToRoutes: new Map(),
             instrumentToRoutes: new Map()
         };
         
-        // DonnÃ©es
+        // Données
         this.midiChannels = [];      // Canaux du fichier MIDI
         this.instruments = [];        // Instruments disponibles
         this.presets = [];           // Presets de routage
         
-        // Ã‰tat
+        // État
         this.isValid = false;
         this.conflicts = [];
         
@@ -90,7 +90,7 @@ RoutingManager = class RoutingManager {
                         instrument: event.instrument || 'Unknown',
                         program: event.program || 0,
                         noteCount: 0,
-                        notes: [],  // âœ… ADDED: Store notes for analysis
+                        notes: [],  // ✅ ADDED: Store notes for analysis
                         noteRange: { min: 127, max: 0 },
                         velocity: { min: 127, max: 0, avg: 0 }
                     });
@@ -148,7 +148,7 @@ RoutingManager = class RoutingManager {
             timestamp: Date.now()
         });
         
-        console.log(`[RoutingManager] Assigned CH${channelNumber + 1} â†’ ${instrument.name}`);
+        console.log(`[RoutingManager] Assigned CH${channelNumber + 1} → ${instrument.name}`);
         
         this.validate();
         this.updateStats();
@@ -576,7 +576,7 @@ RoutingManager = class RoutingManager {
     // ========================================================================
 
     autoRouteByInstrumentType() {
-        console.log('[RoutingManager] ðŸ¤– Auto-routing by instrument type...');
+        console.log('[RoutingManager] 🤖 Auto-routing by instrument type...');
         return this.autoRoute();
     }
 
