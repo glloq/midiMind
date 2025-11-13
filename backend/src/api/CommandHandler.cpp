@@ -1505,7 +1505,26 @@ void CommandHandler::registerMidiCommands() {
             {"filename", filename}
         };
     });
-    
+
+    // midi.list - Lister tous les fichiers MIDI de la base de données
+    registerCommand("midi.list", [this](const json& params) {
+        if (!midiDatabase_) {
+            throw std::runtime_error("MidiDatabase not available");
+        }
+
+        auto files = midiDatabase_->list();
+
+        json filesJson = json::array();
+        for (const auto& metadata : files) {
+            filesJson.push_back(metadata.toJson());
+        }
+
+        return json{
+            {"files", filesJson},
+            {"count", files.size()}
+        };
+    });
+
     // midi.import - Upload + Convert + Save en une commande (Phase 6)
     registerCommand("midi.import", [this](const json& params) {
         if (!params.contains("filename") || !params.contains("content")) {
@@ -1774,7 +1793,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
 
-    Logger::debug("CommandHandler", "âœ“ MIDI commands registered (11 commands)");  // 9 + 2 nouvelles
+    Logger::debug("CommandHandler", "âœ" MIDI commands registered (12 commands)");
 }
 
 void CommandHandler::registerPlaylistCommands() {
