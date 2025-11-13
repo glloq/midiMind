@@ -371,7 +371,7 @@ class MidiJsonConverter {
                 
             case 0x59: // Key Signature
                 event.metaType = 'keySignature';
-                event.key = data[0]; // -7 Ã  +7
+                event.key = data[0]; // -7 à +7
                 event.scale = data[1]; // 0=major, 1=minor
                 break;
                 
@@ -698,7 +698,7 @@ class MidiJsonConverter {
     }
 
     /**
-     * Ã‰crit un nombre de longueur variable
+     * Écrit un nombre de longueur variable
      * @private
      */
     writeVariableLength(value) {
@@ -726,7 +726,7 @@ class MidiJsonConverter {
 
     /**
      * Valide une structure JsonMidi
-     * @param {Object} jsonMidi - JsonMidi Ã  valider
+     * @param {Object} jsonMidi - JsonMidi à valider
      * @returns {Object} {valid: boolean, errors: string[]}
      */
     validate(jsonMidi) {

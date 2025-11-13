@@ -25,10 +25,10 @@
 //
 // MODIFICATIONS v3.1.0:
 //   ✓ Constructeur conforme à BaseController
-//   Ã¢Å“â€¦ Utilisation cohérente de subscribe() pour événements
-//   Ã¢Å“â€¦ Gestion robuste de l'indexation
-//   Ã¢Å“â€¦ Optimisation des algorithmes de recherche
-//   Ã¢Å“â€¦ Méthodes helper de BaseController
+//   ✅ Utilisation cohérente de subscribe() pour événements
+//   ✅ Gestion robuste de l'indexation
+//   ✅ Optimisation des algorithmes de recherche
+//   ✅ Méthodes helper de BaseController
 //
 // Auteur: MidiMind Team
 // ============================================================================

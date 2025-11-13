@@ -2,13 +2,13 @@
 // Fichier: frontend/js/utils/RoutingManager.js
 // Version: v3.1.0 - PERFORMANCE OPTIMIZED (SIMPLIFIED)
 // Date: 2025-10-16
-// Projet: MidiMind v3.0 - SystÃ¨me d'Orchestration MIDI
+// Projet: MidiMind v3.0 - Système d'Orchestration MIDI
 // ============================================================================
 // MODIFICATIONS v3.1.0:
-// âœ“ Uniquement routing 1â†’1 (suppression topologies complexes)
-// âœ“ Suppression calcul compatibilitÃ©
-// âœ“ Auto-assign simple (round-robin)
-// âœ“ Pas de rÃ©solution de conflits
+// ✓ Uniquement routing 1→1 (suppression topologies complexes)
+// ✓ Suppression calcul compatibilité
+// ✓ Auto-assign simple (round-robin)
+// ✓ Pas de résolution de conflits
 // ============================================================================
 
 class RoutingManager {
@@ -16,30 +16,30 @@ class RoutingManager {
         this.eventBus = eventBus || window.eventBus || null;
         this.debugConsole = debugConsole;
         
-        // Configuration du routage (SIMPLIFIÃ‰)
+        // Configuration du routage (SIMPLIFIÉ)
         this.config = {
-            allowComplexRouting: PerformanceConfig.routing.allowComplexRouting || false,  // âœ“ DÃ‰SACTIVÃ‰
+            allowComplexRouting: PerformanceConfig.routing.allowComplexRouting || false,  // ✓ DÉSACTIVÉ
             enableAutoRouting: PerformanceConfig.routing.enableAutoRouting || true,
             maxRoutes: PerformanceConfig.routing.maxRoutes || 16,
-            enableCompatibilityScoring: PerformanceConfig.routing.enableCompatibilityScoring || false,  // âœ“ DÃ‰SACTIVÃ‰
-            enableConflictResolution: PerformanceConfig.routing.enableConflictResolution || false  // âœ“ DÃ‰SACTIVÃ‰
+            enableCompatibilityScoring: PerformanceConfig.routing.enableCompatibilityScoring || false,  // ✓ DÉSACTIVÉ
+            enableConflictResolution: PerformanceConfig.routing.enableConflictResolution || false  // ✓ DÉSACTIVÉ
         };
         
-        // Types de routes (SIMPLIFIÃ‰)
+        // Types de routes (SIMPLIFIÉ)
         this.ROUTE_TYPES = {
-            STANDARD: '1:1'  // âœ“ Uniquement 1â†’1
+            STANDARD: '1:1'  // ✓ Uniquement 1→1
         };
         
-        // DonnÃ©es
-        this.routes = new Map();  // routeId â†’ Route
-        this.channelToRoute = new Map();  // channel â†’ routeId
-        this.instrumentToRoutes = new Map();  // instrumentId â†’ Set<routeId>
+        // Données
+        this.routes = new Map();  // routeId → Route
+        this.channelToRoute = new Map();  // channel → routeId
+        this.instrumentToRoutes = new Map();  // instrumentId → Set<routeId>
         
         this.midiChannels = [];
         this.instruments = [];
         this.presets = [];
         
-        // Ã‰tat
+        // État
         this.isValid = false;
         this.nextRouteId = 1;
         
@@ -52,7 +52,7 @@ class RoutingManager {
             autoAssignments: 0
         };
         
-        this.logDebug('routing', 'âœ“ RoutingManager initialized (simple 1:1 mode)');
+        this.logDebug('routing', '✓ RoutingManager initialized (simple 1:1 mode)');
     }
     
     // ========================================================================
@@ -72,7 +72,7 @@ class RoutingManager {
     }
     
     // ========================================================================
-    // CRÃ‰ATION ROUTE SIMPLE (1â†’1)
+    // CRÉATION ROUTE SIMPLE (1→1)
     // ========================================================================
     
     createRoute(channel, instrumentId) {
@@ -87,14 +87,14 @@ class RoutingManager {
             return null;
         }
         
-        // Supprimer route existante pour ce canal (1â†’1 strict)
+        // Supprimer route existante pour ce canal (1→1 strict)
         const existingRoute = this.getRouteForChannel(channel);
         if (existingRoute) {
             this.removeRoute(existingRoute.id);
             this.logDebug('routing', `Removed existing route for channel ${channel}`);
         }
         
-        // CrÃ©er route simple 1â†’1
+        // Créer route simple 1→1
         const route = {
             id: this.generateRouteId(),
             type: this.ROUTE_TYPES.STANDARD,
@@ -116,10 +116,10 @@ class RoutingManager {
         
         this.updateStats();
         
-        // Ã‰vÃ©nement
+        // Événement
         this.eventBus.emit('routing:route-added', route);
         
-        this.logDebug('routing', `Route created: CH${channel} â†’ ${instrumentId}`);
+        this.logDebug('routing', `Route created: CH${channel} → ${instrumentId}`);
         
         return route;
     }
@@ -150,7 +150,7 @@ class RoutingManager {
         
         this.updateStats();
         
-        // Ã‰vÃ©nement
+        // Événement
         this.eventBus.emit('routing:route-removed', { routeId, route });
         
         this.logDebug('routing', `Route removed: ${routeId}`);
@@ -189,7 +189,7 @@ class RoutingManager {
             return [];
         }
         
-        // Filtrer instruments connectÃ©s uniquement
+        // Filtrer instruments connectés uniquement
         const availableInstruments = this.instruments.filter(i => i.connected);
         
         if (availableInstruments.length === 0) {
@@ -223,7 +223,7 @@ class RoutingManager {
     }
     
     // ========================================================================
-    // VALIDATION (SIMPLIFIÃ‰)
+    // VALIDATION (SIMPLIFIÉ)
     // ========================================================================
     
     isValidChannel(channel) {
@@ -241,7 +241,7 @@ class RoutingManager {
     }
     
     validateRouting() {
-        // Validation simple : vÃ©rifier que toutes les routes sont valides
+        // Validation simple : vérifier que toutes les routes sont valides
         let valid = true;
         
         for (const route of this.routes.values()) {
@@ -289,7 +289,7 @@ class RoutingManager {
     }
     
     // ========================================================================
-    // ACTIVATION/DÃ‰SACTIVATION
+    // ACTIVATION/DÉSACTIVATION
     // ========================================================================
     
     enableRoute(routeId) {
@@ -317,7 +317,7 @@ class RoutingManager {
     }
     
     // ========================================================================
-    // PRESETS (SIMPLIFIÃ‰)
+    // PRESETS (SIMPLIFIÉ)
     // ========================================================================
     
     savePreset(name) {
@@ -356,7 +356,7 @@ class RoutingManager {
         // Effacer routes existantes
         this.clearAllRoutes();
         
-        // RecrÃ©er routes du preset
+        // Recréer routes du preset
         preset.routes.forEach(r => {
             this.createRoute(r.channel, r.instrument);
         });
@@ -453,7 +453,7 @@ class RoutingManager {
         this.instruments = [];
         this.presets = [];
         
-        this.logDebug('routing', 'âœ“ RoutingManager destroyed');
+        this.logDebug('routing', '✓ RoutingManager destroyed');
     }
 }
 

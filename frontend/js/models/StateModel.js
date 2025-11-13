@@ -1,26 +1,26 @@
 // ============================================================================
 // Fichier: frontend/js/models/StateModel.js
-// Chemin rÃ©el: frontend/js/models/StateModel.js
-// Version: v3.3.0 - SIGNATURE CORRIGÃ‰E (5 PARAMÃˆTRES)
+// Chemin réel: frontend/js/models/StateModel.js
+// Version: v3.3.0 - SIGNATURE CORRIGÉE (5 PARAMÈTRES)
 // Date: 2025-11-01
 // ============================================================================
 // CORRECTIONS v3.3.0:
-// âœ… CRITIQUE: Ajout paramÃ¨tres initialData et options manquants
-// âœ… Signature cohÃ©rente: (eventBus, backend, logger, initialData = {}, options = {})
-// âœ… Merge intelligente des options par dÃ©faut
+// ✅ CRITIQUE: Ajout paramètres initialData et options manquants
+// ✅ Signature cohérente: (eventBus, backend, logger, initialData = {}, options = {})
+// ✅ Merge intelligente des options par défaut
 // ============================================================================
 
 class StateModel extends BaseModel {
     constructor(eventBus, backend, logger, initialData = {}, options = {}) {
-        // âœ… NOUVEAU: Appel super() avec les 5 paramÃ¨tres
+        // ✅ NOUVEAU: Appel super() avec les 5 paramètres
         super(eventBus, backend, logger, initialData, {
             persistKey: 'statemodel',
             eventPrefix: 'state',
             autoPersist: true,
-            ...options  // Permet override des options par dÃ©faut
+            ...options  // Permet override des options par défaut
         });
         
-        // Initialisation des donnÃ©es d'Ã©tat avec valeurs par dÃ©faut
+        // Initialisation des données d'état avec valeurs par défaut
         this.data.currentPage = this.data.currentPage || 'home';
         this.data.backendConnected = this.data.backendConnected || false;
         this.data.theme = this.data.theme || 'dark';
@@ -30,7 +30,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit la page courante
+     * Définit la page courante
      * @param {string} page - Nom de la page
      */
     setCurrentPage(page) {
@@ -39,7 +39,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re la page courante
+     * Récupère la page courante
      * @returns {string}
      */
     getCurrentPage() {
@@ -47,7 +47,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit l'Ã©tat de connexion au backend
+     * Définit l'état de connexion au backend
      * @param {boolean} connected
      */
     setBackendConnected(connected) {
@@ -56,7 +56,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * VÃ©rifie si le backend est connectÃ©
+     * Vérifie si le backend est connecté
      * @returns {boolean}
      */
     isBackendConnected() {
@@ -64,7 +64,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * DÃ©finit le thÃ¨me de l'interface
+     * Définit le thème de l'interface
      * @param {string} theme - 'dark' ou 'light'
      */
     setTheme(theme) {
@@ -73,7 +73,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * RÃ©cupÃ¨re le thÃ¨me actuel
+     * Récupère le thème actuel
      * @returns {string}
      */
     getTheme() {
@@ -81,7 +81,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * Active/dÃ©sactive le mode performance
+     * Active/désactive le mode performance
      * @param {boolean} enabled
      */
     setPerformanceMode(enabled) {
@@ -90,7 +90,7 @@ class StateModel extends BaseModel {
     }
     
     /**
-     * VÃ©rifie si le mode performance est actif
+     * Vérifie si le mode performance est actif
      * @returns {boolean}
      */
     isPerformanceModeEnabled() {

@@ -4,11 +4,11 @@
 // Date: 2025-10-28
 // ============================================================================
 // Description:
-//   Moniteur rÃ©seau pour le systÃ¨me MidiMind
-//   - Statut rÃ©seau en temps rÃ©el
+//   Moniteur réseau pour le système MidiMind
+//   - Statut réseau en temps réel
 //   - Liste des interfaces
-//   - Statistiques de dÃ©bit et paquets
-//   - Alertes de problÃ¨mes rÃ©seau
+//   - Statistiques de débit et paquets
+//   - Alertes de problèmes réseau
 // ============================================================================
 
 class NetworkMonitor extends BaseController {
@@ -17,7 +17,7 @@ class NetworkMonitor extends BaseController {
         
         this.backendService = backendService;
         
-        // Ã‰tat du rÃ©seau
+        // État du réseau
         this.state.network = {
             status: {
                 connected: false,
@@ -42,43 +42,43 @@ class NetworkMonitor extends BaseController {
         this.config.alertThresholds = {
             errorRate: 0.05, // 5% d'erreurs
             dropRate: 0.02,  // 2% de drops
-            minQuality: 50   // QualitÃ© minimale (0-100)
+            minQuality: 50   // Qualité minimale (0-100)
         };
         
         // Timers
         this.monitoringTimer = null;
         
-        // Historique pour calcul de dÃ©bit
+        // Historique pour calcul de débit
         this.history = {
             timestamps: [],
             bytesReceived: [],
             bytesSent: []
         };
-        this.historySize = 60; // Garder 60 Ã©chantillons
+        this.historySize = 60; // Garder 60 échantillons
     }
     
     /**
-     * Initialisation personnalisÃ©e
+     * Initialisation personnalisée
      */
     onInitialize() {
         this.logDebug('info', 'NetworkMonitor initializing...');
         
-        // Charger l'Ã©tat initial
+        // Charger l'état initial
         this.checkNetworkStatus();
         this.loadInterfaces();
     }
     
     /**
-     * Liaison des Ã©vÃ©nements
+     * Liaison des événements
      */
     bindEvents() {
-        // Ã‰vÃ©nements de contrÃ´le
+        // Événements de contrôle
         this.subscribe('network:start-monitoring', () => this.startMonitoring());
         this.subscribe('network:stop-monitoring', () => this.stopMonitoring());
         this.subscribe('network:check-status', () => this.checkNetworkStatus());
         this.subscribe('network:refresh', () => this.refreshAll());
         
-        // Ã‰vÃ©nements backend
+        // Événements backend
         this.subscribe('backend:connected', () => {
             this.checkNetworkStatus();
             this.loadInterfaces();
@@ -90,7 +90,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * VÃ©rifie le statut rÃ©seau
+     * Vérifie le statut réseau
      */
     async checkNetworkStatus() {
         return this.executeAction('checkNetworkStatus', async () => {
@@ -107,7 +107,7 @@ class NetworkMonitor extends BaseController {
                         ...response.data
                     };
                     
-                    // DÃ©tecter changement de statut
+                    // Détecter changement de statut
                     if (previousStatus !== this.state.network.status.connected) {
                         if (this.state.network.status.connected) {
                             this.handleNetworkConnection();
@@ -124,14 +124,14 @@ class NetworkMonitor extends BaseController {
                 return response;
             } catch (error) {
                 this.state.network.status.connected = false;
-                this.handleError('Erreur lors de la vÃ©rification du statut rÃ©seau', error);
+                this.handleError('Erreur lors de la vérification du statut réseau', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Charge la liste des interfaces rÃ©seau
+     * Charge la liste des interfaces réseau
      */
     async loadInterfaces() {
         return this.executeAction('loadInterfaces', async () => {
@@ -148,14 +148,14 @@ class NetworkMonitor extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError('Erreur lors du chargement des interfaces rÃ©seau', error);
+                this.handleError('Erreur lors du chargement des interfaces réseau', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Charge les statistiques rÃ©seau
+     * Charge les statistiques réseau
      */
     async loadStatistics() {
         return this.executeAction('loadStatistics', async () => {
@@ -175,13 +175,13 @@ class NetworkMonitor extends BaseController {
                         timestamp: Date.now()
                     };
                     
-                    // Mettre Ã  jour l'historique
+                    // Mettre à jour l'historique
                     this.updateHistory(this.state.network.statistics);
                     
-                    // Calculer les dÃ©bits
+                    // Calculer les débits
                     const rates = this.calculateRates(previousStats);
                     
-                    // VÃ©rifier les seuils d'alerte
+                    // Vérifier les seuils d'alerte
                     this.checkAlertThresholds(rates);
                     
                     this.emitEvent('network:stats:updated', {
@@ -192,14 +192,14 @@ class NetworkMonitor extends BaseController {
                 
                 return response;
             } catch (error) {
-                this.handleError('Erreur lors du chargement des statistiques rÃ©seau', error);
+                this.handleError('Erreur lors du chargement des statistiques réseau', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Met Ã  jour l'historique des statistiques
+     * Met à jour l'historique des statistiques
      */
     updateHistory(stats) {
         this.history.timestamps.push(stats.timestamp);
@@ -215,7 +215,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * Calcule les dÃ©bits (bytes/s)
+     * Calcule les débits (bytes/s)
      */
     calculateRates(previousStats) {
         if (!previousStats.timestamp) {
@@ -239,7 +239,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * Calcule la qualitÃ© rÃ©seau (0-100)
+     * Calcule la qualité réseau (0-100)
      */
     calculateQuality(statusData) {
         if (!statusData.connected) {
@@ -248,14 +248,14 @@ class NetworkMonitor extends BaseController {
         
         let quality = 100;
         
-        // RÃ©duire selon les erreurs
+        // Réduire selon les erreurs
         const stats = this.state.network.statistics;
         if (stats.packetsReceived > 0) {
             const errorRate = stats.errors / stats.packetsReceived;
             quality -= errorRate * 100;
         }
         
-        // RÃ©duire selon les drops
+        // Réduire selon les drops
         if (stats.packetsReceived > 0) {
             const dropRate = stats.drops / stats.packetsReceived;
             quality -= dropRate * 50;
@@ -265,45 +265,45 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * VÃ©rifie les seuils d'alerte
+     * Vérifie les seuils d'alerte
      */
     checkAlertThresholds(rates) {
         const stats = this.state.network.statistics;
         const alerts = [];
         
-        // VÃ©rifier le taux d'erreur
+        // Vérifier le taux d'erreur
         if (stats.packetsReceived > 0) {
             const errorRate = stats.errors / stats.packetsReceived;
             if (errorRate > this.config.alertThresholds.errorRate) {
                 alerts.push({
                     type: 'error',
                     severity: 'warning',
-                    message: `Taux d'erreur Ã©levÃ©: ${(errorRate * 100).toFixed(2)}%`,
+                    message: `Taux d'erreur élevé: ${(errorRate * 100).toFixed(2)}%`,
                     timestamp: Date.now()
                 });
             }
         }
         
-        // VÃ©rifier le taux de drops
+        // Vérifier le taux de drops
         if (stats.packetsReceived > 0) {
             const dropRate = stats.drops / stats.packetsReceived;
             if (dropRate > this.config.alertThresholds.dropRate) {
                 alerts.push({
                     type: 'drop',
                     severity: 'warning',
-                    message: `Taux de paquets perdus Ã©levÃ©: ${(dropRate * 100).toFixed(2)}%`,
+                    message: `Taux de paquets perdus élevé: ${(dropRate * 100).toFixed(2)}%`,
                     timestamp: Date.now()
                 });
             }
         }
         
-        // VÃ©rifier la qualitÃ© minimale
+        // Vérifier la qualité minimale
         const quality = this.calculateQuality({ connected: true });
         if (quality < this.config.alertThresholds.minQuality) {
             alerts.push({
                 type: 'quality',
                 severity: 'error',
-                message: `QualitÃ© rÃ©seau faible: ${quality.toFixed(0)}%`,
+                message: `Qualité réseau faible: ${quality.toFixed(0)}%`,
                 timestamp: Date.now()
             });
         }
@@ -312,7 +312,7 @@ class NetworkMonitor extends BaseController {
         if (alerts.length > 0) {
             this.state.network.alerts.push(...alerts);
             
-            // Limiter le nombre d'alertes conservÃ©es
+            // Limiter le nombre d'alertes conservées
             if (this.state.network.alerts.length > 100) {
                 this.state.network.alerts = this.state.network.alerts.slice(-100);
             }
@@ -327,29 +327,29 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * GÃ¨re la connexion rÃ©seau
+     * Gère la connexion réseau
      */
     handleNetworkConnection() {
         this.logDebug('info', 'Network connected');
         
-        this.showNotification('RÃ©seau connectÃ©', 'success');
+        this.showNotification('Réseau connecté', 'success');
         
         this.emitEvent('network:connected');
     }
     
     /**
-     * GÃ¨re la dÃ©connexion rÃ©seau
+     * Gère la déconnexion réseau
      */
     handleNetworkDisconnection() {
         this.logDebug('warning', 'Network disconnected');
         
-        this.showNotification('RÃ©seau dÃ©connectÃ©', 'error');
+        this.showNotification('Réseau déconnecté', 'error');
         
         this.emitEvent('network:disconnected');
     }
     
     /**
-     * DÃ©marre le monitoring
+     * Démarre le monitoring
      */
     startMonitoring() {
         if (this.config.monitoringEnabled) {
@@ -370,7 +370,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * ArrÃªte le monitoring
+     * Arrête le monitoring
      */
     stopMonitoring() {
         if (!this.config.monitoringEnabled) {
@@ -390,7 +390,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * RafraÃ®chit toutes les donnÃ©es rÃ©seau
+     * Rafraîchit toutes les données réseau
      */
     async refreshAll() {
         return this.executeAction('refreshAll', async () => {
@@ -399,16 +399,16 @@ class NetworkMonitor extends BaseController {
                 await this.loadInterfaces();
                 await this.loadStatistics();
                 
-                this.showNotification('DonnÃ©es rÃ©seau rafraÃ®chies', 'success');
+                this.showNotification('Données réseau rafraîchies', 'success');
             } catch (error) {
-                this.handleError('Erreur lors du rafraÃ®chissement des donnÃ©es rÃ©seau', error);
+                this.handleError('Erreur lors du rafraîchissement des données réseau', error);
                 throw error;
             }
         });
     }
     
     /**
-     * Formate un dÃ©bit (bytes/s) en lecture humaine
+     * Formate un débit (bytes/s) en lecture humaine
      */
     formatRate(bytesPerSecond) {
         const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
@@ -424,7 +424,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * Obtient un rÃ©sumÃ© du statut rÃ©seau
+     * Obtient un résumé du statut réseau
      */
     getNetworkSummary() {
         return {
@@ -448,7 +448,7 @@ class NetworkMonitor extends BaseController {
     }
     
     /**
-     * Obtenir l'Ã©tat actuel
+     * Obtenir l'état actuel
      */
     getNetworkState() {
         return {
