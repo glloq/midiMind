@@ -211,15 +211,22 @@ class GlobalPlaybackController {
             this.state.currentPosition = data.position;
             this.playbackModel.set('currentTime', data.position);
         }
-        
+
         if (data.duration !== undefined) {
             this.state.duration = data.duration;
             this.playbackModel.set('duration', data.duration);
         }
-        
+
+        // ✅ NOUVEAU: Émettre événements pour mise à jour UI
         this.eventBus.emit('globalPlayback:position', {
             position: this.state.currentPosition,
             duration: this.state.duration
+        });
+
+        this.eventBus.emit('globalPlayback:timeUpdate', {
+            position: this.state.currentPosition,
+            duration: this.state.duration,
+            fileName: this.currentFile.name
         });
     }
     
@@ -301,18 +308,22 @@ class GlobalPlaybackController {
                 this.currentFile.id = response.file_id || null;
                 this.currentFile.duration = response.duration || 0;
                 this.state.duration = response.duration || 0;
-                
+                this.state.currentPosition = 0;
+
                 // Charger dans le modèle
                 await this.playbackModel.load(filename);
-                
+
                 this.stats.filesPlayed++;
                 this.log('info', 'GlobalPlayback', `✓ Loaded: ${filename}`);
-                
+
+                // ✅ AMÉLIORÉ: Émettre avec toutes les infos pour le header
                 this.eventBus.emit('globalPlayback:fileLoaded', {
-                    filename,
-                    duration: this.currentFile.duration
+                    fileName: filename,
+                    filename: filename,
+                    duration: this.currentFile.duration,
+                    position: 0
                 });
-                
+
                 return true;
             }
         } catch (error) {
@@ -327,32 +338,114 @@ class GlobalPlaybackController {
     }
     
     /**
+     * ✅ NOUVEAU v4.6.0: Applique la compensation de latence
+     * Récupère les instruments utilisés et applique leurs délais
+     */
+    async applyLatencyCompensation() {
+        if (!this.currentFile.name) {
+            this.log('warn', 'GlobalPlayback', 'No file loaded for latency compensation');
+            return;
+        }
+
+        try {
+            // Récupérer les instruments du fichier chargé
+            const midiData = await this.backend.sendCommand('midi.load', {
+                filepath: this.currentFile.path || this.currentFile.name
+            });
+
+            if (!midiData || !midiData.midi_json || !midiData.midi_json.tracks) {
+                this.log('warn', 'GlobalPlayback', 'No track data for latency compensation');
+                return;
+            }
+
+            // Extraire les instruments utilisés
+            const instruments = new Set();
+            for (const track of midiData.midi_json.tracks) {
+                if (track.instrument) {
+                    instruments.add(track.instrument);
+                }
+            }
+
+            if (instruments.size === 0) {
+                this.log('info', 'GlobalPlayback', 'No instruments found for latency compensation');
+                return;
+            }
+
+            // Récupérer et appliquer les délais pour chaque instrument
+            const latencyController = window.app?.controllers?.latency;
+            if (!latencyController) {
+                this.log('warn', 'GlobalPlayback', 'LatencyController not available');
+                return;
+            }
+
+            let appliedCount = 0;
+            for (const instrumentId of instruments) {
+                try {
+                    // Récupérer le délai configuré
+                    const offset = await latencyController.getLatency(instrumentId);
+
+                    if (offset !== 0) {
+                        // Appliquer via API
+                        await this.backend.sendCommand('latency.setCompensation', {
+                            instrument_id: instrumentId,
+                            offset_ms: offset
+                        });
+
+                        appliedCount++;
+                        this.log('debug', 'GlobalPlayback',
+                            `Applied latency ${offset}ms for ${instrumentId}`);
+                    }
+                } catch (error) {
+                    this.log('warn', 'GlobalPlayback',
+                        `Failed to apply latency for ${instrumentId}:`, error.message);
+                }
+            }
+
+            if (appliedCount > 0) {
+                this.log('info', 'GlobalPlayback',
+                    `✅ Applied latency compensation for ${appliedCount} instruments`);
+
+                this.eventBus.emit('globalPlayback:latencyApplied', {
+                    instrumentCount: appliedCount,
+                    instruments: Array.from(instruments)
+                });
+            }
+        } catch (error) {
+            this.log('error', 'GlobalPlayback', 'Latency compensation error:', error.message);
+        }
+    }
+
+    /**
      * Démarre la lecture
+     * ✅ MODIFIÉ v4.6.0: Applique la compensation de latence avant lecture
      */
     async play() {
         if (!this.backend || !this.backend.isConnected()) {
             this.log('warn', 'GlobalPlayback', 'Playing without backend connection');
             return await this.playbackModel.play();
         }
-        
+
         try {
-            // ✓ NOUVEAU: Utilise sendCommand()
+            // ✅ NOUVEAU: Appliquer la compensation de latence avant lecture
+            await this.applyLatencyCompensation();
+
+            // Lancer la lecture
             const response = await this.backend.sendCommand('playback.play');
-            
+
             if (response) {
                 this.state.isPlaying = true;
                 this.state.isPaused = false;
                 this.stats.startTime = Date.now();
-                
+
                 await this.playbackModel.play();
-                
-                this.log('info', 'GlobalPlayback', '▶️ Playing');
+
+                this.log('info', 'GlobalPlayback', '▶️ Playing with latency compensation');
                 return true;
             }
         } catch (error) {
             this.log('error', 'GlobalPlayback', 'Play error:', error.message);
         }
-        
+
         return false;
     }
     

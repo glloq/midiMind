@@ -861,9 +861,70 @@ class Application {
                 btnPlay.style.display = 'inline-block';
                 btnPause.style.display = 'none';
             });
+
+            // ✅ NOUVEAU: Écouter les mises à jour du header
+            this.setupGlobalPlaybackHeader();
         }
 
         this.log('info', '✔ Global playback controls connected');
+    }
+
+    /**
+     * ✅ NOUVEAU: Configure la mise à jour du header playback
+     * Met à jour nom fichier, durée, temps actuel, barre de progression
+     */
+    setupGlobalPlaybackHeader() {
+        const fileNameEl = document.getElementById('globalFileName');
+        const timeEl = document.getElementById('globalTime');
+        const durationEl = document.getElementById('globalDuration');
+        const progressEl = document.getElementById('globalProgress');
+
+        if (!fileNameEl || !timeEl || !durationEl || !progressEl) {
+            this.log('warn', 'Global playback header elements not found');
+            return;
+        }
+
+        // Formater le temps mm:ss
+        const formatTime = (seconds) => {
+            if (!seconds || seconds < 0) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        // Fichier chargé
+        this.eventBus.on('globalPlayback:fileLoaded', (data) => {
+            this.log('debug', 'Header update: file loaded', data);
+
+            const fileName = data.fileName || data.filename || 'Fichier chargé';
+            const duration = data.duration || 0;
+
+            fileNameEl.textContent = fileName;
+            durationEl.textContent = formatTime(duration);
+            timeEl.textContent = '00:00';
+            progressEl.style.width = '0%';
+        });
+
+        // Mise à jour temps réel
+        this.eventBus.on('globalPlayback:timeUpdate', (data) => {
+            const position = data.position || 0;
+            const duration = data.duration || 0;
+
+            timeEl.textContent = formatTime(position);
+
+            if (duration > 0) {
+                const percentage = (position / duration) * 100;
+                progressEl.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+            }
+        });
+
+        // Arrêt: réinitialiser
+        this.eventBus.on('playback:stopped', () => {
+            timeEl.textContent = '00:00';
+            progressEl.style.width = '0%';
+        });
+
+        this.log('info', '✔ Global playback header configured');
     }
 
     /**
