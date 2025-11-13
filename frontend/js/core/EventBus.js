@@ -1,9 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
 // Chemin réel: frontend/js/core/EventBus.js
-// Version: v3.2.0 - FIXED GLOBAL INITIALIZATION
-// Date: 2025-10-31
+// Version: v3.3.0 - FIX INFINITE LOOP IN EVENT PROCESSING
+// Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v3.3.0:
+// ✅ CRITIQUE: Fix boucle infinie dans le traitement des événements HIGH priority
+// ✅ Limitation du nombre d'événements traités par cycle (maxEventsPerCycle)
+// ✅ Capture de la longueur de queue AVANT traitement pour éviter boucles infinies
+// ✅ Protection contre saturation mémoire
+//
 // CORRECTIONS v3.2.0:
 // ✓ CRITIQUE: Création automatique d'une instance globale
 // ✓ Exposition immédiate dans window.eventBus
@@ -34,7 +40,12 @@ class EventBus {
             enableMetrics: true,
             enableThrottling: true,
             maxQueueSize: 1000,
-            processingInterval: 10
+            processingInterval: 10,
+            // ✅ NOUVEAU v3.3.0: Limiter le nombre d'événements traités par cycle
+            // pour éviter les boucles infinies
+            maxEventsPerCycle: 50,
+            // Protection contre récursion infinie
+            maxRecursionDepth: 10
         };
         
         // Métriques
@@ -55,10 +66,14 @@ class EventBus {
         // Traitement asynchrone
         this.processingTimer = null;
         this._lastCacheClean = null;
-        
+
+        // ✅ NOUVEAU v3.3.0: Compteur de profondeur de récursion
+        this._processingDepth = 0;
+        this._eventCounter = 0;
+
         // Documentation des événements
         this.eventDocumentation = this.initEventDocumentation();
-        
+
         this.init();
     }
     
@@ -133,9 +148,9 @@ class EventBus {
             console.error('EventBus.emit: Event name required');
             return;
         }
-        
+
         this.metrics.eventsEmitted++;
-        
+
         const eventData = {
             event,
             data,
@@ -143,22 +158,20 @@ class EventBus {
             timestamp: Date.now(),
             id: `evt_${Date.now()}_${Math.random()}`
         };
-        
-        if (this.config.enablePriorities && priority === EventPriority.HIGH) {
-            // Traiter immédiatement les événements HIGH priority
-            this.processEvent(eventData);
-        } else {
-            // Ajouter à la queue appropriée
-            const queue = this.queues[priority] || this.queues[EventPriority.NORMAL];
-            
-            if (queue.length >= this.config.maxQueueSize) {
-                this.metrics.eventsDropped++;
-                console.warn(`EventBus: Queue full for priority ${priority}, event dropped`);
-                return;
-            }
-            
-            queue.push(eventData);
+
+        // ✅ FIX v3.3.0: Ne JAMAIS traiter immédiatement les événements HIGH priority
+        // pour éviter les boucles de récursion infinies.
+        // Au lieu de cela, toujours les ajouter à la queue et laisser
+        // le processeur de queue les gérer de manière contrôlée.
+        const queue = this.queues[priority] || this.queues[EventPriority.NORMAL];
+
+        if (queue.length >= this.config.maxQueueSize) {
+            this.metrics.eventsDropped++;
+            console.warn(`EventBus: Queue full for priority ${priority}, event dropped`);
+            return;
         }
+
+        queue.push(eventData);
     }
     
     // ========================================================================
@@ -253,24 +266,48 @@ class EventBus {
     
     startProcessing() {
         if (this.processingTimer) return;
-        
+
         this.processingTimer = setInterval(() => {
+            // ✅ FIX v3.3.0: Capturer la longueur de la queue AVANT le traitement
+            // pour éviter les boucles infinies si de nouveaux événements sont ajoutés
+            // pendant le traitement
+
+            let eventsProcessedThisCycle = 0;
+            const maxPerCycle = this.config.maxEventsPerCycle;
+
             // Traiter HIGH priority en premier
-            while (this.queues[EventPriority.HIGH].length > 0) {
+            // IMPORTANT: Capturer la longueur AVANT la boucle pour éviter boucle infinie
+            const highQueueLength = Math.min(this.queues[EventPriority.HIGH].length, maxPerCycle);
+            for (let i = 0; i < highQueueLength; i++) {
+                if (eventsProcessedThisCycle >= maxPerCycle) break;
+                if (this.queues[EventPriority.HIGH].length === 0) break;
+
                 const eventData = this.queues[EventPriority.HIGH].shift();
                 this.processEvent(eventData);
+                eventsProcessedThisCycle++;
             }
-            
-            // Puis NORMAL
-            if (this.queues[EventPriority.NORMAL].length > 0) {
+
+            // Puis NORMAL (seulement si on n'a pas atteint la limite)
+            if (eventsProcessedThisCycle < maxPerCycle && this.queues[EventPriority.NORMAL].length > 0) {
                 const eventData = this.queues[EventPriority.NORMAL].shift();
                 this.processEvent(eventData);
+                eventsProcessedThisCycle++;
             }
-            
-            // Puis LOW
-            if (this.queues[EventPriority.LOW].length > 0) {
+
+            // Puis LOW (seulement si on n'a pas atteint la limite)
+            if (eventsProcessedThisCycle < maxPerCycle && this.queues[EventPriority.LOW].length > 0) {
                 const eventData = this.queues[EventPriority.LOW].shift();
                 this.processEvent(eventData);
+                eventsProcessedThisCycle++;
+            }
+
+            // ✅ NOUVEAU: Avertir si les queues sont saturées
+            const totalQueueSize = this.queues[EventPriority.HIGH].length +
+                                   this.queues[EventPriority.NORMAL].length +
+                                   this.queues[EventPriority.LOW].length;
+
+            if (totalQueueSize > this.config.maxQueueSize * 0.8) {
+                console.warn(`EventBus: Queues are ${Math.round((totalQueueSize / this.config.maxQueueSize) * 100)}% full (${totalQueueSize} events)`);
             }
         }, this.config.processingInterval);
     }
