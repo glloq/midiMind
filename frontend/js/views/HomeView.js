@@ -288,13 +288,42 @@ class HomeView extends BaseView {
         this.eventBus.on('midi:note_on', (data) => {
             this.visualizeNoteOn(data);
         });
-        
+
         this.eventBus.on('midi:note_off', (data) => {
             this.visualizeNoteOff(data);
         });
-        
+
         this.eventBus.on('midi:cc', (data) => {
             // Gérer les contrôles si nécessaire
+        });
+
+        // ✅ NOUVEAU: Charger le fichier MIDI dans le visualizer quand un fichier est chargé
+        this.eventBus.on('globalPlayback:fileLoaded', (data) => {
+            this.logger.info('[HomeView] File loaded event received:', data);
+            // Le fichier sera chargé via le backend, on va écouter les événements MIDI
+        });
+
+        // Écouter les événements backend pour charger la structure du fichier
+        this.eventBus.on('backend:event:file_loaded', (data) => {
+            this.logger.info('[HomeView] Backend file loaded:', data);
+            if (data.midiData || data.midi_data) {
+                this.loadMidiFileIntoVisualizer(data.midiData || data.midi_data);
+            }
+        });
+
+        // Écouter quand la lecture démarre pour passer en mode temps réel
+        this.eventBus.on('playback:started', () => {
+            // Le visualizer passera automatiquement en mode temps réel car activeNotes > 0
+        });
+
+        // Écouter quand la lecture s'arrête pour revenir à la vue d'ensemble
+        this.eventBus.on('playback:stopped', () => {
+            // Effacer les notes actives pour revenir à la vue d'ensemble
+            setTimeout(() => {
+                if (this.activeNotes.size === 0 && this.midiFileNotes.loaded) {
+                    // Le visualizer affichera automatiquement la structure du fichier
+                }
+            }, 500);
         });
     }
 
@@ -807,13 +836,21 @@ class HomeView extends BaseView {
     initVisualizer() {
         this.visualizerCanvas = this.elements.visualizerCanvas;
         if (!this.visualizerCanvas) return;
-        
+
         this.visualizerContext = this.visualizerCanvas.getContext('2d');
-        
+
+        // ✅ NOUVEAU: Structure pour stocker les notes du fichier MIDI
+        this.midiFileNotes = {
+            notes: [], // Toutes les notes du fichier
+            channels: new Map(), // Notes par canal
+            duration: 0,
+            loaded: false
+        };
+
         // Resize canvas
         this.resizeVisualizer();
         window.addEventListener('resize', () => this.resizeVisualizer());
-        
+
         // Start animation loop
         this.startVisualizerLoop();
     }
@@ -838,21 +875,26 @@ class HomeView extends BaseView {
 
     renderVisualizer() {
         if (!this.visualizerContext || !this.visualizerCanvas) return;
-        
+
         const ctx = this.visualizerContext;
         const width = this.visualizerCanvas.width;
         const height = this.visualizerCanvas.height;
-        
+
         // Clear with gradient
         const gradient = ctx.createLinearGradient(0, 0, width, height);
         gradient.addColorStop(0, 'rgba(26, 26, 46, 0.9)');
         gradient.addColorStop(1, 'rgba(22, 33, 62, 0.9)');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
-        
-        // Dessiner les notes actives
-        this.drawActiveNotes(ctx, width, height);
-        
+
+        // ✅ NOUVEAU: Si un fichier est chargé, afficher sa structure
+        if (this.midiFileNotes.loaded && this.activeNotes.size === 0) {
+            this.drawFileStructure(ctx, width, height);
+        } else {
+            // Dessiner les notes actives (en temps réel pendant la lecture)
+            this.drawActiveNotes(ctx, width, height);
+        }
+
         // Mise à jour des infos
         this.updateVisualizerInfo();
     }
@@ -898,22 +940,164 @@ class HomeView extends BaseView {
         // this.activeNotes.delete(data.note);
     }
 
+    /**
+     * ✅ NOUVEAU: Dessine la structure du fichier MIDI (vue d'ensemble des canaux)
+     */
+    drawFileStructure(ctx, width, height) {
+        if (!this.midiFileNotes.loaded || this.midiFileNotes.channels.size === 0) {
+            // Afficher un message "Aucun fichier chargé"
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Sélectionnez un fichier MIDI', width / 2, height / 2);
+            return;
+        }
+
+        const channels = Array.from(this.midiFileNotes.channels.entries());
+        const channelHeight = height / Math.max(16, channels.length); // Maximum 16 canaux MIDI
+
+        channels.forEach(([channelNum, notes], index) => {
+            if (notes.length === 0) return;
+
+            const y = index * channelHeight;
+            const hue = (channelNum * 30) % 360;
+
+            // Fond du canal
+            ctx.fillStyle = `hsla(${hue}, 40%, 30%, 0.3)`;
+            ctx.fillRect(0, y, width, channelHeight - 2);
+
+            // Dessiner les notes du canal
+            notes.forEach(note => {
+                const x = (note.time / this.midiFileNotes.duration) * width;
+                const noteWidth = Math.max(2, ((note.duration || 100) / this.midiFileNotes.duration) * width);
+                const noteHeight = channelHeight - 4;
+
+                // Intensité basée sur la vélocité
+                const alpha = 0.4 + (note.velocity / 127) * 0.6;
+                ctx.fillStyle = `hsla(${hue}, 70%, 60%, ${alpha})`;
+                ctx.fillRect(x, y + 2, noteWidth, noteHeight);
+            });
+
+            // Label du canal
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Canal ${channelNum + 1}`, 5, y + channelHeight / 2 + 4);
+        });
+    }
+
+    /**
+     * ✅ NOUVEAU: Charge les notes d'un fichier MIDI dans le visualizer
+     */
+    loadMidiFileIntoVisualizer(midiData) {
+        this.logger.info('[HomeView] Loading MIDI file into visualizer');
+
+        // Réinitialiser
+        this.midiFileNotes.notes = [];
+        this.midiFileNotes.channels.clear();
+        this.midiFileNotes.duration = 0;
+        this.midiFileNotes.loaded = false;
+
+        if (!midiData) {
+            this.logger.warn('[HomeView] No MIDI data provided');
+            return;
+        }
+
+        try {
+            // Extraire les notes du midiData
+            let allNotes = [];
+
+            // Si c'est un objet MidiJSON
+            if (midiData.timeline && Array.isArray(midiData.timeline)) {
+                // Convertir timeline en notes
+                const noteOns = new Map();
+
+                midiData.timeline.forEach(event => {
+                    if (event.type === 'noteOn' || event.event === 'noteOn') {
+                        noteOns.set(`${event.channel}-${event.note}`, event);
+                    } else if (event.type === 'noteOff' || event.event === 'noteOff') {
+                        const key = `${event.channel}-${event.note}`;
+                        const noteOn = noteOns.get(key);
+
+                        if (noteOn) {
+                            allNotes.push({
+                                note: noteOn.note,
+                                channel: noteOn.channel,
+                                time: noteOn.time,
+                                duration: event.time - noteOn.time,
+                                velocity: noteOn.velocity || 64
+                            });
+                            noteOns.delete(key);
+                        }
+                    }
+                });
+            }
+            // Si c'est déjà un tableau de notes
+            else if (Array.isArray(midiData)) {
+                allNotes = midiData;
+            }
+
+            // Grouper par canal
+            allNotes.forEach(note => {
+                const channel = note.channel || 0;
+
+                if (!this.midiFileNotes.channels.has(channel)) {
+                    this.midiFileNotes.channels.set(channel, []);
+                }
+
+                this.midiFileNotes.channels.get(channel).push(note);
+
+                // Mettre à jour la durée totale
+                const noteEnd = note.time + (note.duration || 0);
+                if (noteEnd > this.midiFileNotes.duration) {
+                    this.midiFileNotes.duration = noteEnd;
+                }
+            });
+
+            this.midiFileNotes.notes = allNotes;
+            this.midiFileNotes.loaded = true;
+
+            this.logger.info(`[HomeView] Loaded ${allNotes.length} notes from ${this.midiFileNotes.channels.size} channels`);
+        } catch (error) {
+            this.logger.error('[HomeView] Failed to load MIDI file into visualizer:', error);
+        }
+    }
+
     updateVisualizerInfo() {
         if (!this.elements.visualizerInfo) return;
-        
-        const noteCount = this.activeNotes.size;
-        const channels = new Set(
-            Array.from(this.activeNotes.values()).map(n => n.channel)
-        );
-        
+
         const noteCountSpan = this.elements.visualizerInfo.querySelector('.note-count');
         const channelCountSpan = this.elements.visualizerInfo.querySelector('.active-channels');
-        
-        if (noteCountSpan) {
-            noteCountSpan.textContent = `${noteCount} notes actives`;
+
+        // Si en lecture, afficher les notes actives
+        if (this.activeNotes.size > 0) {
+            const noteCount = this.activeNotes.size;
+            const channels = new Set(
+                Array.from(this.activeNotes.values()).map(n => n.channel)
+            );
+
+            if (noteCountSpan) {
+                noteCountSpan.textContent = `${noteCount} notes actives`;
+            }
+            if (channelCountSpan) {
+                channelCountSpan.textContent = `${channels.size} canaux`;
+            }
         }
-        if (channelCountSpan) {
-            channelCountSpan.textContent = `${channels.size} canaux`;
+        // Sinon, afficher les infos du fichier
+        else if (this.midiFileNotes.loaded) {
+            if (noteCountSpan) {
+                noteCountSpan.textContent = `${this.midiFileNotes.notes.length} notes`;
+            }
+            if (channelCountSpan) {
+                channelCountSpan.textContent = `${this.midiFileNotes.channels.size} canaux`;
+            }
+        } else {
+            if (noteCountSpan) {
+                noteCountSpan.textContent = '0 notes';
+            }
+            if (channelCountSpan) {
+                channelCountSpan.textContent = '0 canaux';
+            }
         }
     }
 
