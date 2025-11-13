@@ -223,20 +223,24 @@ class SystemView extends BaseView {
     renderSystemInfo() {
         const info = this.state.systemInfo;
         const uptime = this.state.uptime;
-        
+
         if (!info) {
             return '<div class="loading">Chargement informations système...</div>';
         }
-        
+
         return `
             <div class="system-grid">
                 <div class="system-card">
                     <div class="card-label">Système</div>
-                    <div class="card-value">${info.os || '–'}</div>
+                    <div class="card-value">${info.system || info.os || '–'}</div>
                 </div>
                 <div class="system-card">
-                    <div class="card-label">Modèle</div>
-                    <div class="card-value">${info.model || '–'}</div>
+                    <div class="card-label">Machine</div>
+                    <div class="card-value">${info.machine || info.model || '–'}</div>
+                </div>
+                <div class="system-card">
+                    <div class="card-label">Nœud</div>
+                    <div class="card-value">${info.node || '–'}</div>
                 </div>
                 <div class="system-card">
                     <div class="card-label">Uptime</div>

@@ -213,8 +213,8 @@ class SystemController extends BaseController {
     async getVersion() {
         return this.withBackend(
             async () => {
-                const response = await this.backend.sendCommand('system.info', {});
-                
+                const response = await this.backend.sendCommand('system.version', {});
+
                 if (response.success !== false) {
                     return response.data || response;
                 }
@@ -249,10 +249,11 @@ class SystemController extends BaseController {
     async getUptime() {
         return this.withBackend(
             async () => {
-                const response = await this.backend.sendCommand('system.info', {});
-                
+                const response = await this.backend.sendCommand('system.uptime', {});
+
                 if (response.success !== false) {
-                    return response.data?.uptime || response.uptime || 0;
+                    const data = response.data || response;
+                    return data.uptime_seconds || 0;
                 }
                 throw new Error(response.message || 'Failed to get uptime');
             },
@@ -267,10 +268,16 @@ class SystemController extends BaseController {
     async getMemory() {
         return this.withBackend(
             async () => {
-                const response = await this.backend.sendCommand('system.info', {});
-                
+                const response = await this.backend.sendCommand('system.memory', {});
+
                 if (response.success !== false) {
-                    return response.data?.memory || response.memory || null;
+                    const data = response.data || response;
+                    // Convertir KB en bytes pour la vue
+                    return {
+                        total: (data.total_kb || 0) * 1024,
+                        used: (data.used_kb || 0) * 1024,
+                        available: (data.available_kb || 0) * 1024
+                    };
                 }
                 throw new Error(response.message || 'Failed to get memory');
             },
@@ -285,10 +292,16 @@ class SystemController extends BaseController {
     async getDisk() {
         return this.withBackend(
             async () => {
-                const response = await this.backend.sendCommand('system.info', {});
-                
+                const response = await this.backend.sendCommand('system.disk', {});
+
                 if (response.success !== false) {
-                    return response.data?.disk || response.disk || null;
+                    const data = response.data || response;
+                    return {
+                        total: data.total_bytes || 0,
+                        used: data.used_bytes || 0,
+                        free: data.free_bytes || 0,
+                        available: data.available_bytes || 0
+                    };
                 }
                 throw new Error(response.message || 'Failed to get disk');
             },
@@ -303,7 +316,7 @@ class SystemController extends BaseController {
     async ping() {
         return this.withBackend(
             async () => {
-                const response = await this.backend.sendCommand('system.info', {});
+                const response = await this.backend.sendCommand('system.ping', {});
                 return response.success !== false;
             },
             'ping',
