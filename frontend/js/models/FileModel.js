@@ -316,7 +316,41 @@ class FileModel extends BaseModel {
             throw error;
         }
     }
-    
+
+    /**
+     * Récupère tous les fichiers MIDI de la base de données
+     * ✓ API v4.2.2: midi.list
+     */
+    async getMidiFiles() {
+        if (!this.backend) {
+            throw new Error('Backend service not available');
+        }
+
+        try {
+            this.log('info', 'FileModel', 'Getting MIDI files from database');
+
+            // ✓ Nouvelle commande API v4.2.2
+            const response = await this.backend.sendCommand('midi.list');
+            const data = response.data || response;
+
+            const files = data.files || [];
+
+            if (this.eventBus) {
+                this.eventBus.emit('file:midi-list-loaded', {
+                    files,
+                    count: files.length,
+                    timestamp: Date.now()
+                });
+            }
+
+            return files;
+
+        } catch (error) {
+            this.log('error', 'FileModel', `Get MIDI files failed: ${error.message}`);
+            throw error;
+        }
+    }
+
     // ========================================================================
     // GESTION FICHIERS RÃƒâ€°CENTS
     // ========================================================================

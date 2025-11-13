@@ -96,6 +96,7 @@ class PlaylistController extends BaseController {
         this.eventBus.on('playlist:previous', () => this.previous());
         this.eventBus.on('playlist:toggle-shuffle', () => this.toggleShuffle());
         this.eventBus.on('playlist:toggle-repeat', () => this.toggleRepeat());
+        this.eventBus.on('playlist:add_files_modal_requested', (data) => this.showFileSelectionModal(data.playlist_id));
     }
     
     async createPlaylist(data) {
@@ -236,19 +237,114 @@ class PlaylistController extends BaseController {
     async removeFileFromPlaylist(playlist_id, item_id) {
         try {
             this.logDebug('playlist', `Removing item ${item_id} from playlist ${playlist_id}`);
-            
+
             await this.backend.removePlaylistItem(playlist_id, item_id);
-            
+
             await this.loadPlaylist(playlist_id);
-            
+
             this.eventBus.emit('playlist:file-removed', { playlist_id, item_id });
-            
+
             if (this.notifications) {
                 this.notifications.show('File Removed', '', 'success', 2000);
             }
-            
+
         } catch (error) {
             this.handleError(error, 'Failed to remove file from playlist');
+            throw error;
+        }
+    }
+
+    /**
+     * Affiche le modal de sélection de fichiers MIDI
+     * @param {number} playlist_id - ID de la playlist
+     */
+    async showFileSelectionModal(playlist_id) {
+        try {
+            if (!this.fileModel) {
+                throw new Error('FileModel not available');
+            }
+
+            this.logDebug('playlist', `Opening file selection modal for playlist ${playlist_id}`);
+
+            // Créer le modal de sélection de fichiers
+            const modal = new FileSelectionModal(this.eventBus, this.fileModel, this.logger);
+
+            // Afficher le modal et gérer la sélection
+            await modal.show(
+                (selectedFiles) => this.handleFilesSelected(playlist_id, selectedFiles),
+                {
+                    multiSelect: true,
+                    title: 'Ajouter des fichiers MIDI à la playlist',
+                    confirmText: 'Ajouter',
+                    cancelText: 'Annuler'
+                }
+            );
+
+        } catch (error) {
+            this.handleError(error, 'Failed to show file selection modal');
+        }
+    }
+
+    /**
+     * Gère les fichiers sélectionnés et les ajoute à la playlist
+     * @param {number} playlist_id - ID de la playlist
+     * @param {Array} selectedFiles - Fichiers sélectionnés
+     */
+    async handleFilesSelected(playlist_id, selectedFiles) {
+        try {
+            this.logDebug('playlist', `Adding ${selectedFiles.length} files to playlist ${playlist_id}`);
+
+            // Ajouter chaque fichier à la playlist
+            for (const file of selectedFiles) {
+                await this.addMidiFileToPlaylist(playlist_id, file.id);
+            }
+
+            // Recharger la playlist
+            await this.loadPlaylist(playlist_id);
+
+            if (this.notifications) {
+                this.notifications.show(
+                    'Fichiers ajoutés',
+                    `${selectedFiles.length} fichier(s) ajouté(s) à la playlist`,
+                    'success',
+                    3000
+                );
+            }
+
+            this.eventBus.emit('playlist:files-added', { playlist_id, count: selectedFiles.length });
+
+        } catch (error) {
+            this.handleError(error, 'Failed to add files to playlist');
+        }
+    }
+
+    /**
+     * Ajoute un fichier MIDI à la playlist par son ID
+     * @param {number} playlist_id - ID de la playlist
+     * @param {number} midi_file_id - ID du fichier MIDI
+     */
+    async addMidiFileToPlaylist(playlist_id, midi_file_id) {
+        try {
+            this.logDebug('playlist', `Adding MIDI file ${midi_file_id} to playlist ${playlist_id}`);
+
+            if (!this.backend?.isConnected()) {
+                throw new Error('Backend not connected');
+            }
+
+            // Appeler l'API playlist.addItem avec midi_file_id
+            const response = await this.backend.sendCommand('playlist.addItem', {
+                playlist_id: playlist_id,
+                midi_file_id: midi_file_id
+            });
+
+            if (!response.success) {
+                throw new Error('Failed to add MIDI file to playlist');
+            }
+
+            this.eventBus.emit('playlist:midi-file-added', { playlist_id, midi_file_id });
+
+        } catch (error) {
+            this.handleError(error, `Failed to add MIDI file ${midi_file_id} to playlist`);
             throw error;
         }
     }
