@@ -29,7 +29,8 @@ class RoutingView extends BaseView {
             sources: [], // devices sources
             destinations: [], // devices destinations
             selectedSource: null,
-            selectedDestination: null
+            selectedDestination: null,
+            loadedFile: null // Fichier MIDI chargé pour le routing
         };
         
         this.elements = {};
@@ -56,7 +57,7 @@ class RoutingView extends BaseView {
 
     render() {
         if (!this.container) return;
-        
+
         this.container.innerHTML = `
             <div class="page-header">
                 <h1>🔀 Routage MIDI</h1>
@@ -69,7 +70,9 @@ class RoutingView extends BaseView {
                     </button>
                 </div>
             </div>
-            
+
+            ${this.state.loadedFile ? this.renderLoadedFile() : ''}
+
             <div class="routing-layout">
                 <!-- Matrice de routage -->
                 <div class="routing-matrix-container">
@@ -153,6 +156,9 @@ class RoutingView extends BaseView {
                     break;
                 case 'toggle-route':
                     if (routeItem) this.toggleRoute(routeItem.dataset.routeId, routeItem.dataset.enabled === 'true');
+                    break;
+                case 'clear-loaded-file':
+                    this.clearLoadedFile();
                     break;
             }
         });
@@ -411,6 +417,48 @@ class RoutingView extends BaseView {
         const allDevices = [...this.state.sources, ...this.state.destinations];
         const device = allDevices.find(d => d.id === deviceId);
         return device ? device.name : deviceId;
+    }
+
+    // ========================================================================
+    // FICHIER CHARGÉ
+    // ========================================================================
+
+    renderLoadedFile() {
+        if (!this.state.loadedFile) return '';
+
+        const fileName = this.state.loadedFile.path?.split('/').pop() || 'Fichier MIDI';
+        const trackCount = this.state.loadedFile.data?.tracks?.length || 0;
+
+        return `
+            <div class="loaded-file-banner">
+                <div class="loaded-file-info">
+                    <span class="loaded-file-icon">🎵</span>
+                    <div class="loaded-file-details">
+                        <div class="loaded-file-name">${fileName}</div>
+                        <div class="loaded-file-meta">
+                            ${trackCount} piste${trackCount > 1 ? 's' : ''}
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-clear-file" data-action="clear-loaded-file" title="Effacer">
+                    ✕
+                </button>
+            </div>
+        `;
+    }
+
+    setLoadedFile(fileData) {
+        this.state.loadedFile = fileData;
+        this.render();
+        this.cacheElements();
+        this.attachEvents();
+    }
+
+    clearLoadedFile() {
+        this.state.loadedFile = null;
+        this.render();
+        this.cacheElements();
+        this.attachEvents();
     }
 
     // ========================================================================

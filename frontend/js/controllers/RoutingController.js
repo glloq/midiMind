@@ -41,7 +41,8 @@ class RoutingController extends BaseController {
         this.eventBus.on('routing:enable_route', (data) => this.enableRoute(data.source_id, data.destination_id));
         this.eventBus.on('routing:disable_route', (data) => this.disableRoute(data.source_id, data.destination_id));
         this.eventBus.on('routing:clear_all', () => this.clearAllRoutes());
-        
+        this.eventBus.on('routing:fileLoaded', (data) => this.handleFileLoaded(data));
+
         // Charger routes uniquement quand la page Routing devient active
         this.eventBus.on('navigation:page_changed', (data) => {
             if (data.page === 'routing' && this.backend?.isConnected?.()) {
@@ -269,10 +270,42 @@ class RoutingController extends BaseController {
     
     refreshView() {
         if (!this.view) return;
-        
+
         this.view.render({
             routes: this.getRoutes()
         });
+    }
+
+    /**
+     * Gère le chargement d'un fichier MIDI pour le routing
+     */
+    handleFileLoaded(data) {
+        const { file_path, midi_json } = data;
+
+        this.logger?.info?.('RoutingController', `File loaded for routing: ${file_path}`);
+
+        // Stocker le fichier chargé dans l'état local
+        this.localState.loadedFile = {
+            path: file_path,
+            midiData: midi_json,
+            loadedAt: Date.now()
+        };
+
+        // Émettre vers la vue pour afficher le fichier chargé
+        this.eventBus.emit('routing:file_ready', {
+            file_path,
+            midi_json
+        });
+
+        // Rafraîchir la vue pour afficher le fichier
+        if (this.view) {
+            this.view.setLoadedFile({
+                path: file_path,
+                data: midi_json
+            });
+        }
+
+        this.notifications?.success('Fichier chargé', `${file_path} prêt pour le routing`);
     }
 }
 
