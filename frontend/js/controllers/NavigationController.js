@@ -1,9 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin réel: frontend/js/controllers/NavigationController.js
-// Version: v4.5.0 - FIXED UTF-8 ENCODING
-// Date: 2025-11-12
+// Version: v4.6.0 - FIX INFINITE LOOP
+// Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v4.6.0:
+// ✅ CRITIQUE: Fix boucle infinie causée par double écoute de 'hashchange'
+// ✅ Suppression du listener 'hashchange' dans NavigationController
+// ✅ Le Router gère maintenant seul les changements de hash
+// ✅ Ajout du flag 'fromRouter' pour éviter la mise à jour cyclique du hash
+//
 // CORRECTIONS v4.5.0:
 // ✓ Encodage UTF-8 corrigé (émojis, accents)
 // ✓ Amélioration du logging des erreurs
@@ -58,7 +64,7 @@ class NavigationController extends BaseController {
         // ✓ CRITIQUE: Mapping page -> vue créé ICI
         this.pageViewMap = new Map();
         
-        this.log('debug', 'NavigationController', '✓ NavigationController v4.5.0 created');
+        this.log('debug', 'NavigationController', '✓ NavigationController v4.6.0 created');
     }
     
     // ========================================================================
@@ -159,15 +165,17 @@ class NavigationController extends BaseController {
                 }
             });
         });
-        
-        // Écouter les changements de hash
-        window.addEventListener('hashchange', () => {
-            const hash = window.location.hash.slice(1); // Retirer le #
-            const page = hash || this.config.defaultPage;
-            this.showPage(page, { fromHashChange: true });
-        });
-        
-        this.log('debug', 'NavigationController', 'Navigation events attached');
+
+        // ✅ FIX: NE PAS écouter 'hashchange' directement ici
+        // Le Router gère déjà les changements de hash et appelle showPage()
+        // via l'événement 'route-changed' dans Application.js
+        // Écouter hashchange ici créait une BOUCLE INFINIE car:
+        // 1. Router écoute hashchange → émet 'route-changed' → appelle showPage()
+        // 2. NavigationController écoute hashchange → appelle showPage()
+        // 3. showPage() met à jour window.location.hash
+        // 4. Cela déclenche hashchange → retour à l'étape 1 = BOUCLE INFINIE
+
+        this.log('debug', 'NavigationController', 'Navigation events attached (hashchange handled by Router)');
     }
     
     /**
@@ -309,8 +317,9 @@ class NavigationController extends BaseController {
                 timestamp: Date.now()
             });
             
-            // Mettre à jour le hash URL si pas déjà fait par hashchange
-            if (!options.fromHashChange) {
+            // ✅ FIX: Ne mettre à jour le hash QUE si l'appel ne vient PAS du Router
+            // Si fromRouter est true, le Router a déjà géré le hash
+            if (!options.fromRouter) {
                 window.location.hash = pageName;
             }
             

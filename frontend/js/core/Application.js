@@ -1,9 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
 // Chemin réel: frontend/js/core/Application.js
-// Version: v4.5.0 - FIX NAVIGATION INIT ORDER
-// Date: 2025-11-11
+// Version: v4.7.0 - FIX INFINITE LOOP IN NAVIGATION
+// Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v4.7.0:
+// ✅ CRITIQUE: Fix boucle infinie dans la navigation
+// ✅ Router → NavigationController passe maintenant fromRouter: true
+// ✅ Cela évite que showPage() ne mette à jour le hash quand c'est déjà fait
+//
 // CORRECTIONS v4.1.0:
 // ✓ CRITIQUE: Passer 5 paramètres aux modèles (eventBus, backend, logger, initialData, options)
 // ✓ Fix: StateModel, FileModel, PlaylistModel, InstrumentModel, SystemModel, PlaybackModel, EditorModel, RoutingModel
@@ -629,8 +634,9 @@ class Application {
                 this.router.on('route-changed', (data) => {
                     // Extraire le nom de la page du path
                     let pageKey = data.path.replace(/^\//, '') || 'home';
-                    // Mapper files -> files (le Router utilise /files, NavigationController utilise 'files')
-                    this.controllers.navigation.showPage(pageKey);
+                    // ✅ FIX: Passer fromRouter: true pour éviter la boucle infinie
+                    // Cela empêchera showPage() de mettre à jour le hash (déjà fait par Router)
+                    this.controllers.navigation.showPage(pageKey, { fromRouter: true });
                 });
             }
             
