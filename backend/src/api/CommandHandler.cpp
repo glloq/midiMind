@@ -1793,7 +1793,7 @@ void CommandHandler::registerMidiCommands() {
         };
     });
 
-    Logger::debug("CommandHandler", "âœ" MIDI commands registered (12 commands)");
+    Logger::debug("CommandHandler", "MIDI commands registered (12 commands)");
 }
 
 void CommandHandler::registerPlaylistCommands() {
