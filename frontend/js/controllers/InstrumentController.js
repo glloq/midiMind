@@ -36,12 +36,28 @@ class InstrumentController extends BaseController {
         
         this.deviceInfoCache = new Map();
         this.deviceInfoCacheTTL = 30000;
-        
+
         this.isScanning = false;
         this.lastScanTime = null;
-        
+
+        // Web MIDI Service
+        this.midiService = null;
+        this.initWebMidiService();
+
         this._fullyInitialized = true;
         this.bindEvents();
+    }
+
+    /**
+     * Initialiser le service Web MIDI
+     */
+    initWebMidiService() {
+        if (typeof MidiConnectionService !== 'undefined') {
+            this.midiService = new MidiConnectionService(this.eventBus, this.logger);
+            this.logger?.info?.('InstrumentController', 'Web MIDI Service initialized');
+        } else {
+            this.logger?.warn?.('InstrumentController', 'MidiConnectionService not available');
+        }
     }
 
     bindEvents() {
@@ -129,11 +145,35 @@ class InstrumentController extends BaseController {
         this.eventBus.on('bluetooth:forget_requested', (data) => {
             this.handleBluetoothForgetRequest(data);
         });
-        
+
+        // ========================================================================
+        // WEB MIDI EVENTS
+        // ========================================================================
+
+        // Web MIDI scan
+        this.eventBus.on('webmidi:scan_requested', () => {
+            this.handleWebMidiScanRequest();
+        });
+
+        // Web MIDI connect
+        this.eventBus.on('webmidi:connect_requested', (data) => {
+            this.handleWebMidiConnectRequest(data);
+        });
+
+        // Web MIDI disconnect
+        this.eventBus.on('webmidi:disconnect_requested', (data) => {
+            this.handleWebMidiDisconnectRequest(data);
+        });
+
+        // Web MIDI test
+        this.eventBus.on('webmidi:test_requested', (data) => {
+            this.handleWebMidiTestRequest(data);
+        });
+
         // Autres
         this.eventBus.on('instruments:request_refresh', () => this.refreshDeviceList());
-        
-        this.logger?.info?.('InstrumentController', 'âœ“ Events bound (v4.3.0 - COMPLET)');
+
+        this.logger?.info?.('InstrumentController', 'Events bound (v4.3.0 + Web MIDI)');
     }
 
     async initialize() {
@@ -302,12 +342,116 @@ class InstrumentController extends BaseController {
         try {
             const device_id = data.device_id;
             if (!device_id) throw new Error('device_id required');
-            
+
             this.logger?.debug?.('InstrumentController', `Handling Bluetooth forget request: ${device_id}`);
-            // TODO: ImplÃ©menter l'oubli du device Bluetooth
+            // TODO: Implémenter l'oubli du device Bluetooth
             this.eventBus.emit('bluetooth:forgotten', { device_id });
         } catch (error) {
             this.logger?.error?.('InstrumentController', 'handleBluetoothForgetRequest failed:', error);
+        }
+    }
+
+    // ========================================================================
+    // WEB MIDI HANDLERS
+    // ========================================================================
+
+    async handleWebMidiScanRequest() {
+        try {
+            if (!this.midiService) {
+                throw new Error('Web MIDI Service not available');
+            }
+
+            this.logger?.debug?.('InstrumentController', 'Handling Web MIDI scan request');
+
+            // Scanner les devices
+            const result = this.midiService.scanDevices();
+
+            // Émettre pour la view
+            this.eventBus.emit('webmidi:devices_scanned', {
+                inputs: result.inputs,
+                outputs: result.outputs,
+                total: result.inputs.length + result.outputs.length
+            });
+
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleWebMidiScanRequest failed:', error);
+            this.notifications?.error('Web MIDI Scan failed', error.message);
+        }
+    }
+
+    async handleWebMidiConnectRequest(data) {
+        try {
+            if (!this.midiService) {
+                throw new Error('Web MIDI Service not available');
+            }
+
+            const { device_id, type } = data;
+            if (!device_id || !type) {
+                throw new Error('device_id and type required');
+            }
+
+            this.logger?.debug?.('InstrumentController',
+                `Handling Web MIDI connect: ${device_id} (${type})`);
+
+            // Connecter le device
+            const device = await this.midiService.connectDevice(device_id, type);
+
+            this.notifications?.success('Instrument connecté',
+                `${device.name} connecté avec succès`);
+
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleWebMidiConnectRequest failed:', error);
+            this.notifications?.error('Connexion échouée', error.message);
+        }
+    }
+
+    async handleWebMidiDisconnectRequest(data) {
+        try {
+            if (!this.midiService) {
+                throw new Error('Web MIDI Service not available');
+            }
+
+            const { device_id } = data;
+            if (!device_id) {
+                throw new Error('device_id required');
+            }
+
+            this.logger?.debug?.('InstrumentController',
+                `Handling Web MIDI disconnect: ${device_id}`);
+
+            // Déconnecter le device
+            await this.midiService.disconnectDevice(device_id);
+
+            this.notifications?.success('Instrument déconnecté', 'Déconnexion réussie');
+
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleWebMidiDisconnectRequest failed:', error);
+            this.notifications?.error('Déconnexion échouée', error.message);
+        }
+    }
+
+    async handleWebMidiTestRequest(data) {
+        try {
+            if (!this.midiService) {
+                throw new Error('Web MIDI Service not available');
+            }
+
+            const { device_id } = data;
+            if (!device_id) {
+                throw new Error('device_id required');
+            }
+
+            this.logger?.debug?.('InstrumentController',
+                `Testing Web MIDI output: ${device_id}`);
+
+            // Tester l'output (jouer une note Do majeur)
+            await this.midiService.testOutput(device_id, 60, 100, 500);
+
+            this.notifications?.success('Test réussi', 'Note jouée sur l\'instrument');
+
+        } catch (error) {
+            this.logger?.error?.('InstrumentController', 'handleWebMidiTestRequest failed:', error);
+            this.notifications?.error('Test échoué', error.message);
         }
     }
 
