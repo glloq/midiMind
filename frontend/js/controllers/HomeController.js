@@ -211,7 +211,34 @@ class HomeController extends BaseController {
         // ========================================================================
         // EVENEMENTS FICHIERS
         // ========================================================================
-        
+
+        // ✅ NOUVEAU: Écouter les requêtes de fichiers depuis HomeView
+        this.subscribe('home:request_files', async (data) => {
+            this.logInfo( 'Files requested from HomeView');
+            await this.loadFilesFromBackend(data.path || '/midi');
+        });
+
+        this.subscribe('home:request_playlists', async () => {
+            this.logInfo( 'Playlists requested from HomeView');
+            await this.loadPlaylistsFromBackend();
+        });
+
+        this.subscribe('home:request_devices', async () => {
+            this.logInfo( 'Devices requested from HomeView');
+            await this.loadDevicesFromBackend();
+        });
+
+        // Écouter les demandes de lecture/chargement de fichiers
+        this.subscribe('home:play_file_requested', async (data) => {
+            this.logInfo( 'Play file requested:', data.file_path);
+            await this.loadAndPlayFile(data.file_path);
+        });
+
+        this.subscribe('home:load_file_requested', async (data) => {
+            this.logInfo( 'Load file requested:', data.file_path);
+            await this.loadFileByPath(data.file_path);
+        });
+
         this.subscribe('file:list:updated', (data) => {
             this.logInfo( 'File list updated', data);
             if (this.view && this.view.updateFileList) {
@@ -225,7 +252,7 @@ class HomeController extends BaseController {
                 });
             }
         });
-        
+
         this.subscribe('file:selected', (data) => this.handleFileSelected(data));
         this.subscribe('file:loaded', (data) => this.handleFileLoaded(data));
         
@@ -1539,9 +1566,147 @@ class HomeController extends BaseController {
     }
     
     // ========================================================================
+    // CHARGEMENT DES DONNÉES DEPUIS LE BACKEND
+    // ========================================================================
+
+    /**
+     * Charge les fichiers depuis le backend
+     * @param {string} path - Chemin des fichiers
+     */
+    async loadFilesFromBackend(path = '/midi') {
+        this.logInfo( `Loading files from backend: ${path}`);
+
+        try {
+            if (!this.backend || !this.backend.listFiles) {
+                this.logWarn( 'Backend not available');
+                return;
+            }
+
+            const response = await this.backend.listFiles(path);
+            const files = response.files || [];
+
+            this.logInfo( `Loaded ${files.length} files from backend`);
+
+            // Mettre à jour la vue directement
+            if (this.view && this.view.updateFileList) {
+                this.view.updateFileList(files);
+            }
+
+            // Mettre à jour les stats
+            if (this.view && this.view.updateStats) {
+                this.view.updateStats({
+                    totalFiles: files.length,
+                    totalDuration: this.calculateTotalDuration(files),
+                    totalSize: this.calculateTotalSize(files)
+                });
+            }
+
+            // Émettre l'événement pour les autres composants
+            this.emitEvent('files:loaded', { files, count: files.length });
+        } catch (error) {
+            this.handleError('Failed to load files from backend', error);
+        }
+    }
+
+    /**
+     * Charge les playlists depuis le backend
+     */
+    async loadPlaylistsFromBackend() {
+        this.logInfo( 'Loading playlists from backend');
+
+        try {
+            if (this.playlistModel && this.playlistModel.loadAll) {
+                const playlists = await this.playlistModel.loadAll();
+
+                if (this.view && this.view.updatePlaylistList) {
+                    this.view.updatePlaylistList(playlists);
+                }
+            }
+        } catch (error) {
+            this.handleError('Failed to load playlists', error);
+        }
+    }
+
+    /**
+     * Charge les devices depuis le backend
+     */
+    async loadDevicesFromBackend() {
+        this.logInfo( 'Loading devices from backend');
+
+        try {
+            if (!this.backend || !this.backend.listDevices) {
+                this.logWarn( 'Backend.listDevices not available');
+                return;
+            }
+
+            const response = await this.backend.listDevices();
+            const devices = response.devices || [];
+
+            if (this.view && this.view.updateDevicesList) {
+                this.view.updateDevicesList(devices);
+            }
+        } catch (error) {
+            this.handleError('Failed to load devices', error);
+        }
+    }
+
+    /**
+     * Charge et lit un fichier
+     * @param {string} filePath - Chemin du fichier
+     */
+    async loadAndPlayFile(filePath) {
+        this.logInfo( `Load and play file: ${filePath}`);
+
+        try {
+            // Utiliser GlobalPlaybackController
+            const globalPlayback = window.globalPlaybackController || window.app?.controllers?.globalPlayback;
+
+            if (!globalPlayback) {
+                this.logWarn( 'GlobalPlaybackController not available');
+                return;
+            }
+
+            // Charger le fichier
+            await globalPlayback.load(filePath);
+
+            // Lancer la lecture
+            await globalPlayback.play();
+
+            this.showSuccess(`Playing: ${filePath}`);
+        } catch (error) {
+            this.handleError('Failed to load and play file', error);
+        }
+    }
+
+    /**
+     * Charge un fichier par son chemin
+     * @param {string} filePath - Chemin du fichier
+     */
+    async loadFileByPath(filePath) {
+        this.logInfo( `Load file by path: ${filePath}`);
+
+        try {
+            // Utiliser GlobalPlaybackController
+            const globalPlayback = window.globalPlaybackController || window.app?.controllers?.globalPlayback;
+
+            if (!globalPlayback) {
+                this.logWarn( 'GlobalPlaybackController not available');
+                return;
+            }
+
+            // Charger le fichier
+            await globalPlayback.load(filePath);
+
+            this.showSuccess(`Loaded: ${filePath}`);
+        } catch (error) {
+            this.handleError('Failed to load file', error);
+        }
+    }
+
+    // ========================================================================
     // UTILITAIRES
     // ========================================================================
-    
+
     /**
      * Calcule la durée totale de fichiers
      * @param {Array} files - Liste de fichiers
@@ -1549,12 +1714,12 @@ class HomeController extends BaseController {
      */
     calculateTotalDuration(files) {
         if (!files || !Array.isArray(files)) return 0;
-        
+
         return files.reduce((total, file) => {
             return total + (file.duration || 0);
         }, 0);
     }
-    
+
     /**
      * Calcule la taille totale de fichiers
      * @param {Array} files - Liste de fichiers
@@ -1562,7 +1727,7 @@ class HomeController extends BaseController {
      */
     calculateTotalSize(files) {
         if (!files || !Array.isArray(files)) return 0;
-        
+
         return files.reduce((total, file) => {
             return total + (file.size || 0);
         }, 0);

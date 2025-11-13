@@ -756,7 +756,10 @@ class Application {
         
         // Ãƒâ€°vÃƒÂ©nements de connexion
         this.setupConnectionHandlers();
-        
+
+        // âœ… NOUVEAU: Connecter les boutons globaux de playback
+        this.setupGlobalPlaybackControls();
+
         // Raccourcis clavier
         if (window.KeyboardShortcuts) {
             this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.logger);
@@ -765,6 +768,104 @@ class Application {
         this.log('info', 'Ã¢Å“â€œ Finalization complete');
     }
     
+    /**
+     * Configure les boutons globaux de playback
+     * ✅ NOUVEAU v4.6.0: Connecte les boutons play/pause/stop au GlobalPlaybackController
+     */
+    setupGlobalPlaybackControls() {
+        this.log('info', 'Setting up global playback controls...');
+
+        const btnPlay = document.getElementById('globalPlay');
+        const btnPause = document.getElementById('globalPause');
+        const btnStop = document.getElementById('globalStop');
+
+        if (!btnPlay || !btnPause || !btnStop) {
+            this.log('warn', 'Global playback buttons not found in DOM');
+            return;
+        }
+
+        const globalPlayback = this.controllers.globalPlayback;
+
+        if (!globalPlayback) {
+            this.log('warn', 'GlobalPlaybackController not initialized');
+            return;
+        }
+
+        // Bouton Play
+        btnPlay.addEventListener('click', async () => {
+            this.log('info', 'Global play button clicked');
+
+            try {
+                await globalPlayback.play();
+
+                // Afficher pause, cacher play
+                btnPlay.style.display = 'none';
+                btnPause.style.display = 'inline-block';
+            } catch (error) {
+                this.log('error', 'Play failed:', error);
+
+                if (this.notifications) {
+                    this.notifications.show('Playback error', 'error', 3000);
+                }
+            }
+        });
+
+        // Bouton Pause
+        btnPause.addEventListener('click', async () => {
+            this.log('info', 'Global pause button clicked');
+
+            try {
+                await globalPlayback.pause();
+
+                // Afficher play, cacher pause
+                btnPlay.style.display = 'inline-block';
+                btnPause.style.display = 'none';
+            } catch (error) {
+                this.log('error', 'Pause failed:', error);
+            }
+        });
+
+        // Bouton Stop
+        btnStop.addEventListener('click', async () => {
+            this.log('info', 'Global stop button clicked');
+
+            try {
+                await globalPlayback.stop();
+
+                // Afficher play, cacher pause
+                btnPlay.style.display = 'inline-block';
+                btnPause.style.display = 'none';
+            } catch (error) {
+                this.log('error', 'Stop failed:', error);
+            }
+        });
+
+        // Écouter les changements d'état pour mettre à jour les boutons
+        if (this.eventBus) {
+            this.eventBus.on('playback:started', () => {
+                btnPlay.style.display = 'none';
+                btnPause.style.display = 'inline-block';
+            });
+
+            this.eventBus.on('playback:paused', () => {
+                btnPlay.style.display = 'inline-block';
+                btnPause.style.display = 'none';
+            });
+
+            this.eventBus.on('playback:stopped', () => {
+                btnPlay.style.display = 'inline-block';
+                btnPause.style.display = 'none';
+            });
+
+            this.eventBus.on('playback:ended', () => {
+                btnPlay.style.display = 'inline-block';
+                btnPause.style.display = 'none';
+            });
+        }
+
+        this.log('info', '✔ Global playback controls connected');
+    }
+
     /**
      * Configure les gestionnaires d'erreurs
      */
