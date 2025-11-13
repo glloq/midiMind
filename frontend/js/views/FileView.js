@@ -699,12 +699,17 @@ class FileView extends BaseView {
      */
     handleRouteFile(filePath) {
         this.log('info', 'FileView', `Routing requested: ${filePath}`);
-        
-        // Ouvrir modal de configuration de routage
+
+        // Charger le fichier dans le système de routing
         if (this.eventBus) {
-            this.eventBus.emit('routing:configure', {
+            this.eventBus.emit('file:load_for_routing', {
                 file_path: filePath
             });
+        }
+
+        // Naviguer vers la page routing
+        if (window.app?.router) {
+            window.app.router.navigateTo('/routing');
         }
     }
     
