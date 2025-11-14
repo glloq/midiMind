@@ -204,7 +204,27 @@ class HomeController extends BaseController {
      */
     bindEvents() {
         this.logInfo( 'Binding home events...');
-        
+
+        // ========================================================================
+        // NAVIGATION
+        // ========================================================================
+
+        // ✅ FIX: Charger les données quand on navigue vers la page home
+        this.subscribe('navigation:page_changed', async (data) => {
+            if (data.page === 'home') {
+                this.logInfo( 'Home page activated, loading data if needed');
+                // Charger les données si pas encore chargées
+                if (!this._dataLoaded) {
+                    await this.loadInitialData();
+                } else {
+                    // Rafraîchir la vue avec les données existantes
+                    if (this.view && this.view.updateFileList && this.homeState.files) {
+                        this.view.updateFileList(this.homeState.files);
+                    }
+                }
+            }
+        });
+
         // ========================================================================
         // EVENEMENTS FICHIERS
         // ========================================================================
@@ -1715,6 +1735,9 @@ class HomeController extends BaseController {
             const files = response.files || [];
 
             this.logInfo( `Loaded ${files.length} files from backend`);
+
+            // ✅ FIX: Stocker les fichiers dans homeState
+            this.homeState.files = files;
 
             // Mettre à jour la vue directement
             if (this.view && this.view.updateFileList) {
