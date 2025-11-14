@@ -21,24 +21,24 @@ class Router {
             transitionDuration: config.transitionDuration || 300,
             ...config
         };
-        
+
         // Routes enregistrées
         this.routes = new Map();
-        
+
         // Route actuelle
         this.currentRoute = null;
         this.previousRoute = null;
-        
+
         // Middlewares
         this.middlewares = [];
-        
+
         // Guards (before/after hooks)
         this.beforeHooks = [];
         this.afterHooks = [];
-        
+
         // Cache des vues
         this.viewCache = new Map();
-        
+
         // État
         this.state = {
             isNavigating: false,
@@ -47,10 +47,13 @@ class Router {
             query: {},
             started: false  // Nouveau: indique si le routing a démarré
         };
-        
+
         // Event listeners
         this.listeners = new Map();
-        
+
+        // Debug: Counter for hashchange events
+        this.hashChangeCount = 0;
+
         // Initialisation (sans charger de route)
         this.init();
     }
@@ -252,11 +255,14 @@ class Router {
             await this.loadRoute(matchedRoute.route, normalizedPath, options);
             
             // Mettre à jour l'URL si nécessaire
+            console.log(`🟡 [Router.navigateTo] skipPushState: ${options.skipPushState}`);
             if (!options.skipPushState) {
+                console.log(`🟡 [Router.navigateTo] UPDATING URL to: ${normalizedPath}`);
                 this.updateURL(normalizedPath, options.replace);
             }
-            
+
             // Émettre événement de changement de route
+            console.log(`🟡 [Router.navigateTo] EMITTING 'route-changed' event for path: ${normalizedPath}`);
             this.emit('route-changed', {
                 path: normalizedPath,
                 route: matchedRoute.route,
@@ -264,7 +270,8 @@ class Router {
                 query: query,
                 previous: this.previousRoute
             });
-            
+            console.log(`🟡 [Router.navigateTo] 'route-changed' event EMITTED`);
+
             return true;
             
         } finally {
@@ -388,10 +395,20 @@ class Router {
      * Gérer les changements de hash
      */
     handleHashChange() {
-        if (!this.state.started) return; // Ne rien faire si pas encore démarré
-        
+        this.hashChangeCount++;
+        console.log(`🔴 [Router.handleHashChange #${this.hashChangeCount}] TRIGGERED`);
+        console.log(`🔴 [Router] started: ${this.state.started}, isNavigating: ${this.state.isNavigating}`);
+        console.log(`🔴 [Router] current hash: ${window.location.hash}`);
+
+        if (!this.state.started) {
+            console.log(`🔴 [Router] NOT STARTED, skipping`);
+            return; // Ne rien faire si pas encore démarré
+        }
+
         const path = this.getCurrentPath();
+        console.log(`🔴 [Router] path: ${path}, calling navigateTo()...`);
         this.navigateTo(path, { skipPushState: true });
+        console.log(`🔴 [Router.handleHashChange #${this.hashChangeCount}] COMPLETED`);
     }
     
     /**

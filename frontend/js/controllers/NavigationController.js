@@ -243,26 +243,29 @@ class NavigationController extends BaseController {
      * @param {Object} options - Options de navigation
      */
     async showPage(pageName, options = {}) {
-        console.log(`🔵 [1] showPage called: ${pageName}`);
+        console.log(`🔵 [1] showPage called: ${pageName}, options:`, options);
 
         // Validation
         if (!pageName) {
+            console.log(`🔵 [RETURN] No pageName provided`);
             this.log('warn', 'NavigationController', 'showPage called without pageName');
             return false;
         }
 
-        console.log(`🔵 [2] Checking isTransitioning: ${this.state.isTransitioning}`);
+        console.log(`🔵 [2] Checking isTransitioning: ${this.state.isTransitioning}, force: ${options.force}`);
 
         // Si déjà en transition, ignorer (sauf si force)
         if (this.state.isTransitioning && !options.force) {
+            console.log(`🔵 [RETURN] Already transitioning`);
             this.log('debug', 'NavigationController', `Already transitioning, ignoring showPage(${pageName})`);
             return false;
         }
 
-        console.log(`🔵 [3] currentPage: ${this.state.currentPage}`);
+        console.log(`🔵 [3] currentPage: ${this.state.currentPage}, reload: ${options.reload}`);
 
         // Si c'est déjà la page actuelle, ignorer (sauf si reload)
         if (this.state.currentPage === pageName && !options.reload) {
+            console.log(`🔵 [RETURN] Already on page ${pageName}`);
             this.log('debug', 'NavigationController', `Already on page ${pageName}`);
             return false;
         }
@@ -372,12 +375,26 @@ class NavigationController extends BaseController {
             });
 
             console.log(`🔵 [27] Checking fromRouter: ${options.fromRouter}`);
+            console.log(`🔵 [27.5] Current window.location.hash: ${window.location.hash}`);
             // ✅ FIX: Ne mettre à jour le hash QUE si l'appel ne vient PAS du Router
-            // Si fromRouter est true, le Router a déjà géré le hash
+            // ET si le hash est différent de la page actuelle
             if (!options.fromRouter) {
-                console.log(`🔵 [28] SETTING window.location.hash = ${pageName}`);
-                window.location.hash = pageName;
-                console.log(`🔵 [29] Hash set COMPLETED`);
+                const currentHash = window.location.hash.replace('#', '');
+                console.log(`🔵 [27.6] Comparing currentHash '${currentHash}' with pageName '${pageName}'`);
+
+                if (currentHash !== pageName) {
+                    console.log(`🔵 [28] SETTING window.location.hash = #${pageName}`);
+                    console.log(`🔵 [28.1] ⚠️ WARNING: This will trigger hashchange event!`);
+                    const beforeHash = window.location.hash;
+                    window.location.hash = pageName;
+                    const afterHash = window.location.hash;
+                    console.log(`🔵 [29] Hash updated from ${beforeHash} to ${afterHash}`);
+                    console.log(`🔵 [29.1] Hash change will be processed asynchronously`);
+                } else {
+                    console.log(`🔵 [28] SKIPPING hash update (already #${pageName})`);
+                }
+            } else {
+                console.log(`🔵 [28] SKIPPING hash update (fromRouter=true)`);
             }
 
             console.log(`🔵 [30] Emitting navigation:after`);
