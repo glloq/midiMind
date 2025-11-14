@@ -41,18 +41,27 @@ class RoutingView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX v4.0.2: Early return si déjà initialisé
+        if (this.state.initialized) {
+            this.logger.warn('[RoutingView] Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.logger.error('[RoutingView] Cannot initialize');
             return;
         }
-        
+
         this.render();
         this.cacheElements();
         this.attachEvents();
         this.loadRoutes();
         this.loadDevices();
-        
-        this.logger.info('[RoutingView] Initialized v4.0.1');
+
+        // ✅ FIX v4.0.2: Marquer comme initialisé
+        this.state.initialized = true;
+
+        this.logger.info('[RoutingView] Initialized v4.0.2');
     }
 
     render() {

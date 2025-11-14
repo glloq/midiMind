@@ -43,15 +43,24 @@ class LatencyView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX: Early return si déjà initialisé
+        if (this.state.initialized) {
+            this.log('warn', 'Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.log('error', 'Cannot initialize: container not found');
             return;
         }
-        
+
         this.render();
         this.attachEvents();
         this.loadData();
-        
+
+        // ✅ FIX: Marquer comme initialisé
+        this.state.initialized = true;
+
         this.log('info', 'LatencyView initialized');
     }
 
