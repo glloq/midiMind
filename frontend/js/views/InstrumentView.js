@@ -15,7 +15,12 @@ class InstrumentView extends BaseView {
         
         this.logger = window.logger || console;
         
-        // État interne
+        // État interne (init/render flags dans this.state hérité de BaseView)
+        this.state = {
+            initialized: false,   // ✅ FIX v4.1.5: Ajout flags initialisation
+            rendered: false,      // ✅ FIX v4.1.5: Ajout flag rendu
+        };
+
         this.viewState = {
             connectedDevices: [],
             availableDevices: [],

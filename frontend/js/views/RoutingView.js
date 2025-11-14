@@ -25,6 +25,8 @@ class RoutingView extends BaseView {
         
 // État
         this.state = {
+            initialized: false,   // ✅ FIX v4.0.4: Ajout flags initialisation
+            rendered: false,      // ✅ FIX v4.0.4: Ajout flag rendu
             routes: [],
             sources: [], // devices sources
             destinations: [], // devices destinations

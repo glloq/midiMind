@@ -26,6 +26,8 @@ class SystemView extends BaseView {
         
 // État
         this.state = {
+            initialized: false,   // ✅ FIX v4.0.4: Ajout flags initialisation
+            rendered: false,      // ✅ FIX v4.0.4: Ajout flag rendu
             systemInfo: null,
             memory: null,
             disk: null,
