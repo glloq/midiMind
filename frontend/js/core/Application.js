@@ -1,9 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/Application.js
 // Chemin réel: frontend/js/core/Application.js
-// Version: v4.7.0 - FIX INFINITE LOOP IN NAVIGATION
+// Version: v4.8.0 - FIX DOUBLE INITIALIZATION
 // Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v4.8.0:
+// ✅ CRITIQUE: Fix freeze au démarrage causé par double initialisation
+// ✅ Suppression de l'appel manuel à init() sur NavigationController
+// ✅ NavigationController gère maintenant sa propre initialisation
+//
 // CORRECTIONS v4.7.0:
 // ✅ CRITIQUE: Fix boucle infinie dans la navigation
 // ✅ Router → NavigationController passe maintenant fromRouter: true
@@ -607,15 +612,13 @@ class Application {
                 this.debugConsole,
                 this.services.backend  // ✦ BACKEND PASSED
             );
-            
-            // ✅ FIX CRITIQUE v4.5.0: Initialiser explicitement AVANT Router
-            if (typeof this.controllers.navigation.init === 'function') {
-                this.controllers.navigation.init();
-                this.log('info', '✓ NavigationController initialized');
-            } else if (typeof this.controllers.navigation.onInitialize === 'function') {
-                this.controllers.navigation.onInitialize();
-                this.log('info', '✓ NavigationController.onInitialize() called');
-            }
+
+            // ✅ FIX v4.8.0: NE PAS appeler init() manuellement !
+            // NavigationController gère sa propre initialisation dans son constructeur
+            // en désactivant autoInitialize puis en appelant onInitialize() lui-même.
+            // Appeler init() ici créerait une DOUBLE INITIALISATION qui peut
+            // causer des boucles infinies d'événements.
+            this.log('info', '✓ NavigationController created (self-initializing)');
         }
         
         // Router ensuite

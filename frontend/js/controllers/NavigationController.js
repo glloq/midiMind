@@ -1,9 +1,15 @@
 // ============================================================================
 // Fichier: frontend/js/controllers/NavigationController.js
 // Chemin réel: frontend/js/controllers/NavigationController.js
-// Version: v4.6.0 - FIX INFINITE LOOP
+// Version: v4.7.0 - FIX DOUBLE INITIALIZATION
 // Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v4.7.0:
+// ✅ CRITIQUE: Fix double initialisation qui causait freeze au démarrage
+// ✅ Early return dans onInitialize() si pageViewMap pas prêt
+// ✅ Initialisation contrôlée dans le constructeur après création de pageViewMap
+// ✅ Application.js ne rappelle plus init() manuellement
+//
 // CORRECTIONS v4.6.0:
 // ✅ CRITIQUE: Fix boucle infinie causée par double écoute de 'hashchange'
 // ✅ Suppression du listener 'hashchange' dans NavigationController
@@ -29,11 +35,12 @@ class NavigationController extends BaseController {
     constructor(eventBus, models = {}, views = {}, notifications = null, debugConsole = null, backend = null) {
         // ✓ CRITIQUE: Créer les structures AVANT super()
         // Note: En JavaScript, on ne peut pas accéder à `this` avant super()
-        // Donc on passe une config qui désactive autoInitialize
-        
+
         super(eventBus, models, views, notifications, debugConsole, backend);
-        
-        // ✓ Désactiver l'auto-initialisation héritée
+
+        // ✅ FIX v4.7.0: Désactiver l'auto-initialisation IMMÉDIATEMENT après super()
+        // Cela empêche BaseController.initialize() de s'exécuter
+        this.config.autoInitialize = false;
         this.state.isInitialized = false;
         
         // Configuration spécifique
@@ -63,8 +70,12 @@ class NavigationController extends BaseController {
         
         // ✓ CRITIQUE: Mapping page -> vue créé ICI
         this.pageViewMap = new Map();
-        
-        this.log('debug', 'NavigationController', '✓ NavigationController v4.6.0 created');
+
+        // ✅ FIX v4.7.0: S'initialiser MAINTENANT de manière contrôlée
+        // On appelle initialize() qui va appeler onInitialize() de manière sûre
+        this.initialize();
+
+        this.log('debug', 'NavigationController', '✓ NavigationController v4.7.0 created and initialized');
     }
     
     // ========================================================================
@@ -72,12 +83,15 @@ class NavigationController extends BaseController {
     // ========================================================================
     
     onInitialize() {
-        // ✓ Vérification de sécurité
+        // ✅ FIX v4.7.0: Early return si pageViewMap n'existe pas encore
+        // Cela se produit quand BaseController.constructor() appelle initialize()
+        // avant que NavigationController ait pu créer pageViewMap.
+        // Dans ce cas, on skip l'initialisation et on la fera plus tard explicitement.
         if (!this.pageViewMap) {
-            this.log('error', 'NavigationController', 'CRITICAL: pageViewMap not initialized!');
-            this.pageViewMap = new Map();
+            this.log('debug', 'NavigationController', 'Skipping early onInitialize (pageViewMap not ready)');
+            return;
         }
-        
+
         this.log('info', 'NavigationController', 'Initializing navigation system...');
         
         try {

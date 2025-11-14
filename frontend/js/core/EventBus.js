@@ -1,9 +1,14 @@
 // ============================================================================
 // Fichier: frontend/js/core/EventBus.js
 // Chemin réel: frontend/js/core/EventBus.js
-// Version: v3.3.0 - FIX INFINITE LOOP IN EVENT PROCESSING
+// Version: v3.3.1 - DETECTION BOUCLES D'EVENEMENTS
 // Date: 2025-11-13
 // ============================================================================
+// CORRECTIONS v3.3.1:
+// ✅ CRITIQUE: Détection d'événements émis en boucle (max 100/sec par type)
+// ✅ Protection contre bombardement d'événements identiques
+// ✅ Logs détaillés pour identifier les sources de boucles
+//
 // CORRECTIONS v3.3.0:
 // ✅ CRITIQUE: Fix boucle infinie dans le traitement des événements HIGH priority
 // ✅ Limitation du nombre d'événements traités par cycle (maxEventsPerCycle)
@@ -45,7 +50,9 @@ class EventBus {
             // pour éviter les boucles infinies
             maxEventsPerCycle: 50,
             // Protection contre récursion infinie
-            maxRecursionDepth: 10
+            maxRecursionDepth: 10,
+            // ✅ NOUVEAU v3.3.1: Protection contre bombardement d'événements
+            maxEventsPerTypePerSecond: 100 // Max 100 événements du même type par seconde
         };
         
         // Métriques
@@ -71,6 +78,10 @@ class EventBus {
         this._processingDepth = 0;
         this._eventCounter = 0;
 
+        // ✅ NOUVEAU v3.3.1: Protection contre boucles d'événements
+        this._eventCountMap = new Map(); // Compte combien de fois un événement est émis par seconde
+        this._eventCountResetInterval = null; // Sera initialisé dans init()
+
         // Documentation des événements
         this.eventDocumentation = this.initEventDocumentation();
 
@@ -80,11 +91,16 @@ class EventBus {
     init() {
         // Démarrer le traitement des queues
         this.startProcessing();
-        
+
         // Nettoyer les caches périodiquement
         setInterval(() => this.cleanCaches(), 60000);
-        
-        console.log('✓ EventBus initialized');
+
+        // ✅ NOUVEAU v3.3.1: Reset du compteur d'événements toutes les secondes
+        this._eventCountResetInterval = setInterval(() => {
+            this._eventCountMap.clear();
+        }, 1000);
+
+        console.log('✓ EventBus v3.3.1 initialized');
     }
     
     // ========================================================================
@@ -149,6 +165,25 @@ class EventBus {
             return;
         }
 
+        // ✅ NOUVEAU v3.3.1: Détecter les boucles d'événements
+        // Si un événement est émis plus de maxEventsPerTypePerSecond fois par seconde,
+        // c'est probablement une boucle infinie
+        const currentCount = this._eventCountMap.get(event) || 0;
+        const maxAllowed = this.config.maxEventsPerTypePerSecond;
+
+        if (currentCount >= maxAllowed) {
+            this.metrics.eventsDropped++;
+            console.error(
+                `❌ EventBus: LOOP DETECTED! Event "${event}" was emitted ${currentCount} times in 1 second.` +
+                ` This event is now blocked to prevent infinite loop and memory saturation.` +
+                ` Check listeners for this event that might be emitting it recursively.`
+            );
+            // Log la stack trace pour aider au debug
+            console.trace(`Stack trace for blocked event "${event}"`);
+            return;
+        }
+
+        this._eventCountMap.set(event, currentCount + 1);
         this.metrics.eventsEmitted++;
 
         const eventData = {
@@ -379,6 +414,13 @@ class EventBus {
     
     destroy() {
         this.stopProcessing();
+
+        // ✅ NOUVEAU v3.3.1: Nettoyer l'interval de reset des compteurs
+        if (this._eventCountResetInterval) {
+            clearInterval(this._eventCountResetInterval);
+            this._eventCountResetInterval = null;
+        }
+
         this.clear();
     }
     
