@@ -243,38 +243,50 @@ class NavigationController extends BaseController {
      * @param {Object} options - Options de navigation
      */
     async showPage(pageName, options = {}) {
+        console.log(`🔵 [1] showPage called: ${pageName}`);
+
         // Validation
         if (!pageName) {
             this.log('warn', 'NavigationController', 'showPage called without pageName');
             return false;
         }
-        
+
+        console.log(`🔵 [2] Checking isTransitioning: ${this.state.isTransitioning}`);
+
         // Si déjà en transition, ignorer (sauf si force)
         if (this.state.isTransitioning && !options.force) {
             this.log('debug', 'NavigationController', `Already transitioning, ignoring showPage(${pageName})`);
             return false;
         }
-        
+
+        console.log(`🔵 [3] currentPage: ${this.state.currentPage}`);
+
         // Si c'est déjà la page actuelle, ignorer (sauf si reload)
         if (this.state.currentPage === pageName && !options.reload) {
             this.log('debug', 'NavigationController', `Already on page ${pageName}`);
             return false;
         }
-        
+
+        console.log(`🔵 [4] Setting isTransitioning = true`);
         this.state.isTransitioning = true;
-        
+
         try {
+            console.log(`🔵 [5] Starting navigation to: ${pageName}`);
             this.log('info', 'NavigationController', `Navigating to page: ${pageName}`);
-            
+
             const previousPage = this.state.currentPage;
-            
+            console.log(`🔵 [6] previousPage: ${previousPage}`);
+
             // ✓ Émettre événement before navigation
+            console.log(`🔵 [7] Emitting navigation:before`);
             this.emit('navigation:before', {
                 from: previousPage,
                 to: pageName
             });
-            
+            console.log(`🔵 [8] navigation:before emitted`);
+
             // ✅ Appeler hide() sur la vue précédente pour arrêter ses animations
+            console.log(`🔵 [9] Hiding previous view`);
             if (previousPage) {
                 const previousView = this.pageViewMap.get(previousPage);
                 if (previousView && typeof previousView.hide === 'function') {
@@ -282,56 +294,75 @@ class NavigationController extends BaseController {
                     previousView.hide();
                 }
             }
+            console.log(`🔵 [10] Previous view hidden`);
 
             // Transition sortie de la page actuelle
+            console.log(`🔵 [11] Transition out`);
             if (previousPage && this.config.useTransitions) {
                 await this.transitionOut(previousPage);
             }
 
+            console.log(`🔵 [12] Calling hideAllPages`);
             // Masquer toutes les pages
             this.hideAllPages();
-            
+
+            console.log(`🔵 [13] Finding page element #${pageName}`);
             // Afficher la nouvelle page
             const pageElement = document.getElementById(pageName);
             if (!pageElement) {
                 throw new Error(`Page element #${pageName} not found in DOM`);
             }
-            
+
+            console.log(`🔵 [14] Showing page element`);
             pageElement.classList.add(this.config.activeClass);
             pageElement.style.display = 'block';
-            
+
+            console.log(`🔵 [15] Calling updateNavigation`);
             // Mettre à jour la navigation
             this.updateNavigation(pageName);
-            
+
+            console.log(`🔵 [16] Getting view from pageViewMap`);
             // Initialiser/Rendre la vue si nécessaire
             const view = this.pageViewMap.get(pageName);
+            console.log(`🔵 [17] View found: ${!!view}, initialized: ${view?.state?.initialized}`);
+
             if (view) {
                 // Si la vue n'est pas initialisée, l'initialiser
                 if (!view.state?.initialized && typeof view.init === 'function') {
+                    console.log(`🔵 [18] CALLING view.init()`);
                     this.log('debug', 'NavigationController', `Initializing view: ${pageName}`);
                     view.init();
+                    console.log(`🔵 [19] view.init() COMPLETED`);
                 }
-                
+
                 // Si la vue a une méthode render, la rendre
                 if (typeof view.render === 'function') {
+                    console.log(`🔵 [20] CALLING view.render()`);
                     this.log('debug', 'NavigationController', `Rendering view: ${pageName}`);
                     view.render();
+                    console.log(`🔵 [21] view.render() COMPLETED`);
                 }
-                
+
                 // Si la vue a une méthode show, l'appeler
                 if (typeof view.show === 'function') {
+                    console.log(`🔵 [22] CALLING view.show()`);
                     view.show();
+                    console.log(`🔵 [23] view.show() COMPLETED`);
                 }
             } else {
                 this.log('warn', 'NavigationController', `No view found for page: ${pageName}`);
                 this.log('debug', 'NavigationController', `Available pages: ${Array.from(this.pageViewMap.keys()).join(', ')}`);
             }
-            
+
+            console.log(`🔵 [24] Post-view operations`);
+
+            console.log(`🔵 [25] Transition in`);
             // Transition entrée
             if (this.config.useTransitions) {
                 await this.transitionIn(pageName);
             }
-            
+
+            console.log(`🔵 [26] Updating state`);
             // Mettre à jour l'état
             this.state.previousPage = previousPage;
             this.state.currentPage = pageName;
@@ -339,26 +370,33 @@ class NavigationController extends BaseController {
                 page: pageName,
                 timestamp: Date.now()
             });
-            
+
+            console.log(`🔵 [27] Checking fromRouter: ${options.fromRouter}`);
             // ✅ FIX: Ne mettre à jour le hash QUE si l'appel ne vient PAS du Router
             // Si fromRouter est true, le Router a déjà géré le hash
             if (!options.fromRouter) {
+                console.log(`🔵 [28] SETTING window.location.hash = ${pageName}`);
                 window.location.hash = pageName;
+                console.log(`🔵 [29] Hash set COMPLETED`);
             }
-            
+
+            console.log(`🔵 [30] Emitting navigation:after`);
             // ✓ Émettre événement after navigation
             this.emit('navigation:after', {
                 from: previousPage,
                 to: pageName
             });
-            
+            console.log(`🔵 [31] navigation:after emitted`);
+
+            console.log(`🔵 [32] Checking notifications`);
             // Notification si activée
             if (this.notifications && options.notify) {
                 this.notifications.show(`Page: ${pageName}`, 'info', 2000);
             }
-            
+
+            console.log(`🔵 [33] ✓ Navigation SUCCESS`);
             this.log('info', 'NavigationController', `✓ Navigated to page: ${pageName}`);
-            
+
             return true;
             
         } catch (error) {
