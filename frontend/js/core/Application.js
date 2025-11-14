@@ -635,11 +635,15 @@ class Application {
             // Connecter le Router au NavigationController
             if (this.controllers.navigation) {
                 this.router.on('route-changed', (data) => {
+                    console.log(`🟢 [Application] 'route-changed' event RECEIVED`);
+                    console.log(`🟢 [Application] data.path: ${data.path}`);
                     // Extraire le nom de la page du path
                     let pageKey = data.path.replace(/^\//, '') || 'home';
+                    console.log(`🟢 [Application] pageKey: ${pageKey}, calling showPage(${pageKey}, {fromRouter: true})...`);
                     // ✅ FIX: Passer fromRouter: true pour éviter la boucle infinie
                     // Cela empêchera showPage() de mettre à jour le hash (déjà fait par Router)
                     this.controllers.navigation.showPage(pageKey, { fromRouter: true });
+                    console.log(`🟢 [Application] showPage() call COMPLETED`);
                 });
             }
             
