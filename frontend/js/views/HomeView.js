@@ -79,13 +79,20 @@ class HomeView extends BaseView {
 
         // ✅ FIX v4.3.0: CRITIQUE - Marquer comme initialisé pour éviter double initialisation
         this.state.initialized = true;
+        this.state.rendered = true;
 
-        this.logger.info('[HomeView] Initialized v4.3.0');
+        this.logger.info('[HomeView] Initialized v4.3.1');
     }
 
     render() {
         if (!this.container) return;
-        
+
+        // ✅ FIX v4.3.1: Ne pas re-render si déjà rendu (évite de détruire/recréer le canvas)
+        if (this.state.rendered) {
+            this.logger.debug('[HomeView] Already rendered, skipping');
+            return;
+        }
+
         this.container.innerHTML = `
             <div class="home-layout">
                 

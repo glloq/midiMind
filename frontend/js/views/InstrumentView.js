@@ -64,8 +64,9 @@ class InstrumentView extends BaseView {
 
         // ✅ FIX v4.1.3: Marquer comme initialisé
         this.state.initialized = true;
+        this.state.rendered = true;
 
-        this.log('info', '[InstrumentView]', 'Initialized v4.1.3');
+        this.log('info', '[InstrumentView]', 'Initialized v4.1.4');
     }
 
     render() {
@@ -73,7 +74,12 @@ class InstrumentView extends BaseView {
             this.log('error', '[InstrumentView]', 'Cannot render: container not found');
             return;
         }
-        
+
+        // ✅ FIX v4.1.4: Ne pas re-render si déjà rendu
+        if (this.state.rendered) {
+            return;
+        }
+
         this.container.innerHTML = `
             <div class="page-header">
                 <h1>🎸 Gestion des Instruments</h1>
