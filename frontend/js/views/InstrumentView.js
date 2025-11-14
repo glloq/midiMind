@@ -19,6 +19,7 @@ class InstrumentView extends BaseView {
         this.state = {
             initialized: false,   // ✅ FIX v4.1.5: Ajout flags initialisation
             rendered: false,      // ✅ FIX v4.1.5: Ajout flag rendu
+            eventListenersAttached: false,  // ✅ FIX: Prevent infinite loop in setupEventBusListeners
         };
 
         this.viewState = {
@@ -234,6 +235,15 @@ class InstrumentView extends BaseView {
     setupEventBusListeners() {
         if (!this.eventBus) return;
 
+        // ✅ FIX CRITICAL: Prevent infinite loop - only attach listeners once
+        if (this.state.eventListenersAttached) {
+            this.log('debug', '[InstrumentView]', 'Event listeners already attached, skipping');
+            return;
+        }
+
+        this.state.eventListenersAttached = true;
+        this.log('debug', '[InstrumentView]', 'Attaching event bus listeners');
+
         // devices.list response
         this.eventBus.on('devices:listed', (data) => {
             this.updateDevicesFromList(data.devices || []);
@@ -281,7 +291,9 @@ class InstrumentView extends BaseView {
             this.viewState.webMidiEnabled = data.enabled || false;
             this.render();
             this.cacheElements();
-            this.attachEvents();
+            // ✅ FIX CRITICAL: Do NOT call attachEvents() here - causes infinite loop!
+            // Event listeners are already attached in setupEventBusListeners()
+            // this.attachEvents();  // REMOVED - was causing exponential listener multiplication
         });
 
         this.eventBus.on('webmidi:devices_scanned', (data) => {
