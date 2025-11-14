@@ -37,6 +37,18 @@ class EditorView extends BaseView {
         this.domEventsAttached = false;
         this.eventBusListenersAttached = false;
 
+        // ✅ FIX Bug #8: Store handler references for cleanup
+        this._clickHandler = null;
+
+        // ✅ FIX Bug #9: Store canvas handler references for cleanup
+        this._canvasMouseDownHandler = null;
+        this._canvasMouseMoveHandler = null;
+        this._canvasMouseUpHandler = null;
+        this._canvasWheelHandler = null;
+
+        // ✅ FIX Bug #7: Store ResizeObserver reference
+        this._resizeObserver = null;
+
         this.log('info', 'EditorView', '✅ EditorView v4.0.1 initialized');
     }
     
@@ -160,10 +172,34 @@ class EditorView extends BaseView {
     }
     
     /**
-     * Initialiser le canvas après insertion DOM
+     * ✅ FIX Bug #7: Initialiser le canvas après insertion DOM avec ResizeObserver
      */
     initializeCanvas() {
         this.setupCanvas();
+
+        // ✅ FIX Bug #7: Observer les changements de taille du conteneur
+        if ('ResizeObserver' in window) {
+            const container = this.canvas?.parentElement;
+            if (container) {
+                this._resizeObserver = new ResizeObserver(() => {
+                    if (this.canvas) {
+                        this.resizeCanvas();
+                        this.drawGrid();
+                    }
+                });
+                this._resizeObserver.observe(container);
+                this.log('debug', 'EditorView', 'ResizeObserver attached to canvas container');
+            }
+        } else {
+            // Fallback pour navigateurs anciens
+            window.addEventListener('resize', () => {
+                if (this.canvas) {
+                    this.resizeCanvas();
+                    this.drawGrid();
+                }
+            });
+            this.log('warn', 'EditorView', 'ResizeObserver not supported, using window.resize');
+        }
     }
     
     /**
@@ -182,18 +218,16 @@ class EditorView extends BaseView {
 
         if (!this.container) return;
 
-        // ✅ CRITICAL: Prevent duplicate event listeners
-        if (this.domEventsAttached) {
-            this.log('debug', 'EditorView', 'DOM events already attached, skipping');
-            return;
-        }
+        // ✅ FIX Bug #8: Detach existing event listeners before attaching new ones
+        this.detachDOMEvents();
 
         this.log('debug', 'EditorView', 'Attaching DOM events');
         this.domEventsAttached = true;
 
-        this.container.addEventListener('click', (e) => {
+        // ✅ FIX Bug #8: Store handler reference for cleanup
+        this._clickHandler = (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
-            
+
             switch (action) {
                 case 'load': this.loadFile(); break;
                 case 'save': this.saveFile(); break;
@@ -203,30 +237,79 @@ class EditorView extends BaseView {
                 case 'zoom-in': this.zoom(1.2); break;
                 case 'zoom-out': this.zoom(0.8); break;
             }
-            
+
             const trackItem = e.target.closest('.track-item');
             if (trackItem) {
                 this.viewState.selectedTrack = parseInt(trackItem.dataset.track);
                 this.render();
             }
-        });
-        
+        };
+
+        this.container.addEventListener('click', this._clickHandler);
+
         this.setupCanvas();
         this.setupEventBusListeners();
+    }
+
+    /**
+     * ✅ FIX Bug #8: Detach DOM event listeners to prevent duplication
+     */
+    detachDOMEvents() {
+        if (!this.container) return;
+
+        if (this._clickHandler) {
+            this.container.removeEventListener('click', this._clickHandler);
+            this._clickHandler = null;
+        }
+
+        this.domEventsAttached = false;
     }
     
     setupCanvas() {
         this.canvas = document.getElementById('editorCanvas');
         if (!this.canvas) return;
-        
+
         this.ctx = this.canvas.getContext('2d');
         this.resizeCanvas();
         this.drawGrid();
-        
-        this.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
-        this.canvas.addEventListener('mousemove', (e) => this.handleCanvasMouseMove(e));
-        this.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
-        this.canvas.addEventListener('wheel', (e) => this.handleCanvasWheel(e));
+
+        // ✅ FIX Bug #9: Clean up existing canvas listeners before adding new ones
+        this.detachCanvasEvents();
+
+        // ✅ FIX Bug #9: Store canvas handler references for cleanup
+        this._canvasMouseDownHandler = (e) => this.handleCanvasMouseDown(e);
+        this._canvasMouseMoveHandler = (e) => this.handleCanvasMouseMove(e);
+        this._canvasMouseUpHandler = (e) => this.handleCanvasMouseUp(e);
+        this._canvasWheelHandler = (e) => this.handleCanvasWheel(e);
+
+        this.canvas.addEventListener('mousedown', this._canvasMouseDownHandler);
+        this.canvas.addEventListener('mousemove', this._canvasMouseMoveHandler);
+        this.canvas.addEventListener('mouseup', this._canvasMouseUpHandler);
+        this.canvas.addEventListener('wheel', this._canvasWheelHandler);
+    }
+
+    /**
+     * ✅ FIX Bug #9: Detach canvas event listeners
+     */
+    detachCanvasEvents() {
+        if (!this.canvas) return;
+
+        if (this._canvasMouseDownHandler) {
+            this.canvas.removeEventListener('mousedown', this._canvasMouseDownHandler);
+            this._canvasMouseDownHandler = null;
+        }
+        if (this._canvasMouseMoveHandler) {
+            this.canvas.removeEventListener('mousemove', this._canvasMouseMoveHandler);
+            this._canvasMouseMoveHandler = null;
+        }
+        if (this._canvasMouseUpHandler) {
+            this.canvas.removeEventListener('mouseup', this._canvasMouseUpHandler);
+            this._canvasMouseUpHandler = null;
+        }
+        if (this._canvasWheelHandler) {
+            this.canvas.removeEventListener('wheel', this._canvasWheelHandler);
+            this._canvasWheelHandler = null;
+        }
     }
     
     setupEventBusListeners() {
@@ -245,6 +328,19 @@ class EditorView extends BaseView {
         this.eventBus.on('editor:fileLoaded', (data) => {
             this.log('info', 'EditorView', `File loaded: ${data.file_path}`);
 
+            // ✅ FIX Bug #6: Check for unsaved changes before loading new file
+            if (this.viewState.isModified) {
+                const confirmed = confirm(
+                    'Vous avez des modifications non sauvegardées.\n\n' +
+                    'Voulez-vous les abandonner et charger le nouveau fichier ?'
+                );
+
+                if (!confirmed) {
+                    this.log('info', 'EditorView', 'User cancelled file load due to unsaved changes');
+                    return; // Cancel file load
+                }
+            }
+
             // Set current file info
             this.viewState.currentFile = {
                 name: data.file_path?.split(/[/\\]/).pop() || 'Unknown',
@@ -257,6 +353,9 @@ class EditorView extends BaseView {
                 this.viewState.tracks = data.midi_json.tracks || [];
                 this.extractNotes();
             }
+
+            // Reset modified flag
+            this.viewState.isModified = false;
 
             // Re-render to show loaded file
             this.render();
@@ -498,6 +597,25 @@ class EditorView extends BaseView {
     zoom(factor) {
         this.viewState.zoom = Math.max(0.1, Math.min(5, this.viewState.zoom * factor));
         this.drawGrid();
+    }
+
+    /**
+     * ✅ FIX Bug #7, #8 & #9: Clean up all event listeners and observers
+     */
+    destroy() {
+        this.detachDOMEvents();
+        this.detachCanvasEvents();
+
+        // ✅ FIX Bug #7: Disconnect ResizeObserver
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
+
+        // Call parent destroy if exists
+        if (super.destroy) {
+            super.destroy();
+        }
     }
 }
 

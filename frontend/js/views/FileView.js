@@ -37,6 +37,11 @@ class FileView extends BaseView {
         this.domEventsAttached = false;
         this.eventBusListenersAttached = false;
 
+        // ✅ FIX Bug #4: Store handler references for cleanup
+        this._clickHandler = null;
+        this._searchHandler = null;
+        this._sortHandler = null;
+
         this.log('debug', 'FileView', '✅ FileView v4.3.0 constructed');
 
         // ✅ CRITIQUE: Appeler setupEventBusListeners immédiatement
@@ -504,23 +509,20 @@ class FileView extends BaseView {
     attachEvents() {
         if (!this.container) return;
 
-        // ✅ CRITICAL: Prevent duplicate event listeners
-        if (this.domEventsAttached) {
-            this.log('debug', 'FileView', 'DOM events already attached, skipping');
-            return;
-        }
+        // ✅ FIX Bug #4: Detach existing event listeners before attaching new ones
+        this.detachEvents();
 
         this.log('debug', 'FileView', 'Attaching DOM events');
         this.domEventsAttached = true;
 
-        // Actions des boutons
-        this.container.addEventListener('click', (e) => {
+        // ✅ FIX Bug #4: Store handler reference for cleanup
+        this._clickHandler = (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
             if (!action) return;
-            
+
             const fileRow = e.target.closest('.file-row');
             const filePath = fileRow?.dataset.filePath;
-            
+
             switch (action) {
                 case 'upload-file':
                     this.handleUpload();
@@ -554,28 +556,59 @@ class FileView extends BaseView {
                     this.render();
                     break;
             }
-        });
-        
+        };
+
+        // Actions des boutons
+        this.container.addEventListener('click', this._clickHandler);
+
         // Filtre de recherche
         const searchInput = this.container.querySelector('[data-action="filter-files"]');
         if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
+            this._searchHandler = (e) => {
                 this.viewState.filter = e.target.value;
                 this.render();
-            });
+            };
+            searchInput.addEventListener('input', this._searchHandler);
         }
-        
+
         // Sélecteur de tri
         const sortSelect = this.container.querySelector('[data-action="change-sort"]');
         if (sortSelect) {
-            sortSelect.addEventListener('change', (e) => {
+            this._sortHandler = (e) => {
                 this.viewState.sortBy = e.target.value;
                 this.render();
-            });
+            };
+            sortSelect.addEventListener('change', this._sortHandler);
         }
-        
+
         // Attacher listeners EventBus
         // setupEventBusListeners() appelé dans init() - pas ici
+    }
+
+    /**
+     * ✅ FIX Bug #4: Detach event listeners to prevent duplication
+     */
+    detachEvents() {
+        if (!this.container) return;
+
+        if (this._clickHandler) {
+            this.container.removeEventListener('click', this._clickHandler);
+            this._clickHandler = null;
+        }
+
+        const searchInput = this.container.querySelector('[data-action="filter-files"]');
+        if (searchInput && this._searchHandler) {
+            searchInput.removeEventListener('input', this._searchHandler);
+            this._searchHandler = null;
+        }
+
+        const sortSelect = this.container.querySelector('[data-action="change-sort"]');
+        if (sortSelect && this._sortHandler) {
+            sortSelect.removeEventListener('change', this._sortHandler);
+            this._sortHandler = null;
+        }
+
+        this.domEventsAttached = false;
     }
     
     setupEventBusListeners() {
@@ -822,12 +855,15 @@ class FileView extends BaseView {
      * Nettoyer la vue
      */
     destroy() {
+        // ✅ FIX Bug #4: Clean up event listeners
+        this.detachEvents();
+
         // Nettoyer l'input file si existant
         const input = document.getElementById('file-upload-input');
         if (input) {
             input.remove();
         }
-        
+
         // Appeler la méthode destroy du parent si elle existe
         if (super.destroy) {
             super.destroy();

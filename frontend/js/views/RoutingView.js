@@ -174,6 +174,10 @@ class RoutingView extends BaseView {
                 case 'toggle-route':
                     if (routeItem) this.toggleRoute(routeItem.dataset.routeId, routeItem.dataset.enabled === 'true');
                     break;
+                case 'toggle-route-cell':
+                    // ✅ FIX Bug #11: Rendre la matrice cliquable
+                    this.handleMatrixCellClick(e);
+                    break;
                 case 'clear-loaded-file':
                     this.clearLoadedFile();
                     break;
@@ -273,8 +277,11 @@ class RoutingView extends BaseView {
                             
                             return `
                                 <div class="matrix-cell ${isConnected ? 'connected' : ''} ${!isEnabled ? 'disabled' : ''}"
-                                     data-source="${src.id}" 
-                                     data-destination="${dst.id}">
+                                     data-source="${src.id}"
+                                     data-destination="${dst.id}"
+                                     data-action="toggle-route-cell"
+                                     data-route-id="${route ? route.id : ''}"
+                                     title="Cliquer pour ${isConnected ? (isEnabled ? 'désactiver' : 'activer') : 'créer'} la route">
                                     ${isConnected ? (isEnabled ? '✓' : '●') : ''}
                                 </div>
                             `;
@@ -380,9 +387,40 @@ class RoutingView extends BaseView {
         }
     }
 
+    /**
+     * ✅ FIX Bug #11: Gère le clic sur une cellule de la matrice
+     * @param {Event} e - Événement click
+     */
+    handleMatrixCellClick(e) {
+        const cell = e.target.closest('.matrix-cell');
+        if (!cell) return;
+
+        const sourceId = cell.dataset.source;
+        const destinationId = cell.dataset.destination;
+        const routeId = cell.dataset.routeId;
+
+        if (!sourceId || !destinationId) return;
+
+        // Trouver la route existante
+        const route = this.state.routes.find(r =>
+            r.source_id === sourceId && r.destination_id === destinationId
+        );
+
+        if (route) {
+            // Route existe: toggle enabled/disabled
+            const isEnabled = route.enabled !== false;
+            this.toggleRoute(route.id, isEnabled);
+        } else {
+            // Pas de route: en créer une
+            this.state.selectedSource = sourceId;
+            this.state.selectedDestination = destinationId;
+            this.createRoute();
+        }
+    }
+
     async toggleRoute(routeId, currentlyEnabled) {
         const [sourceId, destinationId] = routeId.split('_');
-        
+
         // API: routing.enableRoute ou routing.disableRoute
         if (this.eventBus) {
             if (currentlyEnabled) {
