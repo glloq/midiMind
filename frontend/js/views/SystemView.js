@@ -65,13 +65,19 @@ class SystemView extends BaseView {
 
         // ✅ FIX v4.0.2: Marquer comme initialisé
         this.state.initialized = true;
+        this.state.rendered = true;
 
-        this.logger.info('[SystemView] Initialized v4.0.2');
+        this.logger.info('[SystemView] Initialized v4.0.3');
     }
 
     render() {
         if (!this.container) return;
-        
+
+        // ✅ FIX v4.0.3: Ne pas re-render si déjà rendu
+        if (this.state.rendered) {
+            return;
+        }
+
         this.container.innerHTML = `
             <div class="page-header">
                 <h1>⚙️ Système & Réseau</h1>

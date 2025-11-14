@@ -78,7 +78,12 @@ class VisualizerView extends BaseView {
             this.log('error', 'Cannot render: container not found');
             return;
         }
-        
+
+        // ✅ FIX: Ne pas re-render si déjà rendu
+        if (this.state.rendered) {
+            return;
+        }
+
         this.container.innerHTML = `
             <div class="visualizer-view">
                 <div class="visualizer-controls">
