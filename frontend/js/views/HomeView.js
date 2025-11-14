@@ -83,6 +83,10 @@ class HomeView extends BaseView {
         this.logger.info('[HomeView] 🔵 Calling initVisualizer()...');
         this.initVisualizer();
 
+        // ✅ NE PAS démarrer l'animation loop dans init() !
+        // Elle sera démarrée dans show() quand la vue devient visible
+        // this.startVisualizerLoop(); ← RETIRÉ
+
         // NE PAS charger les données dans init() - cela sera fait après navigation
         // this.loadFiles();
         // this.loadPlaylists();
@@ -878,8 +882,9 @@ class HomeView extends BaseView {
         this.resizeVisualizer();
         window.addEventListener('resize', () => this.resizeVisualizer());
 
-        // Start animation loop
-        this.startVisualizerLoop();
+        // ✅ NE PAS démarrer l'animation loop ici !
+        // Elle sera démarrée dans show() quand la vue devient visible
+        // this.startVisualizerLoop(); ← RETIRÉ
     }
 
     resizeVisualizer() {
@@ -1194,6 +1199,27 @@ class HomeView extends BaseView {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // ========================================================================
+    // SHOW / HIDE - Gestion intelligente des animations
+    // ========================================================================
+
+    show() {
+        this.logger.info('[HomeView] 🟢 View shown - starting animation loop');
+        // Démarrer l'animation SEULEMENT quand la vue devient visible
+        if (!this.visualizerAnimationId) {
+            this.startVisualizerLoop();
+        }
+    }
+
+    hide() {
+        this.logger.info('[HomeView] 🔴 View hidden - stopping animation loop');
+        // Arrêter l'animation quand la vue est cachée pour économiser CPU
+        if (this.visualizerAnimationId) {
+            cancelAnimationFrame(this.visualizerAnimationId);
+            this.visualizerAnimationId = null;
+        }
     }
 
     // ========================================================================
