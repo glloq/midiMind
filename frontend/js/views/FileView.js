@@ -29,12 +29,16 @@ class FileView extends BaseView {
             sortOrder: 'asc', // 'asc', 'desc'
             filter: '' // filtre de recherche
         };
-        
+
         // Flag pour réattachement événements
         this.needsEventReattach = false;
-        
+
+        // ✅ CRITICAL: Track if DOM events are already attached to prevent duplicates
+        this.domEventsAttached = false;
+        this.eventBusListenersAttached = false;
+
         this.log('debug', 'FileView', '✅ FileView v4.3.0 constructed');
-        
+
         // ✅ CRITIQUE: Appeler setupEventBusListeners immédiatement
         this.setupEventBusListeners();
     }
@@ -499,7 +503,16 @@ class FileView extends BaseView {
     
     attachEvents() {
         if (!this.container) return;
-        
+
+        // ✅ CRITICAL: Prevent duplicate event listeners
+        if (this.domEventsAttached) {
+            this.log('debug', 'FileView', 'DOM events already attached, skipping');
+            return;
+        }
+
+        this.log('debug', 'FileView', 'Attaching DOM events');
+        this.domEventsAttached = true;
+
         // Actions des boutons
         this.container.addEventListener('click', (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
@@ -567,7 +580,16 @@ class FileView extends BaseView {
     
     setupEventBusListeners() {
         if (!this.eventBus) return;
-        
+
+        // ✅ CRITICAL: Prevent duplicate eventBus listeners
+        if (this.eventBusListenersAttached) {
+            this.log('debug', 'FileView', 'EventBus listeners already attached, skipping');
+            return;
+        }
+
+        this.log('debug', 'FileView', 'Attaching EventBus listeners');
+        this.eventBusListenersAttached = true;
+
         // files.list response
         this.eventBus.on('files:listUpdated', (data) => {
             this.log('info', 'FileView', `Received ${data.files?.length || 0} files`);
