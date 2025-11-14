@@ -427,6 +427,13 @@ class NavigationController extends BaseController {
             });
             console.log(`🔵 [31] navigation:after emitted`);
 
+            // ✅ FIX: Émettre l'événement page_changed pour les contrôleurs
+            this.emit('navigation:page_changed', {
+                page: pageName,
+                previousPage: previousPage
+            });
+            console.log(`🔵 [31.5] navigation:page_changed emitted`);
+
             console.log(`🔵 [32] Checking notifications`);
             // Notification si activée
             if (this.notifications && options.notify) {
