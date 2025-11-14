@@ -274,11 +274,20 @@ class NavigationController extends BaseController {
                 to: pageName
             });
             
+            // ✅ Appeler hide() sur la vue précédente pour arrêter ses animations
+            if (previousPage) {
+                const previousView = this.pageViewMap.get(previousPage);
+                if (previousView && typeof previousView.hide === 'function') {
+                    this.log('debug', 'NavigationController', `Hiding previous view: ${previousPage}`);
+                    previousView.hide();
+                }
+            }
+
             // Transition sortie de la page actuelle
             if (previousPage && this.config.useTransitions) {
                 await this.transitionOut(previousPage);
             }
-            
+
             // Masquer toutes les pages
             this.hideAllPages();
             
