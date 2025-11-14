@@ -377,15 +377,22 @@ class NavigationController extends BaseController {
             console.log(`🔵 [27] Checking fromRouter: ${options.fromRouter}`);
             console.log(`🔵 [27.5] Current window.location.hash: ${window.location.hash}`);
             // ✅ FIX: Ne mettre à jour le hash QUE si l'appel ne vient PAS du Router
-            // Si fromRouter est true, le Router a déjà géré le hash
+            // ET si le hash est différent de la page actuelle
             if (!options.fromRouter) {
-                console.log(`🔵 [28] SETTING window.location.hash = #${pageName}`);
-                console.log(`🔵 [28.1] ⚠️ WARNING: This will trigger hashchange event!`);
-                const beforeHash = window.location.hash;
-                window.location.hash = pageName;
-                const afterHash = window.location.hash;
-                console.log(`🔵 [29] Hash updated from ${beforeHash} to ${afterHash}`);
-                console.log(`🔵 [29.1] Hash change will be processed asynchronously`);
+                const currentHash = window.location.hash.replace('#', '');
+                console.log(`🔵 [27.6] Comparing currentHash '${currentHash}' with pageName '${pageName}'`);
+
+                if (currentHash !== pageName) {
+                    console.log(`🔵 [28] SETTING window.location.hash = #${pageName}`);
+                    console.log(`🔵 [28.1] ⚠️ WARNING: This will trigger hashchange event!`);
+                    const beforeHash = window.location.hash;
+                    window.location.hash = pageName;
+                    const afterHash = window.location.hash;
+                    console.log(`🔵 [29] Hash updated from ${beforeHash} to ${afterHash}`);
+                    console.log(`🔵 [29.1] Hash change will be processed asynchronously`);
+                } else {
+                    console.log(`🔵 [28] SKIPPING hash update (already #${pageName})`);
+                }
             } else {
                 console.log(`🔵 [28] SKIPPING hash update (fromRouter=true)`);
             }
