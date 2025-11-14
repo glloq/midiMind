@@ -347,6 +347,33 @@ class InstrumentController extends BaseController {
     // ========================================================================
 
     /**
+     * Convertir le type de device numérique (backend) en string
+     * Backend: enum DeviceType { USB=0, NETWORK=1, BLUETOOTH=2, VIRTUAL=3, UNKNOWN=4 }
+     */
+    deviceTypeToString(typeNum) {
+        const typeMap = {
+            0: 'usb',
+            1: 'network',
+            2: 'bluetooth',
+            3: 'virtual',
+            4: 'unknown'
+        };
+        return typeMap[typeNum] || 'unknown';
+    }
+
+    /**
+     * Normaliser un device du backend (ajouter propriétés manquantes)
+     */
+    normalizeDevice(device) {
+        return {
+            ...device,
+            type: this.deviceTypeToString(device.type),
+            connected: device.status === 2,
+            available: device.available !== false
+        };
+    }
+
+    /**
      * ✅ v5.0.0: Scan avec filtrage par type de connexion (usb, network, bluetooth)
      */
     async scanDevices(full_scan = false, connection_type = null) {
@@ -379,14 +406,18 @@ class InstrumentController extends BaseController {
                 response = await this.backend.scanDevices(full_scan);
                 devices = response.devices || [];
 
+                // Normaliser les devices (convertir type numérique en string)
+                devices = devices.map(d => this.normalizeDevice(d));
+
                 // Filtrer par type si spécifié
                 if (connection_type) {
-                    devices = devices.filter(d =>
-                        d.type?.toLowerCase() === connection_type.toLowerCase()
-                    );
+                    const beforeFilter = devices.length;
+                    devices = devices.filter(d => d.type === connection_type);
+                    this.logger?.debug?.('InstrumentController',
+                        `Filtered from ${beforeFilter} to ${devices.length} devices (type=${connection_type})`);
                 }
 
-                count = response.count || devices.length;
+                count = devices.length;
             }
 
             devices.forEach(device => {
@@ -398,7 +429,7 @@ class InstrumentController extends BaseController {
             this.logger?.info?.('InstrumentController',
                 `✓ Scan complete: ${count} ${connection_type || ''} devices found`);
 
-            // ✅ Émettre pour la View
+            // ✅ Émettre pour la View avec les devices normalisés
             this.eventBus.emit('devices:scanned', {
                 devices,
                 count,
@@ -421,18 +452,21 @@ class InstrumentController extends BaseController {
         try {
             // ✅ devices.list n'a pas de count
             const response = await this.backend.listDevices();
-            const devices = response.devices || [];
-            
+            let devices = response.devices || [];
+
+            // Normaliser les devices (convertir type numérique en string)
+            devices = devices.map(d => this.normalizeDevice(d));
+
             devices.forEach(device => {
                 this.devices.set(device.id, device);
             });
-            
+
             // ✅ NOUVEAU: Émettre pour la View
             this.eventBus.emit('devices:listed', { devices });
-            
+
             this.updateView();
             return devices;
-            
+
         } catch (error) {
             this.logger?.error?.('InstrumentController', 'refreshDeviceList failed:', error);
             throw error;
@@ -441,19 +475,22 @@ class InstrumentController extends BaseController {
 
     async loadConnectedDevices() {
         if (!this.backend) return [];
-        
+
         try {
             const response = await this.backend.getConnectedDevices();
-            const devices = response.devices || [];
-            
+            let devices = response.devices || [];
+
+            // Normaliser les devices (convertir type numérique en string)
+            devices = devices.map(d => this.normalizeDevice(d));
+
             this.connectedDevices.clear();
             devices.forEach(device => {
                 this.connectedDevices.add(device.id);
             });
-            
+
             this.updateView();
             return devices;
-            
+
         } catch (error) {
             this.logger?.error?.('InstrumentController', 'loadConnectedDevices failed:', error);
             return [];

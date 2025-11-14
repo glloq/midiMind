@@ -263,6 +263,11 @@ class InstrumentView extends BaseView {
             this.viewState.availableDevices = data.devices || [];
             this.viewState.scanning.usb = false;
             this.viewState.scanning.network = false;
+
+            this.log('info', '[InstrumentView]',
+                `Received ${this.viewState.availableDevices.length} devices from scan (type: ${scanType})`);
+            this.log('debug', '[InstrumentView]', 'Available devices:', this.viewState.availableDevices);
+
             this.renderAvailableDevicesList();
         });
 
@@ -320,16 +325,25 @@ class InstrumentView extends BaseView {
     }
 
     renderAvailableDeviceCard(device) {
-        const typeIcon = device.type === 'usb' ? '🔌' : 
-                        device.type === 'bluetooth' ? '📡' : 
+        // Sécurité : vérifier que le device a les propriétés minimales
+        if (!device || !device.id) {
+            this.log('warn', '[InstrumentView]', 'Invalid device:', device);
+            return '';
+        }
+
+        const typeIcon = device.type === 'usb' ? '🔌' :
+                        device.type === 'bluetooth' ? '📡' :
                         device.type === 'network' ? '🌐' : '🎹';
-        
+
+        const deviceName = device.name || device.id || 'Unknown Device';
+        const deviceType = device.type ? device.type.toUpperCase() : 'UNKNOWN';
+
         return `
-            <div class="device-card available" data-device-id="${device.id}">
+            <div class="device-card available" data-device-id="${this.escapeHtml(device.id)}">
                 <div class="device-icon">${typeIcon}</div>
                 <div class="device-info">
-                    <div class="device-name">${this.escapeHtml(device.name)}</div>
-                    <div class="device-type">${device.type.toUpperCase()}</div>
+                    <div class="device-name">${this.escapeHtml(deviceName)}</div>
+                    <div class="device-type">${deviceType}</div>
                     ${device.ports ? `<div class="device-ports">${device.ports.in}→${device.ports.out}</div>` : ''}
                 </div>
                 <div class="device-actions">
@@ -341,7 +355,12 @@ class InstrumentView extends BaseView {
 
     renderAvailableDevicesList() {
         if (this.elements.devicesFound) {
-            this.elements.devicesFound.innerHTML = this.renderAvailableDevices();
+            const html = this.renderAvailableDevices();
+            this.elements.devicesFound.innerHTML = html;
+            this.log('debug', '[InstrumentView]',
+                `Rendered ${this.viewState.availableDevices.length} available devices`);
+        } else {
+            this.log('error', '[InstrumentView]', 'devicesFound element not found!');
         }
     }
 
@@ -699,8 +718,22 @@ class InstrumentView extends BaseView {
     // ========================================================================
 
     updateDevicesFromList(devices) {
-        this.viewState.connectedDevices = devices.filter(d => d.connected);
+        // Séparer les devices connectés et disponibles
+        this.viewState.connectedDevices = devices.filter(d => d.connected || d.status === 2);
+
+        // Les devices disponibles sont ceux qui ne sont PAS connectés
+        const newAvailableDevices = devices.filter(d => !d.connected && d.status !== 2);
+
+        // Ne mettre à jour availableDevices que s'ils sont vides (pour ne pas écraser un scan en cours)
+        if (this.viewState.availableDevices.length === 0 && newAvailableDevices.length > 0) {
+            this.viewState.availableDevices = newAvailableDevices;
+            this.renderAvailableDevicesList();
+        }
+
         this.renderConnectedDevicesList();
+
+        this.log('debug', '[InstrumentView]',
+            `Updated from list: ${this.viewState.connectedDevices.length} connected, ${this.viewState.availableDevices.length} available`);
     }
 
     handleDeviceConnected(data) {
