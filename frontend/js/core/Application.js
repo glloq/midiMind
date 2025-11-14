@@ -646,18 +646,38 @@ class Application {
                     console.log(`🟢 [Application] showPage() call COMPLETED`);
                 });
             }
-            
-            
-            // FIX v4.2.0: Forcer le hash à home si vide ou invalide
+
+
+
+
+            // ✅ FIX CRITICAL: Éviter double navigation au démarrage
+            // Problème: Si on fait window.location.hash = '#home' puis startRouting(),
+            // on déclenche 2 navigations:
+            // 1. startRouting() → loadInitialRoute() → navigateTo('/home')
+            // 2. hashchange event (async) → handleHashChange() → navigateTo('/home')
+            //
+            // Solution: Si hash est vide, on le définit PUIS on marque started=true
+            // pour que le hashchange soit traité, SANS appeler loadInitialRoute()
             const currentHash = window.location.hash;
             if (!currentHash || currentHash === '#' || currentHash === '') {
+                this.log('info', '📍 Hash is empty, setting to #home and relying on hashchange event');
+
+                // Marquer le router comme démarré AVANT de définir le hash
+                // Cela permettra au hashchange d'être traité
+                this.router.state.started = true;
+
+                // Définir le hash - ceci va déclencher hashchange qui va naviguer vers /home
                 window.location.hash = '#home';
-                this.log('info', 'Hash forced to #home');
+
+                this.log('info', '✓ Router started (hashchange will trigger initial navigation)');
+            } else {
+                this.log('info', `📍 Hash already set to ${currentHash}, starting router normally`);
+
+                // Le hash existe déjà, utiliser la procédure normale
+                this.router.startRouting();
+
+                this.log('info', '✓ Routing started');
             }
-            
-            // Démarrer le routing maintenant
-            this.router.startRouting();
-            this.log('info', '✓ Routing started');
         }
         
         this.log('info', '✓ Navigation initialized');
