@@ -49,7 +49,7 @@ class NavigationController extends BaseController {
             navItemSelector: '.nav-item',
             activeClass: 'active',
             transitionDuration: 300,
-            useTransitions: true,
+            useTransitions: false,  // ✅ DISABLED: Conflicts with view animation loops
             defaultPage: 'home'
         });
         
