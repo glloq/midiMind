@@ -40,9 +40,8 @@ class VisualizerView extends BaseView {
             colorMode: 'channel' // 'channel', 'velocity'
         };
         
-        // Bind animation frame handler
-        this.boundAnimate = this.animate.bind(this);
-        
+        // Animation handler removed - now throttled in startAnimation()
+
         this.log('info', 'VisualizerView v4.1.0 initialized');
     }
 
@@ -65,12 +64,25 @@ class VisualizerView extends BaseView {
         this.render();
         this.setupCanvas();
         this.attachEvents();
-        this.startAnimation();
+        // ✅ NE PAS démarrer l'animation dans init() !
+        // this.startAnimation(); ← RETIRÉ - sera démarré dans show()
 
         // ✅ FIX: Marquer comme initialisé
         this.state.initialized = true;
 
         this.log('info', 'VisualizerView initialized');
+    }
+
+    show() {
+        this.log('info', 'VisualizerView shown - starting animation');
+        if (!this.animationId) {
+            this.startAnimation();
+        }
+    }
+
+    hide() {
+        this.log('info', 'VisualizerView hidden - stopping animation');
+        this.stopAnimation();
     }
 
     render() {
