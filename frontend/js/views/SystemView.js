@@ -46,18 +46,27 @@ class SystemView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX v4.0.2: Early return si déjà initialisé
+        if (this.state.initialized) {
+            this.logger.warn('[SystemView] Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.logger.error('[SystemView] Cannot initialize');
             return;
         }
-        
+
         this.render();
         this.cacheElements();
         this.attachEvents();
         this.loadSystemData();
         this.startAutoRefresh();
-        
-        this.logger.info('[SystemView] Initialized v4.0.1');
+
+        // ✅ FIX v4.0.2: Marquer comme initialisé
+        this.state.initialized = true;
+
+        this.logger.info('[SystemView] Initialized v4.0.2');
     }
 
     render() {

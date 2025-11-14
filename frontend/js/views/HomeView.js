@@ -56,22 +56,31 @@ class HomeView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX v4.3.0: Early return si déjà initialisé pour éviter double initialisation
+        if (this.state.initialized) {
+            this.logger.warn('[HomeView] Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.logger.error('[HomeView] Cannot initialize: container not found');
             return;
         }
-        
+
         this.render();
         this.cacheElements();
         this.attachEvents();
         this.initVisualizer();
-        
+
         // Charger les données initiales via API
         this.loadFiles();
         this.loadPlaylists();
         this.loadDevices();
-        
-        this.logger.info('[HomeView] Initialized v4.2.0');
+
+        // ✅ FIX v4.3.0: CRITIQUE - Marquer comme initialisé pour éviter double initialisation
+        this.state.initialized = true;
+
+        this.logger.info('[HomeView] Initialized v4.3.0');
     }
 
     render() {

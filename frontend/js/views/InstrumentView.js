@@ -45,18 +45,27 @@ class InstrumentView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX v4.1.3: Early return si déjà initialisé
+        if (this.state.initialized) {
+            this.log('warn', '[InstrumentView]', 'Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.log('error', '[InstrumentView]', 'Cannot initialize: container not found (#instrument-view)');
             return;
         }
-        
+
         this.render();
         this.cacheElements();
         this.attachEvents();
         this.loadDevices();
         this.checkHotPlugStatus();
-        
-        this.log('info', '[InstrumentView]', 'Initialized v4.1.2');
+
+        // ✅ FIX v4.1.3: Marquer comme initialisé
+        this.state.initialized = true;
+
+        this.log('info', '[InstrumentView]', 'Initialized v4.1.3');
     }
 
     render() {

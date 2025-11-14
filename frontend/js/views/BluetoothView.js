@@ -43,15 +43,24 @@ class BluetoothView extends BaseView {
     // ========================================================================
 
     init() {
+        // ✅ FIX: Early return si déjà initialisé
+        if (this.state.initialized) {
+            this.log('warn', 'Already initialized, skipping');
+            return;
+        }
+
         if (!this.container) {
             this.log('error', 'Cannot initialize: container not found');
             return;
         }
-        
+
         this.render();
         this.attachEvents();
         this.loadPairedDevices();
-        
+
+        // ✅ FIX: Marquer comme initialisé
+        this.state.initialized = true;
+
         this.log('info', 'BluetoothView initialized');
     }
 

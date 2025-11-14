@@ -26,11 +26,19 @@ class CCEditorView extends BaseCanvasView {
     }
     
     init() {
+        // ✅ FIX: Early return si déjà initialisé
+        if (this.state.initialized) {
+            return;
+        }
+
         if (!this.canvas) return;
-        
+
         this.ctx = this.canvas.getContext('2d');
         this.attachEvents();
         this.render();
+
+        // ✅ FIX: Marquer comme initialisé
+        this.state.initialized = true;
     }
     
     attachEvents() {
