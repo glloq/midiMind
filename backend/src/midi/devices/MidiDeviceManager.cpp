@@ -323,6 +323,13 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
 #ifdef __linux__
     Logger::info("MidiDeviceManager", "Scanning USB MIDI devices (ALSA)...");
 
+    // First, get list of ALSA sound cards to verify hardware presence
+    std::set<int> hardwareCards;
+    int card = -1;
+    while (snd_card_next(&card) >= 0 && card >= 0) {
+        hardwareCards.insert(card);
+    }
+
     snd_seq_t* seq = nullptr;
 
     if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_INPUT, 0) < 0) {
@@ -338,33 +345,39 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
 
     snd_seq_client_info_set_client(cinfo, -1);
 
-    // Track clients we've already processed (one device per client instead of per port)
-    std::set<int> processedClients;
+    // Track cards we've already processed (one device per card)
+    std::set<int> processedCards;
 
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
         int client = snd_seq_client_info_get_client(cinfo);
 
-        // Skip system clients
+        // Skip system clients (0, 14, etc.)
         if (client == 0 || client == SND_SEQ_CLIENT_SYSTEM) {
             continue;
         }
 
-        // Skip if we've already processed this client
-        if (processedClients.find(client) != processedClients.end()) {
+        // Get card number for this client
+        int cardNum = snd_seq_client_info_get_card(cinfo);
+
+        // Skip clients without a hardware card association
+        if (cardNum < 0) {
             continue;
         }
 
-        // CRITICAL: Only accept KERNEL clients (hardware devices)
-        // User clients are software applications, not hardware
-        snd_seq_client_type_t clientType = snd_seq_client_info_get_type(cinfo);
-        if (clientType != SND_SEQ_KERNEL_CLIENT) {
+        // Skip if this card was already processed
+        if (processedCards.find(cardNum) != processedCards.end()) {
+            continue;
+        }
+
+        // Verify this card actually exists in hardware
+        if (hardwareCards.find(cardNum) == hardwareCards.end()) {
             continue;
         }
 
         const char* clientName = snd_seq_client_info_get_name(cinfo);
         std::string clientNameStr(clientName ? clientName : "");
 
-        // Filter out virtual/software MIDI ports (common system ports)
+        // Additional name-based filtering for known virtual ports
         if (clientNameStr.find("Midi Through") != std::string::npos ||
             clientNameStr.find("MIDI Through") != std::string::npos ||
             clientNameStr == "System" ||
@@ -376,32 +389,23 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
         snd_seq_port_info_set_client(pinfo, client);
         snd_seq_port_info_set_port(pinfo, -1);
 
-        // Find the first suitable port for this client to represent the device
+        // Find the first suitable port for this card
         bool foundValidPort = false;
         MidiDeviceInfo info;
         unsigned int combinedCaps = 0;
-        int hardwarePortCount = 0;
 
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             unsigned int caps = snd_seq_port_info_get_capability(pinfo);
-            unsigned int type = snd_seq_port_info_get_type(pinfo);
 
             // Skip ports without READ or WRITE capability
             if (!((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_WRITE))) {
                 continue;
             }
 
-            // Skip ports that are only for subscription (no actual I/O)
+            // Skip ports that are only for subscription
             if ((caps & SND_SEQ_PORT_CAP_NO_EXPORT)) {
                 continue;
             }
-
-            // CRITICAL: Only accept HARDWARE ports, skip SOFTWARE/APPLICATION ports
-            if (!(type & SND_SEQ_PORT_TYPE_HARDWARE)) {
-                continue;
-            }
-
-            hardwarePortCount++;
 
             if (!foundValidPort) {
                 int port = snd_seq_port_info_get_port(pinfo);
@@ -417,12 +421,11 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
                 foundValidPort = true;
             }
 
-            // Combine capabilities from all ports of this client
+            // Combine capabilities from all ports
             combinedCaps |= caps;
         }
 
-        // Only add device if it has at least one hardware port
-        if (foundValidPort && hardwarePortCount > 0) {
+        if (foundValidPort) {
             // Set direction based on combined capabilities
             if ((combinedCaps & SND_SEQ_PORT_CAP_READ) && (combinedCaps & SND_SEQ_PORT_CAP_WRITE)) {
                 info.direction = DeviceDirection::BIDIRECTIONAL;
@@ -433,11 +436,11 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             }
 
             devices.push_back(info);
-            processedClients.insert(client);
+            processedCards.insert(cardNum);
 
             Logger::info("MidiDeviceManager", "  Found: " + info.name +
-                        " (client " + std::to_string(client) +
-                        ", " + std::to_string(hardwarePortCount) + " hw ports)");
+                        " (card " + std::to_string(cardNum) +
+                        ", client " + std::to_string(client) + ")");
         }
     }
 
