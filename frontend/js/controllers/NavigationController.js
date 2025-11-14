@@ -377,7 +377,15 @@ class NavigationController extends BaseController {
             this.state.previousPage = previousPage;
 
             console.log(`🔵 [26.2] Setting currentPage to: ${pageName}`);
-            this.state.currentPage = pageName;
+            console.log(`🔵 [26.2.1] About to execute: this.state.currentPage = "${pageName}"`);
+            try {
+                this.state.currentPage = pageName;
+                console.log(`🔵 [26.2.2] Assignment completed successfully`);
+            } catch (error) {
+                console.error(`🔵 [26.2.ERROR] Exception during assignment:`, error);
+                throw error;
+            }
+            console.log(`🔵 [26.2.3] After try-catch block`);
 
             console.log(`🔵 [26.3] Pushing to history array (current length: ${this.state.history.length})`);
             this.state.history.push({
