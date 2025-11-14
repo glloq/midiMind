@@ -360,10 +360,16 @@ class NavigationController extends BaseController {
             console.log(`🔵 [24] Post-view operations`);
 
             console.log(`🔵 [25] Transition in`);
+            console.log(`🔵 [25.1] Checking if transitions enabled: ${this.config.useTransitions}`);
             // Transition entrée
             if (this.config.useTransitions) {
+                console.log(`🔵 [25.2] Transitions enabled, calling transitionIn(${pageName})...`);
                 await this.transitionIn(pageName);
+                console.log(`🔵 [25.3] transitionIn() returned`);
+            } else {
+                console.log(`🔵 [25.2] Transitions disabled, skipping`);
             }
+            console.log(`🔵 [25.4] After transition block`);
 
             console.log(`🔵 [26] Updating state`);
             // Mettre à jour l'état
@@ -517,40 +523,66 @@ class NavigationController extends BaseController {
      * Transition de sortie d'une page
      */
     async transitionOut(pageName) {
+        console.log(`🟤 [transitionOut] START for page: ${pageName}`);
         const pageElement = document.getElementById(pageName);
-        
+        console.log(`🟤 [transitionOut] pageElement found: ${!!pageElement}`);
+
         if (pageElement) {
+            console.log(`🟤 [transitionOut] Setting transition and opacity`);
             pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
             pageElement.style.opacity = '0';
-            
+
+            console.log(`🟤 [transitionOut] Waiting ${this.config.transitionDuration}ms...`);
             await this.wait(this.config.transitionDuration);
+            console.log(`🟤 [transitionOut] Wait completed`);
         }
+
+        console.log(`🟤 [transitionOut] COMPLETED`);
     }
     
     /**
      * Transition d'entrée d'une page
      */
     async transitionIn(pageName) {
+        console.log(`🟣 [transitionIn] START for page: ${pageName}`);
+        console.log(`🟣 [transitionIn] useTransitions: ${this.config.useTransitions}, duration: ${this.config.transitionDuration}`);
+
         const pageElement = document.getElementById(pageName);
-        
+        console.log(`🟣 [transitionIn] pageElement found: ${!!pageElement}`);
+
         if (pageElement) {
+            console.log(`🟣 [transitionIn] Setting opacity to 0`);
             pageElement.style.opacity = '0';
             pageElement.style.transition = `opacity ${this.config.transitionDuration}ms ease`;
-            
+
+            console.log(`🟣 [transitionIn] Forcing reflow`);
             // Force reflow
             pageElement.offsetHeight;
-            
+
+            console.log(`🟣 [transitionIn] Setting opacity to 1`);
             pageElement.style.opacity = '1';
-            
+
+            console.log(`🟣 [transitionIn] Waiting ${this.config.transitionDuration}ms...`);
             await this.wait(this.config.transitionDuration);
+            console.log(`🟣 [transitionIn] Wait completed`);
         }
+
+        console.log(`🟣 [transitionIn] COMPLETED`);
     }
     
     /**
      * Attendre un délai
      */
     wait(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        console.log(`⏱️ [wait] Creating Promise to wait ${ms}ms`);
+        return new Promise(resolve => {
+            console.log(`⏱️ [wait] Setting setTimeout for ${ms}ms`);
+            const timeoutId = setTimeout(() => {
+                console.log(`⏱️ [wait] setTimeout callback fired after ${ms}ms, resolving Promise`);
+                resolve();
+            }, ms);
+            console.log(`⏱️ [wait] setTimeout set with ID: ${timeoutId}`);
+        });
     }
     
     // ========================================================================
