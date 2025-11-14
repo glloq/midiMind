@@ -893,11 +893,25 @@ class HomeView extends BaseView {
     }
 
     startVisualizerLoop() {
-        const animate = () => {
-            this.renderVisualizer();
+        // ✅ FIX v4.3.3: Throttle animation loop selon Performance Mode
+        const targetFPS = window.PerformanceConfig?.rendering?.targetFPS || 10;
+        const frameInterval = 1000 / targetFPS; // ms entre frames
+        let lastFrameTime = 0;
+
+        const animate = (currentTime) => {
             this.visualizerAnimationId = requestAnimationFrame(animate);
+
+            // Throttle selon targetFPS
+            const deltaTime = currentTime - lastFrameTime;
+            if (deltaTime < frameInterval) {
+                return; // Skip frame
+            }
+
+            lastFrameTime = currentTime - (deltaTime % frameInterval);
+            this.renderVisualizer();
         };
-        animate();
+
+        this.visualizerAnimationId = requestAnimationFrame(animate);
     }
 
     renderVisualizer() {

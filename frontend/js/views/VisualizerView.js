@@ -188,14 +188,26 @@ class VisualizerView extends BaseView {
             this.log('warn', 'Animation already running');
             return;
         }
-        
-        this.animate();
-        this.log('debug', 'Animation started');
-    }
 
-    animate() {
-        this.draw();
-        this.animationId = requestAnimationFrame(this.boundAnimate);
+        // ✅ FIX: Throttle selon Performance Mode
+        const targetFPS = window.PerformanceConfig?.rendering?.targetFPS || 10;
+        const frameInterval = 1000 / targetFPS;
+        let lastFrameTime = 0;
+
+        const animate = (currentTime) => {
+            this.animationId = requestAnimationFrame(animate);
+
+            const deltaTime = currentTime - lastFrameTime;
+            if (deltaTime < frameInterval) {
+                return; // Skip frame
+            }
+
+            lastFrameTime = currentTime - (deltaTime % frameInterval);
+            this.draw();
+        };
+
+        this.animationId = requestAnimationFrame(animate);
+        this.log('debug', 'Animation started (throttled)');
     }
 
     stopAnimation() {
