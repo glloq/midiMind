@@ -144,14 +144,29 @@ class VisualizerController {
             // Marquer si non-jouable
             if (event.type === 'noteOn') {
                 const instrument = routing.instrument;
-                
+
                 if (instrument && !instrument.notes.includes(event.note)) {
                     event.unplayable = true;
                 }
             }
         }
 
-        // L'événement sera visible dans le visualizer via la mise à jour normale
+        // ✅ FIX: Émettre les événements MIDI pour le visualizer
+        if (event.type === 'noteOn') {
+            this.eventBus.emit('midi:note_on', {
+                note: event.note,
+                velocity: event.velocity || 64,
+                channel: event.channel || 0,
+                timestamp: event.timestamp || Date.now()
+            });
+        } else if (event.type === 'noteOff') {
+            this.eventBus.emit('midi:note_off', {
+                note: event.note,
+                velocity: event.velocity || 0,
+                channel: event.channel || 0,
+                timestamp: event.timestamp || Date.now()
+            });
+        }
     }
 
     /**

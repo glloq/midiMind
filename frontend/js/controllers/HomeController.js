@@ -169,32 +169,29 @@ class HomeController extends BaseController {
      * • Charge les données initiales
      * Protégée contre les appels multiples
      */
-    loadInitialData() {
+    async loadInitialData() {
         // Protéger contre double chargement
         if (this._dataLoaded) {
             this.logInfo( 'Data already loaded, skipping');
             return;
         }
-        
+
         this.logInfo( 'Loading initial data...');
-        
+
         try {
-            // Charger fichiers récents
-            if (this.fileModel) {
-                const recentFiles = this.fileModel.get?.('recentFiles') || [];
-                this.logInfo( `Loaded ${recentFiles.length} recent files`);
-            }
-            
-            // Charger playlists
-            if (this.playlistModel) {
-                const playlists = this.playlistModel.get?.('playlists') || [];
-                this.logInfo( `Loaded ${playlists.length} playlists`);
-            }
-            
+            // ✅ FIX: Charger les fichiers depuis le backend
+            await this.loadFilesFromBackend('/midi');
+
+            // ✅ FIX: Charger les playlists depuis le backend
+            await this.loadPlaylistsFromBackend();
+
+            // ✅ FIX: Charger les devices depuis le backend
+            await this.loadDevicesFromBackend();
+
             // Marquer comme chargé
             this._dataLoaded = true;
             this.logInfo( '✓ Initial data loaded');
-            
+
         } catch (error) {
             this.handleError('Failed to load initial data', error);
         }
@@ -1818,6 +1815,11 @@ class HomeController extends BaseController {
         this.logInfo( `Load file by path: ${filePath}`);
 
         try {
+            // ✅ FIX: Trouver le fichier dans la liste
+            const file = this.homeState.files.find(f =>
+                f.path === filePath || f.name === filePath
+            ) || { name: filePath.split('/').pop(), path: filePath };
+
             // Utiliser GlobalPlaybackController
             const globalPlayback = window.globalPlaybackController || window.app?.controllers?.globalPlayback;
 
@@ -1829,7 +1831,33 @@ class HomeController extends BaseController {
             // Charger le fichier
             await globalPlayback.load(filePath);
 
-            this.showSuccess(`Loaded: ${filePath}`);
+            // ✅ FIX: Passer les données au EditorView si disponible
+            const editorView = window.editorView || window.app?.views?.editor;
+            if (editorView && editorView.viewState) {
+                editorView.viewState.currentFile = file;
+                // Les tracks et notes seront chargés par le backend
+                if (editorView.render) {
+                    editorView.render();
+                }
+            }
+
+            // ✅ FIX: Naviguer vers l'éditeur
+            const navigationController = window.app?.controllers?.navigation;
+            if (navigationController) {
+                navigationController.showPage('editor');
+            }
+
+            // ✅ FIX: Émettre l'événement pour mettre à jour le header
+            if (this.eventBus) {
+                this.eventBus.emit('globalPlayback:fileLoaded', {
+                    fileName: file.name,
+                    filename: file.name,
+                    duration: file.duration || 0,
+                    filePath: file.path || filePath
+                });
+            }
+
+            this.showSuccess(`Loaded: ${file.name}`);
         } catch (error) {
             this.handleError('Failed to load file', error);
         }

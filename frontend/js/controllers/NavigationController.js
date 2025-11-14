@@ -318,7 +318,8 @@ class NavigationController extends BaseController {
 
             console.log(`🔵 [14] Showing page element`);
             pageElement.classList.add(this.config.activeClass);
-            pageElement.style.display = 'block';
+            // Laisser le CSS gérer le display (flex pour .page.active)
+            pageElement.style.display = 'flex';
 
             console.log(`🔵 [15] Calling updateNavigation`);
             // Mettre à jour la navigation
@@ -472,11 +473,8 @@ class NavigationController extends BaseController {
     hideAllPages() {
         this.elements.pages.forEach(page => {
             page.classList.remove(this.config.activeClass);
-            
-            // Pour les pages modales, les masquer complètement
-            if (page.classList.contains('page-modal') || page.classList.contains('page-fullscreen')) {
-                page.style.display = 'none';
-            }
+            // Masquer explicitement TOUTES les pages pour éviter les problèmes de styles inline
+            page.style.display = 'none';
         });
     }
     
