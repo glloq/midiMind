@@ -150,24 +150,45 @@ stop_service() {
 # Installer backend via make install
 install_backend() {
     log "📦 Installation backend (binaire + migrations + service)..."
-    
+
     cd "$BUILD_DIR"
-    
+
+    # Vérifier que le binaire a bien été compilé
+    if [ ! -f "bin/midimind" ]; then
+        error "Binaire bin/midimind non trouvé après compilation"
+    fi
+
+    info "Binaire compilé: $(du -h bin/midimind | cut -f1)"
+
+    # Créer les répertoires d'installation
+    sudo mkdir -p "$INSTALL_DIR/bin"
+    sudo mkdir -p "$INSTALL_DIR/data/migrations"
+
     # Sauvegarder ancien binaire
     if [ -f "$INSTALL_DIR/bin/midimind" ]; then
         sudo cp "$INSTALL_DIR/bin/midimind" \
                 "$INSTALL_DIR/bin/midimind.backup.$(date +%Y%m%d_%H%M%S)"
         info "Ancien binaire sauvegardé"
     fi
-    
-    # make install (installe binaire + migrations + service systemd)
-    sudo make install 2>&1 | grep -v "^--" || warning "make install a échoué partiellement"
-    
-    # Corriger permissions (make install crée les fichiers en root)
+
+    # CRITIQUE: Copier le nouveau binaire EXPLICITEMENT
+    sudo cp -f "bin/midimind" "$INSTALL_DIR/bin/midimind"
+    sudo chmod 755 "$INSTALL_DIR/bin/midimind"
+
+    # Vérifier que la copie a réussi
+    if [ ! -f "$INSTALL_DIR/bin/midimind" ]; then
+        error "Échec de la copie du binaire vers $INSTALL_DIR/bin/"
+    fi
+
+    # Vérifier la date du binaire installé
+    BINARY_DATE=$(stat -c '%y' "$INSTALL_DIR/bin/midimind" 2>/dev/null | cut -d' ' -f1,2)
+    info "Binaire installé: $BINARY_DATE"
+
+    # Corriger permissions
     sudo chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR"
     sudo chmod -R 755 "$INSTALL_DIR"
-    
-    success "Backend installé"
+
+    success "Backend installé dans $INSTALL_DIR/bin/midimind"
 }
 
 # Copier migrations SQL (sécurité supplémentaire)
