@@ -61,6 +61,10 @@ class RoutingView extends BaseView {
         this.render();
         this.cacheElements();
         this.attachEvents();
+
+        // ✅ FIX: Setup EventBus listeners only once during initialization
+        this.setupEventBusListeners();
+
         this.loadRoutes();
         this.loadDevices();
 
@@ -76,6 +80,9 @@ class RoutingView extends BaseView {
 
         // ✅ FIX Bug #10 & #12: Allow re-renders for dynamic updates
         // (Event duplication prevented by detachEvents() in attachEvents())
+
+        // Store whether events were already attached (for first render vs re-render)
+        const isFirstRender = !this.state.rendered;
 
         this.container.innerHTML = `
             <div class="page-header">
@@ -140,6 +147,13 @@ class RoutingView extends BaseView {
                 </div>
             </div>
         `;
+
+        // ✅ FIX: After replacing innerHTML, we need to re-cache elements and re-attach events
+        // (but only if this is a re-render, not the first render from init())
+        if (!isFirstRender) {
+            this.cacheElements();
+            this.attachEvents();
+        }
     }
 
     cacheElements() {
@@ -203,7 +217,7 @@ class RoutingView extends BaseView {
         this.container.addEventListener('click', this._clickHandler);
         this.container.addEventListener('change', this._changeHandler);
 
-        this.setupEventBusListeners();
+        // Note: setupEventBusListeners() is called once in init(), not here
     }
 
     detachEvents() {
@@ -527,16 +541,12 @@ class RoutingView extends BaseView {
 
     setLoadedFile(fileData) {
         this.state.loadedFile = fileData;
-        this.render();
-        this.cacheElements();
-        this.attachEvents();
+        this.render(); // render() now handles cacheElements() and attachEvents()
     }
 
     clearLoadedFile() {
         this.state.loadedFile = null;
-        this.render();
-        this.cacheElements();
-        this.attachEvents();
+        this.render(); // render() now handles cacheElements() and attachEvents()
     }
 
     // ========================================================================

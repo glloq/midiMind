@@ -92,13 +92,13 @@ class PlaybackController extends BaseController {
     async loadFile(filename) {
         try {
             this.log('info', 'PlaybackController', `Loading: ${filename}`);
-            
-            // • Utiliser helper BackendService
-            await this.backend.loadPlaybackFile(filename);
-            
+
+            // ✅ FIX: Corrected method name - loadPlayback not loadPlaybackFile
+            await this.backend.loadPlayback(filename);
+
             this.state.loadedFile = filename;
             this.state.position = 0;
-            
+
             const status = await this.backend.getStatus();
             this.state.duration = status.duration || 0;
             
