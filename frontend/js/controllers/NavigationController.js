@@ -367,12 +367,18 @@ class NavigationController extends BaseController {
 
             console.log(`🔵 [26] Updating state`);
             // Mettre à jour l'état
+            console.log(`🔵 [26.1] Setting previousPage to: ${previousPage}`);
             this.state.previousPage = previousPage;
+
+            console.log(`🔵 [26.2] Setting currentPage to: ${pageName}`);
             this.state.currentPage = pageName;
+
+            console.log(`🔵 [26.3] Pushing to history array (current length: ${this.state.history.length})`);
             this.state.history.push({
                 page: pageName,
                 timestamp: Date.now()
             });
+            console.log(`🔵 [26.4] History push completed (new length: ${this.state.history.length})`);
 
             console.log(`🔵 [27] Checking fromRouter: ${options.fromRouter}`);
             console.log(`🔵 [27.5] Current window.location.hash: ${window.location.hash}`);
@@ -398,6 +404,7 @@ class NavigationController extends BaseController {
             }
 
             console.log(`🔵 [30] Emitting navigation:after`);
+            console.log(`🔵 [30.1] About to call this.emit() with event data:`, { from: previousPage, to: pageName });
             // ✓ Émettre événement after navigation
             this.emit('navigation:after', {
                 from: previousPage,
@@ -414,8 +421,9 @@ class NavigationController extends BaseController {
             console.log(`🔵 [33] ✓ Navigation SUCCESS`);
             this.log('info', 'NavigationController', `✓ Navigated to page: ${pageName}`);
 
+            console.log(`🔵 [34] Returning true from showPage()`);
             return true;
-            
+
         } catch (error) {
             // Logging détaillé de l'erreur
             console.error('❌ NavigationController.showPage() exception:', error);
@@ -430,13 +438,17 @@ class NavigationController extends BaseController {
                 pageViewMapSize: this.pageViewMap?.size || 0,
                 availablePages: this.pageViewMap ? Array.from(this.pageViewMap.keys()) : []
             });
-            
+
             this.log('error', 'NavigationController', `Failed to show page ${pageName}:`, error.message);
             this.handleError(`Failed to show page ${pageName}`, error);
+
+            console.log(`🔵 [ERROR-RETURN] Returning false from showPage() after error`);
             return false;
-            
+
         } finally {
+            console.log(`🔵 [FINALLY] Entering finally block, setting isTransitioning = false`);
             this.state.isTransitioning = false;
+            console.log(`🔵 [FINALLY] isTransitioning set to false, exiting showPage()`);
         }
     }
     
