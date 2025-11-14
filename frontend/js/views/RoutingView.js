@@ -34,8 +34,12 @@ class RoutingView extends BaseView {
             selectedDestination: null,
             loadedFile: null // Fichier MIDI chargé pour le routing
         };
-        
+
         this.elements = {};
+
+        // ✅ FIX Bug #10: Store event handler references for cleanup
+        this._clickHandler = null;
+        this._changeHandler = null;
     }
 
     // ========================================================================
@@ -70,10 +74,8 @@ class RoutingView extends BaseView {
     render() {
         if (!this.container) return;
 
-        // ✅ FIX v4.0.3: Ne pas re-render si déjà rendu
-        if (this.state.rendered) {
-            return;
-        }
+        // ✅ FIX Bug #10 & #12: Allow re-renders for dynamic updates
+        // (Event duplication prevented by detachEvents() in attachEvents())
 
         this.container.innerHTML = `
             <div class="page-header">
@@ -151,13 +153,17 @@ class RoutingView extends BaseView {
 
     attachEvents() {
         if (!this.container) return;
-        
-        this.container.addEventListener('click', (e) => {
+
+        // ✅ FIX Bug #10: Clean up existing listeners before attaching new ones
+        this.detachEvents();
+
+        // Store handler references for cleanup
+        this._clickHandler = (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
             if (!action) return;
-            
+
             const routeItem = e.target.closest('.route-item');
-            
+
             switch (action) {
                 case 'refresh':
                     this.loadRoutes();
@@ -182,19 +188,36 @@ class RoutingView extends BaseView {
                     this.clearLoadedFile();
                     break;
             }
-        });
-        
-        this.container.addEventListener('change', (e) => {
+        };
+
+        this._changeHandler = (e) => {
             const action = e.target.dataset.action;
-            
+
             if (action === 'select-source') {
                 this.state.selectedSource = e.target.value;
             } else if (action === 'select-destination') {
                 this.state.selectedDestination = e.target.value;
             }
-        });
-        
+        };
+
+        this.container.addEventListener('click', this._clickHandler);
+        this.container.addEventListener('change', this._changeHandler);
+
         this.setupEventBusListeners();
+    }
+
+    detachEvents() {
+        if (!this.container) return;
+
+        if (this._clickHandler) {
+            this.container.removeEventListener('click', this._clickHandler);
+            this._clickHandler = null;
+        }
+
+        if (this._changeHandler) {
+            this.container.removeEventListener('change', this._changeHandler);
+            this._changeHandler = null;
+        }
     }
 
     setupEventBusListeners() {
@@ -521,6 +544,9 @@ class RoutingView extends BaseView {
     // ========================================================================
 
     destroy() {
+        // ✅ FIX Bug #10: Clean up DOM event listeners
+        this.detachEvents();
+
         if (this.eventBus) {
             this.eventBus.off('routes:listed');
             this.eventBus.off('route:added');
@@ -529,7 +555,7 @@ class RoutingView extends BaseView {
             this.eventBus.off('route:toggled');
             this.eventBus.off('devices:listed');
         }
-        
+
         this.logger.info('[RoutingView] Destroyed');
     }
 }
