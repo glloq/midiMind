@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <set>
 
 #ifdef __linux__
 #include <alsa/asoundlib.h>
@@ -318,75 +319,118 @@ void MidiDeviceManager::hotPlugThread() {
 
 std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
     std::vector<MidiDeviceInfo> devices;
-    
+
 #ifdef __linux__
     Logger::info("MidiDeviceManager", "Scanning USB MIDI devices (ALSA)...");
-    
+
     snd_seq_t* seq = nullptr;
-    
+
     if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_INPUT, 0) < 0) {
         Logger::warning("MidiDeviceManager", "Failed to open ALSA sequencer");
         return devices;
     }
-    
+
     snd_seq_client_info_t* cinfo;
     snd_seq_port_info_t* pinfo;
-    
+
     snd_seq_client_info_alloca(&cinfo);
     snd_seq_port_info_alloca(&pinfo);
-    
+
     snd_seq_client_info_set_client(cinfo, -1);
-    
+
+    // Track clients we've already processed (one device per client instead of per port)
+    std::set<int> processedClients;
+
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
         int client = snd_seq_client_info_get_client(cinfo);
-        
+
+        // Skip system clients
         if (client == 0 || client == SND_SEQ_CLIENT_SYSTEM) {
             continue;
         }
-        
+
+        // Skip if we've already processed this client
+        if (processedClients.find(client) != processedClients.end()) {
+            continue;
+        }
+
+        const char* clientName = snd_seq_client_info_get_name(cinfo);
+        std::string clientNameStr(clientName ? clientName : "");
+
+        // Filter out virtual/software MIDI ports (common system ports)
+        if (clientNameStr.find("Midi Through") != std::string::npos ||
+            clientNameStr.find("MIDI Through") != std::string::npos ||
+            clientNameStr == "System" ||
+            clientNameStr == "Timer" ||
+            clientNameStr == "Announce") {
+            continue;
+        }
+
         snd_seq_port_info_set_client(pinfo, client);
         snd_seq_port_info_set_port(pinfo, -1);
-        
+
+        // Find the first suitable port for this client to represent the device
+        bool foundValidPort = false;
+        MidiDeviceInfo info;
+        unsigned int combinedCaps = 0;
+
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             unsigned int caps = snd_seq_port_info_get_capability(pinfo);
-            
-            if ((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_WRITE)) {
-                MidiDeviceInfo info;
-                
+
+            // Skip ports without READ or WRITE capability
+            if (!((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_WRITE))) {
+                continue;
+            }
+
+            // Skip ports that are only for subscription (no actual I/O)
+            if ((caps & SND_SEQ_PORT_CAP_NO_EXPORT)) {
+                continue;
+            }
+
+            if (!foundValidPort) {
                 int port = snd_seq_port_info_get_port(pinfo);
                 info.id = "usb_" + std::to_string(client) + "_" + std::to_string(port);
                 info.name = snd_seq_port_info_get_name(pinfo);
                 info.type = DeviceType::USB;
                 info.port = std::to_string(client) + ":" + std::to_string(port);
-                info.manufacturer = snd_seq_client_info_get_name(cinfo);
+                info.manufacturer = clientNameStr;
                 info.available = true;
                 info.status = DeviceStatus::DISCONNECTED;
                 info.messagesReceived = 0;
                 info.messagesSent = 0;
-                
-                if ((caps & SND_SEQ_PORT_CAP_READ) && (caps & SND_SEQ_PORT_CAP_WRITE)) {
-                    info.direction = DeviceDirection::BIDIRECTIONAL;
-                } else if (caps & SND_SEQ_PORT_CAP_READ) {
-                    info.direction = DeviceDirection::INPUT;
-                } else {
-                    info.direction = DeviceDirection::OUTPUT;
-                }
-                
-                devices.push_back(info);
-                
-                Logger::info("MidiDeviceManager", "  Found: " + info.name);
+                foundValidPort = true;
             }
+
+            // Combine capabilities from all ports of this client
+            combinedCaps |= caps;
+        }
+
+        if (foundValidPort) {
+            // Set direction based on combined capabilities
+            if ((combinedCaps & SND_SEQ_PORT_CAP_READ) && (combinedCaps & SND_SEQ_PORT_CAP_WRITE)) {
+                info.direction = DeviceDirection::BIDIRECTIONAL;
+            } else if (combinedCaps & SND_SEQ_PORT_CAP_READ) {
+                info.direction = DeviceDirection::INPUT;
+            } else {
+                info.direction = DeviceDirection::OUTPUT;
+            }
+
+            devices.push_back(info);
+            processedClients.insert(client);
+
+            Logger::info("MidiDeviceManager", "  Found: " + info.name +
+                        " (client " + std::to_string(client) + ")");
         }
     }
-    
+
     snd_seq_close(seq);
-    
-    Logger::info("MidiDeviceManager", "✅ USB scan complete: " + 
+
+    Logger::info("MidiDeviceManager", "✅ USB scan complete: " +
                 std::to_string(devices.size()) + " devices found");
 #else
     Logger::warning("MidiDeviceManager", "USB MIDI scanning not supported on this platform");
 #endif
-    
+
     return devices;
 }
 
