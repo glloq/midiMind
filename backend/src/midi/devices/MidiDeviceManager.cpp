@@ -328,7 +328,25 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
     int card = -1;
     while (snd_card_next(&card) >= 0 && card >= 0) {
         hardwareCards.insert(card);
+
+        // Get card info for debugging
+        snd_ctl_t* ctl;
+        char name[32];
+        sprintf(name, "hw:%d", card);
+        if (snd_ctl_open(&ctl, name, 0) >= 0) {
+            snd_ctl_card_info_t* info;
+            snd_ctl_card_info_alloca(&info);
+            if (snd_ctl_card_info(ctl, info) >= 0) {
+                Logger::debug("MidiDeviceManager",
+                    std::string("  Hardware card ") + std::to_string(card) + ": " +
+                    snd_ctl_card_info_get_name(info));
+            }
+            snd_ctl_close(ctl);
+        }
     }
+
+    Logger::info("MidiDeviceManager",
+        "Found " + std::to_string(hardwareCards.size()) + " hardware sound cards");
 
     snd_seq_t* seq = nullptr;
 
@@ -356,26 +374,33 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             continue;
         }
 
+        const char* clientName = snd_seq_client_info_get_name(cinfo);
+        std::string clientNameStr(clientName ? clientName : "");
+
         // Get card number for this client
         int cardNum = snd_seq_client_info_get_card(cinfo);
 
+        Logger::debug("MidiDeviceManager",
+            std::string("Client ") + std::to_string(client) + ": \"" + clientNameStr +
+            "\" (card=" + std::to_string(cardNum) + ")");
+
         // Skip clients without a hardware card association
         if (cardNum < 0) {
+            Logger::debug("MidiDeviceManager", "  -> Skipped: no card association");
             continue;
         }
 
         // Skip if this card was already processed
         if (processedCards.find(cardNum) != processedCards.end()) {
+            Logger::debug("MidiDeviceManager", "  -> Skipped: card already processed");
             continue;
         }
 
         // Verify this card actually exists in hardware
         if (hardwareCards.find(cardNum) == hardwareCards.end()) {
+            Logger::debug("MidiDeviceManager", "  -> Skipped: card not in hardware list");
             continue;
         }
-
-        const char* clientName = snd_seq_client_info_get_name(cinfo);
-        std::string clientNameStr(clientName ? clientName : "");
 
         // Additional name-based filtering for known virtual ports
         if (clientNameStr.find("Midi Through") != std::string::npos ||
@@ -383,6 +408,7 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             clientNameStr == "System" ||
             clientNameStr == "Timer" ||
             clientNameStr == "Announce") {
+            Logger::debug("MidiDeviceManager", "  -> Skipped: blacklisted name");
             continue;
         }
 
@@ -438,7 +464,7 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             devices.push_back(info);
             processedCards.insert(cardNum);
 
-            Logger::info("MidiDeviceManager", "  Found: " + info.name +
+            Logger::info("MidiDeviceManager", "✓ ACCEPTED: " + info.name +
                         " (card " + std::to_string(cardNum) +
                         ", client " + std::to_string(client) + ")");
         }
