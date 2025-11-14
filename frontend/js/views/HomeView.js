@@ -69,21 +69,30 @@ class HomeView extends BaseView {
             return;
         }
 
+        this.logger.info('[HomeView] 🔵 Starting init...');
+
+        this.logger.info('[HomeView] 🔵 Calling render()...');
         this.render();
+
+        this.logger.info('[HomeView] 🔵 Calling cacheElements()...');
         this.cacheElements();
+
+        this.logger.info('[HomeView] 🔵 Calling attachEvents()...');
         this.attachEvents();
+
+        this.logger.info('[HomeView] 🔵 Calling initVisualizer()...');
         this.initVisualizer();
 
-        // Charger les données initiales via API
-        this.loadFiles();
-        this.loadPlaylists();
-        this.loadDevices();
+        // NE PAS charger les données dans init() - cela sera fait après navigation
+        // this.loadFiles();
+        // this.loadPlaylists();
+        // this.loadDevices();
 
         // ✅ FIX v4.3.0: CRITIQUE - Marquer comme initialisé pour éviter double initialisation
         this.state.initialized = true;
         this.state.rendered = true;
 
-        this.logger.info('[HomeView] Initialized v4.3.1');
+        this.logger.info('[HomeView] ✅ Initialized v4.3.2');
     }
 
     render() {
