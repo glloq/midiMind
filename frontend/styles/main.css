@@ -303,11 +303,13 @@ body.performance-mode .app-main {
     height: 100%;
     padding: var(--spacing-lg);
     overflow: auto;
+    z-index: 1;
 }
 
 .page.active {
     display: flex;
     flex-direction: column;
+    z-index: 10;
 }
 
 /* ============================================================================

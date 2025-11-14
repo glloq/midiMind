@@ -559,13 +559,24 @@ class FileController extends BaseController {
 
     async refreshFileList() {
         try {
-            return await this.listFiles();
+            const files = await this.listFiles();
+
+            // ✅ FIX: Émettre l'événement pour mettre à jour FileView
+            this.eventBus.emit('files:listUpdated', {
+                files,
+                path: this.state.currentPath,
+                count: files.length
+            });
+
+            return files;
         } catch (error) {
             if (!error.offline) {
                 this.log('error', 'FileController', 'refreshFileList failed:', error);
                 if (this.notifications) {
                     this.notifications.show('Erreur', 'Échec actualisation liste', 'error', 3000);
                 }
+                // ✅ FIX: Émettre aussi l'événement d'erreur
+                this.eventBus.emit('files:error', { error: error.message });
             }
             throw error;
         }
