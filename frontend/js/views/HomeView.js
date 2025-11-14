@@ -21,6 +21,8 @@ class HomeView extends BaseView {
         
         // État
         this.state = {
+            initialized: false,  // ✅ FIX v4.3.2: Ajout des flags d'initialisation
+            rendered: false,     // ✅ FIX v4.3.2: Ajout du flag de rendu
             mode: 'files', // 'files' ou 'playlists'
             currentFile: null,
             currentPlaylist: null,
