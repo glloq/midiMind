@@ -1,12 +1,13 @@
 // ============================================================================
 // Fichier: frontend/js/views/InstrumentView.js
-// Version: v4.1.2 - FIX UTF-8 COMPLET
-// Date: 2025-11-11
+// Version: v5.0.0 - BACKEND API ONLY (No WebMIDI)
+// Date: 2025-11-14
 // ============================================================================
-// CORRECTIONS v4.1.2:
-// ✅ Fix: Encodage UTF-8 correct pour tous les émojis et accents français
-// ✅ Fix: Messages console avec caractères corrects
-// ✅ Fix: Interface utilisateur avec émojis corrects
+// CORRECTIONS v5.0.0:
+// ✅ CRITIQUE: Suppression complète du code WebMIDI (gestion backend uniquement)
+// ✅ CRITIQUE: Ajout de 3 boutons séparés: USB, Network/WiFi, Bluetooth
+// ✅ NOUVELLE FONCTION: Interface de modification des réglages instruments
+// ✅ Fix: Toutes les connexions passent par l'API backend
 // ============================================================================
 
 class InstrumentView extends BaseView {
@@ -26,24 +27,20 @@ class InstrumentView extends BaseView {
             connectedDevices: [],
             availableDevices: [],
             bluetoothDevices: [],
-            webMidiInputs: [],
-            webMidiOutputs: [],
-            webMidiConnected: [],
-            webMidiSupported: false,
-            webMidiEnabled: false,
             scanning: {
                 usb: false,
-                bluetooth: false,
-                webMidi: false
+                network: false,
+                bluetooth: false
             },
             hotPlugEnabled: false,
-            selectedDevice: null
+            selectedDevice: null,
+            editingDevice: null
         };
         
         // Éléments DOM
         this.elements = {};
         
-        this.log('info', '[InstrumentView]', '✦ InstrumentView v4.1.2 initialized (UTF-8 Fix)');
+        this.log('info', '[InstrumentView]', '✦ InstrumentView v5.0.0 initialized (Backend API Only)');
     }
 
     // ========================================================================
@@ -90,46 +87,30 @@ class InstrumentView extends BaseView {
             <div class="page-header">
                 <h1>🎸 Gestion des Instruments</h1>
                 <div class="header-actions">
-                    <button class="btn-hotplug" id="btnToggleHotPlug" 
+                    <button class="btn-hotplug" id="btnToggleHotPlug"
                             data-enabled="${this.viewState.hotPlugEnabled}">
                         ${this.viewState.hotPlugEnabled ? '🔌 Hot-Plug ON' : '🔌 Hot-Plug OFF'}
                     </button>
                 </div>
             </div>
-            
+
             <div class="instruments-layout">
-                <!-- Web MIDI - Instruments du navigateur -->
-                <div class="instruments-webmidi">
-                    <div class="section-header">
-                        <h2>🌐 Instruments MIDI (Navigateur)</h2>
-                        <div class="discover-controls">
-                            <button class="btn-scan-webmidi ${this.viewState.scanning.webMidi ? 'scanning' : ''}"
-                                    id="btnScanWebMidi"
-                                    ${!this.viewState.webMidiSupported ? 'disabled' : ''}>
-                                🔍 ${this.viewState.scanning.webMidi ? 'Scan...' : 'Détecter Instruments'}
-                            </button>
-                            ${!this.viewState.webMidiSupported ?
-                                '<span class="webmidi-warning">⚠️ Web MIDI non supporté</span>' : ''}
-                        </div>
-                    </div>
-
-                    <div class="webmidi-devices" id="webMidiDevices">
-                        ${this.renderWebMidiDevices()}
-                    </div>
-                </div>
-
-                <!-- Scan et découverte (Backend) -->
+                <!-- Scan et découverte (Backend API) -->
                 <div class="instruments-discover">
                     <div class="section-header">
-                        <h2>Rechercher et connecter (Backend)</h2>
+                        <h2>🔍 Rechercher des instruments</h2>
                         <div class="discover-controls">
                             <button class="btn-scan ${this.viewState.scanning.usb ? 'scanning' : ''}"
-                                    id="btnScanUSB" data-type="usb">
-                                🔌 ${this.viewState.scanning.usb ? 'Scan...' : 'Scan USB'}
+                                    id="btnScanUSB" data-type="usb" title="Scanner les périphériques USB MIDI">
+                                🔌 ${this.viewState.scanning.usb ? 'Scan...' : 'USB'}
+                            </button>
+                            <button class="btn-scan ${this.viewState.scanning.network ? 'scanning' : ''}"
+                                    id="btnScanNetwork" data-type="network" title="Scanner le réseau/WiFi">
+                                🌐 ${this.viewState.scanning.network ? 'Scan...' : 'Network/WiFi'}
                             </button>
                             <button class="btn-scan ${this.viewState.scanning.bluetooth ? 'scanning' : ''}"
-                                    id="btnScanBluetooth" data-type="bluetooth">
-                                📡 ${this.viewState.scanning.bluetooth ? 'Scan...' : 'Scan Bluetooth'}
+                                    id="btnScanBluetooth" data-type="bluetooth" title="Scanner Bluetooth LE">
+                                📡 ${this.viewState.scanning.bluetooth ? 'Scan...' : 'Bluetooth'}
                             </button>
                         </div>
                     </div>
@@ -143,18 +124,31 @@ class InstrumentView extends BaseView {
                         ${this.renderBluetoothDevices()}
                     </div>
                 </div>
-                
+
                 <!-- Instruments connectés -->
                 <div class="instruments-connected">
                     <div class="section-header">
-                        <h2>Instruments connectés</h2>
+                        <h2>📱 Instruments connectés</h2>
                         <button class="btn-disconnect-all" id="btnDisconnectAll">
                             🔌 Tout déconnecter
                         </button>
                     </div>
-                    
+
                     <div class="devices-list" id="connectedDevices">
                         ${this.renderConnectedDevices()}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal de modification des réglages -->
+            <div class="modal" id="settingsModal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>⚙️ Réglages de l'instrument</h2>
+                        <button class="btn-close-modal" id="btnCloseModal">✕</button>
+                    </div>
+                    <div class="modal-body" id="settingsModalBody">
+                        <!-- Contenu dynamique -->
                     </div>
                 </div>
             </div>
@@ -181,39 +175,46 @@ class InstrumentView extends BaseView {
     cacheElements() {
         this.elements = {
             btnScanUSB: document.getElementById('btnScanUSB'),
+            btnScanNetwork: document.getElementById('btnScanNetwork'),
             btnScanBluetooth: document.getElementById('btnScanBluetooth'),
-            btnScanWebMidi: document.getElementById('btnScanWebMidi'),
             btnToggleHotPlug: document.getElementById('btnToggleHotPlug'),
             btnDisconnectAll: document.getElementById('btnDisconnectAll'),
             devicesFound: document.getElementById('devicesFound'),
             connectedDevices: document.getElementById('connectedDevices'),
             bluetoothPaired: document.getElementById('bluetoothPaired'),
-            webMidiDevices: document.getElementById('webMidiDevices')
+            settingsModal: document.getElementById('settingsModal'),
+            settingsModalBody: document.getElementById('settingsModalBody'),
+            btnCloseModal: document.getElementById('btnCloseModal')
         };
     }
 
     attachEvents() {
         // Scan buttons
         if (this.elements.btnScanUSB) {
-            this.elements.btnScanUSB.addEventListener('click', () => this.scanDevices(true));
+            this.elements.btnScanUSB.addEventListener('click', () => this.scanUSB());
+        }
+        if (this.elements.btnScanNetwork) {
+            this.elements.btnScanNetwork.addEventListener('click', () => this.scanNetwork());
         }
         if (this.elements.btnScanBluetooth) {
             this.elements.btnScanBluetooth.addEventListener('click', () => this.scanBluetooth());
         }
-        if (this.elements.btnScanWebMidi) {
-            this.elements.btnScanWebMidi.addEventListener('click', () => this.scanWebMidi());
-        }
-        
+
         // Hot-plug toggle
         if (this.elements.btnToggleHotPlug) {
             this.elements.btnToggleHotPlug.addEventListener('click', () => this.toggleHotPlug());
         }
-        
+
         // Disconnect all
         if (this.elements.btnDisconnectAll) {
             this.elements.btnDisconnectAll.addEventListener('click', () => this.disconnectAll());
         }
-        
+
+        // Modal close
+        if (this.elements.btnCloseModal) {
+            this.elements.btnCloseModal.addEventListener('click', () => this.closeSettingsModal());
+        }
+
         // Délégation d'événements
         if (this.elements.devicesFound) {
             this.elements.devicesFound.addEventListener('click', (e) => this.handleAvailableDeviceAction(e));
@@ -224,10 +225,7 @@ class InstrumentView extends BaseView {
         if (this.elements.bluetoothPaired) {
             this.elements.bluetoothPaired.addEventListener('click', (e) => this.handleBluetoothAction(e));
         }
-        if (this.elements.webMidiDevices) {
-            this.elements.webMidiDevices.addEventListener('click', (e) => this.handleWebMidiAction(e));
-        }
-        
+
         // EventBus
         this.setupEventBusListeners();
     }
@@ -259,10 +257,12 @@ class InstrumentView extends BaseView {
             this.handleDeviceDisconnected(data);
         });
 
-        // devices.scan response
+        // devices.scan response (USB or Network)
         this.eventBus.on('devices:scanned', (data) => {
+            const scanType = data.scan_type || 'usb'; // usb, network, or all
             this.viewState.availableDevices = data.devices || [];
             this.viewState.scanning.usb = false;
+            this.viewState.scanning.network = false;
             this.renderAvailableDevicesList();
         });
 
@@ -283,39 +283,6 @@ class InstrumentView extends BaseView {
         this.eventBus.on('hotplug:status', (data) => {
             this.viewState.hotPlugEnabled = data.enabled || false;
             this.updateHotPlugButton();
-        });
-
-        // Web MIDI events
-        this.eventBus.on('webmidi:status', (data) => {
-            this.viewState.webMidiSupported = data.supported || false;
-            this.viewState.webMidiEnabled = data.enabled || false;
-            this.render();
-            this.cacheElements();
-            // ✅ FIX CRITICAL: Do NOT call attachEvents() here - causes infinite loop!
-            // Event listeners are already attached in setupEventBusListeners()
-            // this.attachEvents();  // REMOVED - was causing exponential listener multiplication
-        });
-
-        this.eventBus.on('webmidi:devices_scanned', (data) => {
-            this.viewState.webMidiInputs = data.inputs || [];
-            this.viewState.webMidiOutputs = data.outputs || [];
-            this.viewState.scanning.webMidi = false;
-            this.renderWebMidiDevicesList();
-        });
-
-        this.eventBus.on('webmidi:device_connected', (data) => {
-            const device = data.device;
-            if (!this.viewState.webMidiConnected.find(d => d.id === device.id)) {
-                this.viewState.webMidiConnected.push(device);
-            }
-            this.renderWebMidiDevicesList();
-        });
-
-        this.eventBus.on('webmidi:device_disconnected', (data) => {
-            this.viewState.webMidiConnected = this.viewState.webMidiConnected.filter(
-                d => d.id !== data.device_id
-            );
-            this.renderWebMidiDevicesList();
         });
     }
 
@@ -403,12 +370,12 @@ class InstrumentView extends BaseView {
     }
 
     renderConnectedDeviceCard(device) {
-        const typeIcon = device.type === 'usb' ? '🔌' : 
-                        device.type === 'bluetooth' ? '📡' : 
+        const typeIcon = device.type === 'usb' ? '🔌' :
+                        device.type === 'bluetooth' ? '📡' :
                         device.type === 'network' ? '🌐' : '🎹';
-        
+
         const statusClass = device.active ? 'active' : 'idle';
-        
+
         return `
             <div class="device-card connected ${statusClass}" data-device-id="${device.id}">
                 <div class="device-icon">${typeIcon}</div>
@@ -421,6 +388,7 @@ class InstrumentView extends BaseView {
                     ${device.ports ? `<div class="device-ports">${device.ports.in}→${device.ports.out}</div>` : ''}
                 </div>
                 <div class="device-actions">
+                    <button class="btn-settings" data-action="settings" title="Réglages">⚙️</button>
                     <button class="btn-test" data-action="test" title="Tester">🎵</button>
                     <button class="btn-disconnect" data-action="disconnect" title="Déconnecter">🔌</button>
                 </div>
@@ -477,143 +445,35 @@ class InstrumentView extends BaseView {
         }
     }
 
-    // ========================================================================
-    // RENDERING - WEB MIDI DEVICES
-    // ========================================================================
-
-    renderWebMidiDevices() {
-        const inputs = this.viewState.webMidiInputs;
-        const outputs = this.viewState.webMidiOutputs;
-        const connected = this.viewState.webMidiConnected;
-
-        if (!this.viewState.webMidiSupported) {
-            return `
-                <div class="devices-empty">
-                    <div class="empty-icon">⚠️</div>
-                    <p>Web MIDI API non supportée</p>
-                    <p class="text-muted">Veuillez utiliser Chrome, Edge ou Opera</p>
-                </div>
-            `;
-        }
-
-        if (!this.viewState.webMidiEnabled) {
-            return `
-                <div class="devices-empty">
-                    <div class="empty-icon">🎹</div>
-                    <p>Web MIDI non activé</p>
-                    <p class="text-muted">Cliquez sur "Détecter Instruments" pour activer</p>
-                </div>
-            `;
-        }
-
-        if (this.viewState.scanning.webMidi) {
-            return `
-                <div class="devices-scanning">
-                    <div class="spinner"></div>
-                    <p>Scan des instruments MIDI...</p>
-                </div>
-            `;
-        }
-
-        if (inputs.length === 0 && outputs.length === 0) {
-            return `
-                <div class="devices-empty">
-                    <div class="empty-icon">🔍</div>
-                    <p>Aucun instrument MIDI détecté</p>
-                    <p class="text-muted">Connectez un instrument MIDI via USB ou Bluetooth</p>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="webmidi-sections">
-                ${inputs.length > 0 ? `
-                    <div class="webmidi-inputs">
-                        <h3>Entrées MIDI (${inputs.length})</h3>
-                        <div class="devices-grid">
-                            ${inputs.map(device => this.renderWebMidiDeviceCard(device)).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${outputs.length > 0 ? `
-                    <div class="webmidi-outputs">
-                        <h3>Sorties MIDI (${outputs.length})</h3>
-                        <div class="devices-grid">
-                            ${outputs.map(device => this.renderWebMidiDeviceCard(device)).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
-
-    renderWebMidiDeviceCard(device) {
-        const isConnected = this.viewState.webMidiConnected.some(d => d.id === device.id);
-        const typeIcon = device.type === 'input' ? '🎹' : '🔊';
-        const connectionIcon = device.connectionType === 'bluetooth' ? '📡' :
-                              device.connectionType === 'usb' ? '🔌' : '🌐';
-
-        return `
-            <div class="device-card webmidi ${isConnected ? 'connected' : ''}"
-                 data-device-id="${device.id}"
-                 data-device-type="${device.type}">
-                <div class="device-icon">${typeIcon}</div>
-                <div class="device-info">
-                    <div class="device-name">${this.escapeHtml(device.name)}</div>
-                    <div class="device-meta">
-                        <span class="device-manufacturer">${this.escapeHtml(device.manufacturer)}</span>
-                        <span class="device-connection">${connectionIcon} ${device.connectionType}</span>
-                    </div>
-                    <div class="device-type-badge">${device.type === 'input' ? 'Entrée' : 'Sortie'}</div>
-                </div>
-                <div class="device-actions">
-                    ${isConnected ? `
-                        <button class="btn-test" data-action="test" title="Tester"
-                                ${device.type !== 'output' ? 'disabled' : ''}>🎵</button>
-                        <button class="btn-disconnect" data-action="disconnect" title="Déconnecter">🔌</button>
-                    ` : `
-                        <button class="btn-connect" data-action="connect">Connecter</button>
-                    `}
-                </div>
-            </div>
-        `;
-    }
-
-    renderWebMidiDevicesList() {
-        if (this.elements.webMidiDevices) {
-            this.elements.webMidiDevices.innerHTML = this.renderWebMidiDevices();
-        }
-    }
 
     // ========================================================================
     // ACTIONS
     // ========================================================================
 
-    scanDevices(usb = true) {
-        this.viewState.scanning.usb = usb;
-        this.render();
-        
+    scanUSB() {
+        this.viewState.scanning.usb = true;
+        this.renderAvailableDevicesList();
+
         if (this.eventBus) {
-            this.eventBus.emit('devices:scan_requested');
+            this.eventBus.emit('devices:scan_requested', { connection_type: 'usb' });
+        }
+    }
+
+    scanNetwork() {
+        this.viewState.scanning.network = true;
+        this.renderAvailableDevicesList();
+
+        if (this.eventBus) {
+            this.eventBus.emit('devices:scan_requested', { connection_type: 'network' });
         }
     }
 
     scanBluetooth() {
         this.viewState.scanning.bluetooth = true;
-        this.render();
+        this.renderAvailableDevicesList();
 
         if (this.eventBus) {
             this.eventBus.emit('bluetooth:scan_requested');
-        }
-    }
-
-    scanWebMidi() {
-        this.viewState.scanning.webMidi = true;
-        this.renderWebMidiDevicesList();
-
-        if (this.eventBus) {
-            this.eventBus.emit('webmidi:scan_requested');
         }
     }
 
@@ -646,13 +506,16 @@ class InstrumentView extends BaseView {
     handleConnectedDeviceAction(e) {
         const action = e.target.dataset.action;
         if (!action) return;
-        
+
         const card = e.target.closest('.device-card');
         const deviceId = card?.dataset.deviceId;
-        
+
         if (!deviceId) return;
-        
+
         switch (action) {
+            case 'settings':
+                this.showDeviceSettings(deviceId);
+                break;
             case 'test':
                 this.testDevice(deviceId);
                 break;
@@ -677,29 +540,6 @@ class InstrumentView extends BaseView {
                 break;
             case 'unpair':
                 this.unpairBluetoothDevice(address);
-                break;
-        }
-    }
-
-    handleWebMidiAction(e) {
-        const action = e.target.dataset.action;
-        if (!action) return;
-
-        const card = e.target.closest('.device-card');
-        const deviceId = card?.dataset.deviceId;
-        const deviceType = card?.dataset.deviceType;
-
-        if (!deviceId) return;
-
-        switch (action) {
-            case 'connect':
-                this.connectWebMidiDevice(deviceId, deviceType);
-                break;
-            case 'disconnect':
-                this.disconnectWebMidiDevice(deviceId);
-                break;
-            case 'test':
-                this.testWebMidiDevice(deviceId);
                 break;
         }
     }
@@ -734,22 +574,124 @@ class InstrumentView extends BaseView {
         }
     }
 
-    connectWebMidiDevice(deviceId, type) {
+    // ========================================================================
+    // SETTINGS MODAL
+    // ========================================================================
+
+    showDeviceSettings(deviceId) {
+        const device = this.viewState.connectedDevices.find(d => d.id === deviceId);
+        if (!device) {
+            this.log('error', '[InstrumentView]', `Device ${deviceId} not found`);
+            return;
+        }
+
+        this.viewState.editingDevice = device;
+
+        // Demander les infos détaillées au backend
         if (this.eventBus) {
-            this.eventBus.emit('webmidi:connect_requested', { device_id: deviceId, type });
+            this.eventBus.emit('device:info_requested', { device_id: deviceId });
+        }
+
+        // Afficher le modal avec les infos actuelles
+        this.renderSettingsModal(device);
+        this.openSettingsModal();
+    }
+
+    renderSettingsModal(device) {
+        if (!this.elements.settingsModalBody) return;
+
+        this.elements.settingsModalBody.innerHTML = `
+            <form id="deviceSettingsForm" class="settings-form">
+                <div class="form-group">
+                    <label for="deviceName">Nom de l'instrument</label>
+                    <input type="text" id="deviceName" name="name"
+                           value="${this.escapeHtml(device.name)}" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="deviceType">Type de connexion</label>
+                    <input type="text" id="deviceType" name="type"
+                           value="${device.type.toUpperCase()}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label for="latencyOffset">Compensation de latence (µs)</label>
+                    <input type="number" id="latencyOffset" name="latency_offset"
+                           value="${device.latency_offset || 0}" step="100">
+                    <small class="form-hint">Délai pour compenser la latence de l'instrument</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="autoCalibration">
+                        <input type="checkbox" id="autoCalibration" name="auto_calibration"
+                               ${device.auto_calibration ? 'checked' : ''}>
+                        Calibration automatique
+                    </label>
+                    <small class="form-hint">Ajuster automatiquement la latence</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="deviceEnabled">
+                        <input type="checkbox" id="deviceEnabled" name="enabled"
+                               ${device.enabled !== false ? 'checked' : ''}>
+                        Instrument activé
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="btnCancelSettings">Annuler</button>
+                    <button type="submit" class="btn-save">💾 Enregistrer</button>
+                </div>
+            </form>
+        `;
+
+        // Attacher les événements
+        const form = document.getElementById('deviceSettingsForm');
+        const btnCancel = document.getElementById('btnCancelSettings');
+
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveDeviceSettings(device.id);
+            });
+        }
+
+        if (btnCancel) {
+            btnCancel.addEventListener('click', () => this.closeSettingsModal());
         }
     }
 
-    disconnectWebMidiDevice(deviceId) {
+    saveDeviceSettings(deviceId) {
+        const form = document.getElementById('deviceSettingsForm');
+        if (!form) return;
+
+        const formData = new FormData(form);
+        const settings = {
+            device_id: deviceId,
+            name: formData.get('name'),
+            latency_offset: parseInt(formData.get('latency_offset')) || 0,
+            auto_calibration: formData.get('auto_calibration') === 'on',
+            enabled: formData.get('enabled') === 'on'
+        };
+
         if (this.eventBus) {
-            this.eventBus.emit('webmidi:disconnect_requested', { device_id: deviceId });
+            this.eventBus.emit('device:settings_update_requested', settings);
+        }
+
+        this.closeSettingsModal();
+    }
+
+    openSettingsModal() {
+        if (this.elements.settingsModal) {
+            this.elements.settingsModal.style.display = 'flex';
         }
     }
 
-    testWebMidiDevice(deviceId) {
-        if (this.eventBus) {
-            this.eventBus.emit('webmidi:test_requested', { device_id: deviceId });
+    closeSettingsModal() {
+        if (this.elements.settingsModal) {
+            this.elements.settingsModal.style.display = 'none';
         }
+        this.viewState.editingDevice = null;
     }
 
     // ========================================================================
