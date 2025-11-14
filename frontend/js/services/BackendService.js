@@ -721,7 +721,26 @@ class BackendService {
     
     // MIDI
     async convertMidi(filename) { return this.sendCommand('midi.convert', { filename }); }
-    async loadMidi(filepath) { return this.sendCommand('midi.load', { filepath }); }
+    async loadMidi(filePathOrId) {
+        // Handle both file paths (for conversion) and database IDs (for loading)
+        if (typeof filePathOrId === 'number') {
+            // Database ID - use midi.load
+            return this.sendCommand('midi.load', { id: filePathOrId });
+        } else if (typeof filePathOrId === 'string') {
+            // Check if it looks like a filepath (contains / or .)
+            if (filePathOrId.includes('/') || filePathOrId.includes('\\')) {
+                // Extract filename from path and use midi.convert
+                const filename = filePathOrId.split(/[/\\]/).pop();
+                this.logger.debug('BackendService', `Converting filepath to filename: ${filePathOrId} -> ${filename}`);
+                return this.sendCommand('midi.convert', { filename });
+            } else {
+                // Simple filename - use midi.convert
+                return this.sendCommand('midi.convert', { filename: filePathOrId });
+            }
+        } else {
+            throw new Error('loadMidi: parameter must be a filepath (string) or database ID (number)');
+        }
+    }
     async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
     async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
     

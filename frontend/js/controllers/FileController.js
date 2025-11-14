@@ -181,8 +181,9 @@ class FileController extends BaseController {
 
             if (isMidiFile) {
                 try {
-                    // Charger les métadonnées via midi.load
+                    // Charger les métadonnées via midi.convert (via loadMidi wrapper)
                     const filePath = file.path || file.name;
+                    this.log('debug', 'FileController', `Enriching metadata for: ${filePath}`);
                     const midiData = await this.backend.loadMidi(filePath);
 
                     if (midiData && midiData.midi_json) {
@@ -200,7 +201,7 @@ class FileController extends BaseController {
                 } catch (error) {
                     // Si erreur, continuer avec les données de base
                     this.log('warn', 'FileController',
-                        `Failed to enrich ${file.name}:`, error.message);
+                        `Failed to enrich ${file.name}: ${error.message || error}`);
                 }
             }
 
@@ -463,6 +464,8 @@ class FileController extends BaseController {
             return;
         }
 
+        this.log('debug', 'FileController', `handleLoadInEditor called with: ${filePath}`);
+
         try {
             const response = await this.backend.loadMidi(filePath);
 
@@ -471,7 +474,7 @@ class FileController extends BaseController {
                 midi_json: response.midi_json || response.data
             });
 
-            this.log('info', 'FileController', `Loading in editor: ${filePath}`);
+            this.log('info', 'FileController', `Successfully loaded in editor: ${filePath}`);
 
             if (this.notifications) {
                 this.notifications.show('Éditeur', `Chargement de ${filePath}`, 'info', 2000);
@@ -481,12 +484,14 @@ class FileController extends BaseController {
                 message: error?.message || error?.error || 'Unknown error',
                 code: error?.code,
                 details: error?.details,
-                filepath: filePath
+                filepath: filePath,
+                stack: error?.stack
             };
             this.log('error', 'FileController', 'handleLoadInEditor failed:', errorDetails);
 
             if (this.notifications) {
-                this.notifications.show('Erreur', `Échec chargement: ${error.message}`, 'error', 3000);
+                const errorMsg = error.message || 'Unknown error';
+                this.notifications.show('Erreur', `Échec chargement: ${errorMsg}`, 'error', 5000);
             }
         }
     }
@@ -502,6 +507,8 @@ class FileController extends BaseController {
             return;
         }
 
+        this.log('debug', 'FileController', `handleLoadForRouting called with: ${filePath}`);
+
         try {
             const response = await this.backend.loadMidi(filePath);
 
@@ -510,16 +517,24 @@ class FileController extends BaseController {
                 midi_json: response.midi_json || response.data
             });
 
-            this.log('info', 'FileController', `Loading for routing: ${filePath}`);
+            this.log('info', 'FileController', `Successfully loaded for routing: ${filePath}`);
 
             if (this.notifications) {
                 this.notifications.show('Routage', `Configuration du routage pour ${filePath}`, 'info', 2000);
             }
         } catch (error) {
-            this.log('error', 'FileController', 'handleLoadForRouting failed:', error);
+            const errorDetails = {
+                message: error?.message || error?.error || 'Unknown error',
+                code: error?.code,
+                details: error?.details,
+                filepath: filePath,
+                stack: error?.stack
+            };
+            this.log('error', 'FileController', 'handleLoadForRouting failed:', errorDetails);
 
             if (this.notifications) {
-                this.notifications.show('Erreur', `Échec chargement: ${error.message}`, 'error', 3000);
+                const errorMsg = error.message || 'Unknown error';
+                this.notifications.show('Erreur', `Échec chargement: ${errorMsg}`, 'error', 5000);
             }
         }
     }
