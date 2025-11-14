@@ -29,10 +29,14 @@ class EditorView extends BaseView {
             tool: 'select', // select, pencil, eraser
             isModified: false
         };
-        
+
         this.canvas = null;
         this.ctx = null;
-        
+
+        // ✅ CRITICAL: Track if events are already attached to prevent duplicates
+        this.domEventsAttached = false;
+        this.eventBusListenersAttached = false;
+
         this.log('info', 'EditorView', '✅ EditorView v4.0.1 initialized');
     }
     
@@ -175,9 +179,18 @@ class EditorView extends BaseView {
     
     attachEvents() {
         super.attachEvents();
-        
+
         if (!this.container) return;
-        
+
+        // ✅ CRITICAL: Prevent duplicate event listeners
+        if (this.domEventsAttached) {
+            this.log('debug', 'EditorView', 'DOM events already attached, skipping');
+            return;
+        }
+
+        this.log('debug', 'EditorView', 'Attaching DOM events');
+        this.domEventsAttached = true;
+
         this.container.addEventListener('click', (e) => {
             const action = e.target.closest('[data-action]')?.dataset.action;
             
@@ -218,7 +231,37 @@ class EditorView extends BaseView {
     
     setupEventBusListeners() {
         if (!this.eventBus) return;
-        
+
+        // ✅ CRITICAL: Prevent duplicate eventBus listeners
+        if (this.eventBusListenersAttached) {
+            this.log('debug', 'EditorView', 'EventBus listeners already attached, skipping');
+            return;
+        }
+
+        this.log('debug', 'EditorView', 'Attaching EventBus listeners');
+        this.eventBusListenersAttached = true;
+
+        // ✅ NEW: Handle file loaded in editor (from FileController)
+        this.eventBus.on('editor:fileLoaded', (data) => {
+            this.log('info', 'EditorView', `File loaded: ${data.file_path}`);
+
+            // Set current file info
+            this.viewState.currentFile = {
+                name: data.file_path?.split(/[/\\]/).pop() || 'Unknown',
+                path: data.file_path
+            };
+
+            // Set MIDI data
+            if (data.midi_json) {
+                this.viewState.midiData = data.midi_json;
+                this.viewState.tracks = data.midi_json.tracks || [];
+                this.extractNotes();
+            }
+
+            // Re-render to show loaded file
+            this.render();
+        });
+
         // midi.convert response (MIDI → JSON)
         this.eventBus.on('midi:converted_to_json', (data) => {
             this.viewState.midiData = data.json;
@@ -226,7 +269,7 @@ class EditorView extends BaseView {
             this.extractNotes();
             this.render();
         });
-        
+
         // files.read response
         this.eventBus.on('file:loaded_content', (data) => {
             // Convertir le contenu MIDI en JSON
@@ -237,7 +280,7 @@ class EditorView extends BaseView {
                 });
             }
         });
-        
+
         // files.write response
         this.eventBus.on('file:saved', (data) => {
             this.viewState.isModified = false;
