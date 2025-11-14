@@ -121,12 +121,25 @@ class PianoRollView extends BaseCanvasView {
      * Boucle de rendu
      */
     startRenderLoop() {
-        const render = () => {
+        // ✅ FIX: Throttle selon Performance Mode
+        const targetFPS = window.PerformanceConfig?.rendering?.targetFPS || 10;
+        const frameInterval = 1000 / targetFPS;
+        let lastFrameTime = 0;
+
+        const render = (currentTime) => {
+            requestAnimationFrame(render);
+
+            const deltaTime = currentTime - lastFrameTime;
+            if (deltaTime < frameInterval) {
+                return; // Skip frame
+            }
+
+            lastFrameTime = currentTime - (deltaTime % frameInterval);
+
             if (this.needsRedraw) {
                 this.render();
                 this.needsRedraw = false;
             }
-            requestAnimationFrame(render);
         };
         requestAnimationFrame(render);
     }
