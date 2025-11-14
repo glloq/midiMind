@@ -354,6 +354,13 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             continue;
         }
 
+        // CRITICAL: Only accept KERNEL clients (hardware devices)
+        // User clients are software applications, not hardware
+        snd_seq_client_type_t clientType = snd_seq_client_info_get_type(cinfo);
+        if (clientType != SND_SEQ_KERNEL_CLIENT) {
+            continue;
+        }
+
         const char* clientName = snd_seq_client_info_get_name(cinfo);
         std::string clientNameStr(clientName ? clientName : "");
 
@@ -373,9 +380,11 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
         bool foundValidPort = false;
         MidiDeviceInfo info;
         unsigned int combinedCaps = 0;
+        int hardwarePortCount = 0;
 
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            unsigned int type = snd_seq_port_info_get_type(pinfo);
 
             // Skip ports without READ or WRITE capability
             if (!((caps & SND_SEQ_PORT_CAP_READ) || (caps & SND_SEQ_PORT_CAP_WRITE))) {
@@ -386,6 +395,13 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             if ((caps & SND_SEQ_PORT_CAP_NO_EXPORT)) {
                 continue;
             }
+
+            // CRITICAL: Only accept HARDWARE ports, skip SOFTWARE/APPLICATION ports
+            if (!(type & SND_SEQ_PORT_TYPE_HARDWARE)) {
+                continue;
+            }
+
+            hardwarePortCount++;
 
             if (!foundValidPort) {
                 int port = snd_seq_port_info_get_port(pinfo);
@@ -405,7 +421,8 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             combinedCaps |= caps;
         }
 
-        if (foundValidPort) {
+        // Only add device if it has at least one hardware port
+        if (foundValidPort && hardwarePortCount > 0) {
             // Set direction based on combined capabilities
             if ((combinedCaps & SND_SEQ_PORT_CAP_READ) && (combinedCaps & SND_SEQ_PORT_CAP_WRITE)) {
                 info.direction = DeviceDirection::BIDIRECTIONAL;
@@ -419,7 +436,8 @@ std::vector<MidiDeviceInfo> MidiDeviceManager::discoverUsbDevices() {
             processedClients.insert(client);
 
             Logger::info("MidiDeviceManager", "  Found: " + info.name +
-                        " (client " + std::to_string(client) + ")");
+                        " (client " + std::to_string(client) +
+                        ", " + std::to_string(hardwarePortCount) + " hw ports)");
         }
     }
 
