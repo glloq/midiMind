@@ -163,25 +163,39 @@ class FileController extends BaseController {
 
     /**
      * ✅ NOUVEAU v4.5.0: Enrichit les fichiers avec métadonnées MIDI
+     * ✅ FIX Bug #5: Parallélise le chargement avec batching
      * Appelle midi.load pour chaque fichier .mid/.midi
      * @param {Array} files - Liste des fichiers
      * @returns {Promise<Array>} Fichiers enrichis
      */
     async enrichFilesWithMetadata(files) {
+        const BATCH_SIZE = 5; // ✅ FIX Bug #5: Limite de 5 requêtes simultanées
+
+        // Séparer les fichiers MIDI des autres
+        const midiFiles = [];
         const enrichedFiles = [];
 
-        for (const file of files) {
-            const enrichedFile = { ...file };
-
-            // Ne traiter que les fichiers MIDI
+        files.forEach((file, index) => {
             const isMidiFile = file.name && (
                 file.name.toLowerCase().endsWith('.mid') ||
                 file.name.toLowerCase().endsWith('.midi')
             );
 
             if (isMidiFile) {
+                midiFiles.push({ ...file, originalIndex: index });
+            } else {
+                enrichedFiles[index] = { ...file };
+            }
+        });
+
+        // ✅ FIX Bug #5: Traiter par batches parallèles
+        for (let i = 0; i < midiFiles.length; i += BATCH_SIZE) {
+            const batch = midiFiles.slice(i, i + BATCH_SIZE);
+
+            const batchResults = await Promise.all(batch.map(async (file) => {
+                const enrichedFile = { ...file };
+
                 try {
-                    // Charger les métadonnées via midi.convert (via loadMidi wrapper)
                     const filePath = file.path || file.name;
                     this.log('debug', 'FileController', `Enriching metadata for: ${filePath}`);
                     const midiData = await this.backend.loadMidi(filePath);
@@ -189,7 +203,6 @@ class FileController extends BaseController {
                     if (midiData && midiData.midi_json) {
                         const json = midiData.midi_json;
 
-                        // Extraire durée et nombre de pistes
                         enrichedFile.duration = json.duration || 0;
                         enrichedFile.tracks = json.tracks ? json.tracks.length : 0;
                         enrichedFile.tempo = json.tempo || 120;
@@ -199,16 +212,21 @@ class FileController extends BaseController {
                             `Enriched ${file.name}: ${enrichedFile.duration}s, ${enrichedFile.tracks} tracks`);
                     }
                 } catch (error) {
-                    // Si erreur, continuer avec les données de base
                     this.log('warn', 'FileController',
                         `Failed to enrich ${file.name}: ${error.message || error}`);
                 }
-            }
 
-            enrichedFiles.push(enrichedFile);
+                return enrichedFile;
+            }));
+
+            // Réinsérer les fichiers enrichis aux bons indices
+            batchResults.forEach((enrichedFile) => {
+                enrichedFiles[enrichedFile.originalIndex] = enrichedFile;
+            });
         }
 
-        return enrichedFiles;
+        // Retourner le tableau complet dans l'ordre original
+        return enrichedFiles.filter(f => f !== undefined);
     }
 
     /**

@@ -318,24 +318,36 @@ class HomeController extends BaseController {
         // ========================================================================
         // EVENEMENTS PLAYLIST
         // ========================================================================
-        
+
+        // ✅ FIX Bug #16: Handler pour lecture playlist depuis HomeView
+        this.subscribe('home:play_playlist_requested', async (data) => {
+            this.logInfo( 'Play playlist requested:', data.playlist_id);
+            await this.playPlaylistFromHome(data.playlist_id);
+        });
+
+        // ✅ FIX Bug #17: Handler pour chargement playlist depuis HomeView
+        this.subscribe('home:load_playlist_requested', async (data) => {
+            this.logInfo( 'Load playlist requested:', data.playlist_id);
+            await this.loadPlaylistFromHome(data.playlist_id);
+        });
+
         this.subscribe('playlist:changed', (data) => {
             if (data.file && data.file.fileId) {
                 this.loadFile(data.file.fileId);
             }
         });
-        
+
         this.subscribe('playlist:loaded', (data) => {
             this.logInfo( 'Playlist loaded:', data.playlist?.name);
-            
+
             if (this.view && this.view.updatePlaylistInfo) {
                 this.view.updatePlaylistInfo(data.playlist);
             }
         });
-        
+
         this.subscribe('playlist:next', (data) => {
             this.logInfo( 'Playlist next:', data.file?.name);
-            
+
             // Auto-charger le fichier suivant si en lecture
             if (this.isPlaying && data.file) {
                 const fileId = typeof data.file === 'string' ? data.file : data.file.id;
@@ -1351,7 +1363,104 @@ class HomeController extends BaseController {
             this.showNotification('Erreur lors de la création');
         }
     }
-    
+
+    /**
+     * ✅ FIX Bug #16: Lit une playlist depuis HomeView
+     * @param {string} playlistId - ID de la playlist
+     */
+    async playPlaylistFromHome(playlistId) {
+        this.logInfo( `Play playlist from home: ${playlistId}`);
+
+        if (!this.playlistController) {
+            this.showWarning('PlaylistController not available');
+            return;
+        }
+
+        try {
+            // Charger la playlist
+            let playlist = null;
+
+            if (this.playlistController.loadPlaylist) {
+                playlist = await this.playlistController.loadPlaylist(playlistId);
+            } else if (this.playlistModel && this.playlistModel.getPlaylist) {
+                playlist = this.playlistModel.getPlaylist(playlistId);
+            }
+
+            if (!playlist) {
+                this.showWarning('Playlist introuvable');
+                return;
+            }
+
+            this.logInfo( `Playlist loaded: ${playlist.name}`);
+
+            // Si la playlist a des fichiers, charger et lire le premier
+            if (playlist.files && playlist.files.length > 0) {
+                const firstFile = playlist.files[0];
+                const firstFileId = typeof firstFile === 'string' ? firstFile : (firstFile.id || firstFile.fileId);
+
+                // Charger le fichier
+                await this.loadFile(firstFileId);
+
+                // Lancer la lecture
+                await this.play();
+
+                this.showSuccess(`Lecture de "${playlist.name}"`);
+            } else {
+                this.showInfo('Playlist vide');
+            }
+        } catch (error) {
+            this.handleError('Play playlist from home failed', error);
+            this.showNotification('Erreur lors de la lecture de la playlist');
+        }
+    }
+
+    /**
+     * ✅ FIX Bug #17: Charge une playlist depuis HomeView
+     * @param {string} playlistId - ID de la playlist
+     */
+    async loadPlaylistFromHome(playlistId) {
+        this.logInfo( `Load playlist from home: ${playlistId}`);
+
+        if (!this.playlistController) {
+            this.showWarning('PlaylistController not available');
+            return;
+        }
+
+        try {
+            // Charger la playlist
+            let playlist = null;
+
+            if (this.playlistController.loadPlaylist) {
+                playlist = await this.playlistController.loadPlaylist(playlistId);
+            } else if (this.playlistModel && this.playlistModel.getPlaylist) {
+                playlist = this.playlistModel.getPlaylist(playlistId);
+            }
+
+            if (!playlist) {
+                this.showWarning('Playlist introuvable');
+                return;
+            }
+
+            this.logInfo( `Playlist loaded: ${playlist.name}`);
+
+            // Si la playlist a des fichiers, charger le premier
+            if (playlist.files && playlist.files.length > 0) {
+                const firstFile = playlist.files[0];
+                const firstFileId = typeof firstFile === 'string' ? firstFile : (firstFile.id || firstFile.fileId);
+
+                // Charger le fichier dans le player
+                await this.loadFile(firstFileId);
+
+                this.showSuccess(`Playlist "${playlist.name}" chargée (${playlist.files.length} morceaux)`);
+            } else {
+                this.showInfo('Playlist vide');
+            }
+        } catch (error) {
+            this.handleError('Load playlist from home failed', error);
+            this.showNotification('Erreur lors du chargement de la playlist');
+        }
+    }
+
     // ========================================================================
     // VISUALISATION & CANAUX
     // ========================================================================
@@ -1400,34 +1509,57 @@ class HomeController extends BaseController {
     // ========================================================================
     
     /**
-     * Démarre le timer de progression
+     * ✅ FIX Bug #13 & #14: Démarre le timer de progression
+     * - Réduit fréquence à 250ms au lieu de 100ms (Bug #13)
+     * - Synchronise avec backend au lieu d'incrémentation locale (Bug #14)
      */
     startProgressTimer() {
         this.stopProgressTimer();
-        
-        this.playbackTimer = setInterval(() => {
-            this.currentTime += 100; // Incrément de 100ms
-            this.homeState.currentTime += 100;
-            
+
+        this.playbackTimer = setInterval(async () => {
+            // ✅ FIX Bug #14: Récupérer position depuis le backend
+            if (this.backend) {
+                try {
+                    // Tenter de récupérer la position réelle
+                    const status = await this.backend.sendCommand('playback.getStatus', {});
+                    if (status && status.data && status.data.position !== undefined) {
+                        this.currentTime = status.data.position;
+                        this.homeState.currentTime = status.data.position;
+                    } else {
+                        // Fallback: incrémenter localement si backend ne répond pas
+                        this.currentTime += 250;
+                        this.homeState.currentTime += 250;
+                    }
+                } catch (error) {
+                    // En cas d'erreur, incrémenter localement
+                    this.currentTime += 250;
+                    this.homeState.currentTime += 250;
+                }
+            } else {
+                // Pas de backend: incrémenter localement
+                this.currentTime += 250;
+                this.homeState.currentTime += 250;
+            }
+
             if (this.currentFile) {
                 if (this.view && this.view.updateProgress) {
                     this.view.updateProgress(this.currentTime, this.currentFile.duration);
                 }
-                
+
                 // Mettre à jour les notes à venir
                 const upcomingNotes = this.getUpcomingNotes(this.currentTime);
                 if (this.view && this.view.updateNotePreview) {
                     this.view.updateNotePreview(upcomingNotes);
                 }
             }
-            
+
             // Arrêter si on dépasse la durée
             if (this.currentFile && this.currentTime >= this.currentFile.duration) {
                 this.onPlaybackEnded();
             }
-        }, 100);
-        
-        this.logInfo( 'Progress timer started');
+        }, 250);  // ✅ FIX Bug #13: 250ms au lieu de 100ms (4 FPS au lieu de 10 FPS)
+
+        this.logInfo( 'Progress timer started (250ms interval)');
     }
     
     /**

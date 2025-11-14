@@ -69,6 +69,10 @@ class HomeView extends BaseView {
             return;
         }
 
+        // ✅ FIX Bug #1: Set initialized flag IMMEDIATELY to prevent race conditions
+        // This must be done BEFORE any async operations or long-running tasks
+        this.state.initialized = true;
+
         this.logger.info('[HomeView] 🔵 Starting init...');
 
         this.logger.info('[HomeView] 🔵 Calling render()...');
@@ -92,8 +96,7 @@ class HomeView extends BaseView {
         // this.loadPlaylists();
         // this.loadDevices();
 
-        // ✅ FIX v4.3.0: CRITIQUE - Marquer comme initialisé pour éviter double initialisation
-        this.state.initialized = true;
+        // Mark as rendered after initialization completes
         this.state.rendered = true;
 
         this.logger.info('[HomeView] ✅ Initialized v4.3.2');
@@ -436,12 +439,17 @@ class HomeView extends BaseView {
     }
 
     renderFileItem(file) {
-        const isActive = this.state.currentFile && 
-                        (this.state.currentFile.path === file.path || 
+        const isActive = this.state.currentFile &&
+                        (this.state.currentFile.path === file.path ||
                          this.state.currentFile.name === file.name);
-        
-        const duration = file.duration ? this.formatDuration(file.duration) : '—';
-        const size = file.size ? this.formatFileSize(file.size) : '—';
+
+        // ✅ FIX Bug #2: Show loading state instead of placeholder for missing metadata
+        const duration = file.duration
+            ? this.formatDuration(file.duration)
+            : '<span class="metadata-loading" title="Chargement...">⏳</span>';
+        const size = file.size
+            ? this.formatFileSize(file.size)
+            : '<span class="metadata-loading" title="Chargement...">⏳</span>';
         
         return `
             <div class="file-item ${isActive ? 'active' : ''}" 
@@ -709,25 +717,29 @@ class HomeView extends BaseView {
 
     async playFile(file) {
         if (!this.eventBus) return;
-        
+
         try {
-            this.eventBus.emit('home:play_file_requested', { 
-                file_path: file.path || file.name 
+            this.eventBus.emit('home:play_file_requested', {
+                file_path: file.path || file.name
             });
         } catch (error) {
             this.logger.error('[HomeView] Play file error:', error);
+            // ✅ FIX Bug #3: Provide user feedback on error
+            this.showError(`Impossible de lire le fichier: ${error.message || 'Erreur inconnue'}`);
         }
     }
 
     async loadFile(file) {
         if (!this.eventBus) return;
-        
+
         try {
-            this.eventBus.emit('home:load_file_requested', { 
-                file_path: file.path || file.name 
+            this.eventBus.emit('home:load_file_requested', {
+                file_path: file.path || file.name
             });
         } catch (error) {
             this.logger.error('[HomeView] Load file error:', error);
+            // ✅ FIX Bug #3: Provide user feedback on error
+            this.showError(`Impossible de charger le fichier: ${error.message || 'Erreur inconnue'}`);
         }
     }
 
@@ -783,25 +795,29 @@ class HomeView extends BaseView {
 
     async playPlaylist(playlist) {
         if (!this.eventBus) return;
-        
+
         try {
-            this.eventBus.emit('home:play_playlist_requested', { 
-                playlist_id: playlist.id 
+            this.eventBus.emit('home:play_playlist_requested', {
+                playlist_id: playlist.id
             });
         } catch (error) {
             this.logger.error('[HomeView] Play playlist error:', error);
+            // ✅ FIX Bug #3: Provide user feedback on error
+            this.showError(`Impossible de lire la playlist: ${error.message || 'Erreur inconnue'}`);
         }
     }
 
     async loadPlaylist(playlist) {
         if (!this.eventBus) return;
-        
+
         try {
-            this.eventBus.emit('home:load_playlist_requested', { 
-                playlist_id: playlist.id 
+            this.eventBus.emit('home:load_playlist_requested', {
+                playlist_id: playlist.id
             });
         } catch (error) {
             this.logger.error('[HomeView] Load playlist error:', error);
+            // ✅ FIX Bug #3: Provide user feedback on error
+            this.showError(`Impossible de charger la playlist: ${error.message || 'Erreur inconnue'}`);
         }
     }
 
@@ -1104,6 +1120,16 @@ class HomeView extends BaseView {
             this.midiFileNotes.loaded = true;
 
             this.logger.info(`[HomeView] Loaded ${allNotes.length} notes from ${this.midiFileNotes.channels.size} channels`);
+
+            // ✅ FIX Bug #15: Show initial note preview when file is loaded
+            // Display the first notes to make the preview feature discoverable
+            if (allNotes.length > 0) {
+                const firstNotes = allNotes
+                    .slice(0, 10)
+                    .sort((a, b) => a.time - b.time)
+                    .slice(0, 5);
+                this.updateNotePreview(firstNotes);
+            }
         } catch (error) {
             this.logger.error('[HomeView] Failed to load MIDI file into visualizer:', error);
         }
@@ -1220,6 +1246,30 @@ class HomeView extends BaseView {
             cancelAnimationFrame(this.visualizerAnimationId);
             this.visualizerAnimationId = null;
         }
+    }
+
+    // ========================================================================
+    // ERROR HANDLING
+    // ========================================================================
+
+    /**
+     * ✅ FIX Bug #3: Display error message to user
+     * @param {string} message - Error message to display
+     */
+    showError(message) {
+        this.logger.error(`[HomeView] ${message}`);
+        // Use alert for immediate user feedback
+        // TODO: Replace with a proper notification system if available
+        alert(`❌ Erreur: ${message}`);
+    }
+
+    /**
+     * Display warning message to user
+     * @param {string} message - Warning message to display
+     */
+    showWarning(message) {
+        this.logger.warn(`[HomeView] ${message}`);
+        alert(`⚠️ Attention: ${message}`);
     }
 
     // ========================================================================
