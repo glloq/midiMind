@@ -161,30 +161,8 @@ class HomeView extends BaseView {
                             <span class="active-channels">0 canaux</span>
                         </div>
                     </div>
-                    
-                    <!-- Statistiques -->
-                    <div class="home-stats" id="homeStats">
-                        <div class="stat-item">
-                            <span class="stat-label">Fichiers</span>
-                            <span class="stat-value" data-stat="files">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Durée totale</span>
-                            <span class="stat-value" data-stat="duration">0:00</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Taille</span>
-                            <span class="stat-value" data-stat="size">0 MB</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="home-progress-bar" id="homeProgressBar" style="display: none;">
-                        <div class="progress-fill" id="homeProgressFill"></div>
-                        <div class="progress-time" id="homeProgressTime">0:00 / 0:00</div>
-                    </div>
-                    
-                    <!-- Aperçu des notes à venir -->
+
+                    <!-- Aperçu des notes à venir (Piano Roll) -->
                     <div class="home-note-preview" id="homeNotePreview" style="display: none;">
                         <!-- Généré dynamiquement -->
                     </div>
@@ -198,31 +176,20 @@ class HomeView extends BaseView {
             // Tabs
             tabFiles: this.container.querySelector('[data-mode="files"]'),
             tabPlaylists: this.container.querySelector('[data-mode="playlists"]'),
-            
+
             // Listes
             filesList: document.getElementById('homeFilesList'),
             playlistsList: document.getElementById('homePlaylistsList'),
-            
+
             // Devices
             devicesList: document.getElementById('homeActiveDevices'),
             btnMuteAll: document.getElementById('homeBtnMuteAll'),
-            
+
             // Visualizer
             visualizerCanvas: document.getElementById('homeVisualizerCanvas'),
             visualizerInfo: document.getElementById('homeVisualizerInfo'),
-            
-            // Stats
-            stats: document.getElementById('homeStats'),
-            statFiles: document.querySelector('[data-stat="files"]'),
-            statDuration: document.querySelector('[data-stat="duration"]'),
-            statSize: document.querySelector('[data-stat="size"]'),
-            
-            // Progress
-            progressBar: document.getElementById('homeProgressBar'),
-            progressFill: document.getElementById('homeProgressFill'),
-            progressTime: document.getElementById('homeProgressTime'),
-            
-            // Note preview
+
+            // Note preview (Piano Roll)
             notePreview: document.getElementById('homeNotePreview')
         };
     }
@@ -574,60 +541,36 @@ class HomeView extends BaseView {
     }
 
     // ========================================================================
-    // STATISTIQUES
+    // STATISTIQUES - REMOVED (now in global header)
     // ========================================================================
 
-    // ✅ NOUVEAU: Méthode appelée par HomeController
+    // ✅ FIX: Method stub - stats are now displayed in global header
     updateStats(stats) {
         if (!stats) return;
-        
+
         this.state.stats = {
             ...this.state.stats,
             ...stats
         };
-        
-        // Mettre à jour l'affichage
-        if (this.elements.statFiles) {
-            this.elements.statFiles.textContent = stats.totalFiles || 0;
-        }
-        
-        if (this.elements.statDuration && stats.totalDuration) {
-            this.elements.statDuration.textContent = this.formatDuration(stats.totalDuration);
-        }
-        
-        if (this.elements.statSize && stats.totalSize) {
-            this.elements.statSize.textContent = this.formatFileSize(stats.totalSize);
-        }
+
+        // Stats are now displayed in the global playback header
+        // No need to update DOM here
     }
 
     // ========================================================================
-    // PROGRESSION
+    // PROGRESSION - REMOVED (now in global header)
     // ========================================================================
 
-    // ✅ NOUVEAU: Méthode appelée par HomeController
+    // ✅ FIX: Method stub - progress is now displayed in global header
     updateProgress(currentTime, duration) {
-        if (!this.elements.progressBar || !this.elements.progressFill || !this.elements.progressTime) {
-            return;
-        }
-        
-        // Afficher la barre
-        this.elements.progressBar.style.display = 'block';
-        
-        // Calculer le pourcentage
-        const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
-        this.elements.progressFill.style.width = `${percent}%`;
-        
-        // Mettre à jour le temps
-        const current = this.formatDuration(currentTime / 1000);
-        const total = this.formatDuration(duration / 1000);
-        this.elements.progressTime.textContent = `${current} / ${total}`;
+        // Progress is now displayed in the global playback header
+        // No need to update DOM here
     }
 
-    // ✅ NOUVEAU: Méthode appelée par HomeController
+    // ✅ FIX: Method stub - progress is now displayed in global header
     hideProgress() {
-        if (this.elements.progressBar) {
-            this.elements.progressBar.style.display = 'none';
-        }
+        // Progress is now displayed in the global playback header
+        // No need to update DOM here
     }
 
     // ========================================================================
