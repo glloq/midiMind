@@ -13,6 +13,7 @@
 #include "../../core/TimeUtils.h"
 #include "../../events/Events.h"
 #include "../sysex/SysExHandler.h"
+#include "../sysex/SysExParser.h"
 #include "../sysex/MidiManufacturers.h"
 #include <algorithm>
 #include <chrono>
@@ -61,13 +62,13 @@ MidiDeviceManager::MidiDeviceManager(std::shared_ptr<EventBus> eventBus)
 
         // Publish event if EventBus available
         if (eventBus_) {
-            json payload = {
-                {"deviceId", deviceId},
-                {"manufacturer", manufacturer},
-                {"model", model},
-                {"version", version}
-            };
-            eventBus_->publish({"device", "identified"}, payload);
+            eventBus_->publish(events::DeviceIdentifiedEvent(
+                deviceId,
+                manufacturer,
+                model,
+                version,
+                TimeUtils::nowNanos()
+            ));
         }
     });
 

@@ -114,6 +114,30 @@ struct DeviceDisconnectedEvent {
     {}
 };
 
+/**
+ * @struct DeviceIdentifiedEvent
+ * @brief Event published when a device is identified via SysEx Identity Reply
+ */
+struct DeviceIdentifiedEvent {
+    std::string deviceId;
+    std::string manufacturer;
+    std::string model;
+    std::string version;
+    uint64_t timestamp;
+
+    DeviceIdentifiedEvent(const std::string& id,
+                         const std::string& mfr,
+                         const std::string& mdl,
+                         const std::string& ver,
+                         uint64_t ts)
+        : deviceId(id)
+        , manufacturer(mfr)
+        , model(mdl)
+        , version(ver)
+        , timestamp(ts)
+    {}
+};
+
 // ============================================================================
 // PLAYBACK EVENTS
 // ============================================================================
