@@ -742,7 +742,7 @@ class BackendService {
         }
     }
     async saveMidi(filepath, data) { return this.sendCommand('midi.save', { filepath, data }); }
-    async importMidi(filepath) { return this.sendCommand('midi.import', { filepath }); }
+    async importMidi(filename, content, base64 = true) { return this.sendCommand('midi.import', { filename, content, base64 }); }
     
     /**
      * ✅ v4.4.2: Upload File object (wrapper pour importMidi)
