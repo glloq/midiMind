@@ -67,7 +67,7 @@ MidiDeviceManager::MidiDeviceManager(std::shared_ptr<EventBus> eventBus)
                 manufacturer,
                 model,
                 version,
-                TimeUtils::nowNanos()
+                TimeUtils::systemNow()
             ));
         }
     });
