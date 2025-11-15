@@ -327,6 +327,9 @@ private:
     
     /// EventBus for publishing events
     std::shared_ptr<EventBus> eventBus_;
+
+    /// SysEx handler for device identification
+    std::shared_ptr<class SysExHandler> sysexHandler_;
 };
 
 } // namespace midiMind

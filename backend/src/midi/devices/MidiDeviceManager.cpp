@@ -12,6 +12,8 @@
 #include "../../core/EventBus.h"
 #include "../../core/TimeUtils.h"
 #include "../../events/Events.h"
+#include "../sysex/SysExHandler.h"
+#include "../sysex/MidiManufacturers.h"
 #include <algorithm>
 #include <chrono>
 #include <thread>
@@ -26,8 +28,50 @@ namespace midiMind {
 
 MidiDeviceManager::MidiDeviceManager(std::shared_ptr<EventBus> eventBus)
     : eventBus_(eventBus)
+    , sysexHandler_(std::make_shared<SysExHandler>())
 {
-    Logger::info("MidiDeviceManager", "Initializing MidiDeviceManager v4.2.0 (EventBus + BLE)");
+    Logger::info("MidiDeviceManager", "Initializing MidiDeviceManager v4.2.0 (EventBus + BLE + SysEx)");
+
+    // Configure SysEx handler callback for device identification
+    sysexHandler_->setOnDeviceIdentified([this](const std::string& deviceId, const DeviceIdentity& identity) {
+        std::string manufacturer = MidiManufacturers::getName(identity.manufacturerId);
+        std::string model = "Family:" + std::to_string(identity.familyCode) +
+                          " Model:" + std::to_string(identity.modelNumber);
+        std::string version = std::to_string(identity.versionMajor) + "." +
+                            std::to_string(identity.versionMinor) + "." +
+                            std::to_string(identity.versionPatch);
+
+        Logger::info("MidiDeviceManager",
+                    "Device identified: " + deviceId +
+                    " - " + manufacturer + " " + model +
+                    " v" + version);
+
+        // Update device info in available devices list
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (auto& info : availableDevices_) {
+                if (info.id == deviceId) {
+                    info.manufacturer = manufacturer;
+                    info.model = model;
+                    info.version = version;
+                    break;
+                }
+            }
+        }
+
+        // Publish event if EventBus available
+        if (eventBus_) {
+            json payload = {
+                {"deviceId", deviceId},
+                {"manufacturer", manufacturer},
+                {"model", model},
+                {"version", version}
+            };
+            eventBus_->publish({"device", "identified"}, payload);
+        }
+    });
+
+    Logger::info("MidiDeviceManager", "SysEx auto-identification enabled");
 }
 
 MidiDeviceManager::~MidiDeviceManager() {
@@ -129,10 +173,20 @@ bool MidiDeviceManager::connect(const std::string& deviceId) {
         deviceName = device->getName();
         deviceType = device->getType();
         devices_.push_back(device);
-        
+
         Logger::info("MidiDeviceManager", "✅ Device connected: " + deviceName);
+
+        // Request device identity for auto-identification (USB devices only for now)
+        if (deviceType == DeviceType::USB) {
+            Logger::debug("MidiDeviceManager", "Requesting identity from: " + deviceName);
+            std::thread([device]() {
+                // Small delay to let device stabilize
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                device->requestIdentity();
+            }).detach();
+        }
     }
-    
+
     std::function<void(const std::string&)> callback;
     {
         std::lock_guard<std::mutex> lock(callbackMutex_);
@@ -1067,8 +1121,12 @@ std::shared_ptr<MidiDevice> MidiDeviceManager::createDevice(const MidiDeviceInfo
                 
                 int client = std::stoi(info.port.substr(0, colonPos));
                 int port = std::stoi(info.port.substr(colonPos + 1));
-                
+
                 auto device = std::make_shared<UsbMidiDevice>(info.id, info.name, client, port);
+
+                // Inject SysEx handler for auto-identification
+                device->setSysExHandler(sysexHandler_);
+
                 Logger::info("MidiDeviceManager", "✅ Created USB device: " + info.name);
                 return device;
 #else
