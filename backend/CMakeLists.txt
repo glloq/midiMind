@@ -79,6 +79,7 @@ set(ALL_SOURCES
     src/midi/processing/ProcessorManager.cpp
     src/midi/sysex/SysExHandler.cpp
     src/midi/sysex/SysExParser.cpp
+    src/midi/sysex/MidiManufacturers.cpp
     src/api/ApiServer.cpp
     src/api/CommandHandler.cpp
     src/api/MessageEnvelope.cpp
